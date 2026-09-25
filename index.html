@@ -4,91 +4,181 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Druck-Konfigurator</title>
 <link rel="stylesheet" href="css/app.css">
-<link rel="stylesheet" href="css/panel.css">
 </head>
-<body>
-<div class="app" id="app">
-<aside id="panel" aria-label="Druck-Konfigurator">
-<h1 id="mainTitle">Druck-Konfigurator</h1>
-<p class="muted lead">Drucker, Filament und Düse wählen, STL laden, Startprofil erhalten. Eigene Erfahrungswerte lassen sich speichern und teilen. Alles läuft lokal im Browser.</p>
-<div class="card noprint"><h2>Modell laden</h2>
-<div id="drop" class="drop" tabindex="0" role="button" aria-label="STL-Datei auswählen"><b>STL hier hineinziehen</b><br><span class="muted">oder klicken und Datei auswählen</span><input id="file" type="file" accept=".stl,.3mf"></div>
-<div id="fileinfo" class="fileinfo">Noch keine Datei geladen.</div>
-<button class="btn" id="clear" type="button">Datei entfernen</button>
-</div>
-<div class="card"><h2>Auswahl</h2>
-<div class="field"><label for="printer">Drucker</label><select id="printer"><option value="kobra_s1">Anycubic Kobra S1 Combo</option><option value="snapmaker_u1">Snapmaker U1</option></select></div>
-<div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
-<div class="btnrow noprint" style="gap:16px"><button class="linkbtn" id="editMat" type="button">✎ Werte anpassen</button><button class="linkbtn" id="newMat" type="button">＋ Neues Filament</button></div></div>
-<div class="field"><label>Düse <span class="help" id="nozHelp" title="Weicht deine Düse vom Referenzprofil ab, rechnet das Programm Temperatur, Volumenstrom, Schichthöhe und Linienbreite um.">?</span></label>
-<div class="row2"><select id="nozD" aria-label="Düsendurchmesser"><option value="0.25">0,25 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
-<select id="nozM" aria-label="Düsenmaterial"></select></div></div>
-<div class="field"><label for="object">Objekt</label><select id="object">
-<option value="general">Funktionsteil</option>
-<option value="holder">Halterung / Befestigung</option>
-<option value="precision">Präzisionsteil (Passungen, Maße)</option>
-<option value="thin">Dünnwandiges Gehäuse</option>
-<option value="decor">Dekoration / Figur</option>
-<option value="overhang">Viele Überhänge / Freiform</option>
-<option value="multicolor">Mehrfarbig / Gravur</option>
-<option value="tire">Reifen / Rad (TPU)</option>
-<option value="dumpling">Quetschbares Spielzeug (TPU)</option>
-<option value="case">Handyhülle / flexible Hülle (TPU)</option></select></div>
-<div class="field"><label for="goal">Priorität</label><select id="goal"><option value="balanced">Ausgewogen</option><option value="quality">Hohe Qualität</option><option value="fast">Schneller Druck</option><option value="strong">Maximale Stabilität</option></select></div>
-<div class="field"><label for="load">Belastung</label><select id="load"><option value="medium">Mittel</option><option value="low">Gering</option><option value="high">Hoch</option></select></div>
-<div class="field"><label for="support">Support</label><select id="support"><option value="auto">Automatisch entscheiden</option><option value="avoid">Möglichst vermeiden</option><option value="allow">Support erlaubt</option></select></div>
-<div class="field"><label for="supportLevel">Stützreduzierung <span class="help" title="Wirkt nur, wenn Stützen nötig sind. Weniger Stützen sparen Material, erhöhen aber das Risiko für Durchhängen.">?</span></label><select id="supportLevel"><option value="safe">Stark und sicher</option><option value="balanced" selected>Ausgewogen</option><option value="reduced">Stark reduziert</option><option value="minimal">Minimal – gerade noch haltend</option></select></div>
-</div>
-<div class="card"><h2 id="title">Empfohlenes Startprofil</h2><div id="summary" class="muted"></div><div id="settings"></div>
-<div class="program-order"><h3 id="orderedTitle">Einstellungen in Slicer-Reihenfolge</h3><p class="muted" id="orderedIntro"></p><div id="orderedSettings"></div></div>
-<div id="danger" class="note bad"></div><div id="warning" class="note"></div><div id="checks" class="note ok"></div><div id="supportGuide" class="supportbox"></div>
-<div class="btnrow noprint"><button class="btn" id="printBtn">Drucken / PDF speichern</button><button class="btn sec" id="copyBtn">Als Text kopieren</button></div></div>
+<body data-printer="kobra_s1" data-tab="settings">
 
-<div class="card"><h2>Stützparameter</h2><div id="supportParams"></div></div>
-<div class="card"><h2>OrcaSlicer-Import (JSON)</h2>
-<p class="muted" style="margin-top:0">Speichert zwei Dateien direkt in deinen Download-Ordner. In OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug ist ein Hardware-Profil deines Druckers und bleibt bewusst außen vor – den Wert oben manuell unter Printer Settings → Extruder eintragen.</p>
-<div id="orcaNote" class="note"></div>
-<div class="btnrow noprint"><button class="btn sec" id="orcaFilBtn" type="button">Filament-JSON speichern</button><button class="btn sec" id="orcaProcBtn" type="button">Process-JSON speichern</button></div>
-</div>
-<div class="card"><h2>Wichtig</h2><p class="muted">STL-Maße und Überhänge werden lokal im Browser ermittelt. 3MF-Dateien bitte im Slicer als STL exportieren. Nahtposition: sichtbare Außenflächen <b>Hinten</b>; runde Teile <b>Ausgerichtet</b> oder <b>Nächstgelegen</b>. Brücken, dünne Wände und die tatsächliche Kontaktfläche der Stützen immer zusätzlich in der Slicer-Vorschau prüfen – die Empfehlung ist eine Geometrie-Näherung und ersetzt die Vorschau nicht.</p><p class="muted">Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang.</p></div>
-<div class="card"><h2>Meine Erfahrungswerte</h2>
-<p class="muted" style="margin-top:0">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert.</p>
-<div id="myList" class="fileinfo"></div>
-<div class="btnrow noprint"><button class="btn sec" id="exportBtn" type="button">Exportieren</button><button class="btn sec" id="importBtn" type="button">Importieren</button><button class="btn sec" id="settingsBtn" type="button">Düsen-Umrechnung</button><input type="file" id="importFile" accept=".json,application/json" class="hidden"></div>
-<p class="muted" style="font-size:13px;margin-bottom:0">Export sichert deine Profile als Datei – zum Übertragen auf einen anderen Rechner oder zum Teilen mit anderen S1-Nutzern.</p>
-<div id="storeWarn" class="note bad hidden"></div>
-</div>
-<div class="note"><b>Automatik:</b> Filamentprofil = Temperatur, Lüfter, Rückzug und maximale Volumengeschwindigkeit. Prozessprofil = Wände, Schichten, Füllung und Druckgeschwindigkeit. Die Stützen-Entscheidung kommt aus der Überhanganalyse der geladenen STL.</div>
-<div class="card" style="margin-top:18px"><h2>Kurzhilfe</h2><p class="muted">Bewege den Mauszeiger über ein <span class="help" title="Kurzerklärung und typische Auswirkung">?</span> neben einem Parameter.</p><p class="muted"><b>Eigene Werte:</b> Druckst du mit anderer Temperatur, schneller oder langsamer, klicke bei „Filament“ auf <b>Werte anpassen</b>. Alle Empfehlungen rechnen danach mit deinen Werten. <b>Neues Filament</b> legt ein zusätzliches Profil an, z. B. für eine bestimmte Marke.</p></div>
-<footer class="muted">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen.</footer>
-</aside>
+<header class="topbar noprint">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Druck-<br>Konfigurator</span></div>
 
-<main id="stage" aria-label="3D-Ansicht">
-<div id="viewerEmpty">STL-Datei hier ablegen oder klicken zum Auswählen</div>
-<button id="panelToggle" class="hud noprint" type="button" title="Konfigurator ein-/ausblenden" aria-controls="panel" aria-expanded="true">☰</button>
-<div id="info" class="hud"></div>
-<div id="controls" class="hud">
-<button id="btnWireframe" type="button">Wireframe</button>
-<button id="btnAxes" type="button" class="active">Achsen</button>
-<button id="btnClip" type="button">Schnitt</button>
-<button id="btnMeasure" type="button">Messen</button>
+  <div class="machine" role="group" aria-label="Drucker und Düse">
+    <div class="printer-switch" role="radiogroup" aria-label="Drucker">
+      <button type="button" role="radio" data-printer="kobra_s1" aria-checked="true"><small>Anycubic</small>Kobra S1</button>
+      <button type="button" role="radio" data-printer="snapmaker_u1" aria-checked="false" tabindex="-1"><small>Snapmaker</small>U1</button>
+    </div>
+    <select id="printer" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="kobra_s1">Anycubic Kobra S1 Combo</option><option value="snapmaker_u1">Snapmaker U1</option></select>
+    <div class="nozzle"><span>Düse <span class="help" id="nozHelp" title="Weicht deine Düse vom Referenzprofil ab, rechnet das Programm Temperatur, Volumenstrom, Schichthöhe und Linienbreite um.">?</span></span>
+      <span class="nozzle-row">
+        <select id="nozD" aria-label="Düsendurchmesser"><option value="0.25">0,25 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
+        <select id="nozM" aria-label="Düsenmaterial"></select>
+      </span>
+    </div>
+  </div>
+
+  <nav class="menus" aria-label="Menü">
+    <div class="menu">
+      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuDatei">Datei</button>
+      <div class="menu-list" role="menu" id="menuDatei">
+        <button type="button" role="menuitem" data-action="open">STL öffnen …</button>
+        <button type="button" role="menuitem" id="clear">Modell entfernen</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuProfile">Profile</button>
+      <div class="menu-list" role="menu" id="menuProfile">
+        <button type="button" role="menuitem" id="editMat">Filamentwerte anpassen …</button>
+        <button type="button" role="menuitem" id="newMat">Neues Filament …</button>
+        <button type="button" role="menuitem" data-action="profiles">Meine Profile …</button>
+        <hr>
+        <button type="button" role="menuitem" id="importBtn">Profile importieren …</button>
+        <button type="button" role="menuitem" id="exportBtn" data-toast="Profile als Datei gespeichert">Profile exportieren</button>
+        <hr>
+        <button type="button" role="menuitem" id="settingsBtn">Düsen-Umrechnung …</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuExport">Export</button>
+      <div class="menu-list" role="menu" id="menuExport">
+        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer <small>kommt in Schritt 2</small></button>
+        <hr>
+        <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON</button>
+        <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON</button>
+        <hr>
+        <button type="button" role="menuitem" id="printBtn">Drucken / PDF …</button>
+        <button type="button" role="menuitem" id="copyBtn">Als Text kopieren</button>
+      </div>
+    </div>
+    <button type="button" class="menu-btn help-btn" data-action="help" aria-label="Hilfe">?</button>
+  </nav>
+</header>
+
+<div class="tabs noprint" role="tablist" aria-label="Ansicht">
+  <button type="button" role="tab" id="tabSettings" aria-controls="viewSettings" aria-selected="true">Einstellungen</button>
+  <button type="button" role="tab" id="tab3d" aria-controls="view3d" aria-selected="false">3D-Ansicht <span id="modelBadge" class="tab-badge hidden">Modell</span></button>
 </div>
-<div id="subControls" class="hud">
-<div id="clipPanel" class="hidden"><span>Achse:</span>
-<button id="clipAxisX" type="button" class="active">X</button><button id="clipAxisY" type="button">Y</button><button id="clipAxisZ" type="button">Z</button>
-<input type="range" id="clipSlider" min="-100" max="100" value="0" aria-label="Lage der Schnittebene"></div>
-<div id="measureLabel"></div>
-</div>
-<div id="ohBar" class="hud hidden">
-<div class="vbar"><label for="thresh">Überhangwinkel ≤ <span class="help-dark" title="Winkel von der Senkrechten. Flächen, die steiler überhängen als dieser Wert, werden rot markiert und zählen für die Stützen-Entscheidung. 45° ist ein sicherer Standard, 50–55° spart Stützen.">?</span></label><input type="range" id="thresh" min="30" max="70" value="45"><span class="val" id="threshVal">45°</span></div>
-<div class="stats" id="stats"><span>Breite X <b id="sx">–</b></span><span>Tiefe Y <b id="sy">–</b></span><span>Höhe Z <b id="sz">–</b></span><span>Volumen <b id="sv">–</b></span></div>
-<div class="legend" id="legend"><span><i style="background:#9aa8bc"></i>liegt auf dem Druckbett</span><span><i style="background:#3fa8f5"></i>unkritisch</span><span><i style="background:#f2b53d"></i>nahe am Grenzwinkel</span><span><i style="background:#e5514f"></i>über Grenzwinkel</span></div>
-<p id="ohInfo"></p>
-</div>
+
+<main>
+<section id="viewSettings" role="tabpanel" aria-labelledby="tabSettings" class="view">
+  <h1 id="mainTitle" class="print-only">Druck-Konfigurator</h1>
+  <div class="sheet">
+
+    <aside class="inputs" aria-label="Auswahl">
+      <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
+        <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div></div>
+      <div class="field"><label for="object">Objekt</label><select id="object">
+        <option value="general">Funktionsteil</option>
+        <option value="holder">Halterung / Befestigung</option>
+        <option value="precision">Präzisionsteil (Passungen, Maße)</option>
+        <option value="thin">Dünnwandiges Gehäuse</option>
+        <option value="decor">Dekoration / Figur</option>
+        <option value="overhang">Viele Überhänge / Freiform</option>
+        <option value="multicolor">Mehrfarbig / Gravur</option>
+        <option value="tire">Reifen / Rad (TPU)</option>
+        <option value="dumpling">Quetschbares Spielzeug (TPU)</option>
+        <option value="case">Handyhülle / flexible Hülle (TPU)</option></select></div>
+      <div class="field-pair">
+        <div class="field"><label for="goal">Priorität</label><select id="goal"><option value="balanced">Ausgewogen</option><option value="quality">Hohe Qualität</option><option value="fast">Schneller Druck</option><option value="strong">Maximale Stabilität</option></select></div>
+        <div class="field"><label for="load">Belastung</label><select id="load"><option value="medium">Mittel</option><option value="low">Gering</option><option value="high">Hoch</option></select></div>
+      </div>
+      <div class="field"><label for="support">Support</label><select id="support"><option value="auto">Automatisch entscheiden</option><option value="avoid">Möglichst vermeiden</option><option value="allow">Support erlaubt</option></select></div>
+      <div class="field"><label for="supportLevel">Stützreduzierung <span class="help" title="Wirkt nur, wenn Stützen nötig sind. Weniger Stützen sparen Material, erhöhen aber das Risiko für Durchhängen.">?</span></label><select id="supportLevel"><option value="safe">Stark und sicher</option><option value="balanced" selected>Ausgewogen</option><option value="reduced">Stark reduziert</option><option value="minimal">Minimal – gerade noch haltend</option></select></div>
+
+      <div class="model-card noprint" id="modelCard">
+        <div class="model-head"><span class="eyebrow">Modell</span><button class="linkbtn" type="button" data-action="open">STL öffnen</button></div>
+        <div id="fileinfo">Noch keine Datei geladen.</div>
+        <p class="oh-info muted"></p>
+        <p class="muted drop-hint">STL-Datei einfach ins Fenster ziehen.</p>
+      </div>
+      <div id="storeWarn" class="note bad hidden"></div>
+    </aside>
+
+    <article class="result" aria-labelledby="title">
+      <header class="result-head">
+        <span class="eyebrow" id="resultPrinter">Startprofil</span>
+        <h2 id="title">Empfohlenes Startprofil</h2>
+        <div id="summary" class="muted"></div>
+      </header>
+      <div id="danger" class="note bad"></div>
+      <div id="settings" class="spec"></div>
+      <div id="supportGuide" class="supportbox"></div>
+
+      <details class="fold" open>
+        <summary><span id="orderedTitle">Einstellungen in Slicer-Reihenfolge</span></summary>
+        <p class="muted" id="orderedIntro"></p><div id="orderedSettings"></div>
+      </details>
+      <details class="fold">
+        <summary>Stützparameter</summary>
+        <div id="supportParams"></div>
+      </details>
+      <details class="fold" id="hintsFold" open>
+        <summary>Hinweise</summary>
+        <div id="warning" class="note"></div><div id="checks" class="note ok"></div>
+      </details>
+      <details class="fold">
+        <summary>OrcaSlicer-Import (JSON)</summary>
+        <p class="muted">Über <b>Export → Filament-JSON / Process-JSON</b> speichern und in OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug ist ein Hardware-Profil deines Druckers und bleibt bewusst außen vor – den Wert oben manuell unter Printer Settings → Extruder eintragen.</p>
+        <div id="orcaNote" class="note"></div>
+      </details>
+    </article>
+  </div>
+  <p class="muted footnote">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen.</p>
+</section>
+
+<section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view" hidden>
+  <div id="stage">
+    <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL hier ablegen oder klicken zum Auswählen</small></div>
+    <div id="info" class="hud"></div>
+    <div id="controls" class="hud">
+      <button id="btnWireframe" type="button">Wireframe</button>
+      <button id="btnAxes" type="button" class="active">Achsen</button>
+      <button id="btnClip" type="button">Schnitt</button>
+      <button id="btnMeasure" type="button">Messen</button>
+    </div>
+    <div id="subControls" class="hud">
+      <div id="clipPanel" class="hidden"><span>Achse:</span>
+        <button id="clipAxisX" type="button" class="active">X</button><button id="clipAxisY" type="button">Y</button><button id="clipAxisZ" type="button">Z</button>
+        <input type="range" id="clipSlider" min="-100" max="100" value="0" aria-label="Lage der Schnittebene"></div>
+      <div id="measureLabel"></div>
+    </div>
+    <div id="ohBar" class="hud hidden">
+      <div class="vbar"><label for="thresh">Überhangwinkel ≤ <span class="help help-dark" title="Winkel von der Senkrechten. Flächen, die steiler überhängen als dieser Wert, werden rot markiert und zählen für die Stützen-Entscheidung. 45° ist ein sicherer Standard, 50–55° spart Stützen.">?</span></label><input type="range" id="thresh" min="30" max="70" value="45"><span class="val" id="threshVal">45°</span></div>
+      <div class="stats"><span>Breite X <b id="sx">–</b></span><span>Tiefe Y <b id="sy">–</b></span><span>Höhe Z <b id="sz">–</b></span><span>Volumen <b id="sv">–</b></span></div>
+      <div class="legend"><span><i style="background:#9aa8bc"></i>liegt auf dem Druckbett</span><span><i style="background:#3fa8f5"></i>unkritisch</span><span><i style="background:#f2b53d"></i>nahe am Grenzwinkel</span><span><i style="background:#e5514f"></i>über Grenzwinkel</span></div>
+      <p id="ohInfo" class="oh-info"></p>
+    </div>
+  </div>
+</section>
 </main>
-</div>
 
-<dialog id="editor"><div class="ed-head"><h2 id="edTitle">Werte anpassen</h2><div class="muted" id="edSub" style="font-size:13px;margin-top:4px"></div></div><div class="ed-body" id="edBody"></div><div class="ed-foot" id="edFoot"></div></dialog>
+<input id="file" type="file" accept=".stl,.3mf" class="hidden">
+<input type="file" id="importFile" accept=".json,application/json" class="hidden">
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+
+<dialog id="editor" aria-labelledby="edTitle"><div class="ed-head"><h2 id="edTitle">Werte anpassen</h2><div class="muted" id="edSub"></div></div><div class="ed-body" id="edBody"></div><div class="ed-foot" id="edFoot"></div></dialog>
+
+<dialog id="profilesDlg" aria-labelledby="profilesTitle"><div class="ed-head"><h2 id="profilesTitle">Meine Profile</h2><div class="muted">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert – über <b>Profile → Profile exportieren</b> sichern oder teilen.</div></div>
+  <div class="ed-body"><div id="myList"></div></div>
+  <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
+
+<dialog id="helpDlg" aria-labelledby="helpTitle"><div class="ed-head"><h2 id="helpTitle">Hilfe</h2></div>
+  <div class="ed-body prose">
+    <p><b>Automatik:</b> Filamentprofil = Temperatur, Lüfter, Rückzug und maximale Volumengeschwindigkeit. Prozessprofil = Wände, Schichten, Füllung und Druckgeschwindigkeit. Die Stützen-Entscheidung kommt aus der Überhanganalyse der geladenen STL.</p>
+    <p><b>Kurzhilfe:</b> Bewege den Mauszeiger über ein <span class="help">?</span> neben einem Parameter.</p>
+    <p><b>Eigene Werte:</b> Druckst du mit anderer Temperatur, schneller oder langsamer, klicke bei „Filament“ auf <b>Werte anpassen</b>. Alle Empfehlungen rechnen danach mit deinen Werten. <b>Neues Filament</b> legt ein zusätzliches Profil an, z. B. für eine bestimmte Marke.</p>
+    <p><b>Wichtig:</b> STL-Maße und Überhänge werden lokal im Browser ermittelt. 3MF-Dateien bitte im Slicer als STL exportieren. Nahtposition: sichtbare Außenflächen <b>Hinten</b>; runde Teile <b>Ausgerichtet</b> oder <b>Nächstgelegen</b>. Brücken, dünne Wände und die tatsächliche Kontaktfläche der Stützen immer zusätzlich in der Slicer-Vorschau prüfen – die Empfehlung ist eine Geometrie-Näherung und ersetzt die Vorschau nicht.</p>
+    <p>Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang.</p>
+  </div>
+  <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
 
 <script src="vendor/three.min.js"></script>
 <script src="vendor/OrbitControls.js"></script>

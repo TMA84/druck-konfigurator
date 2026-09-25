@@ -29,6 +29,14 @@ function currentInput(){
   return I;
 }
 
+// Kennwert-Kachel für die Übersicht; die ersten Zeilen (Temperaturen, Schichthöhe) sind hervorgehoben.
+const KEY_ROWS=['Düse','Heizbett','Schichthöhe / erste Schicht'];
+function specCell(x){
+  const h=helpFor(x[0],getMat($('material').value).kind);
+  return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])?' key':'')+'"><span class="k">'+esc(x[0])+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
+    '<span class="v">'+x[1]+'</span>'+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</div>';
+}
+
 function update(){
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
   const row=x=>rowHTML(x,r.m.kind);
@@ -38,7 +46,10 @@ function update(){
   $('orderedIntro').innerHTML='Die Bezeichnungen orientieren sich an '+esc(r.printer.slicer)+'. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.'+(r.printer.id==='snapmaker_u1'?' Genaue Feldbezeichnungen können in Snapmaker Orca leicht abweichen (OrcaSlicer-Basis, nicht im Detail geprüft).':'');
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
-  $('settings').innerHTML=r.rows.map(row).join('');
+  document.body.dataset.printer=r.printer.id;
+  document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
+  $('resultPrinter').textContent='Startprofil · '+r.printer.label;
+  $('settings').innerHTML=r.rows.map(specCell).join('');
   $('orderedSettings').innerHTML=r.ordered.map(g=>'<div class="order-group"><div class="order-title">'+g[0]+'</div><div class="order-body">'+g[1].map(row).join('')+'</div></div>').join('');
   $('title').textContent=r.m.name+' – '+r.ob.label+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
@@ -51,7 +62,7 @@ function update(){
   $('checks').innerHTML='<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse '+esc(r.nozLabel)+' · Bett reinigen · erste Schicht beobachten'+(r.dryNeed&&r.m.dry?' · '+esc(r.m.dry):'')+(geom?'<br>STL-Maße und Überhanganalyse ('+r.a.th+'°) wurden berücksichtigt.':'');
   $('supportGuide').innerHTML='<h3>Stützen-Empfehlung</h3><b>'+esc(r.sup)+'</b><br>'+esc(r.supNeed)+
     (r.supOn?'<br><br><b>So stellst du es in '+esc(r.printer.slicer)+' ein:</b><br>1. <i>Stützstrukturen aktivieren</i> einschalten.<br>2. <i>Typ: Baum (automatisch)</i> und <i>nur kritische Bereiche</i> aktivieren.<br>3. <i>Schwellenwinkel: '+r.sp.angle+'°</i>.<br>4. <i>Nur auf Druckplatte</i> zuerst testen; bei unerreichbaren Innenflächen deaktivieren.<br>5. Raft aus. Immer die Schichtvorschau prüfen.':'<br><br>Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.');
-  if(r.a){$('ohInfo').textContent=r.a.level==='none'?'Keine relevanten Überhänge über '+r.a.th+'° (Bodenfläche ausgenommen).':'Über '+r.a.th+'°: ca. '+de(r.a.flagged,0)+' mm² ('+de(r.a.ratio*100,1)+' % der Oberfläche, Bodenfläche ausgenommen).'}
+  if(r.a){const t=r.a.level==='none'?'Keine relevanten Überhänge über '+r.a.th+'° (Bodenfläche ausgenommen).':'Über '+r.a.th+'°: ca. '+de(r.a.flagged,0)+' mm² ('+de(r.a.ratio*100,1)+' % der Oberfläche, Bodenfläche ausgenommen).';document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=t})}
   const tpu=r.tpu,sp=r.sp;
   if(r.supOn){
     const p=[['Stützstrukturen','Aktivieren, nur kritische Bereiche'],['Typ','Baum (automatisch)'],['Schwellenwinkel',sp.angle+'°'],['Nur auf Druckplatte','zunächst aktivieren'],['Kleine Überhänge entfernen',sp.small],['Druckbasis/Raft','0 Schichten'],['Oberer Z-Abstand','0,20 mm'],['Unterer Z-Abstand',tpu?'0,25 mm':'0,20 mm'],['Wände um Stützstrukturen','0'],['Abstand Grundmuster',tpu?'3,0 mm':'2,5–3,0 mm'],['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Oberer Schnittstellenabstand',sp.gap],['Stützen/Objekt XY-Abstand',sp.xy],['Stützen/Objekt Abstand erste Schicht',tpu?'0,25 mm':'0,20 mm'],['Stützspitze','0,8 mm'],['Ast-Dichte',sp.density],['Astabstand',sp.branch],['Stützast-Durchmesser','2,0 mm']];
@@ -59,6 +70,7 @@ function update(){
   }else{
     $('supportParams').innerHTML='<p class="muted" style="margin:0">Für die aktuelle Auswahl'+(geom?' und dieses Modell':'')+' werden keine Stützen empfohlen. Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.</p>';
   }
+  if(typeof enhanceHelp==='function')enhanceHelp();
 }
 
 /* ================= AUSWAHLLISTE & MEINE WERTE ================= */

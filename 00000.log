@@ -1,0 +1,6 @@
+cli mode, Current OrcaSlicer Version 2.4.2
+Slic3r::CLI::run:2523, can not find system preset file: C:\Program Files\OrcaSlicer\resources/profiles/BBL/machine_full/Anycubic Kobra S1 0.4 nozzle.json 
+Slic3r::CLI::run:2545, can not find system preset file: C:\Program Files\OrcaSlicer\resources/profiles/BBL/process_full/0.20mm Standard @Anycubic Kobra S1 0.4 nozzle.json 
+no filament colors found in projects
+got warnings: The precise wall option will be ignored for outer-inner or inner-outer-inner wall sequences.
+SupportSpotsGenerator does not currently handle different materials properly, only first will be used

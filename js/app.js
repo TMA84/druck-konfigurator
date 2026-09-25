@@ -1,18 +1,16 @@
 'use strict';
-/* Start: Datei laden, Viewer-Bedienung, Panel ein-/ausblenden. */
+/* Start und Bedienrahmen: Datei laden, Menüs, Tabs, Druckerumschaltung, Viewer-Bedienung. */
 
-/* ================= FILE LOADING (aus v4) ================= */
-const drop=$('drop'), input=$('file'), stage=$('stage');
-function stop(e){e.preventDefault();e.stopPropagation()}
-['dragenter','dragover','dragleave','drop'].forEach(ev=>document.addEventListener(ev,stop));
-[[drop,'hover'],[stage,'dragover']].forEach(([el,cls])=>{
-  ['dragenter','dragover'].forEach(ev=>el.addEventListener(ev,e=>{stop(e);el.classList.add(cls)}));
-  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{stop(e);el.classList.remove(cls)}));
-  el.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)loadFile(f)});
+/* ================= DATEI LADEN (aus v4) ================= */
+const input=$('file');
+let dragDepth=0;
+['dragenter','dragover','dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation()}));
+document.addEventListener('dragenter',()=>{dragDepth++;document.body.classList.add('dragging')});
+document.addEventListener('dragleave',()=>{if(--dragDepth<=0){dragDepth=0;document.body.classList.remove('dragging')}});
+document.addEventListener('drop',e=>{
+  dragDepth=0;document.body.classList.remove('dragging');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)loadFile(f);
 });
-drop.addEventListener('click',()=>input.click());
-drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();input.click()}});
-$('viewerEmpty').addEventListener('click',()=>input.click());
 input.addEventListener('change',()=>{if(input.files[0])loadFile(input.files[0])});
 $('clear').addEventListener('click',()=>{input.value='';geom=null;$('fileinfo').textContent='Noch keine Datei geladen.';clearModel();update()});
 
@@ -33,6 +31,7 @@ function showModel(g){
   $('sx').textContent=de(g.x,1)+' mm';$('sy').textContent=de(g.y,1)+' mm';$('sz').textContent=de(g.z,1)+' mm';$('sv').textContent=de(g.vol/1000,1)+' cm³';
   $('info').textContent=g.name+'  —  '+de(g.x,1)+' × '+de(g.y,1)+' × '+de(g.z,1)+' mm  —  '+n.toLocaleString('de-DE')+' Dreiecke';
   $('ohBar').classList.remove('hidden');
+  $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');
   // Ohne Renderer bleibt der Hinweis „3D-Ansicht nicht verfügbar“ sichtbar (wie in v4).
   if(Viewer.show(g))$('viewerEmpty').classList.add('hidden');
   Viewer.colorize(+$('thresh').value);
@@ -40,11 +39,128 @@ function showModel(g){
 }
 function clearModel(){
   Viewer.clear();
-  $('ohBar').classList.add('hidden');$('ohInfo').textContent='';$('info').textContent='';
+  $('ohBar').classList.add('hidden');$('info').textContent='';
+  document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=''});
+  $('modelCard').classList.remove('loaded');$('modelBadge').classList.add('hidden');
   $('viewerEmpty').classList.remove('hidden');
 }
 
 $('thresh').addEventListener('input',()=>{$('threshVal').textContent=$('thresh').value+'°';Viewer.colorize(+$('thresh').value);update()});
+
+/* ================= DRUCKER-UMSCHALTUNG ================= */
+const printerButtons=[...document.querySelectorAll('.printer-switch [data-printer]')];
+function syncPrinterSwitch(){
+  printerButtons.forEach(b=>b.setAttribute('aria-checked',String(b.dataset.printer===$('printer').value)));
+}
+printerButtons.forEach(b=>b.addEventListener('click',()=>{
+  if($('printer').value===b.dataset.printer)return;
+  $('printer').value=b.dataset.printer;
+  $('printer').dispatchEvent(new Event('change'));
+  syncPrinterSwitch();
+}));
+// Pfeiltasten wechseln innerhalb der Radiogruppe
+document.querySelector('.printer-switch').addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight'].includes(e.key))return;
+  const i=printerButtons.findIndex(b=>b.getAttribute('aria-checked')==='true');
+  const next=printerButtons[(i+(e.key==='ArrowRight'?1:printerButtons.length-1))%printerButtons.length];
+  next.click();next.focus();
+});
+
+/* ================= MENÜS ================= */
+const menus=[...document.querySelectorAll('.menu')];
+function closeMenus(except){
+  menus.forEach(m=>{if(m===except)return;m.querySelector('.menu-list').classList.remove('open');m.querySelector('.menu-btn').setAttribute('aria-expanded','false')});
+}
+menus.forEach(m=>{
+  const btn=m.querySelector('.menu-btn'),list=m.querySelector('.menu-list');
+  btn.addEventListener('click',()=>{
+    const open=!list.classList.contains('open');
+    closeMenus(m);list.classList.toggle('open',open);btn.setAttribute('aria-expanded',String(open));
+    if(open){const first=list.querySelector('button:not(:disabled)');if(first)first.focus()}
+  });
+  list.addEventListener('keydown',e=>{
+    const items=[...list.querySelectorAll('button:not(:disabled)')],i=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(i+1)%items.length].focus()}
+    if(e.key==='ArrowUp'){e.preventDefault();items[(i+items.length-1)%items.length].focus()}
+  });
+  // Nach der Aktion schließen; die Aktion selbst hängt an der ID bzw. data-action.
+  list.addEventListener('click',e=>{
+    const item=e.target.closest('button');if(!item||item.disabled)return;
+    closeMenus();btn.focus({preventScroll:true});
+    if(item.dataset.toast)toast(item.dataset.toast);
+    else if(item.id==='copyBtn')setTimeout(()=>toast(item.textContent),120);
+  });
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.menu'))closeMenus()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus()});
+
+/* data-action: gemeinsame Aktionen für Menü, Modellkarte und leere 3D-Ansicht */
+const ACTIONS={
+  open:()=>input.click(),
+  profiles:()=>{renderMyList();$('profilesDlg').showModal()},
+  help:()=>$('helpDlg').showModal()
+};
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-action]');if(a&&ACTIONS[a.dataset.action])ACTIONS[a.dataset.action]();
+  const c=e.target.closest('[data-click]');if(c)$(c.dataset.click).click();
+  const x=e.target.closest('[data-close]');if(x)x.closest('dialog').close();
+});
+['profilesDlg','helpDlg'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()}));
+
+/* Erklärungen (?): per Maus, Tastatur und Tippen erreichbar. Der Text steht im title-Attribut
+   (so erzeugt vom Rechenkern); er wandert nach data-tip, damit kein doppelter Browser-Tooltip erscheint. */
+function enhanceHelp(){
+  document.querySelectorAll('.help[title]').forEach(el=>{
+    el.dataset.tip=el.title;el.removeAttribute('title');
+    el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label','Erklärung: '+el.dataset.tip);
+  });
+}
+let tipOwner=null;
+function showTip(el){
+  const tip=$('tip');tipOwner=el;tip.textContent=el.dataset.tip;tip.hidden=false;
+  el.setAttribute('aria-expanded','true');
+  const r=el.getBoundingClientRect(),w=Math.min(320,window.innerWidth-16);
+  tip.style.left=Math.max(8,Math.min(r.left-12,window.innerWidth-w-8))+'px';
+  const below=r.bottom+8,h=tip.offsetHeight;
+  tip.style.top=(below+h>window.innerHeight?r.top-h-8:below)+'px';
+}
+function hideTip(){if(!tipOwner)return;tipOwner.setAttribute('aria-expanded','false');tipOwner=null;$('tip').hidden=true}
+document.addEventListener('mouseover',e=>{const h=e.target.closest('.help[data-tip]');if(h)showTip(h);else if(tipOwner&&!tipOwner.contains(document.activeElement)&&document.activeElement!==tipOwner)hideTip()});
+document.addEventListener('focusin',e=>{const h=e.target.closest('.help[data-tip]');if(h)showTip(h);else hideTip()});
+document.addEventListener('click',e=>{const h=e.target.closest('.help[data-tip]');if(h){e.preventDefault();tipOwner===h?hideTip():showTip(h)}});
+document.addEventListener('keydown',e=>{
+  const h=e.target.closest&&e.target.closest('.help[data-tip]');
+  if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tipOwner===h?hideTip():showTip(h)}
+  if(e.key==='Escape')hideTip();
+});
+document.addEventListener('scroll',hideTip,true);
+
+let toastTimer=0;
+function toast(text){
+  const t=$('toast');t.textContent=text;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* Drucken: alle Aufklappbereiche öffnen, danach Zustand wiederherstellen */
+let foldState=[];
+window.addEventListener('beforeprint',()=>{
+  const folds=[...document.querySelectorAll('details.fold')];
+  foldState=folds.map(d=>d.open);folds.forEach(d=>{d.open=true});
+});
+window.addEventListener('afterprint',()=>{document.querySelectorAll('details.fold').forEach((d,i)=>{d.open=foldState[i]??d.open})});
+
+/* ================= TABS ================= */
+const TAB_KEY='druckKonfigurator.tab';
+const tabs={settings:[$('tabSettings'),$('viewSettings')],'3d':[$('tab3d'),$('view3d')]};
+function setTab(name){
+  Object.entries(tabs).forEach(([k,[btn,view]])=>{const on=k===name;btn.setAttribute('aria-selected',String(on));view.hidden=!on});
+  document.body.dataset.tab=name;
+  try{localStorage.setItem(TAB_KEY,name)}catch(e){/* nur Komfort */}
+}
+Object.entries(tabs).forEach(([k,[btn]])=>btn.addEventListener('click',()=>setTab(k)));
+document.querySelector('.tabs').addEventListener('keydown',e=>{
+  if(['ArrowLeft','ArrowRight'].includes(e.key)){const next=document.body.dataset.tab==='3d'?'settings':'3d';setTab(next);tabs[next][0].focus()}
+});
 
 /* ================= VIEWER-BEDIENUNG (aus 3dView) ================= */
 function toggleButton(id,onChange){
@@ -56,27 +172,16 @@ toggleButton('btnAxes',on=>Viewer.setAxes(on));
 toggleButton('btnClip',on=>{Viewer.setClip(on);$('clipPanel').classList.toggle('hidden',!on)});
 toggleButton('btnMeasure',on=>Viewer.setMeasure(on,text=>{$('measureLabel').textContent=text}));
 ['x','y','z'].forEach(axis=>{
-  const b=$('clipAxis'+axis.toUpperCase());
-  b.addEventListener('click',()=>{
+  $('clipAxis'+axis.toUpperCase()).addEventListener('click',()=>{
     ['X','Y','Z'].forEach(k=>$('clipAxis'+k).classList.toggle('active',k===axis.toUpperCase()));
     $('clipSlider').value=0;Viewer.setClipAxis(axis);
   });
 });
 $('clipSlider').addEventListener('input',()=>Viewer.setClipFraction(Number($('clipSlider').value)/100));
 
-/* Panel ein-/ausblenden */
-const PANEL_KEY='druckKonfigurator.panelCollapsed';
-function setPanel(collapsed){
-  $('app').classList.toggle('panel-collapsed',collapsed);
-  $('panelToggle').setAttribute('aria-expanded',String(!collapsed));
-  try{localStorage.setItem(PANEL_KEY,collapsed?'1':'0')}catch(e){/* nur Komfort */}
-}
-$('panelToggle').addEventListener('click',()=>setPanel(!$('app').classList.contains('panel-collapsed')));
-try{if(localStorage.getItem(PANEL_KEY)==='1')setPanel(true)}catch(e){/* nur Komfort */}
-
 /* ================= START (aus v4) ================= */
 if(Viewer.available()){
-  try{Viewer.init(stage)}catch(e){$('viewerEmpty').textContent='3D-Ansicht konnte nicht gestartet werden. Die Analyse funktioniert trotzdem.'}
+  try{Viewer.init($('stage'))}catch(e){$('viewerEmpty').textContent='3D-Ansicht konnte nicht gestartet werden. Die Analyse funktioniert trotzdem.'}
 }else $('viewerEmpty').textContent='3D-Ansicht nicht verfügbar (three.js fehlt im Ordner vendor/). Die Analyse und alle Empfehlungen funktionieren trotzdem.';
 loadStore();
 if(store.last.printer&&PRINTERS[store.last.printer])$('printer').value=store.last.printer;
@@ -85,4 +190,6 @@ fillMaterialSelect(store.last.material||'pla_hs');
 if(store.last.nozD&&NOZ[nkey(store.last.nozD)])$('nozD').value=store.last.nozD;
 if(store.last.nozM&&NOZZLE_MATERIALS[store.last.nozM]&&currentPrinter().nozzleOptions.includes(store.last.nozM))$('nozM').value=store.last.nozM;
 if(!storageOK)persist();
+syncPrinterSwitch();
+try{if(localStorage.getItem(TAB_KEY)==='3d')setTab('3d')}catch(e){/* nur Komfort */}
 update();
