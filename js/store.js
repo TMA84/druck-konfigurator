@@ -1,0 +1,28 @@
+'use strict';
+/* Eigene Werte im Browser speichern – aus v4. Gleicher Schlüssel wie v4, damit
+   bereits gespeicherte Profile (gleicher file://-Ursprung) übernommen werden. */
+const STORE_KEY='kobraS1Konfigurator.v4';
+let store={profiles:{},settings:{steelOffset:5,steelVol:0.9},last:{}};
+let storageOK=true;
+function loadStore(){
+  try{const s=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
+    if(s&&typeof s==='object'){store.profiles=s.profiles||{};Object.assign(store.settings,s.settings||{});store.last=s.last||{}}
+  }catch(e){storageOK=false}
+}
+// Gibt zurück, ob dauerhaft gespeichert werden konnte; die Anzeige macht panel.js.
+function saveStore(){
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(store));storageOK=true}catch(e){storageOK=false}
+  return storageOK;
+}
+function allMats(){
+  const list=BUILTIN.map(b=>{
+    const u=store.profiles[b.id];
+    return u?Object.assign({},b,u,{id:b.id,builtin:true,overridden:true,status:'user',src:b.src}):Object.assign({},b,{builtin:true});
+  });
+  Object.keys(store.profiles).forEach(id=>{
+    if(!BUILTIN.some(b=>b.id===id))list.push(Object.assign(P({kind:'pla'}),store.profiles[id],{id,builtin:false,status:'user',src:'Eigenes Profil.'}));
+  });
+  return list;
+}
+function getMat(id){const l=allMats();return l.find(m=>m.id===id)||l[0]}
+function builtinOf(id){return BUILTIN.find(b=>b.id===id)}

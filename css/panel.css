@@ -1,0 +1,56 @@
+/* Panel-Stile – aus Druck-Konfigurator v4 übernommen (Karten, Formular, Editor). */
+.card{background:white;border:1px solid #d9dee8;border-radius:14px;padding:18px;box-shadow:0 3px 12px #17203310;margin-bottom:18px}
+.card h2{margin-top:0}
+.field{margin:12px 0}.field label{display:block;font-weight:700;margin-bottom:5px}
+.help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:5px;border:1px solid #9aa8bc;border-radius:50%;font-size:12px;color:#36527a;cursor:help;vertical-align:middle;background:#f8fafc;font-weight:600}
+.help:hover{background:#e8f1ff}
+.field select{width:100%;padding:10px;border:1px solid #c7cfdb;border-radius:8px;background:#fff;font:inherit}
+.field select:focus-visible,.btn:focus-visible,.drop:focus-visible{outline:3px solid #93b4f5;outline-offset:2px}
+.drop{border:2px dashed #7da3e8;border-radius:12px;padding:22px 12px;text-align:center;background:#f7faff;cursor:pointer;transition:.15s}
+.drop.hover{background:#e8f1ff;border-color:#2563eb;transform:scale(1.01)}.drop input{display:none}
+.fileinfo{margin-top:10px;text-align:left;background:#f5f6f8;border-radius:8px;padding:10px;font-size:13px;line-height:1.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.program-order{margin-top:18px;border-top:1px solid #d9dee8;padding-top:14px}.program-order h3{margin:0 0 10px}
+.order-group{border:1px solid #d9dee8;border-radius:10px;margin:9px 0;overflow:hidden}
+.order-title{background:#f3f6fb;padding:9px 11px;font-weight:800;color:#244477}
+.order-body{padding:0 11px}
+.setting{display:flex;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding:9px 0;gap:12px}
+.order-body .setting:last-child{border-bottom:0}
+.setting b{color:#4b5563;font-weight:600}.value{font-weight:800;text-align:right}
+.value small{display:block;font-weight:500;color:#667085;font-size:12px}
+.supportbox{background:#eef4ff;border:1px solid #a9c4f5;border-radius:9px;padding:12px;margin-top:14px;line-height:1.5}.supportbox h3{margin:0 0 8px}
+.note{background:#fff7e6;border:1px solid #efd39c;border-radius:9px;padding:12px;margin-top:14px;line-height:1.45}
+.note:empty{display:none}
+.ok{background:#ecfdf3;border-color:#a7e3bf}
+.bad{background:#fdecec;border-color:#f0b7b7}
+.btn{border:0;border-radius:8px;background:#2563eb;color:white;padding:10px 13px;font-weight:700;cursor:pointer;margin-top:10px;font:inherit;font-weight:700}
+.btn.sec{background:#e8eef9;color:#16449a}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.hidden{display:none}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.linkbtn{background:none;border:0;color:#2563eb;font:inherit;font-weight:700;cursor:pointer;padding:4px 0;margin-top:4px}
+.linkbtn:hover{text-decoration:underline}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:2px}
+.badge.tested{background:#ecfdf3;color:#157347;border:1px solid #a7e3bf}
+.badge.generic{background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db}
+.badge.user{background:#eef4ff;color:#1d4ed8;border:1px solid #a9c4f5}
+.mylist-item{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #e5e7eb}
+.mylist-item:last-child{border-bottom:0}
+dialog#editor{border:0;border-radius:14px;padding:0;max-width:760px;width:calc(100% - 24px);box-shadow:0 20px 60px #0004}
+dialog#editor::backdrop{background:#17203366}
+.ed-head{padding:16px 18px;border-bottom:1px solid #d9dee8}
+.ed-head h2{margin:0}
+.ed-body{padding:4px 18px 18px;max-height:62vh;overflow:auto}
+.ed-foot{padding:12px 18px;border-top:1px solid #d9dee8;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;background:#f8fafc;border-radius:0 0 14px 14px}
+.ed-foot .btn{margin-top:0}
+.ed-group{margin-top:14px}.ed-group h4{margin:0 0 4px;color:#244477}
+.ed-row{display:grid;grid-template-columns:1fr 1.25fr;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #eef0f4}
+.ed-row>label{font-weight:600;font-size:14px}
+.ed-in{display:flex;gap:6px;align-items:center}
+.ed-in input,.ed-in select,.ed-in textarea{width:100%;min-width:0;padding:7px 8px;border:1px solid #c7cfdb;border-radius:7px;font:inherit;font-size:14px;background:#fff}
+.ed-in input[type=checkbox]{width:auto}
+.ed-in .u{font-size:12px;color:#667085;white-space:nowrap;min-width:40px}
+.tri{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;flex:1}
+.tri small{display:block;font-size:11px;color:#667085;text-align:center}
+.btn.danger{background:#fdecec;color:#b42318}
+@media(max-width:600px){.ed-row{grid-template-columns:1fr}}

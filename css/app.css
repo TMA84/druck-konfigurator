@@ -1,0 +1,88 @@
+/* Grundlayout: Konfigurator-Panel links, Vollbild-Viewer rechts. */
+:root {
+  --panel-w: 440px;
+  --panel-bg: #f4f6fa;
+  --ink: #172033;
+  --stage-bg: #1e1e1e;
+  --hud-bg: rgba(0, 0, 0, 0.45);
+  --hud-border: #555;
+  --hud-ink: #ccc;
+  --accent: #4a90d9;
+  font-family: system-ui, Arial;
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--stage-bg); }
+.muted { color: #667085; }
+.hidden { display: none !important; }
+
+.app { display: grid; grid-template-columns: var(--panel-w) 1fr; height: 100%; }
+.app.panel-collapsed { grid-template-columns: 0 1fr; }
+.app.panel-collapsed #panel { visibility: hidden; }
+
+/* ---------- Panel ---------- */
+#panel { background: var(--panel-bg); overflow-y: auto; padding: 16px 14px 24px; border-right: 1px solid #d9dee8; }
+#panel h1 { margin: 0 0 4px; font-size: 22px; }
+#panel .card { padding: 16px; }
+#panel .lead { margin: 0 0 14px; font-size: 14px; }
+#panel footer { text-align: center; font-size: 12px; }
+
+/* ---------- Bühne (Viewer) ---------- */
+#stage { position: relative; overflow: hidden; min-width: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud { position: absolute; color: var(--hud-ink); font-size: 13px; background: var(--hud-bg); border-radius: 4px; }
+.hud button {
+  background: var(--hud-bg); color: var(--hud-ink); border: 1px solid var(--hud-border); border-radius: 4px;
+  padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.hud button:hover { background: rgba(255, 255, 255, 0.1); }
+.hud button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.hud button:focus-visible { outline: 2px solid #93b4f5; outline-offset: 2px; }
+
+#info { top: 10px; left: 52px; padding: 6px 10px; pointer-events: none; }
+#info:empty { display: none; }
+#panelToggle { position: absolute; top: 10px; left: 10px; width: 34px; padding: 6px 0; }
+#controls { top: 10px; right: 10px; display: flex; gap: 6px; background: none; }
+#subControls { top: 48px; right: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; background: none; }
+#clipPanel { display: flex; align-items: center; gap: 6px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 4px; padding: 6px 10px; }
+#clipPanel button { padding: 3px 8px; font-size: 12px; }
+#clipSlider { width: 120px; }
+#measureLabel { color: #ffcc00; background: var(--hud-bg); padding: 6px 10px; border-radius: 4px; }
+#measureLabel:empty { display: none; }
+
+#viewerEmpty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 20px; color: var(--hud-ink); font-size: 20px; cursor: pointer;
+}
+#stage.dragover { outline: 3px dashed var(--accent); outline-offset: -6px; }
+#stage.dragover #viewerEmpty { background: rgba(80, 140, 255, 0.15); }
+
+/* Überhang-Leiste unten */
+#ohBar { left: 10px; right: 10px; bottom: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+#ohBar .vbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#ohBar label { font-weight: 700; }
+#ohBar input[type=range] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+#ohBar .val { font-weight: 800; width: 38px; text-align: right; }
+#ohBar .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+#ohBar .stats b { color: #fff; }
+#ohBar .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+#ohBar .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+#ohInfo { margin: 0; }
+#ohInfo:empty { display: none; }
+.help-dark { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 5px; border: 1px solid #888; border-radius: 50%; font-size: 12px; cursor: help; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 55vh 1fr; }
+  .app.panel-collapsed { grid-template-rows: 100% 0; grid-template-columns: 1fr; }
+  #stage { grid-row: 1; }
+  #panel { grid-row: 2; border-right: 0; border-top: 1px solid #d9dee8; }
+  #ohBar .stats { display: none; }
+}
+
+@media print {
+  html, body { height: auto; overflow: visible; background: #fff; }
+  .app { display: block; height: auto; }
+  #stage, .noprint { display: none !important; }
+  #panel { overflow: visible; border: 0; visibility: visible !important; }
+  .card { box-shadow: none; break-inside: avoid; }
+}
