@@ -2,6 +2,7 @@
 /* Konfigurator-Panel: Auswahl, Ergebnisanzeige, Editor, Import/Export – aus v4. */
 let geom=null;       // Ergebnis von parseSTL
 let lastOrdered=[];
+let lastResult=null;  // letztes compute()-Ergebnis, für den 3MF-Export
 let orcaFilamentJson='',orcaProcessJson='';
 
 function currentPrinter(){return PRINTERS[$('printer').value]||PRINTERS.kobra_s1}
@@ -70,6 +71,8 @@ function update(){
   }else{
     $('supportParams').innerHTML='<p class="muted" style="margin:0">Für die aktuelle Auswahl'+(geom?' und dieses Modell':'')+' werden keine Stützen empfohlen. Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.</p>';
   }
+  lastResult=r;
+  if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof enhanceHelp==='function')enhanceHelp();
 }
 

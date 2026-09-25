@@ -148,9 +148,12 @@ for (const c of cases) {
   V4.setGeom(geoms[geom][0]);
   const r4 = V4.compute(), rn = NEW.compute(inp, geoms[geom][1], ctxNew);
   const kind = rn.m.kind;
+  // Felder, die v5 für den 3MF-Export zusätzlich liefert – v4 kennt sie nicht.
+  const V5_ONLY = ['maxVol', 'firstLayer', 'brim', 'seam'];
+  const rnV4View = Object.fromEntries(Object.entries(rn).filter(([k]) => !V5_ONLY.includes(k)));
   const out4 = [JSON.stringify(r4), V4.buildOrcaFilamentJSON(r4), V4.buildOrcaProcessJSON(r4), V4.orcaWarningText(r4),
     r4.rows.map(V4.rowHTML).join(''), r4.ordered.map(g => g[1].map(V4.rowHTML).join('')).join('|')];
-  const outN = [JSON.stringify(rn), NEW.buildOrcaFilamentJSON(rn), NEW.buildOrcaProcessJSON(rn), NEW.orcaWarningText(rn),
+  const outN = [JSON.stringify(rnV4View), NEW.buildOrcaFilamentJSON(rn), NEW.buildOrcaProcessJSON(rn), NEW.orcaWarningText(rn),
     rn.rows.map(r => NEW.rowHTML(r, kind)).join(''), rn.ordered.map(g => g[1].map(r => NEW.rowHTML(r, kind)).join('')).join('|')];
   const names = ['compute', 'filament-json', 'process-json', 'orca-hinweis', 'rows-html', 'ordered-html'];
   out4.forEach((x, i) => { if (x !== outN[i]) fail(names[i] + ' ' + JSON.stringify(c), x, outN[i]); });

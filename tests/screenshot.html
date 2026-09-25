@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><style>body{margin:0}iframe{border:0;width:1440px;height:900px}</style>
-<!-- Hilfsseite für Sichtprüfungen: ?printer=snapmaker_u1&model=1&tab=3d&menu=2 – headless-Screenshot über http://127.0.0.1 laden. -->
+<!-- Hilfsseite für Sichtprüfungen: ?printer=snapmaker_u1&model=1&tab=3d&menu=2&export=3 – headless-Screenshot über http://127.0.0.1 laden. -->
 <iframe id="f" src="../index.html"></iframe>
 <script>
 const q=new URLSearchParams(location.search);
@@ -10,6 +10,7 @@ f.onload=()=>{const w=f.contentWindow,d=w.document;
  if(q.get('model'))w.showModel(w.parseSTL('pilz.stl',buf));
  if(q.get('tab')==='3d')d.getElementById('tab3d').click();
  if(q.get('tip'))d.querySelector('.spec .help').focus();
+ if(q.get('export')){d.getElementById('export3mf').click();const s=d.querySelector('input[name="slot"][value="'+q.get('export')+'"]');if(s)s.click()}
  if(q.get('menu'))d.querySelectorAll('.menu-btn')[+q.get('menu')].click();
 };
 </script>

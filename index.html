@@ -48,7 +48,7 @@
     <div class="menu">
       <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuExport">Export</button>
       <div class="menu-list" role="menu" id="menuExport">
-        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer <small>kommt in Schritt 2</small></button>
+        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst eine STL laden</small></button>
         <hr>
         <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON</button>
         <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON</button>
@@ -166,6 +166,15 @@
 
 <dialog id="editor" aria-labelledby="edTitle"><div class="ed-head"><h2 id="edTitle">Werte anpassen</h2><div class="muted" id="edSub"></div></div><div class="ed-body" id="edBody"></div><div class="ed-foot" id="edFoot"></div></dialog>
 
+<dialog id="exportDlg" aria-labelledby="exportTitle"><div class="ed-head"><h2 id="exportTitle">3MF für OrcaSlicer</h2><div class="muted" id="exportSub"></div></div>
+  <div class="ed-body">
+    <fieldset class="slots"><legend>Filament-Slot</legend><div id="slotList" class="slot-list"></div></fieldset>
+    <div id="slotWarn" class="note hidden"></div>
+    <details class="fold" id="changesFold"><summary id="changesTitle">Was geändert wird</summary><div id="changesList"></div></details>
+    <p class="muted small">Druckerprofil, Start-G-Code, Rückzug und alle übrigen Werte kommen unverändert aus deiner Orca-Vorlage. Nach dem Öffnen in OrcaSlicer die Vorschau prüfen.</p>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="export3mfSave">3MF speichern</button></div></dialog>
+
 <dialog id="profilesDlg" aria-labelledby="profilesTitle"><div class="ed-head"><h2 id="profilesTitle">Meine Profile</h2><div class="muted">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert – über <b>Profile → Profile exportieren</b> sichern oder teilen.</div></div>
   <div class="ed-body"><div id="myList"></div></div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
@@ -187,8 +196,12 @@
 <script src="js/stl.js"></script>
 <script src="js/store.js"></script>
 <script src="js/engine.js"></script>
+<script src="vendor/fflate.min.js"></script>
+<script src="js/orca-templates.js"></script>
+<script src="js/export3mf.js"></script>
 <script src="js/viewer.js"></script>
 <script src="js/panel.js"></script>
 <script src="js/app.js"></script>
+<script src="js/export-ui.js"></script>
 </body>
 </html>

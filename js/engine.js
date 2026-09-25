@@ -251,5 +251,7 @@ function compute(I,geom,ctx){
   if(o==='thin')warn.push('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.');
 
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
-    nozzle,w,t,b,inf,sp_outer,sp_inner,sp_fill,dSel,top,pattern};
+    nozzle,w,t,b,inf,sp_outer,sp_inner,sp_fill,dSel,top,pattern,
+    // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
+    maxVol,firstLayer:N.fl,brim,seam};
 }
