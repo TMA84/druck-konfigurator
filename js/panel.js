@@ -1,6 +1,7 @@
 'use strict';
 /* Konfigurator-Panel: Auswahl, Ergebnisanzeige, Editor, Import/Export – aus v4. */
-let geom=null;       // Ergebnis von parseSTL
+let project=null;    // geladenes Modell: {name, parts:[{name, geom, extruder, plate}], selected, threemf, notes}
+let geom=null;       // Analyse des gewählten Teils (makeGeom)
 let lastOrdered=[];
 let lastResult=null;  // letztes compute()-Ergebnis, für den 3MF-Export
 let orcaFilamentJson='',orcaProcessJson='';
@@ -72,6 +73,7 @@ function update(){
     $('supportParams').innerHTML='<p class="muted" style="margin:0">Für die aktuelle Auswahl'+(geom?' und dieses Modell':'')+' werden keine Stützen empfohlen. Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.</p>';
   }
   lastResult=r;
+  if(typeof renderPartList==='function')renderPartList();
   if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof enhanceHelp==='function')enhanceHelp();
 }

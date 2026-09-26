@@ -9,29 +9,65 @@ document.addEventListener('dragenter',()=>{dragDepth++;document.body.classList.a
 document.addEventListener('dragleave',()=>{if(--dragDepth<=0){dragDepth=0;document.body.classList.remove('dragging')}});
 document.addEventListener('drop',e=>{
   dragDepth=0;document.body.classList.remove('dragging');
-  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)loadFile(f);
+  const files=e.dataTransfer&&e.dataTransfer.files;if(files&&files.length)loadFiles([...files]);
 });
-input.addEventListener('change',()=>{if(input.files[0])loadFile(input.files[0])});
-$('clear').addEventListener('click',()=>{input.value='';geom=null;$('fileinfo').textContent='Noch keine Datei geladen.';clearModel();update()});
+input.addEventListener('change',()=>{if(input.files.length)loadFiles([...input.files])});
+$('clear').addEventListener('click',()=>{input.value='';project=null;geom=null;$('fileinfo').textContent='Noch keine Datei geladen.';clearModel();update()});
 
-function loadFile(file){
-  const ext=file.name.toLowerCase().split('.').pop();
-  if(ext==='3mf'){$('fileinfo').innerHTML='<b>'+esc(file.name)+'</b><br>3MF-Dateien kann dieses Programm nicht auswerten. Bitte im Slicer als STL exportieren (Rechtsklick auf das Objekt → „Exportieren als eine STL…“).';return}
-  if(ext!=='stl'){$('fileinfo').textContent='Bitte eine STL-Datei verwenden.';return}
-  $('fileinfo').textContent='Lese '+file.name+' …';
-  const r=new FileReader();
-  r.onload=()=>{try{showModel(parseSTL(file.name,r.result))}catch(e){$('fileinfo').textContent='STL konnte nicht gelesen werden: '+e.message+'. Bitte die Datei erneut exportieren.'}};
-  r.readAsArrayBuffer(file);
+const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error('Lesefehler'));r.readAsArrayBuffer(file)});
+
+// Eine oder mehrere Dateien (STL, 3MF, ZIP) → Projekt mit Teileliste
+async function loadFiles(files){
+  $('fileinfo').textContent='Lese '+(files.length===1?files[0].name:files.length+' Dateien')+' …';
+  try{
+    const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
+    const imp=importModels(entries,fflate);
+    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,geom:makeGeom(p.name,p.pos),extruder:p.extruder||null,plate:p.plate||1,objectId:p.objectId||null}));
+    showProject({name:imp.name,parts,threemf:imp.threemf,notes:imp.notes});
+  }catch(e){
+    $('fileinfo').textContent='Modell konnte nicht gelesen werden: '+e.message+'. Bitte die Datei prüfen oder erneut exportieren.';
+  }
 }
+
+function showProject(p){
+  project=p;
+  const n=p.parts.reduce((s,x)=>s+x.geom.n,0);
+  $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+(p.parts.length>1?p.parts.length+' Teile · ':'')+n.toLocaleString('de-DE')+' Dreiecke'+
+    (p.threemf&&p.threemf.plates.length>1?' · '+p.threemf.plates.length+' Platten':'')+
+    (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>Ursprünglich für: '+esc(p.threemf.settings.printer_settings_id)+'</small>':'');
+  const notes=$('importNotes');notes.textContent=p.notes.join(' ');notes.classList.toggle('hidden',!p.notes.length);
+  $('partList').classList.toggle('hidden',p.parts.length<2);
+  $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');
+  selectPart(0);
+}
+
+// Gewähltes Teil bestimmt Datenblatt, Überhanganalyse und 3D-Ansicht
+function selectPart(i){
+  project.selected=i;
+  showModel(project.parts[i].geom);
+}
+
+function renderPartList(){
+  const list=$('partList');
+  if(!project||project.parts.length<2){list.innerHTML='';return}
+  const th=+$('thresh').value,label={none:'ohne Stützen',few:'wenig Stützen',needed:'Stützen'};
+  const colours=(project.threemf&&project.threemf.settings&&project.threemf.settings.filament_colour)||[];
+  list.innerHTML=project.parts.map((p,i)=>{
+    const g=p.geom,lv=analyze(g,th).level,sel=i===project.selected;
+    const slot=p.extruder?'<span class="pslot" style="background:'+esc(colours[p.extruder-1]||'#999')+'"></span>Slot '+p.extruder+' · ':'';
+    const plate=project.threemf&&project.threemf.plates.length>1?'Platte '+p.plate+' · ':'';
+    return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
+      '<span class="pmeta">'+slot+plate+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
+  }).join('');
+}
+$('partList').addEventListener('click',e=>{const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
 
 function showModel(g){
   geom=g;
   const n=g.n;
-  $('fileinfo').innerHTML='<b>'+esc(g.name)+'</b><br>'+de(g.x,2)+' × '+de(g.y,2)+' × '+de(g.z,2)+' mm · '+n.toLocaleString('de-DE')+' Dreiecke';
   $('sx').textContent=de(g.x,1)+' mm';$('sy').textContent=de(g.y,1)+' mm';$('sz').textContent=de(g.z,1)+' mm';$('sv').textContent=de(g.vol/1000,1)+' cm³';
   $('info').textContent=g.name+'  —  '+de(g.x,1)+' × '+de(g.y,1)+' × '+de(g.z,1)+' mm  —  '+n.toLocaleString('de-DE')+' Dreiecke';
   $('ohBar').classList.remove('hidden');
-  $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');
   // Ohne Renderer bleibt der Hinweis „3D-Ansicht nicht verfügbar“ sichtbar (wie in v4).
   if(Viewer.show(g))$('viewerEmpty').classList.add('hidden');
   Viewer.colorize(+$('thresh').value);
@@ -42,6 +78,7 @@ function clearModel(){
   $('ohBar').classList.add('hidden');$('info').textContent='';
   document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=''});
   $('modelCard').classList.remove('loaded');$('modelBadge').classList.add('hidden');
+  $('partList').classList.add('hidden');$('partList').innerHTML='';$('importNotes').classList.add('hidden');
   $('viewerEmpty').classList.remove('hidden');
 }
 

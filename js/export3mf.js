@@ -7,7 +7,9 @@
 const ORCA_KIND = { pla: 'PLA', petg: 'PETG', abs: 'ABS', asa: 'ASA', tpu: 'TPU' };
 const BED_TEMP_KEYS = ['hot_plate_temp', 'textured_plate_temp', 'cool_plate_temp', 'eng_plate_temp'];
 const SEAM_ORCA = { Hinten: 'back', Ausgerichtet: 'aligned' };
-const OBJECT_PATH = '/3D/Objects/object_1.model';
+const PART_GAP_MM = 8;          // Abstand zwischen Teilen beim Anordnen
+const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße versetzt ab (Spalten = ⌈√Platten⌉)
+const objectPath = k => '/3D/Objects/object_' + k + '.model';
 
 function exportTemplate(printerId, nozD) {
   return (ORCA_TEMPLATES[printerId] || {})[nozD] || null;
@@ -126,10 +128,11 @@ function buildProjectSettings(tpl, r, slot, liveSlots) {
 }
 
 const xmlEsc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+const uuid = (n, tail) => ('0000' + n.toString(16)).slice(-4) + '0000-' + tail;
 const coord = v => String(Math.round(v * 1e5) / 1e5);
 
 // Netz als 3MF-Objekt: gemeinsame Eckpunkte, lokal um den Mittelpunkt zentriert (wie Orca es speichert).
-function meshModelXML(geom) {
+function meshModelXML(geom, id = 1) {
   const cx = (geom.mn[0] + geom.mx[0]) / 2, cy = (geom.mn[1] + geom.mx[1]) / 2, cz = (geom.mn[2] + geom.mx[2]) / 2;
   const index = new Map(), verts = [], tris = [];
   for (let i = 0; i < geom.n; i++) {
@@ -145,40 +148,94 @@ function meshModelXML(geom) {
     if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push('     <triangle v1="' + t[0] + '" v2="' + t[1] + '" v3="' + t[2] + '"/>');
   }
   return '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n' +
-    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n  <object id="1" p:UUID="00010000-81cb-4c03-9d28-80fed5dfa1dc" type="model">\n   <mesh>\n    <vertices>\n' +
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n  <object id="' + id + '" p:UUID="' + uuid(id, '81cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <mesh>\n    <vertices>\n' +
     verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build/>\n</model>\n';
 }
 
-function build3mfFiles(tpl, r, geom, slot, liveSlots) {
+function bedSize(tpl) {
+  const pts = (tpl.settings.printable_area || []).map(p => p.split('x').map(Number));
+  if (!pts.length) return [tpl.bedCenter[0] * 2, tpl.bedCenter[1] * 2];
+  return [0, 1].map(k => Math.max(...pts.map(p => p[k])) - Math.min(...pts.map(p => p[k])));
+}
+
+/* Teile zeilenweise aufs Bett legen; passt keine Zeile mehr, beginnt eine neue Platte.
+   Ergebnis je Teil: {plate (0-basiert), x, y} = Mitte in Orca-Weltkoordinaten. */
+function arrangeParts(geoms, tpl) {
+  const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = PART_GAP_MM;
+  const order = geoms.map((g, i) => i).sort((a, b) => geoms[b].y - geoms[a].y || geoms[b].x - geoms[a].x);
+  const plates = [];   // je Platte Zeilen: {y0, depth, width, items:[{i, x0}]}
+  let rows = [];
+  plates.push(rows);
+  const nextY = () => rows.length ? rows[rows.length - 1].y0 + rows[rows.length - 1].depth + gap : 0;
+  for (const i of order) {
+    const g = geoms[i];
+    let row = rows.find(r => r.width + gap + g.x <= bw && g.y <= r.depth);
+    if (!row) {
+      if (rows.length && nextY() + g.y > bd) { rows = []; plates.push(rows); }
+      row = { y0: nextY(), depth: g.y, width: -gap, items: [] };
+      rows.push(row);
+    }
+    row.items.push({ i, x0: row.width + gap });
+    row.width += gap + g.x;
+  }
+  const cols = Math.ceil(Math.sqrt(plates.length)), places = [];
+  plates.forEach((prow, pi) => {
+    const usedW = Math.max(...prow.map(r => r.width)), last = prow[prow.length - 1], usedD = last.y0 + last.depth;
+    const ox = (pi % cols) * bw * PLATE_STRIDE + bx - usedW / 2, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE + by - usedD / 2;
+    prow.forEach(r => r.items.forEach(it => {
+      places[it.i] = { plate: pi, x: ox + it.x0 + geoms[it.i].x / 2, y: oy + r.y0 + r.depth / 2 };
+    }));
+  });
+  return { places, plateCount: plates.length };
+}
+
+const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
+const MODEL_OPEN = '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n';
+const REL_TYPE = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel';
+
+function modelSettingsXML(objs, slot, plateCount) {
+  const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + (slot + 1) + '"/>\n' +
+    '    <part id="' + o.k + '" subtype="normal_part">\n      <metadata key="name" value="' + o.name + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="source_file" value="' + o.name + '"/>\n' +
+    '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n  </object>\n';
+  const instance = o => '    <model_instance>\n      <metadata key="object_id" value="' + o.id + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + o.k + '"/>\n    </model_instance>\n';
+  const plate = pi => '  <plate>\n    <metadata key="plater_id" value="' + (pi + 1) + '"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' +
+    objs.filter(o => o.place.plate === pi).map(instance).join('') + '  </plate>\n';
+  return XML_HEAD + '<config>\n' + objs.map(object).join('') + Array.from({ length: plateCount }, (_, pi) => plate(pi)).join('') +
+    '  <assemble>\n' + objs.map(o => '   <assemble_item object_id="' + o.id + '" instance_id="0" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" offset="0 0 0" />\n').join('') + '  </assemble>\n</config>\n';
+}
+
+// parts: ein geom (Einzelteil) oder [{geom}] – alle Teile bekommen dieselben Werte und den gewählten Slot.
+function build3mfFiles(tpl, r, parts, slot, liveSlots) {
+  const list = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom || p);
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots);
-  const name = xmlEsc(geom.name);
-  const [bx, by] = tpl.bedCenter, hz = coord(geom.z / 2);
+  const { places, plateCount } = arrangeParts(list, tpl);
+  const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
+  // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
+  const objs = list.map((g, i) => ({ g, k: i + 1, id: n + i + 1, name: xmlEsc(g.name), hz: coord(g.z / 2), place: places[i] }));
   const files = {
-    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
-    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>\n',
-    '3D/_rels/3dmodel.model.rels': '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="' + OBJECT_PATH + '" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>\n',
-    '3D/3dmodel.model': '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n' +
-      ' <metadata name="Application">BambuStudio-02.06.00.51</metadata>\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">' + name + '</metadata>\n' +
-      ' <resources>\n  <object id="2" p:UUID="00000001-61cb-4c03-9d28-80fed5dfa1dc" type="model">\n   <components>\n    <component p:path="' + OBJECT_PATH + '" objectid="1" p:UUID="00010000-b206-40ff-9872-83e8017abed1" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n   </components>\n  </object>\n </resources>\n' +
-      ' <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n  <item objectid="2" p:UUID="00000002-b1ec-4553-aec9-835e5b724bb4" transform="1 0 0 0 1 0 0 0 1 ' + coord(bx) + ' ' + coord(by) + ' ' + hz + '" printable="1"/>\n </build>\n</model>\n',
-    '3D/Objects/object_1.model': meshModelXML(geom),
-    'Metadata/model_settings.config': '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <object id="2">\n    <metadata key="name" value="' + name + '"/>\n    <metadata key="extruder" value="' + (slot + 1) + '"/>\n' +
-      '    <part id="1" subtype="normal_part">\n      <metadata key="name" value="' + name + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="source_file" value="' + name + '"/>\n' +
-      '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n  </object>\n' +
-      '  <plate>\n    <metadata key="plater_id" value="1"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' +
-      '    <model_instance>\n      <metadata key="object_id" value="2"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="1"/>\n    </model_instance>\n  </plate>\n' +
-      '  <assemble>\n   <assemble_item object_id="2" instance_id="0" transform="1 0 0 0 1 0 0 0 1 0 0 ' + hz + '" offset="0 0 0" />\n  </assemble>\n</config>\n',
+    '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
+    '_rels/.rels': XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="' + REL_TYPE + '"/>\n</Relationships>\n',
+    '3D/_rels/3dmodel.model.rels': XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+      objs.map(o => ' <Relationship Target="' + objectPath(o.k) + '" Id="rel-' + o.k + '" Type="' + REL_TYPE + '"/>\n').join('') + '</Relationships>\n',
+    '3D/3dmodel.model': XML_HEAD + MODEL_OPEN +
+      ' <metadata name="Application">BambuStudio-02.06.00.51</metadata>\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">' + title + '</metadata>\n <resources>\n' +
+      objs.map(o => '  <object id="' + o.id + '" p:UUID="' + uuid(o.k, '61cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <components>\n    <component p:path="' + objectPath(o.k) + '" objectid="' + o.k + '" p:UUID="' + uuid(o.k, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n   </components>\n  </object>\n').join('') +
+      ' </resources>\n <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n' +
+      objs.map(o => '  <item objectid="' + o.id + '" p:UUID="' + uuid(o.id, 'b1ec-4553-aec9-835e5b724bb4') + '" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" printable="1"/>\n').join('') +
+      ' </build>\n</model>\n',
+    'Metadata/model_settings.config': modelSettingsXML(objs, slot, plateCount),
     'Metadata/project_settings.config': JSON.stringify(settings, null, 4),
-    'Metadata/slice_info.config': '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.06.00.51"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
-    'Metadata/filament_sequence.json': '{"plate_1":{"nozzle_sequence":[],"optimal_assignment":[],"sequence":[]}}'
+    'Metadata/slice_info.config': XML_HEAD + '<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.06.00.51"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
+    'Metadata/filament_sequence.json': JSON.stringify(Object.fromEntries(Array.from({ length: plateCount }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }])))
   };
-  return { files, changes };
+  objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.k); });
+  return { files, changes, plateCount };
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
-function build3mf(tpl, r, geom, slot, zipLib, liveSlots) {
-  const { files, changes } = build3mfFiles(tpl, r, geom, slot, liveSlots);
+function build3mf(tpl, r, parts, slot, zipLib, liveSlots) {
+  const { files, changes, plateCount } = build3mfFiles(tpl, r, parts, slot, liveSlots);
   const entries = {};
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
-  return { bytes: zipLib.zipSync(entries, { level: 6 }), changes };
+  return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount };
 }

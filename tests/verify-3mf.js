@@ -121,6 +121,38 @@ for (const [i, c] of CASES.entries()) {
   check(Math.abs(w - geom.x) < 1.5 && Math.abs(d - geom.y) < 1.5, `Wände ${w.toFixed(1)} × ${d.toFixed(1)} mm ≈ Modell ${geom.x.toFixed(1)} × ${geom.y.toFixed(1)} mm`);
 }
 
+/* ---------- Mehrere Teile: Anordnung auf einer Platte bzw. Verteilung auf mehrere Platten ---------- */
+function sliceParts(label, printer, parts, expectPlates) {
+  const inp = { printer, material: 'pla_hs', nozD: '0.4', nozM: NOZ_MAT[printer], object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const r = K.compute(inp, parts[0], { getMat: K.getMat, settings: K.store.settings });
+  const tpl = K.exportTemplate(printer, '0.4');
+  const { bytes, plateCount } = K.build3mf(tpl, r, parts.map(geom => ({ geom })), 0, fflate);
+  console.log(`\n${label}: ${printer} · ${parts.length} Teile`);
+  check(plateCount === expectPlates, `${plateCount} Platte(n), erwartet ${expectPlates}`);
+  const dir = path.join(OUT, label.replace(/\W+/g, '_')); fs.mkdirSync(dir);
+  const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+  try { execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 }); }
+  catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); return null; }
+  const gfiles = fs.readdirSync(dir).filter(f => f.endsWith('.gcode')).sort();
+  check(gfiles.length === expectPlates, `G-Code je Platte: ${gfiles.join(', ')}`);
+  return { tpl, gcodes: gfiles.map(f => parseGcode(fs.readFileSync(path.join(dir, f), 'utf8'))) };
+}
+const [bw1] = [250];
+let res = sliceParts('Mehrteilig', 'kobra_s1', [MODELS.cube, MODELS.mushroom, MODELS.pillar], 1);
+if (res) {
+  const g = res.gcodes[0], [bx, by] = res.tpl.bedCenter;
+  const w = g.bb[2] - g.bb[0], sumW = MODELS.cube.x + MODELS.mushroom.x + MODELS.pillar.x + 2 * 8;
+  check(Math.abs(g.maxZ - Math.max(MODELS.cube.z, MODELS.mushroom.z, MODELS.pillar.z)) < 0.3, `Höhe ${g.maxZ} = höchstes Teil`);
+  check(Math.abs(w - sumW) < 1.5, `Teile nebeneinander: Wände über ${w.toFixed(1)} mm ≈ ${sumW.toFixed(1)} mm (inkl. 2 × 8 mm Abstand)`);
+  check(Math.abs((g.bb[0] + g.bb[2]) / 2 - bx) < 1.5 && g.bb[0] > 0 && g.bb[2] < bw1, `Gruppe mittig auf dem Bett (${g.bb[0].toFixed(1)}–${g.bb[2].toFixed(1)}, Mitte ${bx})`);
+}
+const big = stl('platte.stl', boxTris(0, 0, 0, 200, 190, 3));
+res = sliceParts('Zwei Platten', 'snapmaker_u1', [big, big], 2);
+if (res) res.gcodes.forEach((g, i) => {
+  const [bx, by] = res.tpl.bedCenter, mx = (g.bb[0] + g.bb[2]) / 2, my = (g.bb[1] + g.bb[3]) / 2;
+  check(Math.abs(mx - bx) < 1.5 && Math.abs(my - by) < 1.5 && Math.abs(g.bb[2] - g.bb[0] - 200) < 1.5, `Platte ${i + 1}: Teil mittig ${mx.toFixed(1)}/${my.toFixed(1)} ≈ ${bx}/${by}`);
+});
+
 console.log(failures ? `\nFEHLGESCHLAGEN: ${failures} Prüfungen` : '\nOK: alle Werte kommen im Orca-G-Code an');
 console.log('Arbeitsordner: ' + OUT);
 process.exit(failures ? 1 : 0);

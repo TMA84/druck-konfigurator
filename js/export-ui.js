@@ -8,7 +8,7 @@ function updateExportMenu(r){
   const tpl=exportTemplate(r.printer.id,r.dSel);
   let reason='';
   if(!tpl)reason='nur mit 0,4-mm-Düse (keine Vorlage für '+de(+r.dSel,r.dSel==='0.25'?2:1)+' mm)';
-  else if(!geom)reason='zuerst eine STL laden';
+  else if(!project)reason='zuerst ein Modell laden';
   btn.disabled=!!reason;
   note.textContent=reason||'Slot wählen und speichern';
 }
@@ -19,6 +19,7 @@ function chosenSlot(){const c=document.querySelector('input[name="slot"]:checked
 
 // Aktuelle Belegung für den Dialog: live vom Drucker oder aus der Vorlage
 let slotState={printer:null,live:null,note:''};
+let slotPicked=false; // Slot im offenen Dialog von Hand gewählt
 function dialogSlots(tpl){
   if(slotState.live)return slotState.live.slots.slice(0,tpl.slots.length).map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:s.present,idx:i}));
   return tpl.slots.map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:true,idx:i}));
@@ -70,7 +71,8 @@ async function loadLiveSlots(){
     const live=await fetchLiveSlots(r.printer.id,host);
     if(slotState.printer!==r.printer.id&&slotState.printer!==null)return; // Drucker inzwischen gewechselt
     slotState={printer:r.printer.id,live,note:''};
-    renderSlotList(tpl,preferredSlot(tpl,r));
+    // Hat der Nutzer schon selbst gewählt, bleibt seine Wahl – die Antwort kann Sekunden später kommen.
+    renderSlotList(tpl,slotPicked?chosenSlot():preferredSlot(tpl,r));
   }catch(e){
     slotState={printer:r.printer.id,live:null,note:e.message};
     renderSlotList(tpl,chosenSlot());
@@ -80,11 +82,12 @@ async function loadLiveSlots(){
 
 function openExportDialog(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel);
-  if(!tpl||!geom)return;
+  if(!tpl||!project)return;
   if(slotState.printer!==r.printer.id)slotState={printer:r.printer.id,live:null,note:''};
-  $('exportSub').textContent=geom.name+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
+  $('exportSub').textContent=project.name+(project.parts.length>1?' ('+project.parts.length+' Teile)':'')+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
   renderSlotList(tpl,preferredSlot(tpl,r));
-  $('slotList').onchange=renderExportDialog;
+  slotPicked=false;
+  $('slotList').onchange=()=>{slotPicked=true;renderExportDialog()};
   renderExportDialog();
   $('exportDlg').showModal();
   loadLiveSlots();
@@ -93,8 +96,8 @@ function openExportDialog(){
 function save3mf(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),slot=chosenSlot();
   try{
-    const {bytes}=build3mf(tpl,r,geom,slot,fflate,slotState.live?slotState.live.slots:null);
-    const base=geom.name.replace(/\.stl$/i,'').replace(/[^\w.-]+/g,'_');
+    const {bytes}=build3mf(tpl,r,project.parts,slot,fflate,slotState.live?slotState.live.slots:null);
+    const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'_'+short+'_Slot'+(slot+1)+'.3mf';

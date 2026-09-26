@@ -28,13 +28,16 @@ async function runSmoke(opts={}){
     tris.forEach((t,i)=>t.flat().forEach((c,j)=>dv.setFloat32(84+i*50+12+j*4,c,true)));
     return new File([buf],name);
   }
-  async function dropFile(file){const dt=new DataTransfer();dt.items.add(file);document.dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}));await wait(150)}
+  async function dropFile(...files){const dt=new DataTransfer();files.forEach(f=>dt.items.add(f));document.dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}));await wait(150)}
+
+  // Ohne Live-Abfrage beginnen: die Prüfungen bis Abschnitt 13 erwarten die Slots der Vorlage
+  const savedHosts=store.settings.printerHosts;store.settings.printerHosts={};slotState={printer:null,live:null,note:''};
 
   /* 1) Startzustand */
   ok(document.body.dataset.printer==='kobra_s1','Start: Kobra S1 aktiv');
   ok($('title').textContent.includes('Anycubic PLA High Speed'),'Start: PLA High Speed gewählt');
   ok($('matBadge').textContent==='Getestet','Start: Badge „Getestet“');
-  ok($('export3mf').disabled&&$('export3mfNote').textContent.includes('STL'),'3MF-Menüpunkt ohne Modell gesperrt mit Grund');
+  ok($('export3mf').disabled&&$('export3mfNote').textContent.includes('Modell'),'3MF-Menüpunkt ohne Modell gesperrt mit Grund');
 
   /* 2) Druckerwechsel */
   document.querySelector('.printer-switch [data-printer="snapmaker_u1"]').click();await wait(50);
@@ -63,8 +66,26 @@ async function runSmoke(opts={}){
   sel('nozD','0.4');
 
   /* 5) Modell laden */
-  await dropFile(new File(['x'],'test.obj'));ok($('fileinfo').textContent.includes('STL-Datei'),'Falsches Format wird abgelehnt');
-  await dropFile(new File(['x'],'teil.3mf'));ok($('fileinfo').textContent.includes('3MF-Dateien'),'3MF-Datei: Hinweis zum STL-Export');
+  await dropFile(new File(['x'],'test.obj'));ok($('fileinfo').textContent.includes('nur STL, 3MF oder ZIP'),'Falsches Format wird abgelehnt');
+  await dropFile(new File(['x'],'teil.3mf'));ok($('fileinfo').textContent.includes('konnte nicht gelesen'),'Kaputte 3MF: verständliche Fehlermeldung');
+  // Mehrere Teile: zwei STLs plus ZIP mit einer STL mit zwei getrennten Körpern
+  const zipBytes=fflate.zipSync({'set/doppel.stl':new Uint8Array(await stlFile('d.stl',[[0,0,0,10,10,10],[30,0,0,40,10,4]]).arrayBuffer())});
+  await dropFile(stlFile('a.stl',[[0,0,0,20,20,20]]),stlFile('b.stl',[[0,0,0,5,5,30]]),new File([zipBytes],'paket.zip'));await wait(150);
+  const items=[...$('partList').querySelectorAll('[data-part]')];
+  ok(!$('partList').classList.contains('hidden')&&items.length===4,'Mehrere Dateien + ZIP: Teileliste mit '+items.length+' Teilen');
+  ok(items[2]&&items[2].textContent.includes('doppel.stl · Teil 1'),'Körper einer STL als eigene Teile');
+  ok(items[0].getAttribute('aria-current')==='true'&&geom.name==='a.stl','Erstes Teil ist gewählt');
+  items[1].click();await wait(50);
+  ok(geom.name==='b.stl'&&$('partList').querySelector('[data-part="1"]').getAttribute('aria-current')==='true','Klick wählt Teil 2');
+  ok($('summary').textContent.includes('30'),'Datenblatt zeigt Maße von Teil 2');
+  const lastBefore=JSON.parse(JSON.stringify(store.last));
+  menuClick('export3mf');await wait(50);$('export3mfSave').click();await wait(100);
+  store.last=lastBefore;persist(); // gemerkten Slot nicht verstellen, spätere Prüfungen hängen daran
+  const fm=downloads.filter(d=>d.name.endsWith('.3mf')).pop();
+  {const z=fflate.unzipSync(await blobBytes(fm));const msx=fflate.strFromU8(z['Metadata/model_settings.config']);
+   ok((msx.match(/<object id=/g)||[]).length===4&&Object.keys(z).filter(k=>k.startsWith('3D/Objects/')).length===4,'3MF mit 4 Objekten ('+fm.name+')')}
+  $('clear').click();await wait(50);
+  ok($('partList').classList.contains('hidden')&&!project,'Leeren entfernt die Teileliste');
   await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
   ok($('fileinfo').textContent.includes('pilz.stl')&&$('modelCard').classList.contains('loaded'),'STL per Drag&Drop geladen');
   ok(!$('modelBadge').classList.contains('hidden'),'Tab-Badge „Modell“ sichtbar');
@@ -152,7 +173,7 @@ async function runSmoke(opts={}){
   ok($('changesTitle').textContent.match(/\d+ Werte/),'Änderungsliste: '+$('changesTitle').textContent);
   ok($('slotWarn').classList.contains('hidden'),'Slot 3 (PLA) passt zu PLA: kein Hinweis');
   $('export3mfSave').click();await wait(100);
-  const f3=downloads.find(d=>d.name.endsWith('.3mf'));
+  const f3=downloads.filter(d=>d.name.endsWith('.3mf')).pop();
   ok(f3&&f3.name==='pilz_KobraS1_Slot3.3mf','Dateiname '+(f3&&f3.name));
   if(f3){const z=fflate.unzipSync(await blobBytes(f3));const ps=JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));
     ok(ps.nozzle_temperature[2]==='215'&&ps.nozzle_temperature[0]==='205','3MF: Temperatur nur in Slot 3');
@@ -199,5 +220,6 @@ async function runSmoke(opts={}){
 
   HTMLAnchorElement.prototype.click=origClick;URL.revokeObjectURL=origRevoke;
   ok(errors.length===0,'keine JavaScript-Fehler ('+errors.join(' | ')+')');
+  if(!opts.hosts){store.settings.printerHosts=savedHosts;persist()}
   return {ok:log.length,fail,log};
 }

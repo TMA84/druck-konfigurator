@@ -28,7 +28,7 @@
     <div class="menu">
       <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuDatei">Datei</button>
       <div class="menu-list" role="menu" id="menuDatei">
-        <button type="button" role="menuitem" data-action="open">STL öffnen …</button>
+        <button type="button" role="menuitem" data-action="open">Modell öffnen … <small>STL, 3MF, ZIP</small></button>
         <button type="button" role="menuitem" id="clear">Modell entfernen</button>
       </div>
     </div>
@@ -49,7 +49,7 @@
     <div class="menu">
       <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuExport">Export</button>
       <div class="menu-list" role="menu" id="menuExport">
-        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst eine STL laden</small></button>
+        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst ein Modell laden</small></button>
         <hr>
         <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON</button>
         <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON</button>
@@ -94,10 +94,12 @@
       <div class="field"><label for="supportLevel">Stützreduzierung <span class="help" title="Wirkt nur, wenn Stützen nötig sind. Weniger Stützen sparen Material, erhöhen aber das Risiko für Durchhängen.">?</span></label><select id="supportLevel"><option value="safe">Stark und sicher</option><option value="balanced" selected>Ausgewogen</option><option value="reduced">Stark reduziert</option><option value="minimal">Minimal – gerade noch haltend</option></select></div>
 
       <div class="model-card noprint" id="modelCard">
-        <div class="model-head"><span class="eyebrow">Modell</span><button class="linkbtn" type="button" data-action="open">STL öffnen</button></div>
+        <div class="model-head"><span class="eyebrow">Modell</span><button class="linkbtn" type="button" data-action="open">Modell öffnen</button></div>
         <div id="fileinfo">Noch keine Datei geladen.</div>
+        <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
+        <p id="importNotes" class="muted hidden"></p>
         <p class="oh-info muted"></p>
-        <p class="muted drop-hint">STL-Datei einfach ins Fenster ziehen.</p>
+        <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
       <div id="storeWarn" class="note bad hidden"></div>
     </aside>
@@ -136,7 +138,7 @@
 
 <section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view" hidden>
   <div id="stage">
-    <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL hier ablegen oder klicken zum Auswählen</small></div>
+    <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
     <div id="info" class="hud"></div>
     <div id="controls" class="hud">
       <button id="btnWireframe" type="button">Wireframe</button>
@@ -160,7 +162,7 @@
 </section>
 </main>
 
-<input id="file" type="file" accept=".stl,.3mf" class="hidden">
+<input id="file" type="file" accept=".stl,.3mf,.zip" multiple class="hidden">
 <input type="file" id="importFile" accept=".json,application/json" class="hidden">
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="tip" class="tip" role="tooltip" hidden></div>
@@ -193,10 +195,10 @@
 
 <dialog id="helpDlg" aria-labelledby="helpTitle"><div class="ed-head"><h2 id="helpTitle">Hilfe</h2></div>
   <div class="ed-body prose">
-    <p><b>Automatik:</b> Filamentprofil = Temperatur, Lüfter, Rückzug und maximale Volumengeschwindigkeit. Prozessprofil = Wände, Schichten, Füllung und Druckgeschwindigkeit. Die Stützen-Entscheidung kommt aus der Überhanganalyse der geladenen STL.</p>
+    <p><b>Automatik:</b> Filamentprofil = Temperatur, Lüfter, Rückzug und maximale Volumengeschwindigkeit. Prozessprofil = Wände, Schichten, Füllung und Druckgeschwindigkeit. Die Stützen-Entscheidung kommt aus der Überhanganalyse des gewählten Teils.</p>
     <p><b>Kurzhilfe:</b> Bewege den Mauszeiger über ein <span class="help">?</span> neben einem Parameter.</p>
     <p><b>Eigene Werte:</b> Druckst du mit anderer Temperatur, schneller oder langsamer, klicke bei „Filament“ auf <b>Werte anpassen</b>. Alle Empfehlungen rechnen danach mit deinen Werten. <b>Neues Filament</b> legt ein zusätzliches Profil an, z. B. für eine bestimmte Marke.</p>
-    <p><b>Wichtig:</b> STL-Maße und Überhänge werden lokal im Browser ermittelt. 3MF-Dateien bitte im Slicer als STL exportieren. Nahtposition: sichtbare Außenflächen <b>Hinten</b>; runde Teile <b>Ausgerichtet</b> oder <b>Nächstgelegen</b>. Brücken, dünne Wände und die tatsächliche Kontaktfläche der Stützen immer zusätzlich in der Slicer-Vorschau prüfen – die Empfehlung ist eine Geometrie-Näherung und ersetzt die Vorschau nicht.</p>
+    <p><b>Wichtig:</b> STL-Maße und Überhänge werden lokal im Browser ermittelt. 3MF und Makerworld-ZIPs werden direkt gelesen; bei mehreren Teilen gilt die Analyse für das in der Teileliste gewählte Teil. Nahtposition: sichtbare Außenflächen <b>Hinten</b>; runde Teile <b>Ausgerichtet</b> oder <b>Nächstgelegen</b>. Brücken, dünne Wände und die tatsächliche Kontaktfläche der Stützen immer zusätzlich in der Slicer-Vorschau prüfen – die Empfehlung ist eine Geometrie-Näherung und ersetzt die Vorschau nicht.</p>
     <p>Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang.</p>
   </div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
@@ -206,6 +208,7 @@
 <script src="js/util.js"></script>
 <script src="js/data.js"></script>
 <script src="js/stl.js"></script>
+<script src="js/import.js"></script>
 <script src="js/store.js"></script>
 <script src="js/engine.js"></script>
 <script src="vendor/fflate.min.js"></script>

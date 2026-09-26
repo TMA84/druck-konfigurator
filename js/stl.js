@@ -1,6 +1,7 @@
 'use strict';
 /* STL einlesen und Überhänge analysieren – aus v4, ohne DOM-Zugriffe. */
-function parseSTL(name,buf){
+// STL-Datei → flaches Dreiecksarray (9 Werte je Dreieck)
+function readSTL(buf){
   const bytes=new Uint8Array(buf), dv=new DataView(buf);
   let pos;
   const declared=bytes.length>=84?dv.getUint32(80,true):0;
@@ -15,6 +16,13 @@ function parseSTL(name,buf){
     while((m=re.exec(text)))arr.push(+m[1],+m[2],+m[3]);
     arr.length-=arr.length%9; pos=new Float32Array(arr);
   }
+  if(!pos.length)throw Error('Keine gültigen Dreiecke gefunden');
+  return pos;
+}
+function parseSTL(name,buf){return makeGeom(name,readSTL(buf))}
+
+// Dreiecke → Analyse-Grundlage (Maße, Winkel je Fläche, Bettkontakt); Bett = tiefster Punkt.
+function makeGeom(name,pos){
   const n=pos.length/9;
   if(!n)throw Error('Keine gültigen Dreiecke gefunden');
   let mn=[Infinity,Infinity,Infinity],mx=[-Infinity,-Infinity,-Infinity];
