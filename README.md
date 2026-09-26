@@ -13,13 +13,13 @@ Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** berec
 - **Bohrlöcher verstärken:** erkannte Löcher per Häkchen mit einem 100-%-Füllung-Ring versehen (Orca-Modifikator)
 - **3MF für OrcaSlicer:** Werte, Stützen und Slots landen direkt im Projekt
 - **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
-- **Filament-Belegung live** vom Drucker (Moonraker, nur lesend)
+- **Filament-Belegung** einmal eintragen – oder mit Rinkhals/Moonraker live vom Drucker lesen (braucht Python, nur lesend)
 - Läuft komplett lokal im Browser, ohne Installation und ohne Cloud
 
 ## Schnellstart
 
 1. **Code → Download ZIP**, entpacken.
-2. Doppelklick auf **`Konfigurator starten.cmd`** (braucht [Python](https://www.python.org)) – oder ohne Python auf **`index.html`**.
+2. Doppelklick auf **`index.html`** – keine Installation nötig.
 3. Drucker wählen, Modell ins Fenster ziehen, **Export → 3MF für OrcaSlicer**.
 
 Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
@@ -28,7 +28,7 @@ Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
 
 - Windows, aktueller Browser (Chrome, Edge, Firefox)
 - OrcaSlicer (Vorlagen erstellt mit 2.4.2)
-- Für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1)
+- Nur für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1); Start dann über `Konfigurator starten.cmd`
 
 ## Hinweise
 

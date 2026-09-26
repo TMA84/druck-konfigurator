@@ -28,12 +28,12 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 ## 1. Installation und Start
 
-**Voraussetzungen:** Windows mit einem aktuellen Browser (Chrome, Edge oder Firefox) und OrcaSlicer. Für die Live-Abfrage der Filament-Belegung zusätzlich [Python](https://www.python.org) (Version 3.8 oder neuer).
+**Voraussetzungen:** Windows mit einem aktuellen Browser (Chrome, Edge oder Firefox) und OrcaSlicer. **Keine Installation nötig.** Nur wer die Filament-Belegung live vom Drucker lesen will (Rinkhals/Moonraker), braucht zusätzlich [Python](https://www.python.org) (Version 3.8 oder neuer).
 
 1. Das Projekt als ZIP herunterladen (auf GitHub: **Code → Download ZIP**) und in einen Ordner entpacken, z. B. `C:\Druck-Konfigurator`.
 2. Starten – zwei Möglichkeiten:
-   - **Empfohlen:** Doppelklick auf **`Konfigurator starten.cmd`**. Es öffnet sich ein schwarzes Fenster (lokaler Webserver) und der Browser mit dem Tool. Das Fenster offen lassen, solange du das Tool benutzt. Der Server ist nur auf deinem PC erreichbar.
-   - **Ohne Python:** Doppelklick auf **`index.html`**. Alles funktioniert, nur die Live-Abfrage der Filament-Belegung vom Drucker nicht (der Browser blockiert sie bei direkt geöffneten Dateien).
+   - **Normal:** Doppelklick auf **`index.html`**. Alles funktioniert; die Filament-Belegung trägst du einmal im Export-Dialog ein (siehe [Kapitel 9](#9-3mf-für-orcaslicer-speichern)).
+   - **Mit Live-Abfrage** (nur Rinkhals/Moonraker, braucht Python): Doppelklick auf **`Konfigurator starten.cmd`**. Es öffnet sich ein schwarzes Fenster (lokaler Webserver) und der Browser mit dem Tool. Das Fenster offen lassen, solange du das Tool benutzt. Der Server ist nur auf deinem PC erreichbar. Direkt geöffnet (`index.html`) blockiert der Browser die Antworten der Drucker.
 
 > Deine eigenen Filamentwerte speichert der Browser getrennt je Startart. Bleib deshalb bei einer Startart – oder übertrage die Werte über **Profile → Profile exportieren/importieren**.
 
@@ -129,6 +129,8 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 
 ## 8. Drucker-Verbindung (Filament-Belegung live)
 
+> Nur mit **Rinkhals** (Kobra S1) oder **Moonraker/Klipper** – mit der Originalfirmware geht das nicht. Dann die Belegung im Export-Dialog von Hand eintragen.
+
 Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Drucker im Heimnetz ein und testest die Verbindung. Das Tool fragt dann beim Export die **tatsächliche Filament-Belegung** (Typ und Farbe je Slot) ab.
 
 - Voraussetzung: Der Drucker läuft mit **Moonraker/Klipper** (Kobra S1 mit Rinkhals, Snapmaker U1) und das Tool wurde über `Konfigurator starten.cmd` gestartet.
@@ -143,10 +145,11 @@ Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Druck
 
 **Export → 3MF für OrcaSlicer …** öffnet den Dialog:
 
-1. **Slot wählen** – bei einem Teil der Slot, bei mehreren der Standard-Slot für Teile ohne eigenen Slot. **Vom Drucker laden** holt die aktuelle Belegung.
-2. Bei mehreren Teilen zeigt die Tabelle **Teil · Slot · Filament · eigene Werte**. Passt das Filament eines Teils nicht zum Slot, hilft **„Filament … passend zur Belegung wählen“**.
-3. **Was geändert wird** – alle Werte, die gegenüber deiner Orca-Vorlage geändert werden.
-4. **3MF speichern** – die Datei landet in deinem Download-Ordner, z. B. `modell_KobraS1_Slot2.3mf`.
+1. **Belegung prüfen** – was steckt in welchem Slot? **Belegung eintragen** öffnet je Slot eine Auswahl für Filamenttyp und Farbe; das bleibt gespeichert, bis du es änderst (z. B. nach einem Spulenwechsel). **Vorlage verwenden** löscht die eigene Eingabe. Mit Rinkhals/Moonraker holt **Vom Drucker laden** die Belegung automatisch.
+2. **Slot wählen** – bei einem Teil der Slot, bei mehreren der Standard-Slot für Teile ohne eigenen Slot.
+3. Bei mehreren Teilen zeigt die Tabelle **Teil · Slot · Filament · eigene Werte**. Passt das Filament eines Teils nicht zum Slot, hilft **„Filament … passend zur Belegung wählen“**.
+4. **Was geändert wird** – alle Werte, die gegenüber deiner Orca-Vorlage geändert werden.
+5. **3MF speichern** – die Datei landet in deinem Download-Ordner, z. B. `modell_KobraS1_Slot2.3mf`.
 
 In der Datei stehen: Druckerprofil aus der Vorlage, die berechneten Filament- und Prozesswerte, die Stützen, je Teil der Slot und abweichende Werte als **Objekt-Einstellung**. Mehrere Teile werden nebeneinander aufs Bett gelegt; passt nicht alles, kommt eine weitere Platte dazu.
 

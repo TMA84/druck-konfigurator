@@ -263,6 +263,25 @@ async function runSmoke(opts={}){
   menuClick('export3mf');ok(document.querySelector('input[name="slot"]:checked').value==='0','U1: zuletzt gespeicherter Slot noch nicht gesetzt → Slot 1');$('exportDlg').close();
 
   /* 13b) Drucker-Verbindung und Live-Belegung (nur lesende Abfragen); Hosts via runSmoke({hosts}) */
+  /* Belegung von Hand eintragen (Originalfirmware): Slot 2 = PETG schwarz → Dialog, 3MF, Teileliste */
+  { if(!geom)await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
+    menuClick('export3mf');await wait(50);
+    $('slotEditBtn').click();
+    ok(!$('slotEdit').classList.contains('hidden')&&document.querySelectorAll('[data-slot-type]').length===4,'Eintragen: 4 Slots zum Ausfüllen');
+    const t=document.querySelector('[data-slot-type="1"]');t.value='PETG';document.querySelector('[data-slot-colour="1"]').value='#101010';
+    document.querySelector('[data-slot-type="3"]').value='';
+    $('slotEditSave').click();await wait(50);
+    ok(/Von Hand eingetragen/.test($('slotSource').textContent)&&/Slot 2 · PETG/.test($('slotList').textContent)&&/Slot 4 · leer/.test($('slotList').textContent),'Eintragen: Dialog zeigt die eigene Belegung');
+    document.querySelector('input[name="slot"][value="0"]').click();await wait(30);
+    $('export3mfSave').click();await wait(100);
+    const zz=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop()));
+    const pz=JSON.parse(fflate.strFromU8(zz['Metadata/project_settings.config']));
+    ok(pz.filament_type[1]==='PETG'&&pz.filament_colour[1]==='#101010'&&/PETG/.test(pz.filament_settings_id[1]),'Eintragen: 3MF hat Slot 2 = PETG schwarz mit PETG-Preset');
+    loadStore();ok(store.settings.manualSlots&&store.settings.manualSlots[$('printer').value][1].type==='PETG','Eintragen: bleibt gespeichert');
+    menuClick('export3mf');await wait(50);$('slotEditBtn').click();$('slotEditReset').click();await wait(50);
+    ok(/Vorlage/.test($('slotSource').textContent)&&!(store.settings.manualSlots||{})[$('printer').value],'Vorlage verwenden: eigene Belegung gelöscht');
+    $('exportDlg').close();}
+
   if(opts.hosts){
     sel('material','petg');
     document.querySelector('[data-action="link"]').click();ok($('linkDlg').open,'Dialog Drucker-Verbindung');

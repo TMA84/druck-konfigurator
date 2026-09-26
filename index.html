@@ -197,7 +197,9 @@
 <dialog id="exportDlg" aria-labelledby="exportTitle"><div class="ed-head"><h2 id="exportTitle">3MF für OrcaSlicer</h2><div class="muted" id="exportSub"></div></div><p id="sizeWarn" class="note bad hidden" role="alert"></p>
   <div class="ed-body">
     <fieldset class="slots"><legend id="slotLegend">Filament-Slot</legend>
-      <div class="slot-source"><span id="slotSource" class="muted">Belegung aus der Vorlage</span><button class="linkbtn" type="button" id="slotReload">Vom Drucker laden</button></div>
+      <div class="slot-source"><span id="slotSource" class="muted">Belegung aus der Vorlage</span><span class="slot-actions"><button class="linkbtn" type="button" id="slotEditBtn">Belegung eintragen</button><button class="linkbtn" type="button" id="slotReload">Vom Drucker laden</button></span></div>
+      <div id="slotEdit" class="slot-edit hidden"><p class="muted small">Was steckt gerade in welchem Slot? Bleibt gespeichert, bis du es änderst.</p><div id="slotEditRows"></div>
+        <div class="slot-edit-foot"><button class="btn sec" type="button" id="slotEditReset">Vorlage verwenden</button><button class="btn sec" type="button" id="slotEditCancel">Abbrechen</button><button class="btn" type="button" id="slotEditSave">Belegung speichern</button></div></div>
       <div id="slotList" class="slot-list"></div></fieldset>
     <div id="slotWarn" class="note hidden"></div>
     <div id="partPlan" class="hidden"><h3 class="plan-title">Teile</h3><div id="partPlanTable"></div><ul id="partPlanNotes" class="plan-notes"></ul>
