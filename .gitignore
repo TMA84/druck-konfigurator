@@ -1,0 +1,4 @@
+# Orca-CLI-Protokolle und erzeugte Dateien
+*.log
+docs/handbuch.html
+node_modules/

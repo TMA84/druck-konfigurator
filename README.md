@@ -1,0 +1,55 @@
+# Druck-Konfigurator für Kobra S1 und Snapmaker U1
+
+Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – mit Überhang-Analyse, Lage-Vorschlag, Einstellungen je Teil und Umstellung von Makerworld-Projekten auf den eigenen Drucker.
+
+![Übersicht](docs/img/uebersicht.png)
+
+## Was es kann
+
+- **Modell laden:** STL (auch mit mehreren Körpern), mehrere Dateien, 3MF, Makerworld-ZIP
+- **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
+- **Datenblatt:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung
+- **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil
+- **3MF für OrcaSlicer:** Werte, Stützen und Slots landen direkt im Projekt
+- **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
+- **Filament-Belegung live** vom Drucker (Moonraker, nur lesend)
+- Läuft komplett lokal im Browser, ohne Installation und ohne Cloud
+
+## Schnellstart
+
+1. **Code → Download ZIP**, entpacken.
+2. Doppelklick auf **`Konfigurator starten.cmd`** (braucht [Python](https://www.python.org)) – oder ohne Python auf **`index.html`**.
+3. Drucker wählen, Modell ins Fenster ziehen, **Export → 3MF für OrcaSlicer**.
+
+Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
+
+## Voraussetzungen
+
+- Windows, aktueller Browser (Chrome, Edge, Firefox)
+- OrcaSlicer (Vorlagen erstellt mit 2.4.2)
+- Für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1)
+
+## Hinweise
+
+- Alle Werte sind **Startwerte ohne Gewähr**. Getestet am Kobra S1 mit PLA High Speed und TPU; die U1-Werte sind noch nicht am U1 gegengetestet.
+- Der 3MF-Export nutzt die Orca-Vorlagen in `templates/` (0,4-mm-Düse). Eigene Vorlagen: in Orca ein leeres Projekt mit deinem Drucker speichern, nach `templates/<drucker>_0.4.3mf` legen und `node tools/build-orca-templates.js` ausführen.
+
+## Für Entwickler
+
+Reines HTML/CSS/JavaScript ohne Build-Schritt (`<script src>`, funktioniert auch über `file://`). Tests mit Node:
+
+```
+node tests/compare-v4.js      # gleiche Ergebnisse wie v4
+node tests/import.js          # Import (STL/ZIP/3MF)
+node tests/orient.js          # Lage-Bewertung
+node tests/export-project.js  # Makerworld-Umstellung
+node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
+```
+
+Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei). Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`.
+
+## Änderungen und Lizenz
+
+- Versionen und Änderungen: [CHANGELOG.md](CHANGELOG.md)
+- Lizenz: [CC BY-NC 4.0](LICENSE) – nutzen, ändern und weitergeben erlaubt, **nicht kommerziell**, mit Namensnennung.
+- Mitgelieferte Bibliotheken (three.js, fflate) stehen unter MIT-Lizenz, siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
