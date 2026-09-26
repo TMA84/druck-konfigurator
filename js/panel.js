@@ -77,6 +77,7 @@ function update(){
   if(typeof renderPartList==='function')renderPartList();
   if(typeof renderOrient==='function')renderOrient();
   if(typeof renderPartScope==='function')renderPartScope();
+  if(typeof renderHoles==='function')renderHoles();
   if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof enhanceHelp==='function')enhanceHelp();
 }

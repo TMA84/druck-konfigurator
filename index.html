@@ -114,6 +114,12 @@
           </div>
           <button type="button" id="orientAll" class="linkbtn hidden" data-orient="all">Alle Teile nach Vorschlag ausrichten</button>
         </section>
+        <section id="holeBox" class="holes hidden" aria-labelledby="holeTitle">
+          <span class="eyebrow" id="holeTitle">Bohrlöcher verstärken</span>
+          <p id="holeInfo"></p>
+          <ul id="holeList" class="hole-list"></ul>
+          <button type="button" id="holeAll" class="linkbtn hidden">Alle an/aus</button>
+        </section>
         <p class="oh-info muted"></p>
         <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
@@ -232,6 +238,7 @@
 <script src="js/stl.js"></script>
 <script src="js/import.js"></script>
 <script src="js/orient.js"></script>
+<script src="js/holes.js"></script>
 <script src="js/store.js"></script>
 <script src="js/engine.js"></script>
 <script src="vendor/fflate.min.js"></script>
@@ -244,5 +251,6 @@
 <script src="js/export-ui.js"></script>
 <script src="js/orient-ui.js"></script>
 <script src="js/part-settings.js"></script>
+<script src="js/holes-ui.js"></script>
 </body>
 </html>

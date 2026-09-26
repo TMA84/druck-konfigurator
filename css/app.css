@@ -390,3 +390,13 @@ table.changes td small { display: block; color: var(--ink-3); font-family: var(-
 .plan-notes { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--warn); }
 .plan-notes:empty { display: none; }
 table.changes td.bad { color: var(--bad); }
+
+/* Bohrlöcher verstärken */
+.holes { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.holes.hidden { display: none; }
+.holes p { margin: 4px 0 0; font-size: 13px; }
+.hole-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.hole-list li { padding: 4px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.hole-list label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.hole-list input { margin-top: 3px; accent-color: var(--accent); }
+.hole-list small { display: block; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); }

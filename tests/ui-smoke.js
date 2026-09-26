@@ -122,6 +122,25 @@ async function runSmoke(opts={}){
     ok(/<object id="1">[\s\S]*?key="extruder" value="2"/.test(msx)&&!/key="enable_support" value="1"/.test(msx),'Export: Slot bleibt, Stützen-Vorgabe des Designers durch eigene Analyse ersetzt');
     ok(/transform="1 0 0 0 1 0 0 0 1 115 115 0"/.test(root)&&/transform="1 0 0 0 1 0 0 0 1 420 120 0"/.test(root),'Export: beide Platten auf die S1-Bettmitte gerückt');
     $('clear').click();await wait(50);}
+  /* Bohrlöcher: Platte mit Loch Ø 5 → Vorschlag mit Häkchen, angehakt → Modifikator in der 3MF */
+  { const tris=[],h=6,r=2.5,n=32,sq=a=>{const c=Math.cos(a),s=Math.sin(a),k=20/Math.max(Math.abs(c),Math.abs(s));return [20+k*c,20+k*s]},ci=a=>[20+r*Math.cos(a),20+r*Math.sin(a)];
+    for(let i=0;i<n;i++){const a=2*Math.PI*i/n,b=2*Math.PI*(i+1)/n,[oa,ob,ia,ib]=[sq(a),sq(b),ci(a),ci(b)];
+      tris.push([[...ia,h],[...oa,h],[...ob,h]],[[...ia,h],[...ob,h],[...ib,h]],[[...ia,0],[...ob,0],[...oa,0]],[[...ia,0],[...ib,0],[...ob,0]],[[...oa,0],[...ob,0],[...ob,h]],[[...oa,0],[...ob,h],[...oa,h]],[[...ia,0],[...ib,h],[...ib,0]],[[...ia,0],[...ia,h],[...ib,h]])}
+    const buf=new ArrayBuffer(84+tris.length*50),dv=new DataView(buf);dv.setUint32(80,tris.length,true);tris.forEach((t,i)=>t.flat().forEach((c,j)=>dv.setFloat32(84+i*50+12+j*4,c,true)));
+    await dropFile(new File([buf],'lochplatte.stl'));await wait(300);
+    const cbs=[...$('holeList').querySelectorAll('[data-hole]')];
+    ok(!$('holeBox').classList.contains('hidden')&&cbs.length===1&&!cbs[0].checked&&/Ø 5,0 mm/.test($('holeList').textContent),'Bohrloch vorgeschlagen, Häkchen nicht gesetzt ('+$('holeList').textContent.trim().slice(0,40)+')');
+    menuClick('export3mf');await wait(50);$('export3mfSave').click();await wait(100);
+    let z=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop()));
+    ok(!/modifier_part/.test(fflate.strFromU8(z['Metadata/model_settings.config'])),'Ohne Häkchen: kein Modifikator');
+    cbs[0].click();await wait(30);
+    menuClick('export3mf');await wait(50);$('export3mfSave').click();await wait(100);
+    z=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop()));
+    const msh=fflate.strFromU8(z['Metadata/model_settings.config']);
+    ok(/modifier_part/.test(msh)&&/sparse_infill_density" value="100%"/.test(msh),'Mit Häkchen: Modifikator mit 100 % Füllung');
+    document.querySelector('.orient-tools [data-orient="x"]').click();await wait(80);
+    ok(!project.parts[0].holes.length&&$('holeList').querySelectorAll('[data-hole]').length===1,'Nach Drehung neu erkannt, Auswahl zurückgesetzt');
+    $('clear').click();await wait(50);}
   sel('material','pla_hs');sel('object','general'); // Ausgangslage für die folgenden Prüfungen
 
   /* Ausrichtung: Pilz steht auf dem Stiel → Vorschlag Hut aufs Bett */

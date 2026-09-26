@@ -94,6 +94,14 @@ Unter **Lage auf dem Bett** bewertet das Tool, wie viele Stützen die aktuelle L
 
 Bei 3MF-Projekten bleibt die Lage des Designers erhalten; Drehen ist dort gesperrt.
 
+### Bohrlöcher verstärken
+
+Unter **Bohrlöcher verstärken** listet das Tool die runden Löcher des gewählten Teils auf – senkrecht und waagerecht, mit Durchmesser, Tiefe und Lage. Nichts wird automatisch geändert: Setze ein **Häkchen** bei den Löchern, die Last tragen (z. B. Schraubenlöcher). Beim 3MF-Export bekommt jedes angehakte Loch in Orca einen **Modifikator**: einen Ring von 3 mm rund um das Loch mit **100 % Füllung**. Dort ist das Teil dann massiv und verteilt die Last der Schraube besser.
+
+- Nach einer Drehung wird neu erkannt, die Häkchen werden zurückgesetzt.
+- Nur bei STL-Teilen; Makerworld-Projekte bleiben unverändert.
+- In Orca erscheint der Modifikator unter dem Objekt als „Verstärkung Loch …“ und lässt sich dort anpassen oder löschen.
+
 ---
 
 ## 6. Einstellungen und Datenblatt
@@ -173,6 +181,7 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 
 - Getestet sind die Werte am **Kobra S1** mit PLA High Speed und TPU. Die **U1-Werte** sind übernommen und noch nicht am U1 gegengetestet – vorsichtig beginnen.
 - 3MF-Export nur mit **0,4-mm-Düse** (dafür gibt es die Orca-Vorlagen).
+- Bohrlöcher werden nur erkannt, wenn sie rund sind und entlang einer Achse des Teils verlaufen (bis etwa 3° Neigung). Schräge Löcher, Sechskant-Aussparungen für Muttern und Senkungen erscheinen nicht in der Liste.
 - Die Überhang-Erkennung ist eine Geometrie-Näherung. Bei beschädigten Netzen (verdrehte Flächen) kann ein Überhang übersehen werden.
 
 ---

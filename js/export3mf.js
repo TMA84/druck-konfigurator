@@ -179,24 +179,40 @@ const uuid = (n, tail) => ('0000' + n.toString(16)).slice(-4) + '0000-' + tail;
 const coord = v => String(Math.round(v * 1e5) / 1e5);
 
 // Netz als 3MF-Objekt: gemeinsame Eckpunkte, lokal um den Mittelpunkt zentriert (wie Orca es speichert).
-function meshModelXML(geom, id = 1) {
-  const cx = (geom.mn[0] + geom.mx[0]) / 2, cy = (geom.mn[1] + geom.mx[1]) / 2, cz = (geom.mn[2] + geom.mx[2]) / 2;
+// Ein Netz als <object>; center = Mittelpunkt des Teils, damit Modifikatoren relativ dazu passen
+function meshObjectXML(pos, center, id) {
+  const [cx, cy, cz] = center, n = pos.length / 9;
   const index = new Map(), verts = [], tris = [];
-  for (let i = 0; i < geom.n; i++) {
+  for (let i = 0; i < n; i++) {
     const t = [];
     for (let v = 0; v < 3; v++) {
       const o = i * 9 + v * 3;
-      const x = coord(geom.pos[o] - cx), y = coord(geom.pos[o + 1] - cy), z = coord(geom.pos[o + 2] - cz);
+      const x = coord(pos[o] - cx), y = coord(pos[o + 1] - cy), z = coord(pos[o + 2] - cz);
       const key = x + ' ' + y + ' ' + z;
-      let id = index.get(key);
-      if (id === undefined) { id = verts.length; index.set(key, id); verts.push('     <vertex x="' + x + '" y="' + y + '" z="' + z + '"/>'); }
-      t.push(id);
+      let vid = index.get(key);
+      if (vid === undefined) { vid = verts.length; index.set(key, vid); verts.push('     <vertex x="' + x + '" y="' + y + '" z="' + z + '"/>'); }
+      t.push(vid);
     }
     if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push('     <triangle v1="' + t[0] + '" v2="' + t[1] + '" v3="' + t[2] + '"/>');
   }
+  return '  <object id="' + id + '" p:UUID="' + uuid(id, '81cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <mesh>\n    <vertices>\n' +
+    verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n';
+}
+
+// Netz-Datei eines Teils: das Teil selbst (id) und seine Modifikatoren (mods: [{id, pos}])
+function meshModelXML(geom, id = 1, mods = []) {
+  const center = [(geom.mn[0] + geom.mx[0]) / 2, (geom.mn[1] + geom.mx[1]) / 2, (geom.mn[2] + geom.mx[2]) / 2];
   return '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n' +
-    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n  <object id="' + id + '" p:UUID="' + uuid(id, '81cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <mesh>\n    <vertices>\n' +
-    verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build/>\n</model>\n';
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n' + meshObjectXML(geom.pos, center, id) +
+    mods.map(m => meshObjectXML(m.pos, center, m.id)).join('') + ' </resources>\n <build/>\n</model>\n';
+}
+
+/* Bohrloch-Verstärkung: je gewähltem Loch ein Orca-Modifikator (Zylinder) mit 100 % Füllung.
+   Ids liegen weit über denen der Teile, damit sie in keiner Datei kollidieren. */
+const HOLE_MOD_ID_BASE = 10000;
+const HOLE_MOD_SETTINGS = [['sparse_infill_density', '100%']];
+function holeMods(k, holes) {
+  return (holes || []).map((h, j) => ({ id: HOLE_MOD_ID_BASE + k * 1000 + j + 1, pos: holeModifierMesh(h), name: 'Verstärkung Loch ' + h.id + ' (Ø ' + de(2 * h.r, 1) + ' mm)' }));
 }
 
 function bedSize(tpl) {
@@ -246,7 +262,9 @@ function modelSettingsXML(objs, plateCount) {
   const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + o.extruder + '"/>\n' +
     o.overrides.map(c => '    <metadata key="' + c.key + '" value="' + xmlEsc(c.value) + '"/>\n').join('') +
     '    <part id="' + o.k + '" subtype="normal_part">\n      <metadata key="name" value="' + o.name + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="source_file" value="' + o.name + '"/>\n' +
-    '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n  </object>\n';
+    '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n' +
+    (o.mods || []).map(m => '    <part id="' + m.id + '" subtype="modifier_part">\n      <metadata key="name" value="' + xmlEsc(m.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
+      HOLE_MOD_SETTINGS.map(([k, v]) => '      <metadata key="' + k + '" value="' + v + '"/>\n').join('') + '    </part>\n').join('') + '  </object>\n';
   const instance = o => '    <model_instance>\n      <metadata key="object_id" value="' + o.id + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + o.k + '"/>\n    </model_instance>\n';
   const plate = pi => '  <plate>\n    <metadata key="plater_id" value="' + (pi + 1) + '"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' +
     objs.filter(o => o.place.plate === pi).map(instance).join('') + '  </plate>\n';
@@ -283,7 +301,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
   const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
   // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
   const objs = items.map((p, i) => ({ g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
-    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [] }));
+    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: holeMods(i + 1, p.holes) }));
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
@@ -292,7 +310,9 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
       objs.map(o => ' <Relationship Target="' + objectPath(o.k) + '" Id="rel-' + o.k + '" Type="' + REL_TYPE + '"/>\n').join('') + '</Relationships>\n',
     '3D/3dmodel.model': XML_HEAD + MODEL_OPEN +
       ' <metadata name="Application">BambuStudio-02.06.00.51</metadata>\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">' + title + '</metadata>\n <resources>\n' +
-      objs.map(o => '  <object id="' + o.id + '" p:UUID="' + uuid(o.k, '61cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <components>\n    <component p:path="' + objectPath(o.k) + '" objectid="' + o.k + '" p:UUID="' + uuid(o.k, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n   </components>\n  </object>\n').join('') +
+      objs.map(o => '  <object id="' + o.id + '" p:UUID="' + uuid(o.k, '61cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <components>\n    <component p:path="' + objectPath(o.k) + '" objectid="' + o.k + '" p:UUID="' + uuid(o.k, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n' +
+        o.mods.map(m => '    <component p:path="' + objectPath(o.k) + '" objectid="' + m.id + '" p:UUID="' + uuid(m.id, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') +
+        '   </components>\n  </object>\n').join('') +
       ' </resources>\n <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n' +
       objs.map(o => '  <item objectid="' + o.id + '" p:UUID="' + uuid(o.id, 'b1ec-4553-aec9-835e5b724bb4') + '" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" printable="1"/>\n').join('') +
       ' </build>\n</model>\n',
@@ -301,7 +321,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
     'Metadata/slice_info.config': XML_HEAD + '<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.06.00.51"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
     'Metadata/filament_sequence.json': JSON.stringify(Object.fromEntries(Array.from({ length: plateCount }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }])))
   };
-  objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.k); });
+  objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.k, o.mods); });
   return { files, changes, plateCount, objectChanges, notes };
 }
 

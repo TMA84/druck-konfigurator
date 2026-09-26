@@ -14,9 +14,9 @@ const ORCA = process.env.ORCA || 'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verify3mf-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'export3mf'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
-const K = vm.runInContext('({compute,getMat,store,parseSTL,exportTemplate,build3mf,plannedChanges})', ctx);
+const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,build3mf,plannedChanges,findHoles})', ctx);
 
 /* ---------- Testmodelle ---------- */
 function boxTris(x0, y0, z0, x1, y1, z1) {
@@ -191,6 +191,53 @@ if (!ONLY_MW) {
     check(temps[0] === String(rB.nozzle) && temps[1] === String(rA.nozzle), `Düsentemperaturen je Slot ${temps.slice(0, 2).join('/')} = ${rB.nozzle}/${rA.nozzle}`);
     check(cfg.wall_loops === String(rB.w) && cfg.enable_support === '0', `Globale Werte vom Würfel (Wände ${cfg.wall_loops}, Stützen ${cfg.enable_support})`);
   } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
+/* ---------- Bohrloch-Verstärkung: Platte mit zwei Löchern, eines mit Modifikator (100 % Füllung) ---------- */
+if (!ONLY_MW) {
+  // Platte 60×30×6 mit zwei senkrechten Löchern Ø 5 (geschlossenes Netz, 32 Segmente je Loch)
+  function plateTwoHoles() {
+    const tris = [], h = 6, r = 2.5, n = 32;
+    const cell = (cx, x0, x1) => {
+      const sq = a => { const c = Math.cos(a), s = Math.sin(a), k = 15 / Math.max(Math.abs(c), Math.abs(s)); return [cx + k * c, 15 + k * s]; };
+      const ci = a => [cx + r * Math.cos(a), 15 + r * Math.sin(a)];
+      for (let i = 0; i < n; i++) {
+        const a = 2 * Math.PI * i / n, b = 2 * Math.PI * (i + 1) / n, [oa, ob, ia, ib] = [sq(a), sq(b), ci(a), ci(b)];
+        tris.push([[...ia, h], [...oa, h], [...ob, h]], [[...ia, h], [...ob, h], [...ib, h]], [[...ia, 0], [...ob, 0], [...oa, 0]], [[...ia, 0], [...ib, 0], [...ob, 0]]);
+        tris.push([[...ia, 0], [...ib, h], [...ib, 0]], [[...ia, 0], [...ia, h], [...ib, h]]);
+        // Außenwand nur dort, wo die Zelle nicht an die Nachbarzelle stößt (x = 30 ist innen)
+        const outside = p => !(Math.abs(p[0] - 30) < 1e-9);
+        if (outside(oa) || outside(ob)) tris.push([[...oa, 0], [...ob, 0], [...ob, h]], [[...oa, 0], [...ob, h], [...oa, h]]);
+      }
+    };
+    cell(15); cell(45);
+    return K.makeGeom('lochplatte.stl', Float32Array.from(tris.flat(2)));
+  }
+  const geom = plateTwoHoles();
+  const holes = K.findHoles(geom);
+  console.log('\nBohrloch-Verstärkung: ' + holes.length + ' Löcher erkannt');
+  check(holes.length === 2, `2 Löcher erkannt (${holes.map(x => 'Ø ' + (2 * x.r).toFixed(2)).join(', ')})`);
+  const inp = { printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const r = K.compute(inp, geom, { getMat: K.getMat, settings: K.store.settings });
+  const tpl = K.exportTemplate('kobra_s1', '0.4');
+  const used = {};
+  for (const [label, sel] of [['ohne', []], ['mit', holes.slice(0, 1)]]) {
+    const { bytes } = K.build3mf(tpl, r, [{ geom, r, holes: sel }], 0, fflate);
+    const z = fflate.unzipSync(bytes), ms = fflate.strFromU8(z['Metadata/model_settings.config']);
+    if (label === 'mit') check((ms.match(/subtype="modifier_part"/g) || []).length === 1 && /sparse_infill_density" value="100%"/.test(ms), 'Modifikator mit 100 % Füllung in der 3MF');
+    const dir = path.join(OUT, 'loch_' + label); fs.mkdirSync(dir);
+    const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+    try { execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 }); }
+    catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); continue; }
+    const text = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.gcode'))), 'utf8'), g = parseGcode(text);
+    used[label] = { mm: Number((text.match(/^; filament used \[mm\] = ([\d.]+)/m) || [])[1]), g };
+  }
+  if (used.ohne && used.mit) {
+    const [a, b] = [used.ohne.mm, used.mit.mm];
+    check(b > a * 1.02, `Mehr Material durch die Verstärkung: ${a} → ${b} mm Filament (+${((b / a - 1) * 100).toFixed(1)} %)`);
+    const w = gg => (gg.bb[2] - gg.bb[0]).toFixed(1) + ' × ' + (gg.bb[3] - gg.bb[1]).toFixed(1);
+    check(w(used.ohne.g) === w(used.mit.g) && used.ohne.g.maxZ === used.mit.g.maxZ, `Modifikator wird nicht selbst gedruckt (Wände ${w(used.mit.g)} mm, Höhe ${used.mit.g.maxZ})`);
+  }
 }
 
 /* ---------- Makerworld-3MF auf den eigenen Drucker umstellen (optional: MW3MF=<Pfad>) ---------- */

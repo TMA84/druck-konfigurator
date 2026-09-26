@@ -10,6 +10,7 @@ Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** berec
 - **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
 - **Datenblatt:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung
 - **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil
+- **Bohrlöcher verstärken:** erkannte Löcher per Häkchen mit einem 100-%-Füllung-Ring versehen (Orca-Modifikator)
 - **3MF für OrcaSlicer:** Werte, Stützen und Slots landen direkt im Projekt
 - **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
 - **Filament-Belegung live** vom Drucker (Moonraker, nur lesend)

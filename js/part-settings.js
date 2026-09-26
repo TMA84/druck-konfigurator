@@ -52,7 +52,7 @@ $('partSlot').addEventListener('change', () => {
 // Je Teil ein eigenes Ergebnis; Drucker, Düse und Überhangwinkel gelten für alle
 function partJobs() {
   const base = currentInput(), ctx = { getMat, settings: store.settings };
-  return project.parts.map(p => ({ geom: p.geom, slot: p.slot ?? null, part: p, r: compute({ ...base, ...(p.input || {}) }, p.geom, ctx) }));
+  return project.parts.map(p => ({ geom: p.geom, slot: p.slot ?? null, part: p, holes: p.holeGeom === p.geom ? p.holes || [] : [], r: compute({ ...base, ...(p.input || {}) }, p.geom, ctx) }));
 }
 
 /* Globale Werte = erstes Teil ohne eigenen Slot (dessen Slot wählt der Dialog); haben alle Teile einen
