@@ -2,6 +2,8 @@
 /* Rechenkern – aus v4 übernommen. Einziger Unterschied: Eingaben kommen als
    Parameter statt aus dem DOM, damit tests/compare-v4.js ihn gegen v4 prüfen kann. */
 
+// Objektart „Wasserdicht / Behälter“
+const WATERTIGHT_TEMP_BOOST=5, WATERTIGHT_OUTER_FACTOR=0.7;
 function supportProfile(level,tpu){
   const p={
     safe:{angle:45,xy:tpu?'0,40 mm':'0,35 mm',iface:tpu?3:2,gap:'0,50 mm',density:tpu?'15 %':'20 %',branch:tpu?'1,5–2,0 mm':'1,0–1,5 mm',small:'Ein'},
@@ -119,7 +121,9 @@ function compute(I,geom,ctx){
   let volF=N.v/R.v,tOff=0;
   if(selFamily!==refFamily){if(selFamily==='steel'){tOff=+S.steelOffset;volF*=+S.steelVol}else{tOff=-S.steelOffset;volF/=+S.steelVol}}
   const maxVol=Math.round(m.maxVol*volF*10)/10;
-  const nozzle=Math.round(m.nozzle[pi]+tOff);
+  // Wasserdicht: etwas heißer für besser verschmelzende Schichten, langsamere Außenwand
+  const wtBoost=o==='watertight'?WATERTIGHT_TEMP_BOOST:0;
+  const nozzle=Math.round(m.nozzle[pi]+tOff+wtBoost);
   const nozLabel=de(+dSel,dSel==='0.25'?2:1)+' mm '+NOZZLE_MATERIALS[mSel].label;
 
   // Schichthöhe
@@ -141,7 +145,7 @@ function compute(I,geom,ctx){
   // Geschwindigkeiten (Slicer-Wert + effektive Grenze durch Volumenstrom)
   let top=m.top;if(o==='multicolor'||o==='precision'||g==='quality')top=Math.min(top,tpu?20:40);
   const capNote=(v,lw)=>{const c=Math.floor(maxVol/(layer*lw));return v>c?'effektiv ca. '+c+' mm/s (Grenze '+de(maxVol,1)+' mm³/s)':''};
-  const sp_outer=m.outer[pi],sp_inner=m.inner[pi],sp_fill=m.fill[pi];
+  const sp_outer=o==='watertight'?Math.round(m.outer[pi]*WATERTIGHT_OUTER_FACTOR):m.outer[pi],sp_inner=m.inner[pi],sp_fill=m.fill[pi];
   const nOuter=capNote(sp_outer,N.lwo),nInner=capNote(sp_inner,N.lw),nFill=capNote(sp_fill,N.lw);
   const accelTxt=m.accel>0?de(m.accel,0)+' mm/s²':'Werksprofil beibehalten';
   const accelNote=m.accel>0?'':'bei Ringing reduzieren';
@@ -187,7 +191,7 @@ function compute(I,geom,ctx){
 
   // Übersicht
   const rows=[
-    ['Düse',nozzle+' °C',tOff?(tOff>0?'+':'−')+Math.abs(tOff)+' °C für '+NOZZLE_MATERIALS[mSel].label:''],['Heizbett',m.bed+' °C',esc(m.bedNote)],
+    ['Düse',nozzle+' °C',[tOff?(tOff>0?'+':'−')+Math.abs(tOff)+' °C für '+NOZZLE_MATERIALS[mSel].label:'',wtBoost?'+'+wtBoost+' °C für dichte Schichten':''].filter(Boolean).join(' · ')],['Heizbett',m.bed+' °C',esc(m.bedNote)],
     ['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(N.fl,2)+' mm'],
     ['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner],['Füllung / Travel',sp_fill+' / '+m.travel+' mm/s',nFill],
     ['Wandlinien',base.wr&&soft?base.wr:w],['Obere / untere Schichten',t+' / '+b],
@@ -259,6 +263,7 @@ function compute(I,geom,ctx){
   if(o==='precision')warn.push('<b>Präzisionsteil:</b> Vorher einen kleinen Testkörper mit dem kritischen Maß drucken und nachmessen. Weichen die Maße systematisch ab, das Durchflussverhältnis oder die X-Y-Konturkompensation anpassen.');
   if(o==='multicolor')warn.push('<b>Mehrfarbig:</b> Jeder Farbwechsel kostet Zeit und Spülmaterial. Kleine Details in einer eigenen Farbe verursachen viele zusätzliche Wechsel. Eine größere Schichthöhe reduziert die Zahl der Wechsel.');
   if(o==='overhang'&&!a)warn.push('<b>Freiform:</b> Zuerst die Ausrichtung prüfen. Das Modell um 10–20° zu kippen reduziert Stützen oft deutlicher als jede Parameteränderung.');
+  if(o==='watertight')warn.push('<b>Wasserdicht:</b> Dicht wird ein Teil über die Wand: '+w+' Wandlinien, '+t+' / '+b+' Deck-/Bodenschichten, +'+WATERTIGHT_TEMP_BOOST+' °C und eine langsamere Außenwand sind gesetzt; im Slicer „Lückenfüllung überall“. Lüfter eher niedrig halten. PETG und ASA werden dichter als PLA. Einfache Gefäße ohne Deckel: Vasenmodus mit breiter Linie (0,6–0,8 mm) ist oft dichter. Für dauerhaften Wasserkontakt oder Druck innen mit Epoxidharz beschichten. Nicht für Trinkwasser oder Lebensmittel geeignet – nach dem Druck mit Wasser testen.');
   if(o==='thin')warn.push('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.');
 
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,

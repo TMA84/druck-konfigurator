@@ -112,6 +112,8 @@ const ORCA_PROCESS_BASE={
 const OBJ={
   general:{label:'Funktionsteil',pla:{w:2,t:4,b:4,i:15},tpu:{w:2,t:3,b:3,i:10}},
   holder:{label:'Halterung',pla:{w:3,t:4,b:4,i:20},tpu:{w:3,t:3,b:3,i:15}},
+  // Dichtheit kommt aus der Wand (≥ 4 Linien ≈ 1,6–2 mm) und einem dicken Boden, nicht aus der Füllung
+  watertight:{label:'Wasserdicht / Behälter',pla:{w:4,t:5,b:6,i:15},tpu:{w:3,t:4,b:5,i:10}},
   precision:{label:'Präzisionsteil',pla:{w:3,t:5,b:5,i:25},tpu:{w:3,t:4,b:4,i:20}},
   thin:{label:'Dünnwandiges Gehäuse',pla:{w:2,t:4,b:4,i:15},tpu:{w:2,t:3,b:3,i:10}},
   decor:{label:'Dekoration',pla:{w:2,t:4,b:4,i:10},tpu:{w:2,t:3,b:3,i:10}},

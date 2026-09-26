@@ -41,6 +41,8 @@ const CASES = [
   { printer: 'snapmaker_u1', material: 'tpu', object: 'tire', goal: 'balanced', load: 'medium', model: 'pillar', slot: 1 },
   { printer: 'snapmaker_u1', material: 'petg_hs', object: 'precision', goal: 'fast', load: 'low', model: 'cube', slot: 3 },
   { printer: 'snapmaker_u1', material: 'abs', object: 'holder', goal: 'strong', load: 'high', support: 'allow', model: 'mushroom', slot: 0 },
+  // Objektart „Wasserdicht / Behälter“: mehr Wände/Schichten, +5 °C, Lückenfüllung überall
+  { printer: 'snapmaker_u1', material: 'petg', object: 'watertight', goal: 'balanced', load: 'medium', model: 'cube', slot: 0 },
   // mit Live-Belegung vom Drucker (Stand der Abfrage am 26.09.2026)
   { printer: 'kobra_s1', material: 'petg', object: 'general', goal: 'balanced', load: 'medium', model: 'cube', slot: 1,
     live: [{ type: 'PLA', colour: '#AFAFAF' }, { type: 'PETG', colour: '#75787B' }, { type: 'PETG', colour: '#212721' }, { type: 'PETG', colour: '#212721' }] },

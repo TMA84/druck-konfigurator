@@ -119,6 +119,10 @@ function plannedChanges(r, slot, liveSlots) {
   proc('Brim', 'brim_type', brimType);
   if (brimWidth) proc('Brim-Breite', 'brim_width', brimWidth);
   if (SEAM_ORCA[r.seam]) proc('Nahtposition', 'seam_position', SEAM_ORCA[r.seam]);
+  if (r.o === 'watertight') {  // Lücken zwischen den Bahnen sind die typischen Undichtigkeiten
+    proc('Lückenfüllung', 'gap_fill_target', 'everywhere');
+    proc('Vertikale Schalendicke sicherstellen', 'ensure_vertical_shell_thickness', 'ensure_all');
+  }
   return f.map(([label, key, value, index]) => ({ label, key, value, perSlot: index !== null, index }));
 }
 
@@ -178,7 +182,7 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = []) {
    Travel und Erste-Schicht-Geschwindigkeit gelten für die ganze Platte und bleiben global. */
 const OBJECT_KEYS = new Set(['wall_loops', 'sparse_infill_density', 'sparse_infill_pattern', 'top_shell_layers', 'bottom_shell_layers',
   'outer_wall_speed', 'inner_wall_speed', 'sparse_infill_speed', 'internal_solid_infill_speed', 'top_surface_speed', 'gap_infill_speed',
-  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'seam_position']);
+  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'seam_position', 'gap_fill_target', 'ensure_vertical_shell_thickness']);
 const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(k);
 
 // Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config
