@@ -84,12 +84,11 @@ function plannedChanges(r, slot, liveSlots) {
   fil('Lüfter max.', 'fan_max_speed', r.m.fan);
   fil('Max. Volumenstrom', 'filament_max_volumetric_speed', numStr(r.maxVol));
   fil('Durchflussverhältnis', 'filament_flow_ratio', numStr(r.m.flow));
-  // Lüfter erste Schicht, Rückzug und Z-Hop als Filament-Überschreibung je Slot – das Druckerprofil
-  // bleibt unverändert, jedes Material bringt seine eigenen Werte mit (TPU anders als PLA).
+  // Lüfter erste Schicht und Z-Hop als Filament-Überschreibung je Slot. Den Rückzug schreibt das Tool
+  // bewusst nicht: er hängt von Filament, Temperatur und Extruder ab, das Orca-Filamentprofil des Slots
+  // bringt passende Werte mit (Entscheidung des Nutzers 2026-09-26, bisherige Standardwerte passten).
   fil('Lüfter erste Schicht aus', 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
-  if (isNum(r.m.retrLen)) fil('Rückzug Länge', 'filament_retraction_length', numStr(r.m.retrLen));
-  if (isNum(r.m.retrSpeed)) fil('Rückzug Geschwindigkeit', 'filament_retraction_speed', numStr(r.m.retrSpeed));
   if (isNum(r.m.zhop)) fil('Z-Hop', 'filament_z_hop', numStr(r.m.zhop));
   if (r.m.pa !== null && r.m.pa !== undefined && r.m.pa !== '') {
     fil('Pressure Advance', 'pressure_advance', numStr(r.m.pa));

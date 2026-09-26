@@ -119,11 +119,14 @@ for (const [i, c] of (ONLY_MW ? [] : CASES).entries()) {
   }
   // 1b) Stützen werden tatsächlich gedruckt, wenn sie empfohlen sind – und sonst nicht
   check(r.supOn ? g.supportMoves > 0 : g.supportMoves === 0, `Stützen im G-Code: ${g.supportMoves} Bahnen (empfohlen: ${r.supOn ? 'ja' : 'nein'})`);
-  // 1c) Rückzug tatsächlich mit der berechneten Länge (häufigster Wert beim Zurückschieben)
+  // 1c) Rückzug bleibt beim Orca-Standard: Filamentprofil des Slots, sonst Druckerprofil (häufigster Wert beim Zurückschieben)
+  check(!K.plannedChanges(r, c.slot, c.live).some(p => /retraction/.test(p.key)), 'Rückzug wird nicht überschrieben');
   if (g.unretracts.length) {
     const cnt = {}; g.unretracts.forEach(v => { cnt[v] = (cnt[v] || 0) + 1; });
     const mode = +Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
-    check(Math.abs(mode - r.m.retrLen) < 1e-6, `Rückzug im G-Code ${mode} mm = ${r.m.retrLen} mm (${g.unretracts.length} Rückzüge)`);
+    const at = (key, i) => { const a = String(g.cfg[key] || '').split(/[,;]/); return a[i] !== undefined ? a[i] : a[0]; };
+    const fil = at('filament_retraction_length', c.slot), std = +(fil && fil !== 'nil' ? fil : at('retraction_length', c.slot));
+    check(Math.abs(mode - std) < 1e-6, `Rückzug im G-Code ${mode} mm = Orca-Standard ${std} mm (${g.unretracts.length} Rückzüge)`);
   } else check(false, 'keine Rückzüge im G-Code gefunden');
   // 1d) Beschleunigung: gibt das Datenblatt eine vor (TPU), werden Wände höchstens damit gedruckt
   if (Number(r.m.accel) > 0) check(g.wallAccelMax > 0 && g.wallAccelMax <= r.m.accel, `Wände mit höchstens ${r.m.accel} mm/s² gedruckt (im G-Code max. ${g.wallAccelMax})`);

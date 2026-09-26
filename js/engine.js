@@ -146,6 +146,8 @@ function compute(I,geom,ctx){
   const accelTxt=m.accel>0?de(m.accel,0)+' mm/s²':'Werksprofil beibehalten';
   const accelNote=m.accel>0?'':'bei Ringing reduzieren';
   const retr=de(m.retrLen,1)+' mm / '+de(m.retrSpeed,0)+' mm/s';
+  // Rückzug bleibt beim Orca-Standard (Filament- bzw. Druckerprofil); der Wert aus den S1-Tests ist nur Richtwert
+  const retrRow=['Rückzug','Orca-Standard','Richtwert '+retr+' (am S1 getestet)'];
   const enclosed=m.kind==='abs'||m.kind==='asa';
 
   // Stützen
@@ -191,7 +193,7 @@ function compute(I,geom,ctx){
     ['Wandlinien',base.wr&&soft?base.wr:w],['Obere / untere Schichten',t+' / '+b],
     ['Fülldichte / Muster',(base.ir&&soft?base.ir:inf+' %')+' / '+pattern],
     ['Lüfter',m.fan+' %',fanNote],['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?'umgerechnet für '+nozLabel:''],
-    ['Beschleunigung',accelTxt,accelNote],['Rückzug',retr],['Support',sup],['Brim',brim,brimNote]
+    ['Beschleunigung',accelTxt,accelNote],retrRow,['Support',sup],['Brim',brim,brimNote]
   ];
 
   const supZ=supportZGap(layer,m.kind,tpu);
@@ -233,7 +235,7 @@ function compute(I,geom,ctx){
     ['Profilname',esc(m.name)],['Düse',nozzle+' °C','erste und weitere Schichten'],['Herstellerbereich',esc(m.range)||'Angabe auf der Rolle'],
     ['Heizbett',m.bed+' °C',esc(m.bedNote)],['Lüfter erste Schicht',m.fanFirst+' %'],['Lüfter Folgeschichten',m.fan+' %',fanNote],
     ['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s'],['Durchflussverhältnis',de(m.flow,2)]]
-    .concat(m.pa!=null&&m.pa!==''?[['Pressure Advance',de(m.pa,3)]]:[]).concat([['Rückzug',retr],['Filament trocken',dryNeed?'Ja, unbedingt':'Ja',esc(m.dry)]])]);
+    .concat(m.pa!=null&&m.pa!==''?[['Pressure Advance',de(m.pa,3)]]:[]).concat([retrRow,['Filament trocken',dryNeed?'Ja, unbedingt':'Ja',esc(m.dry)]])]);
   ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],['Brim',brim,brimNote],['Z-Hop',de(m.zhop,1)+' mm'],['Erste Schicht beobachten','Ja']]]);
 
   // Warnungen / Hinweise

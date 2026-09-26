@@ -161,7 +161,10 @@ for (const c of cases) {
   // Für den Vergleich wird die v4-Angabe eingesetzt; die neuen Werte prüft tests/verify-3mf.js im G-Code.
   const V4_ZGAP = { 'Oberer Z-Abstand': '0,20 mm', 'Unterer Z-Abstand': rn.tpu ? '0,25 mm' : '0,20 mm' };
   rn.ordered = rn.ordered.map(([t, rows]) => [t, rows.map(r => V4_ZGAP[r[0]] ? [r[0], V4_ZGAP[r[0]], ...r.slice(2)] : r)]);
-  rnV4View.ordered = rn.ordered;
+  // Bewusste Änderung 2026-09-26: Rückzug zeigt „Orca-Standard“, der v4-Wert steht als Richtwert daneben
+  const v4Retr = r => r[0] === 'Rückzug' && r[1] === 'Orca-Standard' ? ['Rückzug', r[2].replace(/^Richtwert /, '').replace(/ \(am S1 getestet\)$/, '')] : r;
+  rn.ordered = rn.ordered.map(([t, rows]) => [t, rows.map(v4Retr)]); rn.rows = rn.rows.map(v4Retr);
+  rnV4View.ordered = rn.ordered; rnV4View.rows = rn.rows;
   const out4 = [JSON.stringify(r4), V4.buildOrcaFilamentJSON(r4), V4.buildOrcaProcessJSON(r4), V4.orcaWarningText(r4),
     r4.rows.map(V4.rowHTML).join(''), r4.ordered.map(g => g[1].map(V4.rowHTML).join('')).join('|')];
   const outN = [JSON.stringify(rnV4View), NEW.buildOrcaFilamentJSON(rn), NEW.buildOrcaProcessJSON(rn), NEW.orcaWarningText(rn),
