@@ -60,20 +60,24 @@ function parseGcode(text) {
   const nozzleCmds = [], bedCmds = [];
   let supportMoves = 0;
   const unretracts = []; // reine E-Bewegungen ohne XY nach vorne = Zurückschieben nach einem Rückzug
+  let accel = null, wallAccelMax = 0; // Beschleunigung, mit der Wände tatsächlich gedruckt werden (M204 / Klipper)
   for (const line of text.split('\n')) {
     if (line.startsWith(';TYPE:')) type = line.slice(6).trim();
     const mk = /^G9111 bedTemp=(\d+) extruderTemp=(\d+)/.exec(line); // Anycubic-Startmakro (Kobra S1)
     if (mk) { bedCmds.push(+mk[1]); nozzleCmds.push(+mk[2]); }
     const tn = /^M10[49] .*?S(\d+)/.exec(line); if (tn && +tn[1] > 0) nozzleCmds.push(+tn[1]);
     const tb = /^M1[49]0 .*?S(\d+)/.exec(line); if (tb && +tb[1] > 0) bedCmds.push(+tb[1]);
+    const ac = /^M204 .*?S(\d+)/.exec(line) || /^SET_VELOCITY_LIMIT .*?ACCEL=(\d+)/.exec(line); if (ac) accel = +ac[1];
     if (!/^G[01] /.test(line)) continue;
     if (/^Support/i.test(type) && / E\.?\d/.test(line)) supportMoves++;
     const ue = /^G1 E(\.?\d[\d.]*) F/.exec(line); if (ue) unretracts.push(+ue[1]);
+    // nur echte Druckbahnen (mit X/Y) – das Zurückschieben nach einem Rückzug läuft noch mit Fahr-Beschleunigung
+    if (/ [XY]-?[\d.]/.test(line) && / E\.?\d/.test(line) && /wall/i.test(type) && accel !== null) wallAccelMax = Math.max(wallAccelMax, accel);
     const gx = /X(-?[\d.]+)/.exec(line), gy = /Y(-?[\d.]+)/.exec(line), ge = /E([\d.]+)/.exec(line);
     if (gx) x = +gx[1]; if (gy) y = +gy[1];
     if (ge && +ge[1] > 0 && x !== null && y !== null && /wall/i.test(type)) { bb[0] = Math.min(bb[0], x); bb[1] = Math.min(bb[1], y); bb[2] = Math.max(bb[2], x); bb[3] = Math.max(bb[3], y); }
   }
-  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds, supportMoves, unretracts };
+  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds, supportMoves, unretracts, wallAccelMax };
 }
 
 let failures = 0;
@@ -121,6 +125,8 @@ for (const [i, c] of (ONLY_MW ? [] : CASES).entries()) {
     const mode = +Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
     check(Math.abs(mode - r.m.retrLen) < 1e-6, `Rückzug im G-Code ${mode} mm = ${r.m.retrLen} mm (${g.unretracts.length} Rückzüge)`);
   } else check(false, 'keine Rückzüge im G-Code gefunden');
+  // 1d) Beschleunigung: gibt das Datenblatt eine vor (TPU), werden Wände höchstens damit gedruckt
+  if (Number(r.m.accel) > 0) check(g.wallAccelMax > 0 && g.wallAccelMax <= r.m.accel, `Wände mit höchstens ${r.m.accel} mm/s² gedruckt (im G-Code max. ${g.wallAccelMax})`);
   // 2) Das Modell druckt mit dem gewählten Slot
   check(g.filament === String(c.slot + 1), `Slot: erwartet ${c.slot + 1}, G-Code "; filament: ${g.filament}"`);
   // 3) Tatsächliche Befehle: Düsen- und Betttemperatur

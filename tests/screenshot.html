@@ -7,8 +7,8 @@ f.onload=()=>{const w=f.contentWindow,d=w.document;
  function box(x0,y0,z0,x1,y1,z1){const v=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];return [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]].map(t=>t.map(i=>v[i]))}
  const tris=[...box(15,15,0,25,25,20),...box(0,0,20,40,40,25)],buf=new ArrayBuffer(84+tris.length*50),dv=new DataView(buf);dv.setUint32(80,tris.length,true);tris.forEach((t,i)=>t.flat().forEach((c,j)=>dv.setFloat32(84+i*50+12+j*4,c,true)));
  if(q.get('printer'))d.querySelector('.printer-switch [data-printer="'+q.get('printer')+'"]').click();
- // model=1: Pilz; model=2: Pilz + zweites Teil (Teileliste)
- const loaded=q.get('model')?w.loadFiles(q.get('model')==='2'?[new w.File([buf],'pilz.stl'),new w.File([buf],'pilz-2.stl')]:[new w.File([buf],'pilz.stl')]):Promise.resolve();
+ // model=N: N Pilze als Teile (Teileliste)
+ const loaded=q.get('model')?w.loadFiles(Array.from({length:Math.max(1,+q.get('model')||1)},(_,i)=>new w.File([buf],i?'pilz-'+(i+1)+'.stl':'pilz.stl'))):Promise.resolve();
  loaded.then(()=>{
   if(q.get('scroll'))w.document.querySelector('.inputs').scrollIntoView();if(q.get('card'))d.getElementById('modelCard').scrollIntoView();
   if(q.get('tab')==='3d')d.getElementById('tab3d').click();

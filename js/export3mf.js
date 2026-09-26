@@ -7,6 +7,9 @@
 const ORCA_KIND = { pla: 'PLA', petg: 'PETG', abs: 'ABS', asa: 'ASA', tpu: 'TPU' };
 const BED_TEMP_KEYS = ['hot_plate_temp', 'textured_plate_temp', 'cool_plate_temp', 'eng_plate_temp'];
 const SEAM_ORCA = { Hinten: 'back', Ausgerichtet: 'aligned' };
+const ACCEL_KEYS = [['Beschleunigung Standard', 'default_acceleration'], ['Beschleunigung Außenwand', 'outer_wall_acceleration'],
+  ['Beschleunigung Innenwand', 'inner_wall_acceleration'], ['Beschleunigung massive Füllung', 'internal_solid_infill_acceleration'],
+  ['Beschleunigung Füllung', 'sparse_infill_acceleration'], ['Beschleunigung obere Fläche', 'top_surface_acceleration']];
 const PART_GAP_MM = 8;          // Abstand zwischen Teilen beim Anordnen
 const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße versetzt ab (Spalten = ⌈√Platten⌉)
 const objectPath = k => '/3D/Objects/object_' + k + '.model';
@@ -108,6 +111,9 @@ function plannedChanges(r, slot, liveSlots) {
   proc('Lückenfüllung', 'gap_infill_speed', r.m.gap);
   proc('Erste Schicht Geschwindigkeit', 'initial_layer_speed', r.m.first);
   proc('Travel', 'travel_speed', r.m.travel);
+  // Beschleunigung nur, wenn das Datenblatt sie vorgibt (TPU 800 mm/s²); sonst bleibt das Werksprofil.
+  // Druckbewegungen werden begrenzt, Travel und erste Schicht (500 mm/s² in den Vorlagen) bleiben.
+  if (Number(r.m.accel) > 0) ACCEL_KEYS.forEach(([label, key]) => proc(label, key, numStr(r.m.accel)));
   proc('Stützen', 'enable_support', r.supOn ? 1 : 0);
   if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
   const [brimType, brimWidth] = orcaBrim(r.brim);
