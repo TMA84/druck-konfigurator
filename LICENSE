@@ -1,0 +1,19 @@
+Druck-Konfigurator
+Copyright (c) 2026 wolfb63-del
+
+Dieses Werk ist lizenziert unter der Creative Commons Namensnennung –
+Nicht kommerziell 4.0 International Lizenz (CC BY-NC 4.0).
+
+This work is licensed under the Creative Commons Attribution-NonCommercial
+4.0 International License. To view a copy of this license, visit
+https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+Kurz gesagt: Du darfst das Werk nutzen, verändern und weitergeben, solange du
+den Urheber nennst und es nicht kommerziell verwendest. Maßgeblich ist der
+Lizenztext unter dem Link oben.
+
+Ausgenommen sind die Dateien in vendor/ (three.js, fflate). Sie stehen unter
+der MIT-Lizenz ihrer Urheber, siehe THIRD_PARTY_NOTICES.md.
+
+Die berechneten Druckwerte sind Startwerte ohne Gewähr. Das Werk wird ohne
+jede Gewährleistung bereitgestellt (siehe Abschnitt 5 des Lizenztextes).
