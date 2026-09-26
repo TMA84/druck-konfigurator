@@ -38,7 +38,7 @@ function renderSlotList(tpl,preselect){
   $('slotList').innerHTML=slots.map(s=>
     '<label class="slot'+(s.present?'':' absent')+'" title="'+esc(s.name)+'"><input type="radio" name="slot" value="'+s.idx+'"'+(s.idx===preselect?' checked':'')+'>'+
     '<span class="swatch" style="background:'+esc(/^#[0-9a-f]{6}$/i.test(s.colour)?s.colour:'#888888')+'"></span>'+
-    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b>'+(s.type?' · '+esc(s.type):s.present?'':' · leer')+'<small>'+esc(!s.present?'kein Filament':s.name||'Filament nicht bekannt')+'</small></span></label>').join('');
+    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b>'+(s.type?' · '+esc(s.type):s.present?'':' · leer')+'<small>'+esc(!s.present?'kein Filament':s.name||'unbekannt')+'</small></span></label>').join('');
   const src=document.querySelector('.slot-source'),kind=slotSource(tpl).kind;
   src.classList.toggle('live',kind!=='template');src.classList.toggle('fallback',kind==='template'&&!!slotState.note);
   $('slotSource').textContent=kind==='live'
@@ -135,7 +135,7 @@ function openExportDialog(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel);
   if(!tpl||!project)return;
   if(slotState.printer!==r.printer.id)slotState={printer:r.printer.id,live:null,note:''};
-  $('exportSub').textContent=project.name+(project.parts.length>1?' ('+project.parts.length+' Teile)':'')+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
+  $('exportSub').textContent=project.name+(project.parts.length>1&&!/Teile$/.test(project.name)?' ('+project.parts.length+' Teile)':'')+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
   const [bw,bd]=bedSize(tpl);
   let tooBig=[];
   if(project.threemf){
