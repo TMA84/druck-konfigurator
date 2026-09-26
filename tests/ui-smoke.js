@@ -4,7 +4,7 @@
      await new Promise(r=>{const s=document.createElement('script');s.src='tests/ui-smoke.js?'+Date.now();s.onload=r;document.head.appendChild(s)});
      await runSmoke()
    Downloads werden abgefangen und inhaltlich geprüft; confirm/alert/print sind Attrappen. */
-async function runSmoke(){
+async function runSmoke(opts={}){
   const log=[],fail=[];
   const ok=(cond,msg)=>{(cond?log:fail).push((cond?'ok   ':'FEHL ')+msg)};
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -164,6 +164,35 @@ async function runSmoke(){
   ok(!$('slotWarn').classList.contains('hidden')&&$('slotWarn').textContent.includes('PETG'),'U1 Slot 4 (PETG) bei PLA: Hinweis');
   $('exportDlg').close();
   menuClick('export3mf');ok(document.querySelector('input[name="slot"]:checked').value==='0','U1: zuletzt gespeicherter Slot noch nicht gesetzt → Slot 1');$('exportDlg').close();
+
+  /* 13b) Drucker-Verbindung und Live-Belegung (nur lesende Abfragen); Hosts via runSmoke({hosts}) */
+  if(opts.hosts){
+    sel('material','petg');
+    document.querySelector('[data-action="link"]').click();ok($('linkDlg').open,'Dialog Drucker-Verbindung');
+    $('host_kobra_s1').value='kein host!';$('linkSave').click();ok($('linkDlg').open&&$('linkRes_kobra_s1').textContent.includes('Ungültig'),'Ungültige Adresse abgelehnt');
+    $('host_kobra_s1').value=opts.hosts.kobra_s1;$('host_snapmaker_u1').value=opts.hosts.snapmaker_u1;
+    await testLink('kobra_s1');await testLink('snapmaker_u1');
+    ok($('linkRes_kobra_s1').classList.contains('good'),'Test S1: '+$('linkRes_kobra_s1').textContent);
+    ok($('linkRes_snapmaker_u1').classList.contains('good'),'Test U1: '+$('linkRes_snapmaker_u1').textContent);
+    $('linkSave').click();ok(store.settings.printerHosts.kobra_s1===opts.hosts.kobra_s1,'IPs gespeichert');
+    for(const pid of ['kobra_s1','snapmaker_u1']){
+      document.querySelector('.printer-switch [data-printer="'+pid+'"]').click();
+      if(!geom)await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
+      menuClick('export3mf');for(let i=0;i<180&&!document.querySelector('.slot-source.live, .slot-source.fallback');i++)await wait(100);
+      ok(document.querySelector('.slot-source.live'),pid+': '+$('slotSource').textContent);
+      const checked=document.querySelector('input[name="slot"]:checked').closest('.slot').textContent;
+      ok(/PETG/.test(checked),pid+': PETG-Slot vorausgewählt ('+checked.replace(/\s+/g,' ').trim()+')');
+      $('export3mfSave').click();await wait(100);
+      const f=downloads.filter(d=>d.name.endsWith('.3mf')).pop();
+      const z=fflate.unzipSync(await blobBytes(f)),ps=JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));
+      ok(ps.filament_type.some(t=>t!=='PLA'),pid+': echte Slot-Typen in der 3MF ('+ps.filament_type.join(',')+')');
+    }
+    document.querySelector('.printer-switch [data-printer="kobra_s1"]').click(); // S1 bekommt eine Adresse, die nie antwortet
+    store.settings.printerHosts={kobra_s1:'10.255.255.1',snapmaker_u1:''};slotState={printer:null,live:null,note:''};
+    menuClick('export3mf');for(let i=0;i<180&&!document.querySelector('.slot-source.fallback');i++)await wait(100);
+    ok(document.querySelector('.slot-source.fallback')&&/antwortet nicht|nicht erreichbar/.test($('slotSource').textContent),'Drucker nicht erreichbar → Vorlage mit Hinweis ('+$('slotSource').textContent+')');
+    $('exportDlg').close();store.settings.printerHosts=opts.hosts;persist();
+  }
 
   /* 14) Modell entfernen */
   menuClick('clear');ok(!$('modelCard').classList.contains('loaded')&&$('export3mf').disabled,'Modell entfernen setzt alles zurück');

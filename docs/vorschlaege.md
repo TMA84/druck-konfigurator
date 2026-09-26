@@ -10,10 +10,14 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 
 ## Komfort
 5. **3MF-Dateien öffnen** (bisher nur STL) – auch eigene Orca-Projekte als Ausgangspunkt.
-6. **Slot-Belegung live vom Drucker** (ACE / Werkzeugköpfe) statt aus der Vorlage – ungeprüft, ob die Drucker das per Netzwerk hergeben.
+6. ~~Slot-Belegung live vom Drucker~~ – umgesetzt 2026-09-26 (Moonraker, Start über „Konfigurator starten.cmd“).
 7. **Weitere Düsen** (0,6 / 0,8 mm): je Drucker eine Orca-Vorlage speichern, `node tools/build-orca-templates.js` – dann ist der 3MF-Export auch dort frei.
 8. Lange Slot-Namen im Export-Dialog werden abgeschnitten → vollständigen Namen als Tooltip.
 9. Deine alten v4-Profile: Das neue Tool nutzt denselben Speicherschlüssel; sie erscheinen, wenn es wie v4 per Doppelklick (file://) geöffnet wird. Sicherer Weg: in v4 „Exportieren“, im neuen Tool „Profile importieren“.
+
+## Neu aus der Live-Anbindung
+12. Der Kobra S1 antwortet sehr unterschiedlich schnell (gemessen 0,2–15 s, einmal gar nicht). Ursache unbestätigt (WLAN? Drucker ausgelastet?). Tool wartet 8 s mit einem zweiten Versuch.
+13. Offen: In OrcaSlicer standen nach dem Öffnen einer 3MF die Vorlagenwerte (2 Wände, 15 %) statt der exportierten (4 Wände, 30 %) – die Datei selbst ist korrekt. Klärung: Wie wurde die Datei geöffnet?
 
 ## Bereits geplant (Plan-Schritte 3 und 4)
 10. Ausrichtung im Tool (Fläche aufs Bett legen, 90°-Tasten).

@@ -1,5 +1,6 @@
 'use strict';
-/* Bedienung des 3MF-Exports: Menüpunkt freischalten, Slot wählen, Änderungen zeigen, speichern. */
+/* Bedienung des 3MF-Exports: Menüpunkt freischalten, Belegung live vom Drucker laden,
+   Slot wählen, Änderungen zeigen, speichern. Dazu der Dialog „Drucker-Verbindung“. */
 
 // Menüpunkt nach jeder Neuberechnung aktualisieren (aufgerufen aus update()).
 function updateExportMenu(r){
@@ -12,16 +13,48 @@ function updateExportMenu(r){
   note.textContent=reason||'Slot wählen und speichern';
 }
 
+const printerHost=id=>((store.settings.printerHosts||{})[id]||'').trim();
 function slotKey(printerId){return 'exportSlot_'+printerId}
 function chosenSlot(){const c=document.querySelector('input[name="slot"]:checked');return c?+c.value:0}
 
+// Aktuelle Belegung für den Dialog: live vom Drucker oder aus der Vorlage
+let slotState={printer:null,live:null,note:''};
+function dialogSlots(tpl){
+  if(slotState.live)return slotState.live.slots.slice(0,tpl.slots.length).map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:s.present,idx:i}));
+  return tpl.slots.map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:true,idx:i}));
+}
+
+function renderSlotList(tpl,preselect){
+  const slots=dialogSlots(tpl);
+  $('slotList').innerHTML=slots.map(s=>
+    '<label class="slot'+(s.present?'':' absent')+'" title="'+esc(s.name)+'"><input type="radio" name="slot" value="'+s.idx+'"'+(s.idx===preselect?' checked':'')+'>'+
+    '<span class="swatch" style="background:'+esc(/^#[0-9a-f]{6}$/i.test(s.colour)?s.colour:'#888888')+'"></span>'+
+    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b> · '+esc(s.type||'leer')+'<small>'+esc(s.present?s.name:'kein Filament erkannt')+'</small></span></label>').join('');
+  const src=document.querySelector('.slot-source');
+  src.classList.toggle('live',!!slotState.live);src.classList.toggle('fallback',!slotState.live&&!!slotState.note);
+  $('slotSource').textContent=slotState.live
+    ?'Live vom Drucker ('+slotState.live.host+') · Stand '+slotState.live.time.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})
+    :(slotState.note?slotState.note+' – Belegung aus der Vorlage':'Belegung aus der Vorlage (Stand beim Speichern in Orca)');
+}
+
+// Vorauswahl: passender Filamenttyp (live), sonst zuletzt genutzter Slot
+function preferredSlot(tpl,r){
+  const slots=dialogSlots(tpl);
+  if(slotState.live){const m=slots.find(s=>s.present&&slotMatchesKind(s.type,r.m.kind));if(m)return m.idx}
+  return Math.min(+(store.last[slotKey(r.printer.id)]||0),slots.length-1);
+}
+
 function renderExportDialog(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),slot=chosenSlot();
-  const {changes}=buildProjectSettings(tpl,r,slot);
-  const kind=ORCA_KIND[r.m.kind]||'PLA',slotType=tpl.slots[slot].type;
+  const live=slotState.live?slotState.live.slots:null;
+  const {changes}=buildProjectSettings(tpl,r,slot,live);
+  const kind=ORCA_KIND[r.m.kind]||'PLA',s=dialogSlots(tpl)[slot];
   const warn=$('slotWarn');
-  if(slotType&&slotType!==kind){
-    warn.innerHTML='<b>Hinweis:</b> Slot '+(slot+1)+' ist in deiner Vorlage als <b>'+esc(slotType)+'</b> eingerichtet, gewählt ist <b>'+esc(r.m.name)+'</b> ('+kind+'). Die Werte werden trotzdem geschrieben – in OrcaSlicer bleibt der Presetname „'+esc(tpl.slots[slot].name)+'“ stehen. Prüfe, ob im Drucker wirklich '+kind+' in diesem Slot steckt.';
+  const where=slotState.live?'laut Drucker':'in deiner Vorlage';
+  if(s&&!s.present){
+    warn.innerHTML='<b>Hinweis:</b> In Slot '+(slot+1)+' hat der Drucker kein Filament erkannt.';warn.classList.remove('hidden');
+  }else if(s&&s.type&&!slotMatchesKind(s.type,r.m.kind)){
+    warn.innerHTML='<b>Hinweis:</b> In Slot '+(slot+1)+' steckt '+where+' <b>'+esc(s.type)+'</b>, gewählt ist <b>'+esc(r.m.name)+'</b> ('+kind+'). Die Werte werden trotzdem für '+kind+' geschrieben.';
     warn.classList.remove('hidden');
   }else warn.classList.add('hidden');
   $('changesTitle').textContent='Was geändert wird ('+changes.length+' Werte)';
@@ -29,24 +62,38 @@ function renderExportDialog(){
     changes.map(c=>'<tr><td>'+esc(c.label)+'<small>'+esc(c.key)+'</small></td><td>'+esc(c.before??'–')+'</td><td><b>'+esc(c.after)+'</b></td></tr>').join('')+'</tbody></table>';
 }
 
+async function loadLiveSlots(){
+  const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),host=printerHost(r.printer.id);
+  if(!host){slotState={printer:r.printer.id,live:null,note:'Keine Drucker-IP eingetragen (Profile → Drucker-Verbindung)'};renderSlotList(tpl,chosenSlot());renderExportDialog();return}
+  $('slotSource').textContent='Frage '+host+' ab … (bis zu 16 s)';$('slotReload').disabled=true;
+  try{
+    const live=await fetchLiveSlots(r.printer.id,host);
+    if(slotState.printer!==r.printer.id&&slotState.printer!==null)return; // Drucker inzwischen gewechselt
+    slotState={printer:r.printer.id,live,note:''};
+    renderSlotList(tpl,preferredSlot(tpl,r));
+  }catch(e){
+    slotState={printer:r.printer.id,live:null,note:e.message};
+    renderSlotList(tpl,chosenSlot());
+  }finally{$('slotReload').disabled=false}
+  renderExportDialog();
+}
+
 function openExportDialog(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel);
   if(!tpl||!geom)return;
-  const saved=+(store.last[slotKey(r.printer.id)]||0);
+  if(slotState.printer!==r.printer.id)slotState={printer:r.printer.id,live:null,note:''};
   $('exportSub').textContent=geom.name+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
-  $('slotList').innerHTML=tpl.slots.map((s,i)=>
-    '<label class="slot"><input type="radio" name="slot" value="'+i+'"'+(i===Math.min(saved,tpl.slots.length-1)?' checked':'')+'>'+
-    '<span class="swatch" style="background:'+esc(/^#[0-9a-f]{6}$/i.test(s.colour)?s.colour:'#888888')+'"></span>'+
-    '<span class="slot-text"><b>Slot '+(i+1)+'</b> · '+esc(s.type||'?')+'<small>'+esc(s.name)+'</small></span></label>').join('');
+  renderSlotList(tpl,preferredSlot(tpl,r));
   $('slotList').onchange=renderExportDialog;
   renderExportDialog();
   $('exportDlg').showModal();
+  loadLiveSlots();
 }
 
 function save3mf(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),slot=chosenSlot();
   try{
-    const {bytes}=build3mf(tpl,r,geom,slot,fflate);
+    const {bytes}=build3mf(tpl,r,geom,slot,fflate,slotState.live?slotState.live.slots:null);
     const base=geom.name.replace(/\.stl$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
@@ -62,5 +109,38 @@ function save3mf(){
 
 $('export3mf').addEventListener('click',openExportDialog);
 $('export3mfSave').addEventListener('click',save3mf);
+$('slotReload').addEventListener('click',loadLiveSlots);
 $('exportDlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()});
+
+/* ================= Drucker-Verbindung ================= */
+const IP_PATTERN=/^[A-Za-z0-9.-]+(:\d+)?$/;
+const LINK_PRINTERS=['kobra_s1','snapmaker_u1'];
+function openLinkDialog(){
+  LINK_PRINTERS.forEach(id=>{$('host_'+id).value=printerHost(id);const res=$('linkRes_'+id);res.textContent='';res.className='muted small link-result'});
+  $('linkDlg').showModal();
+}
+async function testLink(id){
+  const host=$('host_'+id).value.trim(),res=$('linkRes_'+id);
+  res.className='muted small link-result';res.textContent='Frage '+host+' ab …';
+  try{
+    if(!IP_PATTERN.test(host))throw Error('Bitte eine IP-Adresse wie 192.168.1.50 eintragen');
+    const live=await fetchLiveSlots(id,host);
+    res.classList.add('good');
+    res.textContent='Verbunden: '+live.slots.map((s,i)=>'Slot '+(i+1)+' '+(s.present?s.type||'?':'leer')).join(' · ');
+  }catch(e){res.classList.add('bad');res.textContent=e.message}
+}
+document.querySelectorAll('#linkDlg [data-test]').forEach(b=>b.addEventListener('click',()=>testLink(b.dataset.test)));
+$('linkSave').addEventListener('click',()=>{
+  const hosts={};
+  for(const id of LINK_PRINTERS){
+    const v=$('host_'+id).value.trim();
+    if(v&&!IP_PATTERN.test(v)){const res=$('linkRes_'+id);res.className='small link-result bad';res.textContent='Ungültige Adresse';return}
+    hosts[id]=v;
+  }
+  store.settings.printerHosts=hosts;persist();slotState={printer:null,live:null,note:''};
+  $('linkDlg').close();toast('Drucker-Verbindung gespeichert');
+});
+$('linkDlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()});
+ACTIONS.link=openLinkDialog;
+
 if(lastResult)updateExportMenu(lastResult);

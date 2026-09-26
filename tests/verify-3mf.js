@@ -40,7 +40,12 @@ const CASES = [
   { printer: 'kobra_s1', material: 'petg', object: 'overhang', goal: 'quality', load: 'high', support: 'allow', model: 'mushroom', slot: 2 },
   { printer: 'snapmaker_u1', material: 'tpu', object: 'tire', goal: 'balanced', load: 'medium', model: 'pillar', slot: 1 },
   { printer: 'snapmaker_u1', material: 'petg_hs', object: 'precision', goal: 'fast', load: 'low', model: 'cube', slot: 3 },
-  { printer: 'snapmaker_u1', material: 'abs', object: 'holder', goal: 'strong', load: 'high', support: 'allow', model: 'mushroom', slot: 0 }
+  { printer: 'snapmaker_u1', material: 'abs', object: 'holder', goal: 'strong', load: 'high', support: 'allow', model: 'mushroom', slot: 0 },
+  // mit Live-Belegung vom Drucker (Stand der Abfrage am 26.09.2026)
+  { printer: 'kobra_s1', material: 'petg', object: 'general', goal: 'balanced', load: 'medium', model: 'cube', slot: 1,
+    live: [{ type: 'PLA', colour: '#AFAFAF' }, { type: 'PETG', colour: '#75787B' }, { type: 'PETG', colour: '#212721' }, { type: 'PETG', colour: '#212721' }] },
+  { printer: 'snapmaker_u1', material: 'abs', object: 'general', goal: 'balanced', load: 'medium', model: 'cube', slot: 2,
+    live: [{ type: 'PLA', colour: '#BEC9A5' }, { type: 'PLA', colour: '#8C9099' }, { type: 'ABS', colour: '#000000' }, { type: 'PETG', colour: '#000000' }] }
 ];
 const NOZ_MAT = { kobra_s1: 'steel_hardened', snapmaker_u1: 'steel_stainless' };
 
@@ -76,7 +81,7 @@ for (const [i, c] of CASES.entries()) {
   const geom = MODELS[c.model];
   const r = K.compute(inp, geom, { getMat: K.getMat, settings: K.store.settings });
   const tpl = K.exportTemplate(c.printer, '0.4');
-  const { bytes } = K.build3mf(tpl, r, geom, c.slot, fflate);
+  const { bytes } = K.build3mf(tpl, r, geom, c.slot, fflate, c.live);
   const dir = path.join(OUT, 'case' + i); fs.mkdirSync(dir);
   const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
   console.log(`\nFall ${i + 1}: ${c.printer} · ${r.m.name} · ${r.ob.label} · Slot ${c.slot + 1} · ${geom.name}`);
@@ -87,12 +92,12 @@ for (const [i, c] of CASES.entries()) {
   const g = parseGcode(fs.readFileSync(path.join(dir, gfile), 'utf8'));
 
   // 1) Jeder geplante Wert muss im G-Code-Fuß stehen (Slot-Werte an Position des Slots)
-  for (const p of K.plannedChanges(r, c.slot)) {
+  for (const p of K.plannedChanges(r, c.slot, c.live)) {
     const raw = g.cfg[p.key];
     if (raw === undefined) { check(false, `${p.key}: fehlt im G-Code`); continue; }
-    const got = p.perSlot ? raw.split(/[,;]/)[c.slot] : raw;
-    if (got === undefined) { check(false, `${p.key}: kein Wert für Slot ${c.slot + 1} (${raw})`); continue; }
-    const same = got === p.value || (!isNaN(+got) && !isNaN(+p.value) && Math.abs(+got - +p.value) < 1e-6) || got.replace(/%$/, '') === p.value.replace(/%$/, '');
+    const got = p.perSlot ? raw.split(/[,;]/)[p.index] : raw;
+    if (got === undefined) { check(false, `${p.key}: kein Wert für Slot ${p.index + 1} (${raw})`); continue; }
+    const same = got.toUpperCase() === p.value.toUpperCase() || (!isNaN(+got) && !isNaN(+p.value) && Math.abs(+got - +p.value) < 1e-6) || got.replace(/%$/, '') === p.value.replace(/%$/, '');
     check(same, `${p.label} (${p.key}): erwartet ${p.value}, im G-Code ${got}`);
   }
   // 2) Das Modell druckt mit dem gewählten Slot

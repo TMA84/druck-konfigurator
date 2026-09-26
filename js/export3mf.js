@@ -25,11 +25,18 @@ function orcaBrim(brim) {
 }
 
 /* Liefert die Werte, die in project_settings.config geschrieben werden, jeweils mit
-   Beschriftung, damit Dialog und Test dieselbe Liste verwenden. slot ist 0-basiert. */
-function plannedChanges(r, slot) {
-  const f = []; // [Beschriftung, Key, Wert, istSlotWert]
-  const fil = (label, key, v) => f.push([label, key, String(v), true]);
-  const proc = (label, key, v) => f.push([label, key, String(v), false]);
+   Beschriftung, damit Dialog und Test dieselbe Liste verwenden. slot ist 0-basiert.
+   liveSlots (optional): echte Belegung vom Drucker [{type, colour}] – Typ und Farbe aller
+   Slots werden übernommen, der gewählte Slot bekommt den Typ des gewählten Filaments. */
+function plannedChanges(r, slot, liveSlots) {
+  const f = []; // [Beschriftung, Key, Wert, Slot-Index oder null]
+  const fil = (label, key, v, index = slot) => f.push([label, key, String(v), index]);
+  const proc = (label, key, v) => f.push([label, key, String(v), null]);
+
+  (liveSlots || []).forEach((s, i) => {
+    if (s.colour) fil('Slot ' + (i + 1) + ' Farbe (Drucker)', 'filament_colour', s.colour, i);
+    if (i !== slot && s.type) fil('Slot ' + (i + 1) + ' Typ (Drucker)', 'filament_type', s.type, i);
+  });
 
   fil('Filamenttyp', 'filament_type', ORCA_KIND[r.m.kind] || 'PLA');
   fil('Düse', 'nozzle_temperature', r.nozzle);
@@ -69,17 +76,18 @@ function plannedChanges(r, slot) {
   proc('Brim', 'brim_type', brimType);
   if (brimWidth) proc('Brim-Breite', 'brim_width', brimWidth);
   if (SEAM_ORCA[r.seam]) proc('Nahtposition', 'seam_position', SEAM_ORCA[r.seam]);
-  return f.map(([label, key, value, perSlot]) => ({ label, key, value, perSlot }));
+  return f.map(([label, key, value, index]) => ({ label, key, value, perSlot: index !== null, index }));
 }
 
 // Neue project_settings (Kopie) + Liste der tatsächlichen Änderungen gegenüber der Vorlage.
-function buildProjectSettings(tpl, r, slot) {
+function buildProjectSettings(tpl, r, slot, liveSlots) {
   const settings = JSON.parse(JSON.stringify(tpl.settings));
   const changes = [];
-  for (const c of plannedChanges(r, slot)) {
+  for (const c of plannedChanges(r, slot, liveSlots)) {
     if (!(c.key in settings)) continue; // Schlüssel kennt diese Orca-Version nicht → Vorlage unverändert
-    const before = c.perSlot ? settings[c.key][slot] : settings[c.key];
-    if (c.perSlot) settings[c.key][slot] = c.value; else settings[c.key] = c.value;
+    if (c.perSlot && !(c.index < settings[c.key].length)) continue; // mehr Druckerslots als in der Vorlage
+    const before = c.perSlot ? settings[c.key][c.index] : settings[c.key];
+    if (c.perSlot) settings[c.key][c.index] = c.value; else settings[c.key] = c.value;
     if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
   }
   return { settings, changes };
@@ -109,8 +117,8 @@ function meshModelXML(geom) {
     verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n </resources>\n <build/>\n</model>\n';
 }
 
-function build3mfFiles(tpl, r, geom, slot) {
-  const { settings, changes } = buildProjectSettings(tpl, r, slot);
+function build3mfFiles(tpl, r, geom, slot, liveSlots) {
+  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots);
   const name = xmlEsc(geom.name);
   const [bx, by] = tpl.bedCenter, hz = coord(geom.z / 2);
   const files = {
@@ -136,8 +144,8 @@ function build3mfFiles(tpl, r, geom, slot) {
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
-function build3mf(tpl, r, geom, slot, zipLib) {
-  const { files, changes } = build3mfFiles(tpl, r, geom, slot);
+function build3mf(tpl, r, geom, slot, zipLib, liveSlots) {
+  const { files, changes } = build3mfFiles(tpl, r, geom, slot, liveSlots);
   const entries = {};
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
   return { bytes: zipLib.zipSync(entries, { level: 6 }), changes };

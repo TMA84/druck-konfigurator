@@ -341,3 +341,10 @@ table.changes th { text-align: left; font-weight: 600; color: var(--ink-2); bord
 table.changes td { border-bottom: 1px solid var(--rule); padding: 6px 8px 6px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
 table.changes td small { display: block; color: var(--ink-3); font-family: var(--f-mono); font-size: 11px; }
 .small { font-size: 13px; }
+.slot-source { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 8px; font-size: 13px; }
+.slot-source.live #slotSource { color: var(--ok); font-weight: 600; }
+.slot-source.fallback #slotSource { color: var(--warn); }
+.slot.absent { opacity: .55; }
+.link-result { margin: 2px 0 8px; }
+.link-result.good { color: var(--ok); }
+.link-result.bad { color: var(--bad); }
