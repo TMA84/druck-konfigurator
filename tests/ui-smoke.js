@@ -258,7 +258,8 @@ async function runSmoke(opts={}){
   ok($('toast').textContent.includes('3MF gespeichert'),'Toast nach 3MF-Export');
   document.querySelector('.printer-switch [data-printer="snapmaker_u1"]').click();sel('material','pla_hs');
   menuClick('export3mf');document.querySelector('input[name="slot"][value="3"]').click();await wait(30);
-  ok(!$('slotWarn').classList.contains('hidden')&&$('slotWarn').textContent.includes('PETG'),'U1 Slot 4 (PETG) bei PLA: Hinweis');
+  // Die Vorlage sagt nichts über die echte Belegung → kein Hinweis und kein Filamenttyp in der Liste
+  ok($('slotWarn').classList.contains('hidden')&&!/PLA|PETG/.test($('slotList').textContent),'U1 ohne bekannte Belegung: kein Vorlagen-Typ, kein Hinweis');
   $('exportDlg').close();
   menuClick('export3mf');ok(document.querySelector('input[name="slot"]:checked').value==='0','U1: zuletzt gespeicherter Slot noch nicht gesetzt → Slot 1');$('exportDlg').close();
 
@@ -279,7 +280,7 @@ async function runSmoke(opts={}){
     ok(pz.filament_type[1]==='PETG'&&pz.filament_colour[1]==='#101010'&&/PETG/.test(pz.filament_settings_id[1]),'Eintragen: 3MF hat Slot 2 = PETG schwarz mit PETG-Preset');
     loadStore();ok(store.settings.manualSlots&&store.settings.manualSlots[$('printer').value][1].type==='PETG','Eintragen: bleibt gespeichert');
     menuClick('export3mf');await wait(50);$('slotEditBtn').click();$('slotEditReset').click();await wait(50);
-    ok(/Vorlage/.test($('slotSource').textContent)&&!(store.settings.manualSlots||{})[$('printer').value],'Vorlage verwenden: eigene Belegung gelöscht');
+    ok(/unbekannt/.test($('slotSource').textContent)&&!(store.settings.manualSlots||{})[$('printer').value]&&!/PLA|PETG/.test($('slotList').textContent),'Eingabe löschen: Belegung wieder unbekannt, keine Typen aus der Vorlage');
     $('exportDlg').close();}
 
   if(opts.hosts){

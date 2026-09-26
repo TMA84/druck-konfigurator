@@ -26,7 +26,8 @@ function slotSource(tpl){
   if(slotState.live)return {kind:'live',slots:slotState.live.slots.slice(0,tpl.slots.length)};
   const m=lastResult&&manualSlots(lastResult.printer.id);
   if(m)return {kind:'manual',slots:m.slice(0,tpl.slots.length).map(s=>({...s,present:!!s.type,name:s.type?'von Hand eingetragen':'leer'}))};
-  return {kind:'template',slots:tpl.slots.map(s=>({...s,present:true}))};
+  // Die Vorlage kennt nur den Stand beim Speichern in Orca – Typ und Farbe daraus wären irreführend.
+  return {kind:'template',slots:tpl.slots.map(()=>({type:'',colour:'',name:'',present:true}))};
 }
 function dialogSlots(tpl){return slotSource(tpl).slots.map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:s.present,idx:i}))}
 // Belegung, die in die 3MF geschrieben wird (Typ und Farbe je Slot); Vorlage = unverändert lassen
@@ -37,13 +38,13 @@ function renderSlotList(tpl,preselect){
   $('slotList').innerHTML=slots.map(s=>
     '<label class="slot'+(s.present?'':' absent')+'" title="'+esc(s.name)+'"><input type="radio" name="slot" value="'+s.idx+'"'+(s.idx===preselect?' checked':'')+'>'+
     '<span class="swatch" style="background:'+esc(/^#[0-9a-f]{6}$/i.test(s.colour)?s.colour:'#888888')+'"></span>'+
-    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b> · '+esc(s.type||'leer')+'<small>'+esc(s.present?s.name:'kein Filament erkannt')+'</small></span></label>').join('');
+    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b>'+(s.type?' · '+esc(s.type):s.present?'':' · leer')+'<small>'+esc(!s.present?'kein Filament':s.name||'Filament nicht bekannt')+'</small></span></label>').join('');
   const src=document.querySelector('.slot-source'),kind=slotSource(tpl).kind;
   src.classList.toggle('live',kind!=='template');src.classList.toggle('fallback',kind==='template'&&!!slotState.note);
   $('slotSource').textContent=kind==='live'
     ?'Live vom Drucker ('+slotState.live.host+') · Stand '+slotState.live.time.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})
     :kind==='manual'?'Von Hand eingetragen – gilt, bis du es änderst'
-    :(slotState.note?slotState.note+' – Belegung aus der Vorlage':'Belegung aus der Vorlage – bitte eintragen, was wirklich im Drucker steckt');
+    :(slotState.note?slotState.note+' – ':'')+'Belegung unbekannt – wähle den Slot, in dem dein Filament steckt';
 }
 
 // Vorauswahl: passender Filamenttyp (live oder eingetragen), sonst zuletzt genutzter Slot
@@ -204,7 +205,7 @@ $('slotEditReset').addEventListener('click',()=>{
   const id=lastResult.printer.id,tpl=exportTemplate(id,lastResult.dSel),m={...(store.settings.manualSlots||{})};
   delete m[id];store.settings.manualSlots=m;persist();
   closeSlotEditor();renderSlotList(tpl,chosenSlot());renderExportDialog();
-  toast('Eigene Belegung gelöscht – es gilt wieder die Vorlage');
+  toast('Eigene Belegung gelöscht');
 });
 $('exportDlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()});
 

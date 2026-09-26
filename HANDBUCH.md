@@ -145,7 +145,7 @@ Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Druck
 
 **Export → 3MF für OrcaSlicer …** öffnet den Dialog:
 
-1. **Belegung prüfen** – was steckt in welchem Slot? **Belegung eintragen** öffnet je Slot eine Auswahl für Filamenttyp und Farbe; das bleibt gespeichert, bis du es änderst (z. B. nach einem Spulenwechsel). **Vorlage verwenden** löscht die eigene Eingabe. Mit Rinkhals/Moonraker holt **Vom Drucker laden** die Belegung automatisch.
+1. **Belegung prüfen** – was steckt in welchem Slot? **Belegung eintragen** öffnet je Slot eine Auswahl für Filamenttyp und Farbe; das bleibt gespeichert, bis du es änderst (z. B. nach einem Spulenwechsel). **Eingabe löschen** entfernt sie wieder. Ohne Eingabe oder Live-Abfrage zeigt das Tool nur die Slot-Nummern – welches Filament wo steckt, weißt du selbst am besten. Mit Rinkhals/Moonraker holt **Vom Drucker laden** die Belegung automatisch.
 2. **Slot wählen** – bei einem Teil der Slot, bei mehreren der Standard-Slot für Teile ohne eigenen Slot.
 3. Bei mehreren Teilen zeigt die Tabelle **Teil · Slot · Filament · eigene Werte**. Passt das Filament eines Teils nicht zum Slot, hilft **„Filament … passend zur Belegung wählen“**.
 4. **Was geändert wird** – alle Werte, die gegenüber deiner Orca-Vorlage geändert werden.
