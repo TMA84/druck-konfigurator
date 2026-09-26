@@ -305,6 +305,90 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
   return { files, changes, plateCount, objectChanges, notes };
 }
 
+/* ---------- Vorhandene 3MF (z. B. Makerworld) auf den eigenen Drucker umstellen ----------
+   Entscheidung 2026-09-26: Lage, Platten, Farben und Bemalung des Designers bleiben. Ersetzt werden
+   die Einstellungen (project_settings aus der eigenen Orca-Vorlage + berechnete Werte), je Objekt
+   Slot und die selbst berechneten Objektwerte; jede Platte wird auf die Bettmitte gerückt. */
+const PLATE_SLICE_FILES = /^Metadata\/plate_\d+\.gcode(\.md5)?$/;
+
+// Mitte der Teile je Platte → Verschiebung auf die Bettmitte der Platte im eigenen Drucker
+function plateShifts(jobs, tpl) {
+  const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter;
+  const ids = [...new Set(jobs.map(j => j.plate || 1))].sort((a, b) => a - b);
+  const count = Math.max(...ids), cols = Math.ceil(Math.sqrt(count)), shifts = new Map(), oversize = [];
+  for (const id of ids) {
+    const on = jobs.filter(j => (j.plate || 1) === id);
+    const mnx = Math.min(...on.map(j => j.geom.mn[0])), mxx = Math.max(...on.map(j => j.geom.mx[0]));
+    const mny = Math.min(...on.map(j => j.geom.mn[1])), mxy = Math.max(...on.map(j => j.geom.mx[1]));
+    const pi = id - 1, tx = (pi % cols) * bw * PLATE_STRIDE + bx, ty = -Math.floor(pi / cols) * bd * PLATE_STRIDE + by;
+    shifts.set(id, [tx - (mnx + mxx) / 2, ty - (mny + mxy) / 2]);
+    if (mxx - mnx > bw || mxy - mny > bd) oversize.push(id);
+  }
+  return { shifts, oversize };
+}
+
+// Objekt-Kopf in model_settings.config: Slot setzen, eigene Werte setzen bzw. auf global zurücknehmen
+function patchObjectHead(head, extruder, own, computedKeys) {
+  const setMeta = (h, key, value) => {
+    const re = new RegExp('(<metadata key="' + key + '" value=")[^"]*(")');
+    return re.test(h) ? h.replace(re, '$1' + xmlEsc(value) + '$2') : h.replace(/(<object id="[^"]*">\n?)/, '$1    <metadata key="' + key + '" value="' + xmlEsc(value) + '"/>\n');
+  };
+  let h = setMeta(head, 'extruder', extruder);
+  const ownKeys = new Set(own.map(c => c.key));
+  for (const key of computedKeys) if (!ownKeys.has(key)) h = h.replace(new RegExp('[ \\t]*<metadata key="' + key + '" value="[^"]*"/>\\n?', 'g'), '');
+  for (const c of own) h = setMeta(h, c.key, c.value);
+  return h;
+}
+
+/* jobs: [{geom, r, slot, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip. */
+function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf) {
+  const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate }));
+  const { extra, notes, partSlot } = slotPlan(items, r, slot);
+  const nFil = tpl.settings.filament_settings_id.length;
+  items.forEach(j => { if (partSlot(j) >= nFil) notes.push(j.geom.name + ': Slot ' + (partSlot(j) + 1) + ' gibt es an deinem Drucker nicht – bitte in Orca zuweisen.'); });
+  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra.filter(e => e.slot < nFil));
+  const { shifts, oversize } = plateShifts(items, tpl);
+  oversize.forEach(id => notes.push('Platte ' + id + ' ist größer als dein Druckbett – in Orca prüfen.'));
+
+  const out = {};
+  for (const [name, data] of Object.entries(threemf.zip)) if (!PLATE_SLICE_FILES.test(name)) out[name] = data;
+  out['Metadata/project_settings.config'] = zipLib.strToU8(JSON.stringify(settings, null, 4));
+
+  // Build-Items verschieben (Translation = letzte drei Werte der Matrix)
+  const rootPath = Object.keys(out).find(k => /^3D\/3dmodel\.model$/i.test(k));
+  // Je Build-Item die Platte seiner Instanz – dasselbe Objekt kann auf mehreren Platten stehen
+  const plateOfItem = new Map(items.map(j => [j.part.objectId + '#' + (j.part.instance || 0), j.plate || 1]));
+  const itemCount = new Map();
+  out[rootPath] = zipLib.strToU8(zipLib.strFromU8(out[rootPath]).replace(/<((?:\w+:)?item\b)([^>]*?)(\/?)>/g, (all, tag, attrs, close) => {
+    const id = (/objectid="([^"]+)"/.exec(attrs) || [])[1], inst = itemCount.get(id) || 0;
+    itemCount.set(id, inst + 1);
+    const shift = shifts.get(plateOfItem.get(id + '#' + inst));
+    if (!shift) return all;
+    const t = (/transform="([^"]+)"/.exec(attrs) || [])[1];
+    const m = t ? t.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+    m[9] += shift[0]; m[10] += shift[1];
+    const tr = 'transform="' + m.map(v => String(Math.round(v * 1e4) / 1e4)).join(' ') + '"';
+    return '<' + tag + (t ? attrs.replace(/transform="[^"]+"/, tr) : attrs + ' ' + tr) + close + '>';
+  }));
+
+  // Slot und eigene Werte je Objekt
+  const computedKeys = [...new Set(plannedChanges(r, 0, null).filter(c => !c.perSlot && isObjectKey(c.key)).map(c => c.key).concat([...OBJECT_KEYS], supportChanges(r).map(x => x[1])))];
+  const objectChanges = [];
+  let ms = zipLib.strFromU8(out['Metadata/model_settings.config'] || zipLib.strToU8('<?xml version="1.0" encoding="UTF-8"?>\n<config>\n</config>\n'));
+  const done = new Set(); // Objekt mit mehreren Instanzen nur einmal anpassen
+  for (const j of items) {
+    if (done.has(j.part.objectId)) continue;
+    done.add(j.part.objectId);
+    const own = objectOverrides(settings, j.r);
+    if (own.length) objectChanges.push({ name: j.geom.name, changes: own });
+    const esc = String(j.part.objectId).replace(/[^\w-]/g, '');
+    if (!new RegExp('<object id="' + esc + '">').test(ms)) { notes.push(j.geom.name + ': keine Objekt-Einstellungen in der 3MF – Slot und eigene Werte bitte in Orca prüfen.'); continue; }
+    ms = ms.replace(new RegExp('(<object id="' + esc + '">)([\\s\\S]*?)(?=<part\\b|</object>)'), (all, open, body) => patchObjectHead(open + body, Math.min(partSlot(j), nFil - 1) + 1, own, computedKeys));
+  }
+  out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
+  return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: shifts.size };
+}
+
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
 function build3mf(tpl, r, parts, slot, zipLib, liveSlots) {
   const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots);

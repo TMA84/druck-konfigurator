@@ -1,4 +1,4 @@
-# Offene Vorschläge (Stand 2026-09-25)
+# Offene Vorschläge (Stand 2026-09-26)
 
 Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt beim Nutzer.
 
@@ -9,7 +9,7 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 4. **Brim-Spannen:** Aus „5–8 mm“ wird 5 mm (untere Grenze), aus „0–5 mm bei Haftungsproblemen“ (Reifen) wird „kein Brim“. Ggf. im Export-Dialog wählbar machen.
 
 ## Komfort
-5. **3MF-Dateien öffnen** (bisher nur STL) – auch eigene Orca-Projekte als Ausgangspunkt.
+5. ~~3MF-Dateien öffnen~~ – umgesetzt 2026-09-26 (STL mit mehreren Körpern, mehrere Dateien, ZIP, 3MF; Makerworld-3MF wird auf S1/U1 umgestellt).
 6. ~~Slot-Belegung live vom Drucker~~ – umgesetzt 2026-09-26 (Moonraker, Start über „Konfigurator starten.cmd“).
 7. **Weitere Düsen** (0,6 / 0,8 mm): je Drucker eine Orca-Vorlage speichern, `node tools/build-orca-templates.js` – dann ist der 3MF-Export auch dort frei.
 8. Lange Slot-Namen im Export-Dialog werden abgeschnitten → vollständigen Namen als Tooltip.
@@ -22,6 +22,12 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 ## Geplant 2026-09-26 (nach Import/Ausrichtung/Stützwerte/Werte je Teil/Makerworld-3MF)
 14. **Bohrlöcher verstärken:** zylindrische Löcher erkennen, in der 3MF je Loch einen Orca-Modifikator (Zylinder, Loch + 2 × ~3 mm) mit 100 % Füllung und ggf. mehr Wänden. Offen: automatisch oder nur als Vorschlag.
 
+## Bekannte Grenzen (aus den Prüfungen 2026-09-26)
+15. Überhang-/Innenflächen-Erkennung setzt richtig orientierte Dreiecke voraus; bei kaputten Netzen (Normalen verdreht) kann ein echter Überhang übersehen werden.
+16. Zwei getrennte Flächen desselben Teils auf exakt gleicher Höhe (±0,05 mm) gelten als Innenfläche.
+17. Schichthöhe gilt in Orca für die ganze Platte – weichen Teile ab, nennt der Export-Dialog das als Hinweis.
+18. Makerworld-3MF: Lage des Designers bleibt, Drehen im Tool ist dort gesperrt.
+
 ## Bereits geplant (Plan-Schritte 3 und 4)
-10. Ausrichtung im Tool (Fläche aufs Bett legen, 90°-Tasten).
+10. ~~Ausrichtung im Tool~~ – umgesetzt 2026-09-26 (Vorschlag, Fläche anklicken, 90°-Tasten).
 11. Testdruck-Protokoll pro Drucker/Profil – dafür sind die U1-Werte der wichtigste Kandidat (bisher nirgends gegengetestet).

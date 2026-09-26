@@ -77,7 +77,9 @@ function parseGcode(text) {
 let failures = 0;
 const check = (ok, msg) => { console.log((ok ? '  ok   ' : '  FEHL ') + msg); if (!ok) failures++; };
 
-for (const [i, c] of CASES.entries()) {
+// ONLY_MW=1: nur die Makerworld-Prüfung (schneller beim Entwickeln)
+const ONLY_MW = !!process.env.ONLY_MW;
+for (const [i, c] of (ONLY_MW ? [] : CASES).entries()) {
   const inp = { printer: c.printer, material: c.material, nozD: '0.4', nozM: NOZ_MAT[c.printer], object: c.object, goal: c.goal,
     load: c.load, support: c.support || 'auto', supportLevel: 'balanced', thresh: '45' };
   const geom = MODELS[c.model];
@@ -142,7 +144,7 @@ function sliceParts(label, printer, parts, expectPlates) {
   return { tpl, gcodes: gfiles.map(f => parseGcode(fs.readFileSync(path.join(dir, f), 'utf8'))) };
 }
 const [bw1] = [250];
-let res = sliceParts('Mehrteilig', 'kobra_s1', [MODELS.cube, MODELS.mushroom, MODELS.pillar], 1);
+let res = ONLY_MW ? null : sliceParts('Mehrteilig', 'kobra_s1', [MODELS.cube, MODELS.mushroom, MODELS.pillar], 1);
 if (res) {
   const g = res.gcodes[0], [bx, by] = res.tpl.bedCenter;
   const w = g.bb[2] - g.bb[0], sumW = MODELS.cube.x + MODELS.mushroom.x + MODELS.pillar.x + 2 * 8;
@@ -151,14 +153,14 @@ if (res) {
   check(Math.abs((g.bb[0] + g.bb[2]) / 2 - bx) < 1.5 && g.bb[0] > 0 && g.bb[2] < bw1, `Gruppe mittig auf dem Bett (${g.bb[0].toFixed(1)}–${g.bb[2].toFixed(1)}, Mitte ${bx})`);
 }
 const big = stl('platte.stl', boxTris(0, 0, 0, 200, 190, 3));
-res = sliceParts('Zwei Platten', 'snapmaker_u1', [big, big], 2);
+res = ONLY_MW ? null : sliceParts('Zwei Platten', 'snapmaker_u1', [big, big], 2);
 if (res) res.gcodes.forEach((g, i) => {
   const [bx, by] = res.tpl.bedCenter, mx = (g.bb[0] + g.bb[2]) / 2, my = (g.bb[1] + g.bb[3]) / 2;
   check(Math.abs(mx - bx) < 1.5 && Math.abs(my - by) < 1.5 && Math.abs(g.bb[2] - g.bb[0] - 200) < 1.5, `Platte ${i + 1}: Teil mittig ${mx.toFixed(1)}/${my.toFixed(1)} ≈ ${bx}/${by}`);
 });
 
 /* ---------- Werte je Teil: PETG-Pilz mit Stützen in Slot 2, PLA-Würfel schnell im Standard-Slot 1 ---------- */
-{
+if (!ONLY_MW) {
   const base = { printer: 'snapmaker_u1', nozD: '0.4', nozM: NOZ_MAT.snapmaker_u1, load: 'medium', supportLevel: 'balanced', thresh: '45' };
   const ctxc = { getMat: K.getMat, settings: K.store.settings };
   const rA = K.compute({ ...base, material: 'petg', object: 'overhang', goal: 'strong', support: 'allow' }, MODELS.mushroom, ctxc);
@@ -189,6 +191,41 @@ if (res) res.gcodes.forEach((g, i) => {
     check(temps[0] === String(rB.nozzle) && temps[1] === String(rA.nozzle), `Düsentemperaturen je Slot ${temps.slice(0, 2).join('/')} = ${rB.nozzle}/${rA.nozzle}`);
     check(cfg.wall_loops === String(rB.w) && cfg.enable_support === '0', `Globale Werte vom Würfel (Wände ${cfg.wall_loops}, Stützen ${cfg.enable_support})`);
   } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
+/* ---------- Makerworld-3MF auf den eigenen Drucker umstellen (optional: MW3MF=<Pfad>) ---------- */
+const MW = process.env.MW3MF;
+if (MW && fs.existsSync(MW)) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'import.js'), 'utf8'), ctx, { filename: 'import.js' });
+  const I = vm.runInContext('({importModels, makeGeom, build3mfFromProject})', ctx);
+  for (const printer of ['kobra_s1', 'snapmaker_u1']) {
+    const imp = I.importModels([{ name: path.basename(MW), bytes: new Uint8Array(fs.readFileSync(MW)) }], fflate);
+    const base = { printer, nozD: '0.4', nozM: NOZ_MAT[printer], material: 'petg', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+    const jobs = imp.parts.map(p => { const geom = I.makeGeom(p.name, p.pos);
+      return { geom, slot: p.extruder - 1, part: { objectId: p.objectId, plate: p.plate }, r: K.compute(base, geom, { getMat: K.getMat, settings: K.store.settings }) }; });
+    const tpl = K.exportTemplate(printer, '0.4');
+    const res = I.build3mfFromProject(tpl, jobs[0].r, jobs, jobs[0].slot, fflate, null, imp.threemf);
+    console.log(`\nMakerworld → ${printer}: ${jobs.length} Teile, ${res.plateCount} Platten` + (res.notes.length ? ' · Hinweise: ' + res.notes.join(' | ') : ''));
+    const z = fflate.unzipSync(res.bytes), ps = JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));
+    check(ps.printer_settings_id === tpl.printerPreset, `Druckerprofil ${ps.printer_settings_id}`);
+    check(fflate.strFromU8(z['Metadata/model_settings.config']).includes('paint_color') === fflate.strFromU8(fflate.unzipSync(new Uint8Array(fs.readFileSync(MW)))['Metadata/model_settings.config']).includes('paint_color') && Object.keys(z).filter(k => k.startsWith('3D/Objects/')).length === 8, 'Geometrie-Dateien und Bemalung unverändert übernommen');
+    const dir = path.join(OUT, 'mw_' + printer); fs.mkdirSync(dir);
+    const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, res.bytes);
+    try { execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 400000 }); }
+    catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); continue; }
+    const gfiles = fs.readdirSync(dir).filter(f => /^plate_\d+\.gcode$/.test(f)).sort();
+    check(gfiles.length === res.plateCount, `G-Code je Platte: ${gfiles.join(', ')}`);
+    const [bx, by] = tpl.bedCenter;
+    for (const gf of gfiles) {
+      const id = +gf.match(/\d+/)[0], on = jobs.filter(j => j.part.plate === id), g = parseGcode(fs.readFileSync(path.join(dir, gf), 'utf8'));
+      const mx = (g.bb[0] + g.bb[2]) / 2, my = (g.bb[1] + g.bb[3]) / 2, h = Math.max(...on.map(j => j.geom.z));
+      const slots = [...new Set(on.map(j => String(j.slot + 1)))].sort().join(',');
+      check(Math.abs(mx - bx) < 2 && Math.abs(my - by) < 2, `Platte ${id}: Mitte ${mx.toFixed(1)}/${my.toFixed(1)} ≈ Bett ${bx}/${by}`);
+      check(Math.abs(g.maxZ - h) < 0.35, `Platte ${id}: Höhe ${g.maxZ} ≈ ${h.toFixed(2)} mm`);
+      check(g.filament === slots, `Platte ${id}: Slot(s) ${g.filament} = ${slots}`);
+      check(g.nozzleCmds.includes(jobs[0].r.nozzle), `Platte ${id}: PETG ${jobs[0].r.nozzle} °C wird geheizt (${[...new Set(g.nozzleCmds)].join('/')})`);
+    }
+  }
 }
 
 console.log(failures ? `\nFEHLGESCHLAGEN: ${failures} Prüfungen` : '\nOK: alle Werte kommen im Orca-G-Code an');

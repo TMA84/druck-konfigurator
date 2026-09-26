@@ -14,9 +14,11 @@ function initPartInputs(parts) {
 }
 function loadPartIntoForm(part) {
   if (!part.input) return;
+  // Gibt es den gespeicherten Wert nicht mehr (z. B. Filament gelöscht), gilt die erste Option –
+  // sonst bliebe die Auswahl des vorher gewählten Teils stehen und würde übernommen.
   for (const id of PART_FIELDS) {
     const sel = $(id), v = part.input[id];
-    if ([...sel.options].some(o => o.value === v)) sel.value = v;
+    sel.value = [...sel.options].some(o => o.value === v) ? v : (sel.options[0] || {}).value;
   }
 }
 // Aus update(): aktuelle Auswahl gehört zum gewählten Teil

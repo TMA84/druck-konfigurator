@@ -73,6 +73,7 @@ function renderExportDialog(){
 function renderPartPlan(tpl,plan,partSlot,notes,settings){
   const multi=plan.jobs.length>1;
   $('partPlan').classList.toggle('hidden',!multi);
+  document.querySelector('#exportDlg fieldset.slots').classList.toggle('hidden',!plan.usesDefault); // alle Teile haben eigene Slots
   $('slotLegend').textContent=multi?'Standard-Slot (für Teile ohne eigenen Slot)':'Filament-Slot';
   if(!multi)return;
   const slots=dialogSlots(tpl);let mismatch=0;
@@ -122,9 +123,16 @@ function openExportDialog(){
   if(!tpl||!project)return;
   if(slotState.printer!==r.printer.id)slotState={printer:r.printer.id,live:null,note:''};
   $('exportSub').textContent=project.name+(project.parts.length>1?' ('+project.parts.length+' Teile)':'')+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
-  const {oversize}=arrangeParts(project.parts.map(p=>p.geom),tpl),[bw,bd]=bedSize(tpl);
-  $('sizeWarn').textContent=oversize.length?'Größer als das Bett ('+de(bw,0)+' × '+de(bd,0)+' mm): '+oversize.map(i=>project.parts[i].name).join(', ')+'. Bitte drehen oder in Orca skalieren/teilen.':'';
-  $('sizeWarn').classList.toggle('hidden',!oversize.length);
+  const [bw,bd]=bedSize(tpl);
+  let tooBig=[];
+  if(project.threemf){
+    // Makerworld-3MF: Platten bleiben, geprüft wird je Platte
+    const {oversize}=plateShifts(project.parts.map(p=>({geom:p.geom,plate:p.plate})),tpl);
+    tooBig=oversize.map(id=>'Platte '+id);
+    $('exportSub').textContent+=' · Einstellungen von „'+((project.threemf.settings||{}).printer_settings_id||'?')+'“ werden ersetzt, Platten und Farben bleiben';
+  }else tooBig=arrangeParts(project.parts.map(p=>p.geom),tpl).oversize.map(i=>project.parts[i].name);
+  $('sizeWarn').textContent=tooBig.length?'Größer als das Bett ('+de(bw,0)+' × '+de(bd,0)+' mm): '+tooBig.join(', ')+'. Bitte drehen oder in Orca skalieren/teilen.':'';
+  $('sizeWarn').classList.toggle('hidden',!tooBig.length);
   renderSlotList(tpl,preferredSlot(tpl,r));
   slotPicked=false;
   $('slotList').onchange=()=>{slotPicked=true;renderExportDialog()};
@@ -137,7 +145,10 @@ function save3mf(){
   const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel);
   const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   try{
-    const {bytes}=build3mf(tpl,r,plan.jobs,slot,fflate,slotState.live?slotState.live.slots:null);
+    const live=slotState.live?slotState.live.slots:null;
+    const {bytes}=project.threemf
+      ?build3mfFromProject(tpl,r,plan.jobs,slot,fflate,live,project.threemf)
+      :build3mf(tpl,r,plan.jobs,slot,fflate,live);
     const slotsUsed=new Set(plan.jobs.map(j=>j.slot===null?slot:j.slot));
     const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':'KobraS1';

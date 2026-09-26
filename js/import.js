@@ -130,8 +130,9 @@ function parseModelSettings(text) {
     objects.set(attrsOf(m[1] || '').id, { name: meta(head, 'name'), extruder: meta(head, 'extruder'), parts });
   }
   for (const m of text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)) {
-    const ids = [...m[1].matchAll(/<metadata key="object_id" value="([^"]+)"/g)].map(x => x[1]);
-    plates.push({ id: +(meta(m[1], 'plater_id') || plates.length + 1), name: meta(m[1], 'plater_name') || '', objects: ids });
+    // Instanzen einzeln: dasselbe Objekt kann mehrfach auf verschiedenen Platten stehen
+    const inst = [...m[1].matchAll(/<model_instance>([\s\S]*?)<\/model_instance>/g)].map(x => ({ id: meta(x[1], 'object_id'), instance: +(meta(x[1], 'instance_id') || 0) }));
+    plates.push({ id: +(meta(m[1], 'plater_id') || plates.length + 1), name: meta(m[1], 'plater_name') || '', objects: inst.map(x => x.id), instances: inst });
   }
   return { objects, plates };
 }
@@ -148,7 +149,8 @@ function parse3MF(fileName, zip, zipLib) {
   const root = model(rootPath);
   const settings = parseModelSettings(text('Metadata/model_settings.config'));
   const plateOf = new Map();
-  settings.plates.forEach(pl => pl.objects.forEach(id => plateOf.set(id, pl.id)));
+  settings.plates.forEach(pl => pl.instances.forEach(x => plateOf.set(x.id + '#' + x.instance, pl.id)));
+  const seen = new Map(); // Build-Items je Objekt zählen → Instanznummer
 
   // Alle Dreiecke eines Objekts (rekursiv über Komponenten) mit der Gesamttransformation sammeln
   function collect(path, id, T, skipPart, out, depth) {
@@ -176,13 +178,15 @@ function parse3MF(fileName, zip, zipLib) {
     const ms = settings.objects.get(item.objectid);
     // Modifier, Negativteile und Stützen-Blocker/-Erzwinger sind keine druckbaren Körper
     const skipPart = pid => { const p = ms && ms.parts.get(pid); const skip = !!p && p.subtype !== 'normal_part'; if (skip) skipped++; return skip; };
+    const instance = seen.get(item.objectid) || 0;
+    seen.set(item.objectid, instance + 1);
     const out = [];
     collect(rootPath, item.objectid, item.transform, skipPart, out, 0);
     if (!out.length) return;
     parts.push({
       name: unxml((ms && ms.name) || obj.name || 'Objekt ' + item.objectid),
-      pos: Float32Array.from(out), objectId: item.objectid,
-      extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid) || 1, printable: item.printable
+      pos: Float32Array.from(out), objectId: item.objectid, instance,
+      extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid + '#' + instance) || 1, printable: item.printable
     });
   });
   if (!parts.length) throw Error('keine druckbaren Objekte in ' + fileName);

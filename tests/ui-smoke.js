@@ -101,6 +101,27 @@ async function runSmoke(opts={}){
    ok(ps.filament_type[1]==='PETG'&&/key="wall_loops"/.test(msx),'Slot 2 = PETG, eigene Werte als Objekt-Einstellung')}
   $('clear').click();await wait(50);
   ok($('partList').classList.contains('hidden')&&!project,'Leeren entfernt die Teileliste');
+  /* Makerworld-3MF: zwei Objekte auf zwei Platten, für Bambu eingestellt → S1-Einstellungen, Platten bleiben */
+  { const u8=s=>fflate.strToU8(s);
+    const cubeXml=(id,s)=>{const b=[[0,0,0],[s,0,0],[s,s,0],[0,s,0],[0,0,s],[s,0,s],[s,s,s],[0,s,s]];const f=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+      return '<object id="'+id+'" type="model"><mesh><vertices>'+b.map(v=>'<vertex x="'+v[0]+'" y="'+v[1]+'" z="'+v[2]+'"/>').join('')+'</vertices><triangles>'+f.map(t=>'<triangle v1="'+t[0]+'" v2="'+t[1]+'" v3="'+t[2]+'"/>').join('')+'</triangles></mesh></object>'};
+    const zipBytes2=fflate.zipSync({'_rels/.rels':u8('<Relationships><Relationship Target="/3D/3dmodel.model" Id="rel-1"/></Relationships>'),
+      '3D/3dmodel.model':u8('<?xml version="1.0"?><model unit="millimeter" xmlns:p="x"><resources>'+cubeXml(1,20)+cubeXml(2,10)+'</resources><build><item objectid="1" transform="1 0 0 0 1 0 0 0 1 128 128 0"/><item objectid="2" transform="1 0 0 0 1 0 0 0 1 435.2 128 0"/></build></model>'),
+      'Metadata/model_settings.config':u8('<?xml version="1.0"?><config><object id="1"><metadata key="name" value="Gross"/><metadata key="extruder" value="2"/><metadata key="enable_support" value="1"/><part id="1" subtype="normal_part"></part></object><object id="2"><metadata key="name" value="Klein"/><metadata key="extruder" value="1"/><part id="2" subtype="normal_part"></part></object>'+
+        '<plate><metadata key="plater_id" value="1"/><model_instance><metadata key="object_id" value="1"/></model_instance></plate><plate><metadata key="plater_id" value="2"/><model_instance><metadata key="object_id" value="2"/></model_instance></plate></config>'),
+      'Metadata/project_settings.config':u8('{"printer_settings_id":"Bambu Lab X1 Carbon 0.4 nozzle"}'),'Metadata/plate_1.gcode':u8('; alt')});
+    await dropFile(new File([zipBytes2],'makerworld.3mf'));await wait(300);
+    ok(project&&project.threemf&&project.parts.length===2&&project.parts[0].slot===1,'Makerworld-3MF geladen: 2 Teile, Slot des Designers übernommen');
+    ok($('orientInfo').textContent.includes('bleibt erhalten')&&document.querySelector('.orient-tools [data-orient="x"]').disabled,'3MF: Lage bleibt, Drehen gesperrt');
+    menuClick('export3mf');await wait(50);
+    ok($('exportSub').textContent.includes('Bambu Lab X1 Carbon')&&document.querySelector('#exportDlg fieldset.slots').classList.contains('hidden'),'Dialog: Bambu-Einstellungen werden ersetzt, kein Standard-Slot nötig');
+    $('export3mfSave').click();await wait(150);
+    const fz=downloads.filter(d=>d.name.endsWith('.3mf')).pop(),z=fflate.unzipSync(await blobBytes(fz));
+    const ps=JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config'])),msx=fflate.strFromU8(z['Metadata/model_settings.config']),root=fflate.strFromU8(z['3D/3dmodel.model']);
+    ok(ps.printer_settings_id===exportTemplate('kobra_s1','0.4').printerPreset&&!z['Metadata/plate_1.gcode'],'Export: S1-Druckerprofil, alter G-Code entfernt');
+    ok(/<object id="1">[\s\S]*?key="extruder" value="2"/.test(msx)&&!/key="enable_support" value="1"/.test(msx),'Export: Slot bleibt, Stützen-Vorgabe des Designers durch eigene Analyse ersetzt');
+    ok(/transform="1 0 0 0 1 0 0 0 1 115 115 0"/.test(root)&&/transform="1 0 0 0 1 0 0 0 1 420 120 0"/.test(root),'Export: beide Platten auf die S1-Bettmitte gerückt');
+    $('clear').click();await wait(50);}
   sel('material','pla_hs');sel('object','general'); // Ausgangslage für die folgenden Prüfungen
 
   /* Ausrichtung: Pilz steht auf dem Stiel → Vorschlag Hut aufs Bett */
