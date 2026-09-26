@@ -3,7 +3,7 @@
 Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt beim Nutzer.
 
 ## Wichtig (betrifft Richtigkeit)
-1. **Sichttest in OrcaSlicer steht aus.** Die CLI bestätigt alle Werte; offen ist nur, wie die Orca-Oberfläche die geänderten Werte anzeigt (Preset als „geändert“ markiert?). Einmal eine exportierte 3MF öffnen und durchsehen.
+1. ~~Sichttest in OrcaSlicer~~ – erledigt 2026-09-26: Werte gingen zunächst verloren (fehlende Änderungsliste), nach Fix vom Nutzer bestätigt (4 Wände, PETG).
 2. **Slicer-Namen für den Kobra S1:** Die „Slicer-Reihenfolge“ und die Stützen-Anleitung nennen „Anycubic Slicer Next“, du slicst aber mit OrcaSlicer. Beschriftung auf OrcaSlicer umstellen.
 3. **Nicht exportierte Empfehlungen:** Lüfter erste Schicht, Beschleunigung (bei TPU 800 mm/s²), Rückzug und Z-Hop landen noch nicht in der 3MF. Rückzug/Z-Hop sind Druckerwerte – sie ließen sich in der 3MF trotzdem setzen, weil die Vorlage das Druckerprofil mitbringt.
 4. **Brim-Spannen:** Aus „5–8 mm“ wird 5 mm (untere Grenze), aus „0–5 mm bei Haftungsproblemen“ (Reifen) wird „kein Brim“. Ggf. im Export-Dialog wählbar machen.
@@ -17,7 +17,7 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 
 ## Neu aus der Live-Anbindung
 12. Der Kobra S1 antwortet sehr unterschiedlich schnell (gemessen 0,2–15 s, einmal gar nicht). Ursache unbestätigt (WLAN? Drucker ausgelastet?). Tool wartet 8 s mit einem zweiten Versuch.
-13. Offen: In OrcaSlicer standen nach dem Öffnen einer 3MF die Vorlagenwerte (2 Wände, 15 %) statt der exportierten (4 Wände, 30 %) – die Datei selbst ist korrekt. Klärung: Wie wurde die Datei geöffnet?
+13. ~~Vorlagenwerte statt Exportwerte in Orca~~ – behoben (different_settings_to_system + passende System-Presets).
 
 ## Bereits geplant (Plan-Schritte 3 und 4)
 10. Ausrichtung im Tool (Fläche aufs Bett legen, 90°-Tasten).
