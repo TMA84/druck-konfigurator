@@ -58,6 +58,7 @@ function parseGcode(text) {
   // XY-Bereich der Wand-Extrusionen (;TYPE: … wall) als Lagekontrolle – ohne Reinigungslinie, Brim, Stützen
   let x = null, y = null, type = ''; const bb = [Infinity, Infinity, -Infinity, -Infinity];
   const nozzleCmds = [], bedCmds = [];
+  let supportMoves = 0;
   for (const line of text.split('\n')) {
     if (line.startsWith(';TYPE:')) type = line.slice(6).trim();
     const mk = /^G9111 bedTemp=(\d+) extruderTemp=(\d+)/.exec(line); // Anycubic-Startmakro (Kobra S1)
@@ -65,11 +66,12 @@ function parseGcode(text) {
     const tn = /^M10[49] .*?S(\d+)/.exec(line); if (tn && +tn[1] > 0) nozzleCmds.push(+tn[1]);
     const tb = /^M1[49]0 .*?S(\d+)/.exec(line); if (tb && +tb[1] > 0) bedCmds.push(+tb[1]);
     if (!/^G[01] /.test(line)) continue;
+    if (/^Support/i.test(type) && / E\.?\d/.test(line)) supportMoves++;
     const gx = /X(-?[\d.]+)/.exec(line), gy = /Y(-?[\d.]+)/.exec(line), ge = /E([\d.]+)/.exec(line);
     if (gx) x = +gx[1]; if (gy) y = +gy[1];
     if (ge && +ge[1] > 0 && x !== null && y !== null && /wall/i.test(type)) { bb[0] = Math.min(bb[0], x); bb[1] = Math.min(bb[1], y); bb[2] = Math.max(bb[2], x); bb[3] = Math.max(bb[3], y); }
   }
-  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds };
+  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds, supportMoves };
 }
 
 let failures = 0;
@@ -107,6 +109,8 @@ for (const [i, c] of CASES.entries()) {
     const same = got.toUpperCase() === p.value.toUpperCase() || (!isNaN(+got) && !isNaN(+p.value) && Math.abs(+got - +p.value) < 1e-6) || got.replace(/%$/, '') === p.value.replace(/%$/, '');
     check(same, `${p.label} (${p.key}): erwartet ${p.value}, im G-Code ${got}`);
   }
+  // 1b) Stützen werden tatsächlich gedruckt, wenn sie empfohlen sind – und sonst nicht
+  check(r.supOn ? g.supportMoves > 0 : g.supportMoves === 0, `Stützen im G-Code: ${g.supportMoves} Bahnen (empfohlen: ${r.supOn ? 'ja' : 'nein'})`);
   // 2) Das Modell druckt mit dem gewählten Slot
   check(g.filament === String(c.slot + 1), `Slot: erwartet ${c.slot + 1}, G-Code "; filament: ${g.filament}"`);
   // 3) Tatsächliche Befehle: Düsen- und Betttemperatur

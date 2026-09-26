@@ -150,8 +150,13 @@ for (const c of cases) {
   const r4 = V4.compute(), rn = NEW.compute(inp, geoms[geom][1], ctxNew);
   const kind = rn.m.kind;
   // Felder, die v5 für den 3MF-Export zusätzlich liefert – v4 kennt sie nicht.
-  const V5_ONLY = ['maxVol', 'firstLayer', 'brim', 'seam'];
+  const V5_ONLY = ['maxVol', 'firstLayer', 'brim', 'seam', 'supZ'];
   const rnV4View = Object.fromEntries(Object.entries(rn).filter(([k]) => !V5_ONLY.includes(k)));
+  // Bewusste Änderung 2026-09-26: Z-Abstand der Stützen = Schichthöhe (PETG +0,05 mm) statt fest 0,20 mm.
+  // Für den Vergleich wird die v4-Angabe eingesetzt; die neuen Werte prüft tests/verify-3mf.js im G-Code.
+  const V4_ZGAP = { 'Oberer Z-Abstand': '0,20 mm', 'Unterer Z-Abstand': rn.tpu ? '0,25 mm' : '0,20 mm' };
+  rn.ordered = rn.ordered.map(([t, rows]) => [t, rows.map(r => V4_ZGAP[r[0]] ? [r[0], V4_ZGAP[r[0]], ...r.slice(2)] : r)]);
+  rnV4View.ordered = rn.ordered;
   const out4 = [JSON.stringify(r4), V4.buildOrcaFilamentJSON(r4), V4.buildOrcaProcessJSON(r4), V4.orcaWarningText(r4),
     r4.rows.map(V4.rowHTML).join(''), r4.ordered.map(g => g[1].map(V4.rowHTML).join('')).join('|')];
   const outN = [JSON.stringify(rnV4View), NEW.buildOrcaFilamentJSON(rn), NEW.buildOrcaProcessJSON(rn), NEW.orcaWarningText(rn),

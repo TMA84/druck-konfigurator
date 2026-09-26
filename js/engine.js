@@ -10,6 +10,14 @@ function supportProfile(level,tpu){
     minimal:{angle:55,xy:tpu?'0,50 mm':'0,45 mm',iface:1,gap:'0,60 mm',density:'10 %',branch:'2,0 mm',small:'Aus'}
   };return p[level]||p.balanced;
 }
+/* Z-Abstand Stütze↔Teil: eine Schichthöhe – so halten die Stützen sicher (abfallende Stützen gab es schon).
+   PETG haftet stärker am Teil → eine Stufe (0,05 mm) mehr. Unten bei TPU mindestens 0,25 mm wie in v4. */
+function supportZGap(layer,kind,tpu){
+  const top=Math.round((layer+(kind==='petg'?0.05:0))*100)/100;
+  return {top,bottom:tpu?Math.max(0.25,top):top};
+}
+// Untere Grenze einer Angabe wie "1,0–1,5 mm" oder "20 %" als Zahl
+const lowerNum=s=>{const m=/(\d+(?:[.,]\d+)?)/.exec(String(s));return m?Number(m[1].replace(',','.')):null};
 // kind = Filamenttyp des aktuell gewählten Filaments (v4 las ihn aus dem DOM)
 function helpFor(label,kind){
   const keys=Object.keys(explanations);
@@ -186,6 +194,7 @@ function compute(I,geom,ctx){
     ['Beschleunigung',accelTxt,accelNote],['Rückzug',retr],['Support',sup],['Brim',brim,brimNote]
   ];
 
+  const supZ=supportZGap(layer,m.kind,tpu);
   const ordered=[
     ['Qualität',[
       ['Schichthöhe',de(layer,2)+' mm'],['Höhe der ersten Schicht',de(N.fl,2)+' mm'],['Linienbreite Standard',de(N.lw,2)+' mm'],['Linienbreite erste Schicht',de(N.lwf,2)+' mm'],
@@ -201,7 +210,7 @@ function compute(I,geom,ctx){
     ['Stützen',supOn?[
       ['Stützstrukturen','Aktivieren'],['Typ','Baum (automatisch)'],['Schwellenwinkel',sp.angle+'°'],['Nur kritische Bereiche','Ein'],
       ['Nur auf Druckplatte','Ein, zuerst testen'],['Kleine Überhänge entfernen',sp.small],['Raft','0 Schichten'],
-      ['Oberer Z-Abstand','0,20 mm'],['Unterer Z-Abstand',tpu?'0,25 mm':'0,20 mm'],['Stützen/Objekt XY-Abstand',sp.xy],
+      ['Oberer Z-Abstand',de(supZ.top,2)+' mm'],['Unterer Z-Abstand',de(supZ.bottom,2)+' mm'],['Stützen/Objekt XY-Abstand',sp.xy],
       ['Obere Schnittstellenschichten',sp.iface],['Schnittstellenabstand',sp.gap]
     ]:[['Stützstrukturen','Nicht aktivieren',sup==='Nicht nötig'?'':sup],['Raft','0 Schichten']]],
   ];
@@ -253,5 +262,5 @@ function compute(I,geom,ctx){
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t,b,inf,sp_outer,sp_inner,sp_fill,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
-    maxVol,firstLayer:N.fl,brim,seam};
+    maxVol,firstLayer:N.fl,brim,seam,supZ};
 }

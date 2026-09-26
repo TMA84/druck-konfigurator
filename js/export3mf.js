@@ -26,6 +26,39 @@ function orcaBrim(brim) {
   return w > 0 ? ['outer_only', numStr(w)] : ['no_brim', null];
 }
 
+/* Stützen wie im Datenblatt (Stützparameter): gleiches Material wie das Teil, Z-Abstand = Schichthöhe
+   (PETG +0,05 mm), Spannen („1,0–1,5 mm“) mit der unteren Grenze. „Nur kritische Bereiche“ ändert bei
+   Baumstützen nichts (per Orca-CLI geprüft 2026-09-26) und wird nur der Vollständigkeit halber gesetzt.
+   Astabstand/-durchmesser: die v4-Werte entsprechen den organischen Baumstützen (Orca-Standard 1 mm / 2 mm);
+   der klassische Astabstand (Standard 5 mm) bleibt unverändert. */
+function supportChanges(r) {
+  const sp = r.sp, tpu = r.tpu;
+  const out = [
+    ['Stützentyp', 'support_type', 'tree(auto)'],
+    ['Schwellenwinkel', 'support_threshold_angle', sp.angle],
+    ['Nur kritische Bereiche', 'support_critical_regions_only', 1],
+    ['Nur auf Druckplatte', 'support_on_build_plate_only', 1],
+    ['Kleine Überhänge entfernen', 'support_remove_small_overhang', sp.small === 'Ein' ? 1 : 0],
+    ['Raft', 'raft_layers', 0],
+    ['Oberer Z-Abstand', 'support_top_z_distance', numStr(r.supZ.top)],
+    ['Unterer Z-Abstand', 'support_bottom_z_distance', numStr(r.supZ.bottom)],
+    ['Stützen/Objekt XY-Abstand', 'support_object_xy_distance', numStr(lowerNum(sp.xy))],
+    ['Abstand erste Schicht', 'support_object_first_layer_gap', tpu ? '0.25' : '0.2'],
+    ['Obere Schnittstellenschichten', 'support_interface_top_layers', sp.iface],
+    ['Untere Schnittstellenschichten', 'support_interface_bottom_layers', 1],
+    ['Schnittstellenabstand', 'support_interface_spacing', numStr(lowerNum(sp.gap))],
+    ['Abstand Grundmuster', 'support_base_pattern_spacing', tpu ? '3' : '2.5'],
+    ['Wände um Stützen', 'tree_support_wall_count', 0],
+    ['Stützspitze', 'tree_support_tip_diameter', '0.8'],
+    ['Ast-Dichte', 'tree_support_top_rate', lowerNum(sp.density) + '%'],
+    ['Astabstand', 'tree_support_branch_distance_organic', numStr(lowerNum(sp.branch))],
+    ['Ast-Durchmesser', 'tree_support_branch_diameter_organic', '2']
+  ];
+  // Gleiches Material wie das Teil (Entscheidung 2026-09-26): 0 = Filament des Objekts
+  out.push(['Stützenfilament', 'support_filament', 0], ['Schnittstellenfilament', 'support_interface_filament', 0]);
+  return out;
+}
+
 /* Liefert die Werte, die in project_settings.config geschrieben werden, jeweils mit
    Beschriftung, damit Dialog und Test dieselbe Liste verwenden. slot ist 0-basiert.
    liveSlots (optional): echte Belegung vom Drucker [{type, colour}] – Typ und Farbe aller
@@ -69,11 +102,7 @@ function plannedChanges(r, slot, liveSlots) {
   proc('Erste Schicht Geschwindigkeit', 'initial_layer_speed', r.m.first);
   proc('Travel', 'travel_speed', r.m.travel);
   proc('Stützen', 'enable_support', r.supOn ? 1 : 0);
-  if (r.supOn) {
-    proc('Stützentyp', 'support_type', 'tree(auto)');
-    proc('Schwellenwinkel', 'support_threshold_angle', r.sp.angle);
-    proc('Nur auf Druckplatte', 'support_on_build_plate_only', 1);
-  }
+  if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
   const [brimType, brimWidth] = orcaBrim(r.brim);
   proc('Brim', 'brim_type', brimType);
   if (brimWidth) proc('Brim-Breite', 'brim_width', brimWidth);
