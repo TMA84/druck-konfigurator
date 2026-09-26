@@ -139,7 +139,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus()});
 const ACTIONS={
   open:()=>input.click(),
   profiles:()=>{renderMyList();$('profilesDlg').showModal()},
-  help:()=>$('helpDlg').showModal()
+  help:()=>$('helpDlg').showModal(),
+  disclaimer:()=>{if($('helpDlg').open)$('helpDlg').close();$('disclaimerDlg').showModal()}
 };
 document.addEventListener('click',e=>{
   const a=e.target.closest('[data-action]');if(a&&ACTIONS[a.dataset.action])ACTIONS[a.dataset.action]();
@@ -233,4 +234,11 @@ if(store.last.nozM&&NOZZLE_MATERIALS[store.last.nozM]&&currentPrinter().nozzleOp
 if(!storageOK)persist();
 syncPrinterSwitch();
 try{if(localStorage.getItem(TAB_KEY)==='3d')setTab('3d')}catch(e){/* nur Komfort */}
+
+/* Haftungsausschluss: beim ersten Start (und nach inhaltlicher Änderung, neue Versionsnummer) einmal bestätigen.
+   Ist kein Speichern möglich, erscheint er bei jedem Start – lieber einmal zu oft als gar nicht. */
+const DISCLAIMER_KEY='druckKonfigurator.disclaimer',DISCLAIMER_VERSION='1';
+$('disclaimerOk').addEventListener('click',()=>{try{localStorage.setItem(DISCLAIMER_KEY,DISCLAIMER_VERSION)}catch(e){/* nicht speicherbar */}$('disclaimerDlg').close()});
+{let seen=null;try{seen=localStorage.getItem(DISCLAIMER_KEY)}catch(e){/* nicht lesbar */}
+ if(seen!==DISCLAIMER_VERSION)$('disclaimerDlg').showModal()}
 update();

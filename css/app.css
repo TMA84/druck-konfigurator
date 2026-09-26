@@ -422,3 +422,9 @@ table.changes td.bad { color: var(--bad); }
 .slot-edit-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
 
 .slot-hint { margin: 2px 0 8px; font-size: 13px; color: var(--ink-2); }
+
+/* Haftungsausschluss */
+#disclaimerDlg { max-width: 640px; }
+.disclaimer ol { margin: 6px 0 8px; padding-left: 20px; }
+.disclaimer li { margin: 6px 0; font-size: 14px; line-height: 1.45; }
+.footnote .linkbtn { font-size: inherit; padding: 0; }

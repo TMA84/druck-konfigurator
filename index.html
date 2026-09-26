@@ -158,7 +158,7 @@
       </details>
     </article>
   </div>
-  <p class="muted footnote">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen.</p>
+  <p class="muted footnote">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen. · <button class="linkbtn" type="button" data-action="disclaimer">Haftungsausschluss</button></p>
 </section>
 
 <section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view" hidden>
@@ -226,6 +226,21 @@
   <div class="ed-body"><div id="myList"></div></div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
 
+<dialog id="disclaimerDlg" aria-labelledby="disclaimerTitle"><div class="ed-head"><h2 id="disclaimerTitle">Haftungsausschluss</h2><div class="muted">Bitte kurz lesen – Nutzung auf eigene Verantwortung.</div></div>
+  <div class="ed-body disclaimer">
+    <ol>
+      <li><b>Startwerte ohne Gewähr.</b> Die Werte sind Empfehlungen; Slicer-Vorschau und ein Testdruck haben immer Vorrang.</li>
+      <li><b>Keine Haftung für Schäden</b> an Drucker und Zubehör – z. B. Düse, Druckplatte (PETG auf PEI), Verstopfungen, Fehldrucke, verbrauchtes Filament.</li>
+      <li><b>Gedruckte Teile:</b> Keine Eignung für sicherheitskritische oder tragende Anwendungen, Lebensmittelkontakt oder Kinderspielzeug zugesichert – das beurteilst du selbst.</li>
+      <li><b>Gesundheit:</b> ABS und ASA dünsten aus – gut lüften. Drucker nicht unbeaufsichtigt laufen lassen.</li>
+      <li><b>Drucker-Verbindung:</b> Das Tool liest nur die Filament-Belegung und steuert nichts; Nutzung auf eigene Verantwortung.</li>
+      <li><b>Marken:</b> Kein Bezug zu Anycubic, Snapmaker, Bambu Lab, Makerworld oder OrcaSlicer; die Namen dienen nur der Beschreibung.</li>
+      <li><b>Fremde Modelle:</b> Wer Projekte anderer (z. B. von Makerworld) umstellt, beachtet deren Lizenz.</li>
+    </ol>
+    <p class="muted small">Ausführlich in der README auf GitHub. Lizenz: CC BY-NC 4.0, ohne Gewährleistung.</p>
+  </div>
+  <div class="ed-foot"><button class="btn" type="button" id="disclaimerOk">Verstanden</button></div></dialog>
+
 <dialog id="helpDlg" aria-labelledby="helpTitle"><div class="ed-head"><h2 id="helpTitle">Hilfe</h2></div>
   <div class="ed-body prose">
     <p><b>Automatik:</b> Filamentprofil = Temperatur, Lüfter, Rückzug und maximale Volumengeschwindigkeit. Prozessprofil = Wände, Schichten, Füllung und Druckgeschwindigkeit. Die Stützen-Entscheidung kommt aus der Überhanganalyse des gewählten Teils.</p>
@@ -233,7 +248,7 @@
     <p><b>Eigene Werte:</b> Druckst du mit anderer Temperatur, schneller oder langsamer, klicke bei „Filament“ auf <b>Werte anpassen</b>. Alle Empfehlungen rechnen danach mit deinen Werten. <b>Neues Filament</b> legt ein zusätzliches Profil an, z. B. für eine bestimmte Marke.</p>
     <p><b>Wichtig:</b> STL-Maße und Überhänge werden lokal im Browser ermittelt. 3MF und Makerworld-ZIPs werden direkt gelesen; bei mehreren Teilen gilt die Analyse für das in der Teileliste gewählte Teil. Nahtposition: sichtbare Außenflächen <b>Hinten</b>; runde Teile <b>Ausgerichtet</b> oder <b>Nächstgelegen</b>. Brücken, dünne Wände und die tatsächliche Kontaktfläche der Stützen immer zusätzlich in der Slicer-Vorschau prüfen – die Empfehlung ist eine Geometrie-Näherung und ersetzt die Vorschau nicht.</p>
     <p>Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang.</p>
-    <p><b>Ausführlich:</b> <a href="docs/Handbuch.pdf" target="_blank" rel="noopener">Handbuch öffnen (PDF)</a> – alle Funktionen mit Bildern, dazu Lösungen für häufige Probleme.</p>
+    <p><b>Ausführlich:</b> <a href="docs/Handbuch.pdf" target="_blank" rel="noopener">Handbuch öffnen (PDF)</a> · <button class="linkbtn" type="button" data-action="disclaimer">Haftungsausschluss</button> – alle Funktionen mit Bildern, dazu Lösungen für häufige Probleme.</p>
   </div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
 

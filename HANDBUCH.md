@@ -4,7 +4,7 @@ Der Druck-Konfigurator berechnet passende Startwerte für den **Anycubic Kobra S
 
 Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Internet geschickt.
 
-> **Hinweis:** Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang. Die Slicer-Vorschau immer prüfen.
+> **Hinweis:** Alle Werte sind Startwerte ohne Gewähr. Filamente unterscheiden sich je nach Hersteller und Charge – die Angaben auf der Rolle haben Vorrang. Die Slicer-Vorschau immer prüfen. Nutzung auf eigene Verantwortung – den vollständigen **Haftungsausschluss** findest du in der [README](README.md#haftungsausschluss) und im Tool unter **? → Haftungsausschluss**.
 
 ---
 

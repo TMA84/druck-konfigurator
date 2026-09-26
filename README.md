@@ -49,6 +49,18 @@ node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige M
 
 Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei). Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`.
 
+## Haftungsausschluss
+
+Die Nutzung erfolgt auf eigene Verantwortung. Der Druck-Konfigurator ist ein privates, nicht kommerzielles Projekt und wird ohne jede Gewährleistung bereitgestellt.
+
+1. **Keine Gewähr für die Werte.** Alle berechneten Einstellungen sind Startwerte. Filamente unterscheiden sich je nach Hersteller und Charge; die Angaben auf der Rolle, die Vorschau im Slicer und ein Testdruck haben immer Vorrang.
+2. **Keine Haftung für Schäden an Drucker und Zubehör.** Für Schäden an Düse, Druckplatte (z. B. PETG auf glatter PEI-Platte ohne Trennmittel), Hotend oder anderen Teilen, für Verstopfungen, Fehldrucke oder verbrauchtes Material wird keine Haftung übernommen.
+3. **Keine zugesicherte Eignung der gedruckten Teile.** Ob ein Teil für eine sicherheitskritische oder tragende Anwendung, für den Kontakt mit Lebensmitteln oder als Kinderspielzeug geeignet ist, beurteilt allein der Nutzer. Auch die Bohrloch-Verstärkung ersetzt keine Festigkeitsprüfung.
+4. **Gesundheit und Sicherheit.** Beim Drucken – besonders mit ABS und ASA – entstehen Dämpfe und ultrafeine Partikel: Raum gut lüften, nicht in Wohn- oder Schlafräumen drucken. 3D-Drucker nicht unbeaufsichtigt betreiben.
+5. **Drucker-Verbindung.** Die optionale Live-Abfrage liest über Moonraker nur die Filament-Belegung und sendet keine Steuerbefehle. Die Nutzung erfolgt trotzdem auf eigene Verantwortung.
+6. **Marken.** Dieses Projekt steht in keiner Verbindung zu Anycubic, Snapmaker, Bambu Lab, Makerworld oder OrcaSlicer. Produkt- und Markennamen werden nur zur Beschreibung verwendet und gehören ihren Inhabern.
+7. **Fremde Modelle.** Wer Projekte anderer (z. B. von Makerworld) mit dem Tool umstellt, ist selbst für die Einhaltung ihrer Lizenz verantwortlich – etwa „nicht kommerziell“ oder „keine Weitergabe“.
+
 ## Änderungen und Lizenz
 
 - Versionen und Änderungen: [CHANGELOG.md](CHANGELOG.md)
