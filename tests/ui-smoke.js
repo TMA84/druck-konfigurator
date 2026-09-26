@@ -78,14 +78,30 @@ async function runSmoke(opts={}){
   items[1].click();await wait(50);
   ok(geom.name==='b.stl'&&$('partList').querySelector('[data-part="1"]').getAttribute('aria-current')==='true','Klick wählt Teil 2');
   ok($('summary').textContent.includes('30'),'Datenblatt zeigt Maße von Teil 2');
+  // Werte je Teil: Teil 2 bekommt PETG, Halterung und Slot 2 – Teil 1 behält seine Auswahl
+  ok(!$('partScope').classList.contains('hidden')&&$('partScopeName').textContent==='b.stl','Formular zeigt, für welches Teil es gilt');
+  sel('material','petg');sel('object','holder');
+  $('partSlot').value='1';$('partSlot').dispatchEvent(new Event('change'));
+  $('partList').querySelector('[data-part="0"]').click();await wait(50);
+  ok($('material').value==='pla_hs'&&$('object').value==='general','Teil 1 behält eigene Auswahl ('+$('material').value+'/'+$('object').value+')');
+  $('partList').querySelector('[data-part="1"]').click();await wait(50);
+  ok($('material').value==='petg'&&$('object').value==='holder'&&$('partSlot').value==='1','Teil 2: PETG, Halterung, Slot 2 gemerkt');
+  ok($('partList').querySelector('[data-part="1"]').textContent.includes('Slot 2'),'Teileliste zeigt Slot von Teil 2');
   const lastBefore=JSON.parse(JSON.stringify(store.last));
-  menuClick('export3mf');await wait(50);$('export3mfSave').click();await wait(100);
+  menuClick('export3mf');await wait(50);
+  ok(!$('partPlan').classList.contains('hidden')&&$('partPlanTable').querySelectorAll('tbody tr').length===4,'Export-Dialog: Tabelle mit 4 Teilen');
+  ok(/PETG/.test($('partPlanTable').textContent)&&$('slotLegend').textContent.includes('Standard'),'Tabelle zeigt PETG-Teil, Standard-Slot beschriftet');
+  $('export3mfSave').click();await wait(100);
   store.last=lastBefore;persist(); // gemerkten Slot nicht verstellen, spätere Prüfungen hängen daran
   const fm=downloads.filter(d=>d.name.endsWith('.3mf')).pop();
   {const z=fflate.unzipSync(await blobBytes(fm));const msx=fflate.strFromU8(z['Metadata/model_settings.config']);
-   ok((msx.match(/<object id=/g)||[]).length===4&&Object.keys(z).filter(k=>k.startsWith('3D/Objects/')).length===4,'3MF mit 4 Objekten ('+fm.name+')')}
+   ok((msx.match(/<object id=/g)||[]).length===4&&Object.keys(z).filter(k=>k.startsWith('3D/Objects/')).length===4,'3MF mit 4 Objekten ('+fm.name+')');
+   ok((msx.match(/key="extruder" value="2"/g)||[]).length===1&&/_2Slots\.3mf$/.test(fm.name),'Teil 2 auf Slot 2, Dateiname nennt 2 Slots');
+   const ps=JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));
+   ok(ps.filament_type[1]==='PETG'&&/key="wall_loops"/.test(msx),'Slot 2 = PETG, eigene Werte als Objekt-Einstellung')}
   $('clear').click();await wait(50);
   ok($('partList').classList.contains('hidden')&&!project,'Leeren entfernt die Teileliste');
+  sel('material','pla_hs');sel('object','general'); // Ausgangslage für die folgenden Prüfungen
 
   /* Ausrichtung: Pilz steht auf dem Stiel → Vorschlag Hut aufs Bett */
   await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));await wait(300);

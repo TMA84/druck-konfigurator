@@ -92,9 +92,34 @@ function scoreOrientation(pos, th) {
   return { onBed, onPart, contact, height, score };
 }
 
+/* Große Netze für die Bewertung vereinfachen (Eckpunkte auf ein Raster ziehen, entartete Dreiecke
+   verwerfen). Die Rangfolge der Lagen bleibt erhalten; bei 200.000 Dreiecken dauerte die Bewertung
+   sonst ~25 s (Prüfung 2026-09-26). Gedreht wird immer das Originalnetz. */
+const ORIENT_TARGET_TRIS = 20000;
+function simplifyForScoring(pos) {
+  const n = pos.length / 9;
+  if (n <= ORIENT_TARGET_TRIS) return pos;
+  let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], pos[i + k]); mx[k] = Math.max(mx[k], pos[i + k]); }
+  const diag = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) || 1;
+  let cell = diag / 400, out = pos;
+  for (let round = 0; round < 8 && out.length / 9 > ORIENT_TARGET_TRIS; round++, cell *= 1.6) {
+    const q = v => Math.round(v / cell) * cell, keep = [];
+    for (let t = 0; t < n; t++) {
+      const o = t * 9, v = [];
+      for (let k = 0; k < 9; k++) v.push(q(pos[o + k]));
+      const same = (a, b) => v[a] === v[b] && v[a + 1] === v[b + 1] && v[a + 2] === v[b + 2];
+      if (!same(0, 3) && !same(3, 6) && !same(0, 6)) keep.push(...v);
+    }
+    out = Float32Array.from(keep);
+  }
+  return out;
+}
+
 /* Alle Kandidaten bewerten. R0 = aktuelle Drehung des Teils gegenüber der Datei; die Kandidaten
    werden auf die Originalpositionen angewandt. Ergebnis sortiert, bestes zuerst; current = aktuelle Lage. */
 function evaluateOrientations(origPos, R0, th) {
+  origPos = simplifyForScoring(origPos);
   const current = { R: R0, ...scoreOrientation(rotatePositions(origPos, R0), th) };
   const seen = [];
   const results = [];

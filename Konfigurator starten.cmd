@@ -9,4 +9,4 @@ where python >nul 2>nul || (echo Python wurde nicht gefunden. Bitte Python insta
 netstat -ano | findstr /r /c:"127.0.0.1:%PORT%  *0.0.0.0:0" >nul && (echo Konfigurator laeuft bereits. & start "" "http://127.0.0.1:%PORT%/index.html" & exit /b 0)
 echo Druck-Konfigurator laeuft unter http://127.0.0.1:%PORT%/  - dieses Fenster offen lassen.
 start "" "http://127.0.0.1:%PORT%/index.html"
-python -m http.server %PORT% --bind 127.0.0.1
+python "%~dp0tools\serve.py" %PORT%

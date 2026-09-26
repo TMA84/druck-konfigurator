@@ -115,14 +115,17 @@ function plannedChanges(r, slot, liveSlots) {
    der Datei nur die Schlüssel, die in different_settings_to_system stehen (Aufbau wie von Orca selbst
    gespeichert: [Prozess, Filament 1..n, Drucker], Schlüssel mit ";" getrennt). Ohne diese Liste
    landen in der Oberfläche die Presetwerte statt der exportierten (beobachtet 2026-09-26). */
-function filamentSlotTypes(r, slot, liveSlots, n) {
+function filamentSlotTypes(r, slot, liveSlots, n, extra = []) {
   const types = Array(n).fill(null);
   (liveSlots || []).forEach((s, i) => { if (i < n && s.type) types[i] = s.type; });
+  extra.forEach(e => { if (e.slot < n) types[e.slot] = ORCA_KIND[e.r.m.kind] || types[e.slot]; });
   types[slot] = ORCA_KIND[r.m.kind] || types[slot];
   return types;
 }
 
-function buildProjectSettings(tpl, r, slot, liveSlots) {
+/* extra: [{slot, r}] – weitere Slots, die Teile mit eigenem Filament belegen. Dort werden nur die
+   Filamentwerte (Temperaturen, Lüfter, Fluss …) aus dem Ergebnis dieses Teils geschrieben. */
+function buildProjectSettings(tpl, r, slot, liveSlots, extra = []) {
   const settings = JSON.parse(JSON.stringify(tpl.settings));
   const changes = [];
   const nFil = settings.filament_settings_id.length;
@@ -133,7 +136,7 @@ function buildProjectSettings(tpl, r, slot, liveSlots) {
 
   // 1) Jeder Slot bekommt das System-Preset seines Filamenttyps (sofern Orca eines kennt)
   const presets = tpl.filamentPresets || {};
-  filamentSlotTypes(r, slot, liveSlots, nFil).forEach((type, i) => {
+  filamentSlotTypes(r, slot, liveSlots, nFil, extra).forEach((type, i) => {
     const preset = type && presets[String(type).toUpperCase()];
     if (!preset || settings.filament_settings_id[i] === preset) return;
     changes.push({ label: 'Slot ' + (i + 1) + ' Preset', key: 'filament_settings_id', before: settings.filament_settings_id[i], after: preset });
@@ -143,7 +146,10 @@ function buildProjectSettings(tpl, r, slot, liveSlots) {
   });
 
   // 2) Berechnete Werte schreiben und als „geändert“ vermerken
-  for (const c of plannedChanges(r, slot, liveSlots)) {
+  const extraFil = extra.flatMap(e => plannedChanges(e.r, e.slot, null)
+    .filter(c => c.perSlot && c.index === e.slot)
+    .map(c => ({ ...c, label: 'Slot ' + (e.slot + 1) + ': ' + c.label })));
+  for (const c of [...plannedChanges(r, slot, liveSlots), ...extraFil]) {
     if (!(c.key in settings)) continue; // Schlüssel kennt diese Orca-Version nicht → Vorlage unverändert
     if (c.perSlot && !(c.index < settings[c.key].length)) continue; // mehr Druckerslots als in der Vorlage
     const before = c.perSlot ? settings[c.key][c.index] : settings[c.key];
@@ -154,6 +160,18 @@ function buildProjectSettings(tpl, r, slot, liveSlots) {
   settings.different_settings_to_system = diff.map(s => [...s].join(';'));
   settings.inherits_group = inherits;
   return { settings, changes };
+}
+
+/* Prozesswerte, die Orca je Objekt überschreiben kann (Objekt-Einstellungen). Schichthöhe, erste Schicht,
+   Travel und Erste-Schicht-Geschwindigkeit gelten für die ganze Platte und bleiben global. */
+const OBJECT_KEYS = new Set(['wall_loops', 'sparse_infill_density', 'sparse_infill_pattern', 'top_shell_layers', 'bottom_shell_layers',
+  'outer_wall_speed', 'inner_wall_speed', 'sparse_infill_speed', 'internal_solid_infill_speed', 'top_surface_speed', 'gap_infill_speed',
+  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'seam_position']);
+const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(k);
+
+// Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config
+function objectOverrides(settings, pr) {
+  return plannedChanges(pr, 0, null).filter(c => !c.perSlot && isObjectKey(c.key) && c.key in settings && String(settings[c.key]) !== c.value);
 }
 
 const xmlEsc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
@@ -224,8 +242,9 @@ const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
 const MODEL_OPEN = '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n';
 const REL_TYPE = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel';
 
-function modelSettingsXML(objs, slot, plateCount) {
-  const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + (slot + 1) + '"/>\n' +
+function modelSettingsXML(objs, plateCount) {
+  const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + o.extruder + '"/>\n' +
+    o.overrides.map(c => '    <metadata key="' + c.key + '" value="' + xmlEsc(c.value) + '"/>\n').join('') +
     '    <part id="' + o.k + '" subtype="normal_part">\n      <metadata key="name" value="' + o.name + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="source_file" value="' + o.name + '"/>\n' +
     '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n  </object>\n';
   const instance = o => '    <model_instance>\n      <metadata key="object_id" value="' + o.id + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + o.k + '"/>\n    </model_instance>\n';
@@ -236,13 +255,36 @@ function modelSettingsXML(objs, slot, plateCount) {
 }
 
 // parts: ein geom (Einzelteil) oder [{geom}] – alle Teile bekommen dieselben Werte und den gewählten Slot.
+/* parts: ein geom oder [{geom, r?, slot?}]. r/slot = Werte und Slot für alle Teile ohne eigene Angabe.
+   Teile mit eigenem r bekommen abweichende Prozesswerte als Objekt-Einstellung, ein eigener Slot
+   bekommt die Filamentwerte dieses Teils. notes: Werte, die Orca nur global kennt. */
+/* Welche Slots welche Filamentwerte bekommen: der Standard-Slot die von r, jeder weitere Slot die des
+   ersten Teils darin. Teile mit anderem Material im selben Slot → Hinweis (Orca kennt ein Filament je Slot). */
+function slotPlan(items, r, slot) {
+  const partSlot = p => (p.slot === null || p.slot === undefined ? slot : p.slot);
+  const extra = [], notes = [];
+  for (const p of items) {
+    const ps = partSlot(p), pr = p.r || r;
+    if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(p.geom.name + ': ' + pr.m.name + ' im selben Slot wie ' + r.m.name + ' – es gelten die Filamentwerte von ' + r.m.name + '.'); continue; }
+    const other = extra.find(e => e.slot === ps);
+    if (!other) extra.push({ slot: ps, r: pr });
+    else if (other.r.m.kind !== pr.m.kind) notes.push(p.geom.name + ': Slot ' + (ps + 1) + ' ist schon mit ' + other.r.m.name + ' belegt – es gelten dessen Filamentwerte.');
+  }
+  for (const p of items) if (p.r && Math.abs(p.r.layer - r.layer) > 1e-9) notes.push(p.geom.name + ': Schichthöhe ' + de(p.r.layer, 2) + ' mm empfohlen – Orca nutzt für alle Teile ' + de(r.layer, 2) + ' mm.');
+  return { extra, notes, partSlot };
+}
+
 function build3mfFiles(tpl, r, parts, slot, liveSlots) {
-  const list = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom || p);
-  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots);
+  const items = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom ? p : { geom: p });
+  const list = items.map(p => p.geom);
+  const { extra, notes, partSlot } = slotPlan(items, r, slot);
+  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra);
   const { places, plateCount } = arrangeParts(list, tpl);
   const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
   // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
-  const objs = list.map((g, i) => ({ g, k: i + 1, id: n + i + 1, name: xmlEsc(g.name), hz: coord(g.z / 2), place: places[i] }));
+  const objs = items.map((p, i) => ({ g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
+    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [] }));
+  const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
     '_rels/.rels': XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="' + REL_TYPE + '"/>\n</Relationships>\n',
@@ -254,19 +296,19 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
       ' </resources>\n <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n' +
       objs.map(o => '  <item objectid="' + o.id + '" p:UUID="' + uuid(o.id, 'b1ec-4553-aec9-835e5b724bb4') + '" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" printable="1"/>\n').join('') +
       ' </build>\n</model>\n',
-    'Metadata/model_settings.config': modelSettingsXML(objs, slot, plateCount),
+    'Metadata/model_settings.config': modelSettingsXML(objs, plateCount),
     'Metadata/project_settings.config': JSON.stringify(settings, null, 4),
     'Metadata/slice_info.config': XML_HEAD + '<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.06.00.51"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
     'Metadata/filament_sequence.json': JSON.stringify(Object.fromEntries(Array.from({ length: plateCount }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }])))
   };
   objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.k); });
-  return { files, changes, plateCount };
+  return { files, changes, plateCount, objectChanges, notes };
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
 function build3mf(tpl, r, parts, slot, zipLib, liveSlots) {
-  const { files, changes, plateCount } = build3mfFiles(tpl, r, parts, slot, liveSlots);
+  const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots);
   const entries = {};
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
-  return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount };
+  return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount, objectChanges, notes };
 }

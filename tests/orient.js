@@ -78,5 +78,25 @@ const ms = Date.now() - t0;
 check('Laufzeit ' + (big.length / 9) + ' Dreiecke < 3 s', ms < 3000, ms + ' ms');
 console.log('Laufzeit ' + (big.length / 9) + ' Dreiecke: ' + ms + ' ms');
 
+// 8) Großes Netz (≈ 200.000 Dreiecke, fein zerlegter Pilz): Bewertung auf vereinfachtem Netz, gleiches Ergebnis
+function fineBox(x0, y0, z0, x1, y1, z1, k) {
+  const out = [];
+  const quad = (p, u, v) => { for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) {
+    const P = (a, b) => [0, 1, 2].map(c => p[c] + u[c] * a / k + v[c] * b / k);
+    out.push([P(i, j), P(i + 1, j), P(i + 1, j + 1)], [P(i, j), P(i + 1, j + 1), P(i, j + 1)]); } };
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  quad([x0, y0, z0], [0, dy, 0], [dx, 0, 0]); quad([x0, y0, z1], [dx, 0, 0], [0, dy, 0]);   // unten, oben
+  quad([x0, y0, z0], [dx, 0, 0], [0, 0, dz]); quad([x0, y1, z0], [0, 0, dz], [dx, 0, 0]);   // vorne, hinten
+  quad([x0, y0, z0], [0, 0, dz], [0, dy, 0]); quad([x1, y0, z0], [0, dy, 0], [0, 0, dz]);   // links, rechts
+  return out;
+}
+const bigPilz = flat([...fineBox(15, 15, 0, 25, 25, 20, 90), ...fineBox(0, 0, 20, 40, 40, 25, 90)]);
+const t1 = Date.now();
+e = K.evaluateOrientations(bigPilz, K.IDENTITY3, 45);
+const ms2 = Date.now() - t1;
+console.log('Laufzeit ' + (bigPilz.length / 9) + ' Dreiecke: ' + ms2 + ' ms');
+check('Großes Netz: Bewertung < 6 s', ms2 < 6000, ms2 + ' ms');
+check('Großes Netz: Vorschlag Hut aufs Bett', e.suggestion && Math.abs(K.makeGeom('b', K.rotatePositions(bigPilz, e.suggestion.R)).bedArea - 1600) < 5, e.suggestion && e.suggestion.contact);
+
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

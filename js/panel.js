@@ -40,6 +40,7 @@ function specCell(x){
 }
 
 function update(){
+  if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
   const row=x=>rowHTML(x,r.m.kind);
   $('mainTitle').textContent=r.printer.label+' – Druck-Konfigurator';
@@ -75,6 +76,7 @@ function update(){
   lastResult=r;
   if(typeof renderPartList==='function')renderPartList();
   if(typeof renderOrient==='function')renderOrient();
+  if(typeof renderPartScope==='function')renderPartScope();
   if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof enhanceHelp==='function')enhanceHelp();
 }

@@ -46,22 +46,59 @@ function preferredSlot(tpl,r){
 }
 
 function renderExportDialog(){
-  const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),slot=chosenSlot();
+  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel);
+  const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   const live=slotState.live?slotState.live.slots:null;
-  const {changes}=buildProjectSettings(tpl,r,slot,live);
+  const {extra,notes,partSlot}=slotPlan(plan.jobs,r,slot);
+  const {settings,changes}=buildProjectSettings(tpl,r,slot,live,extra);
+  renderPartPlan(tpl,plan,partSlot,notes,settings);
   const kind=ORCA_KIND[r.m.kind]||'PLA',s=dialogSlots(tpl)[slot];
   const warn=$('slotWarn');
   const where=slotState.live?'laut Drucker':'in deiner Vorlage';
-  if(s&&!s.present){
+  if(plan.jobs.length>1)warn.classList.add('hidden');
+  else if(s&&!s.present){
     warn.innerHTML='<b>Hinweis:</b> In Slot '+(slot+1)+' hat der Drucker kein Filament erkannt.';warn.classList.remove('hidden');
   }else if(s&&s.type&&!slotMatchesKind(s.type,r.m.kind)){
     warn.innerHTML='<b>Hinweis:</b> In Slot '+(slot+1)+' steckt '+where+' <b>'+esc(s.type)+'</b>, gewählt ist <b>'+esc(r.m.name)+'</b> ('+kind+'). Die Werte werden trotzdem für '+kind+' geschrieben.';
     warn.classList.remove('hidden');
   }else warn.classList.add('hidden');
-  $('changesTitle').textContent='Was geändert wird ('+changes.length+' Werte)';
+  const objCount=plan.jobs.reduce((n,j)=>n+objectOverrides(settings,j.r).length,0)*(plan.jobs.length>1?1:0);
+  $('changesTitle').textContent='Was geändert wird ('+changes.length+' Werte'+(objCount?' + '+objCount+' je Teil':'')+')';
   $('changesList').innerHTML='<table class="changes"><thead><tr><th>Einstellung</th><th>Vorlage</th><th>Neu</th></tr></thead><tbody>'+
     changes.map(c=>'<tr><td>'+esc(c.label)+'<small>'+esc(c.key)+'</small></td><td>'+esc(c.before??'–')+'</td><td><b>'+esc(c.after)+'</b></td></tr>').join('')+'</tbody></table>';
 }
+
+/* Mehrere Teile: Tabelle Teil · Slot · Filament · abweichende Werte, mit Hinweis, wenn der Slot laut
+   Belegung ein anderes Filament hat. „Passend wählen“ stellt das Filament der Teile auf die Belegung um. */
+function renderPartPlan(tpl,plan,partSlot,notes,settings){
+  const multi=plan.jobs.length>1;
+  $('partPlan').classList.toggle('hidden',!multi);
+  $('slotLegend').textContent=multi?'Standard-Slot (für Teile ohne eigenen Slot)':'Filament-Slot';
+  if(!multi)return;
+  const slots=dialogSlots(tpl);let mismatch=0;
+  $('partPlanTable').innerHTML='<table class="changes"><thead><tr><th>Teil</th><th>Slot</th><th>Filament</th><th>Eigene Werte</th></tr></thead><tbody>'+
+    plan.jobs.map(j=>{
+      const si=partSlot(j),s=slots[si],bad=s&&s.type&&!slotMatchesKind(s.type,j.r.m.kind);
+      if(bad)mismatch++;
+      const own=objectOverrides(settings,j.r);
+      return '<tr><td>'+esc(j.geom.name)+'</td><td>'+(si+1)+(j.slot===null?' <small>Standard</small>':'')+(s&&s.type?'<small>'+esc(s.type)+'</small>':'')+'</td>'+
+        '<td'+(bad?' class="bad"':'')+'>'+esc(j.r.m.name)+(bad?'<small>passt nicht zu '+esc(s.type)+'</small>':'')+'</td>'+
+        '<td title="'+esc(own.map(c=>c.label+': '+c.value).join('\n'))+'">'+(own.length?own.length+' Werte':'–')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  $('partPlanNotes').innerHTML=notes.map(n=>'<li>'+esc(n)+'</li>').join('');
+  $('matchLive').classList.toggle('hidden',!mismatch);
+  $('matchLive').textContent='Filament von '+mismatch+' Teil'+(mismatch>1?'en':'')+' passend zur Belegung wählen';
+}
+$('matchLive').addEventListener('click',()=>{
+  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),slots=dialogSlots(tpl),def=chosenSlot();
+  let n=0;
+  for(const p of project.parts){
+    const s=slots[p.slot==null?def:p.slot];if(!s||!s.type)continue;
+    const m=materialForSlotType(s.type,p.input.material);if(m!==p.input.material){p.input.material=m;n++}
+  }
+  loadPartIntoForm(project.parts[project.selected]);update();renderExportDialog();
+  toast(n?n+' Teil'+(n>1?'e':'')+' auf das Filament im Slot umgestellt':'Nichts umzustellen');
+});
 
 async function loadLiveSlots(){
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),host=printerHost(r.printer.id);
@@ -97,15 +134,17 @@ function openExportDialog(){
 }
 
 function save3mf(){
-  const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),slot=chosenSlot();
+  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel);
+  const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   try{
-    const {bytes}=build3mf(tpl,r,project.parts,slot,fflate,slotState.live?slotState.live.slots:null);
+    const {bytes}=build3mf(tpl,r,plan.jobs,slot,fflate,slotState.live?slotState.live.slots:null);
+    const slotsUsed=new Set(plan.jobs.map(j=>j.slot===null?slot:j.slot));
     const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'_'+short+'_Slot'+(slot+1)+'.3mf';
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'_'+short+(slotsUsed.size===1?'_Slot'+(slot+1):'_'+slotsUsed.size+'Slots')+'.3mf';
     document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
-    store.last[slotKey(r.printer.id)]=slot;persist();
+    if(plan.usesDefault){store.last[slotKey(r.printer.id)]=slot;persist()}
     $('exportDlg').close();
     toast('3MF gespeichert: '+a.download);
   }catch(e){

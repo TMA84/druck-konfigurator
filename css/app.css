@@ -378,3 +378,15 @@ table.changes td small { display: block; color: var(--ink-3); font-family: var(-
 .link-result { margin: 2px 0 8px; }
 .link-result.good { color: var(--ok); }
 .link-result.bad { color: var(--bad); }
+
+/* Einstellungen je Teil: zeigt, für welches Teil das Formular gilt */
+.part-scope { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; margin: -4px 0 14px; padding: 10px 12px; border-radius: var(--r-m); background: var(--accent-soft); border-left: 3px solid var(--accent); }
+.part-scope.hidden { display: none; }
+.part-scope .eyebrow { grid-column: 1 / -1; }
+.part-scope b { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.part-scope label { font-size: 13px; color: var(--ink-2); }
+.part-scope select { padding: 5px 8px; font-size: 13px; }
+.plan-title { font-size: 14px; margin: 14px 0 6px; }
+.plan-notes { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--warn); }
+.plan-notes:empty { display: none; }
+table.changes td.bad { color: var(--bad); }

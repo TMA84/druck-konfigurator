@@ -157,6 +157,40 @@ if (res) res.gcodes.forEach((g, i) => {
   check(Math.abs(mx - bx) < 1.5 && Math.abs(my - by) < 1.5 && Math.abs(g.bb[2] - g.bb[0] - 200) < 1.5, `Platte ${i + 1}: Teil mittig ${mx.toFixed(1)}/${my.toFixed(1)} ≈ ${bx}/${by}`);
 });
 
+/* ---------- Werte je Teil: PETG-Pilz mit Stützen in Slot 2, PLA-Würfel schnell im Standard-Slot 1 ---------- */
+{
+  const base = { printer: 'snapmaker_u1', nozD: '0.4', nozM: NOZ_MAT.snapmaker_u1, load: 'medium', supportLevel: 'balanced', thresh: '45' };
+  const ctxc = { getMat: K.getMat, settings: K.store.settings };
+  const rA = K.compute({ ...base, material: 'petg', object: 'overhang', goal: 'strong', support: 'allow' }, MODELS.mushroom, ctxc);
+  const rB = K.compute({ ...base, material: 'pla_hs', object: 'general', goal: 'fast', support: 'auto' }, MODELS.cube, ctxc);
+  const tpl = K.exportTemplate('snapmaker_u1', '0.4');
+  const { bytes, objectChanges } = K.build3mf(tpl, rB, [{ geom: MODELS.mushroom, r: rA, slot: 1 }, { geom: MODELS.cube, r: rB }], 0, fflate);
+  console.log('\nWerte je Teil: pilz.stl PETG Slot 2 · wuerfel.stl PLA Slot 1');
+  const own = (objectChanges[0] || { changes: [] }).changes.map(c => c.key);
+  check(objectChanges.length === 1 && own.includes('enable_support') && own.includes('wall_loops'), 'Objekt-Einstellungen nur für den Pilz: ' + own.join(','));
+  const dir = path.join(OUT, 'je_teil'); fs.mkdirSync(dir);
+  const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+  try {
+    execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 });
+    const text = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.gcode'))), 'utf8');
+    // Bahnen je Objekt und Art zählen (Orca markiert Objekte mit "; printing object <name>")
+    const per = {}; let obj = null, type = '';
+    for (const line of text.split('\n')) {
+      const po = /^; printing object (\S+)/.exec(line); if (po) { obj = po[1]; continue; }
+      if (/^; stop printing object/.test(line)) { obj = null; continue; }
+      if (line.startsWith(';TYPE:')) type = line.slice(6).trim();
+      if (/^G1 .* E\.?\d/.test(line)) { const k = (obj || '-') + '|' + type; per[k] = (per[k] || 0) + 1; }
+    }
+    const supportOf = name => Object.entries(per).filter(([k]) => k.startsWith(name + '|') && /^Support/i.test(k.split('|')[1])).reduce((s, [, v]) => s + v, 0);
+    check(supportOf('pilz.stl') > 0 && supportOf('wuerfel.stl') === 0, `Stützen nur am Pilz (Pilz ${supportOf('pilz.stl')}, Würfel ${supportOf('wuerfel.stl')})`);
+    check(/^; filament: (2,1|1,2)$/m.test(text), 'Beide Slots im Einsatz: ' + (text.match(/^; filament: .*$/m) || ['?'])[0]);
+    check(new RegExp('^M10[49] S' + rA.nozzle + ' T1', 'm').test(text), `Slot 2 (T1) heizt auf ${rA.nozzle} °C (PETG)`);
+    const cfg = parseGcode(text).cfg, temps = cfg.nozzle_temperature.split(/[,;]/);
+    check(temps[0] === String(rB.nozzle) && temps[1] === String(rA.nozzle), `Düsentemperaturen je Slot ${temps.slice(0, 2).join('/')} = ${rB.nozzle}/${rA.nozzle}`);
+    check(cfg.wall_loops === String(rB.w) && cfg.enable_support === '0', `Globale Werte vom Würfel (Wände ${cfg.wall_loops}, Stützen ${cfg.enable_support})`);
+  } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
 console.log(failures ? `\nFEHLGESCHLAGEN: ${failures} Prüfungen` : '\nOK: alle Werte kommen im Orca-G-Code an');
 console.log('Arbeitsordner: ' + OUT);
 process.exit(failures ? 1 : 0);
