@@ -1,6 +1,6 @@
 'use strict';
 /* Migrationsprüfung: gleiche Eingabe → gleiches Ergebnis wie Druck-Konfigurator v4.
-   v4 läuft unverändert (reference/druck-konfigurator_v4.html) mit einer DOM-Attrappe,
+   v4 läuft unverändert (Pfad per V4_HTML) mit einer DOM-Attrappe,
    der neue Rechenkern aus js/*.js. Aufruf: node tests/compare-v4.js */
 const fs = require('fs');
 const path = require('path');
@@ -79,7 +79,10 @@ function makeDomStub(state) {
 }
 
 /* ---------- v4 laden ---------- */
-const v4html = read('reference/druck-konfigurator_v4.html');
+// v4 liegt nicht im Projekt: Pfad per V4_HTML=<Datei>, sonst wird der Vergleich übersprungen
+const V4_PATH = process.env.V4_HTML || path.join(ROOT, 'reference', 'druck-konfigurator_v4.html');
+if (!fs.existsSync(V4_PATH)) { console.log('übersprungen: v4 nicht gefunden (V4_HTML=<Pfad zu druck-konfigurator_v4.html> setzen)'); process.exit(0); }
+const v4html = fs.readFileSync(V4_PATH, 'utf8');
 const v4script = v4html.slice(v4html.lastIndexOf('<script>') + 8, v4html.lastIndexOf('</script>'));
 const DEFAULTS = { material: 'pla_hs', printer: 'kobra_s1', nozD: '0.4', nozM: 'steel_hardened', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
 const v4state = { ...DEFAULTS };
@@ -95,6 +98,8 @@ Object.assign(V4.store.settings, SETTINGS);
 const newCtx = vm.createContext({ console, TextDecoder });
 for (const f of ['js/util.js', 'js/data.js', 'js/stl.js', 'js/store.js', 'js/engine.js'])
   vm.runInContext(read(f), newCtx, { filename: f });
+// Bewusste Änderung 2026-09-26: Slicer-Namen auf OrcaSlicer – für den Vergleich die v4-Namen einsetzen
+vm.runInContext("PRINTERS.kobra_s1.slicer='Anycubic Slicer Next';PRINTERS.snapmaker_u1.slicer='Snapmaker Orca (OrcaSlicer-Basis)';", newCtx);
 vm.runInContext(`store.profiles=${JSON.stringify(USER_PROFILES)};Object.assign(store.settings,${JSON.stringify(SETTINGS)});`, newCtx);
 const NEW = vm.runInContext('({compute,buildOrcaFilamentJSON,buildOrcaProcessJSON,orcaWarningText,rowHTML,parseSTL,getMat,store})', newCtx);
 
@@ -161,6 +166,7 @@ for (const c of cases) {
     r4.rows.map(V4.rowHTML).join(''), r4.ordered.map(g => g[1].map(V4.rowHTML).join('')).join('|')];
   const outN = [JSON.stringify(rnV4View), NEW.buildOrcaFilamentJSON(rn), NEW.buildOrcaProcessJSON(rn), NEW.orcaWarningText(rn),
     rn.rows.map(r => NEW.rowHTML(r, kind)).join(''), rn.ordered.map(g => g[1].map(r => NEW.rowHTML(r, kind)).join('')).join('|')];
+  outN.forEach((x, i) => { outN[i] = x.split('vor Druckstart in OrcaSlicer prüfen').join('vor Druckstart in Snapmaker Orca prüfen'); });
   const names = ['compute', 'filament-json', 'process-json', 'orca-hinweis', 'rows-html', 'ordered-html'];
   out4.forEach((x, i) => { if (x !== outN[i]) fail(names[i] + ' ' + JSON.stringify(c), x, outN[i]); });
 }

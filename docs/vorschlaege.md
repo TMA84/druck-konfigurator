@@ -4,7 +4,7 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 
 ## Wichtig (betrifft Richtigkeit)
 1. ~~Sichttest in OrcaSlicer~~ – erledigt 2026-09-26: Werte gingen zunächst verloren (fehlende Änderungsliste), nach Fix vom Nutzer bestätigt (4 Wände, PETG).
-2. **Slicer-Namen für den Kobra S1:** Die „Slicer-Reihenfolge“ und die Stützen-Anleitung nennen „Anycubic Slicer Next“, du slicst aber mit OrcaSlicer. Beschriftung auf OrcaSlicer umstellen.
+2. ~~Slicer-Namen~~ – umgesetzt 2026-09-26: alle Anleitungen nennen OrcaSlicer.
 3. **Nicht exportierte Empfehlungen:** Lüfter erste Schicht, Beschleunigung (bei TPU 800 mm/s²), Rückzug und Z-Hop landen noch nicht in der 3MF. Rückzug/Z-Hop sind Druckerwerte – sie ließen sich in der 3MF trotzdem setzen, weil die Vorlage das Druckerprofil mitbringt.
 4. **Brim-Spannen:** Aus „5–8 mm“ wird 5 mm (untere Grenze), aus „0–5 mm bei Haftungsproblemen“ (Reifen) wird „kein Brim“. Ggf. im Export-Dialog wählbar machen.
 

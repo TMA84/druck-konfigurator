@@ -224,7 +224,7 @@ function compute(I,geom,ctx){
     }else{
       ordered.push(['Mehrfarbig (Werkzeugwechsler)',[
         ['Werkzeugwechsel','Automatisch pro Farbe/Material','kein Reinigungsturm nötig – jeder Kopf bleibt vorgeheizt'],
-        ['Werkzeug-Zuordnung','Slicer-Farbe = Toolhead-Slot','vor Druckstart in Snapmaker Orca prüfen'],
+        ['Werkzeug-Zuordnung','Slicer-Farbe = Toolhead-Slot','vor Druckstart in OrcaSlicer prüfen'],
         ['Rüstzeit pro Wechsel','ca. 5 s laut Hersteller','wirkt sich kaum auf die Gesamtdruckzeit aus']]]);
     }
   }

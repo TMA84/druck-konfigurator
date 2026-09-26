@@ -174,7 +174,6 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 - Getestet sind die Werte am **Kobra S1** mit PLA High Speed und TPU. Die **U1-Werte** sind übernommen und noch nicht am U1 gegengetestet – vorsichtig beginnen.
 - 3MF-Export nur mit **0,4-mm-Düse** (dafür gibt es die Orca-Vorlagen).
 - Die Überhang-Erkennung ist eine Geometrie-Näherung. Bei beschädigten Netzen (verdrehte Flächen) kann ein Überhang übersehen werden.
-- Die Beschriftung „Slicer-Reihenfolge“ nennt beim S1 derzeit „Anycubic Slicer Next“; die Werte gelten genauso in OrcaSlicer.
 
 ---
 

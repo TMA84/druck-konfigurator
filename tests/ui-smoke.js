@@ -45,7 +45,7 @@ async function runSmoke(opts={}){
   ok([...$('nozM').options].map(o=>o.value).join()==='steel_stainless,steel_hardened','U1: Düsenmaterialien Edelstahl/gehärtet');
   ok($('matBadge').textContent==='Allgemeiner Startwert','U1: getestetes Profil gilt als allgemein');
   ok($('warning').innerHTML.includes('Snapmaker U1'),'U1: Warnhinweis „nicht gegengetestet“');
-  ok($('orderedTitle').textContent.includes('Snapmaker Orca'),'U1: Slicer-Reihenfolge Snapmaker Orca');
+  ok($('orderedTitle').textContent.includes('OrcaSlicer'),'U1: Slicer-Reihenfolge OrcaSlicer');
   const sw=document.querySelector('.printer-switch');sw.querySelector('[aria-checked="true"]').focus();
   sw.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));await wait(30);
   ok(document.body.dataset.printer==='kobra_s1','Pfeiltaste wechselt Drucker zurück');

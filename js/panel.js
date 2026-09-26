@@ -46,7 +46,7 @@ function update(){
   $('mainTitle').textContent=r.printer.label+' – Druck-Konfigurator';
   document.title=r.printer.label+' – Druck-Konfigurator';
   $('orderedTitle').textContent='Einstellungen in '+r.printer.slicer+'-Reihenfolge';
-  $('orderedIntro').innerHTML='Die Bezeichnungen orientieren sich an '+esc(r.printer.slicer)+'. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.'+(r.printer.id==='snapmaker_u1'?' Genaue Feldbezeichnungen können in Snapmaker Orca leicht abweichen (OrcaSlicer-Basis, nicht im Detail geprüft).':'');
+  $('orderedIntro').innerHTML='Die Bezeichnungen orientieren sich an '+esc(r.printer.slicer)+'. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.';
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
   document.body.dataset.printer=r.printer.id;

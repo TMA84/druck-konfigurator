@@ -83,12 +83,12 @@ NOZZLE_MATERIALS.steel=NOZZLE_MATERIALS.steel_hardened; // Altwert aus gespeiche
 // Startbasis – auf dem Snapmaker U1 aber nicht gegengetestet (siehe testedOK).
 const PRINTERS={
   kobra_s1:{
-    id:'kobra_s1',label:'Anycubic Kobra S1 Combo',slicer:'Anycubic Slicer Next',
+    id:'kobra_s1',label:'Anycubic Kobra S1 Combo',slicer:'OrcaSlicer',
     nozzleOptions:['steel_hardened','brass'],nozzleDefault:'steel_hardened',
     multicolorSystem:'ace',enclosureBuiltin:true,testedOK:true,brassNozzleNote:true
   },
   snapmaker_u1:{
-    id:'snapmaker_u1',label:'Snapmaker U1',slicer:'Snapmaker Orca (OrcaSlicer-Basis)',
+    id:'snapmaker_u1',label:'Snapmaker U1',slicer:'OrcaSlicer',
     nozzleOptions:['steel_stainless','steel_hardened'],nozzleDefault:'steel_stainless',
     multicolorSystem:'toolchanger',enclosureBuiltin:false,testedOK:false,brassNozzleNote:false
   }
