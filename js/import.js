@@ -45,7 +45,12 @@ function splitBodies(pos) {
   bodies.sort((a, b) => b.tris.length - a.tris.length);
   // Splitter an den größten Körper hängen
   const main = bodies[0];
-  bodies = bodies.filter((b, i) => { if (i && b.tris.length < MIN_BODY_TRIS) { for (const t of b.tris) main.tris.push(t); return false; } return true; });
+  bodies = bodies.filter((b, i) => {
+    if (!i || b.tris.length >= MIN_BODY_TRIS) return true;
+    for (const t of b.tris) main.tris.push(t);
+    for (let k = 0; k < 3; k++) { main.mn[k] = Math.min(main.mn[k], b.mn[k]); main.mx[k] = Math.max(main.mx[k], b.mx[k]); }
+    return false;
+  });
   // Berührende Körper zusammenfassen, bis sich nichts mehr ändert (der gemeinsame Quader wächst mit)
   let kept = bodies, merged = true;
   while (merged) {
@@ -71,7 +76,15 @@ function splitBodies(pos) {
 /* ---------- 3MF lesen ---------- */
 const attrsOf = tag => { const o = {}; tag.replace(/([\w:]+)="([^"]*)"/g, (_, k, v) => { o[k] = v; }); return o; };
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
-const parseTransform = s => { const t = s ? s.trim().split(/\s+/).map(Number) : IDENTITY; return t.length === 12 && t.every(Number.isFinite) ? t : IDENTITY; };
+// unit = Einheit der Datei in mm; gilt auch für den Verschiebungsanteil
+const parseTransform = (s, unit = 1) => {
+  const t = s ? s.trim().split(/\s+/).map(Number) : IDENTITY;
+  if (t.length !== 12 || !t.every(Number.isFinite)) return IDENTITY;
+  return t.map((v, i) => i >= 9 ? v * unit : v);
+};
+// Tags mit oder ohne Namensraum-Präfix (z. B. <m:vertex> aus 3D Builder)
+const tagRe = (name, flags = 'g') => new RegExp('<(?:\\w+:)?' + name + '\\b([^>]*?)\\/?>', flags);
+const blockRe = name => new RegExp('<(?:\\w+:)?' + name + '\\b([^>]*[^/>])?>([\\s\\S]*?)<\\/(?:\\w+:)?' + name + '>', 'g');
 // 3MF-Matrizen wirken auf Zeilenvektoren: p' = p·A, danach ·B  →  C = A·B
 function mulTransform(a, b) {
   const A = [[a[0], a[1], a[2], 0], [a[3], a[4], a[5], 0], [a[6], a[7], a[8], 0], [a[9], a[10], a[11], 1]];
@@ -81,27 +94,27 @@ function mulTransform(a, b) {
 }
 
 function parseModelXML(text) {
-  const unit = UNIT_MM[(/<model\b[^>]*\bunit="([^"]+)"/.exec(text) || [])[1] || 'millimeter'] || 1;
+  const unit = UNIT_MM[(/<(?:\w+:)?model\b[^>]*\bunit="([^"]+)"/.exec(text) || [])[1] || 'millimeter'] || 1;
   const objects = new Map();
-  for (const m of text.matchAll(/<object\b([^>]*)>([\s\S]*?)<\/object>/g)) {
-    const a = attrsOf(m[1]), body = m[2], obj = { id: a.id, name: a.name || '', type: a.type || 'model', mesh: null, components: [] };
-    const meshXml = /<mesh>([\s\S]*?)<\/mesh>/.exec(body);
+  for (const m of text.matchAll(blockRe('object'))) {
+    const a = attrsOf(m[1] || ''), body = m[2], obj = { id: a.id, name: a.name || '', type: a.type || 'model', mesh: null, components: [] };
+    const meshXml = blockRe('mesh').exec(body);
     if (meshXml) {
       const vs = [];
-      for (const v of meshXml[1].matchAll(/<vertex\b([^>]*)\/?>/g)) { const va = attrsOf(v[1]); vs.push(+va.x * unit, +va.y * unit, +va.z * unit); }
+      for (const v of meshXml[2].matchAll(tagRe('vertex'))) { const va = attrsOf(v[1]); vs.push(+va.x * unit, +va.y * unit, +va.z * unit); }
       const ts = [];
-      for (const t of meshXml[1].matchAll(/<triangle\b([^>]*)\/?>/g)) { const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3); }
+      for (const t of meshXml[2].matchAll(tagRe('triangle'))) { const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3); }
       obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts) };
     }
-    for (const c of body.matchAll(/<component\b([^>]*)\/?>/g)) {
+    for (const c of body.matchAll(tagRe('component'))) {
       const ca = attrsOf(c[1]);
-      obj.components.push({ path: ca['p:path'] || null, objectid: ca.objectid, transform: parseTransform(ca.transform) });
+      obj.components.push({ path: ca['p:path'] || null, objectid: ca.objectid, transform: parseTransform(ca.transform, unit) });
     }
     objects.set(a.id, obj);
   }
-  const items = [...text.matchAll(/<item\b([^>]*)\/?>/g)].map(m => {
+  const items = [...text.matchAll(tagRe('item'))].map(m => {
     const a = attrsOf(m[1]);
-    return { objectid: a.objectid, transform: parseTransform(a.transform), printable: a.printable !== '0' };
+    return { objectid: a.objectid, transform: parseTransform(a.transform, unit), printable: a.printable !== '0' };
   });
   return { objects, items };
 }
@@ -111,10 +124,10 @@ function parseModelSettings(text) {
   const objects = new Map(), plates = [];
   if (!text) return { objects, plates };
   const meta = (xml, key) => { const m = new RegExp('<metadata key="' + key + '" value="([^"]*)"').exec(xml); return m ? m[1] : null; };
-  for (const m of text.matchAll(/<object id="([^"]+)">([\s\S]*?)<\/object>/g)) {
+  for (const m of text.matchAll(blockRe('object'))) {
     const head = m[2].split('<part')[0], parts = new Map();
-    for (const p of m[2].matchAll(/<part id="([^"]+)" subtype="([^"]+)">([\s\S]*?)<\/part>/g)) parts.set(p[1], { subtype: p[2], extruder: meta(p[3], 'extruder') });
-    objects.set(m[1], { name: meta(head, 'name'), extruder: meta(head, 'extruder'), parts });
+    for (const p of m[2].matchAll(blockRe('part'))) { const pa = attrsOf(p[1] || ''); parts.set(pa.id, { subtype: pa.subtype || 'normal_part', extruder: meta(p[2], 'extruder') }); }
+    objects.set(attrsOf(m[1] || '').id, { name: meta(head, 'name'), extruder: meta(head, 'extruder'), parts });
   }
   for (const m of text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)) {
     const ids = [...m[1].matchAll(/<metadata key="object_id" value="([^"]+)"/g)].map(x => x[1]);

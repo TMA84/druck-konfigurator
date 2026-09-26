@@ -86,6 +86,26 @@ async function runSmoke(opts={}){
    ok((msx.match(/<object id=/g)||[]).length===4&&Object.keys(z).filter(k=>k.startsWith('3D/Objects/')).length===4,'3MF mit 4 Objekten ('+fm.name+')')}
   $('clear').click();await wait(50);
   ok($('partList').classList.contains('hidden')&&!project,'Leeren entfernt die Teileliste');
+
+  /* Ausrichtung: Pilz steht auf dem Stiel → Vorschlag Hut aufs Bett */
+  await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));await wait(300);
+  ok(!$('orientBox').classList.contains('hidden')&&/Stützen/.test($('orientInfo').textContent),'Ausrichtung: aktuelle Lage bewertet ('+$('orientInfo').textContent+')');
+  ok(!$('orientSuggest').classList.contains('hidden'),'Ausrichtung: Vorschlag angezeigt');
+  $('orientSuggest').querySelector('[data-orient="apply"]').click();await wait(300);
+  ok(Math.abs(geom.z-25)<1e-3&&analyze(geom,45).level==='none'&&$('orientSuggest').classList.contains('hidden'),'Vorschlag übernommen: keine Stützen mehr ('+$('orientInfo').textContent+')');
+  document.querySelector('.orient-tools [data-orient="x"]').click();await wait(50);
+  ok(Math.abs(geom.z-40)<1e-3,'↻ X: 90° gedreht (Höhe '+de(geom.z,1)+')');
+  document.querySelector('.orient-tools [data-orient="reset"]').click();await wait(50);
+  ok(Math.abs(geom.z-25)<1e-3&&Math.abs(geom.bedArea-100)<1,'Original: Lage aus der Datei');
+  { let cb=null;const orig=Viewer.setPick;Viewer.setPick=(on,f)=>{cb=f};
+    document.querySelector('.orient-tools [data-orient="pick"]').click();await wait(30);
+    ok(document.body.dataset.tab==='3d'&&typeof cb==='function','Fläche aufs Bett: 3D-Ansicht mit Auswahlmodus');
+    // oberste Fläche des Huts (z = 25, Normale nach oben) anklicken
+    const top=[...Array(geom.n).keys()].find(i=>geom.ang[i]<-80&&geom.pos[i*9+2]>24.9);cb(top);await wait(50);
+    Viewer.setPick=orig;
+    ok(Math.abs(geom.bedArea-1600)<1,'Angeklickte Fläche liegt auf dem Bett (Auflage '+de(geom.bedArea,0)+' mm²)');
+    setTab('settings');}
+  $('clear').click();await wait(50);
   await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
   ok($('fileinfo').textContent.includes('pilz.stl')&&$('modelCard').classList.contains('loaded'),'STL per Drag&Drop geladen');
   ok(!$('modelBadge').classList.contains('hidden'),'Tab-Badge „Modell“ sichtbar');

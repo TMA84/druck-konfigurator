@@ -19,6 +19,9 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 12. Der Kobra S1 antwortet sehr unterschiedlich schnell (gemessen 0,2–15 s, einmal gar nicht). Ursache unbestätigt (WLAN? Drucker ausgelastet?). Tool wartet 8 s mit einem zweiten Versuch.
 13. ~~Vorlagenwerte statt Exportwerte in Orca~~ – behoben (different_settings_to_system + passende System-Presets).
 
+## Geplant 2026-09-26 (nach Import/Ausrichtung/Stützwerte/Werte je Teil/Makerworld-3MF)
+14. **Bohrlöcher verstärken:** zylindrische Löcher erkennen, in der 3MF je Loch einen Orca-Modifikator (Zylinder, Loch + 2 × ~3 mm) mit 100 % Füllung und ggf. mehr Wänden. Offen: automatisch oder nur als Vorschlag.
+
 ## Bereits geplant (Plan-Schritte 3 und 4)
 10. Ausrichtung im Tool (Fläche aufs Bett legen, 90°-Tasten).
 11. Testdruck-Protokoll pro Drucker/Profil – dafür sind die U1-Werte der wichtigste Kandidat (bisher nirgends gegengetestet).

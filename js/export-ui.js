@@ -85,6 +85,9 @@ function openExportDialog(){
   if(!tpl||!project)return;
   if(slotState.printer!==r.printer.id)slotState={printer:r.printer.id,live:null,note:''};
   $('exportSub').textContent=project.name+(project.parts.length>1?' ('+project.parts.length+' Teile)':'')+' · '+r.m.name+' · Vorlage: '+tpl.printerPreset+' (OrcaSlicer '+tpl.orcaVersion+')';
+  const {oversize}=arrangeParts(project.parts.map(p=>p.geom),tpl),[bw,bd]=bedSize(tpl);
+  $('sizeWarn').textContent=oversize.length?'Größer als das Bett ('+de(bw,0)+' × '+de(bd,0)+' mm): '+oversize.map(i=>project.parts[i].name).join(', ')+'. Bitte drehen oder in Orca skalieren/teilen.':'';
+  $('sizeWarn').classList.toggle('hidden',!oversize.length);
   renderSlotList(tpl,preferredSlot(tpl,r));
   slotPicked=false;
   $('slotList').onchange=()=>{slotPicked=true;renderExportDialog()};

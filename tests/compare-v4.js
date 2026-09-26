@@ -112,6 +112,7 @@ for (const [name, buf] of Object.entries(MODELS)) {
   Object.assign(v4state, DEFAULTS);
   V4.parseSTL(name, buf);
   const gOld = V4.getGeom(), gNew = NEW.parseSTL(name, buf);
+  delete gNew.hidden; // neu seit v5: Innenflächen zählen nicht als Überhang (eigener Test in tests/orient.js)
   const a = plain(gOld), b = plain(gNew);
   if (a !== b) fail('parseSTL ' + name, a, b);
   geoms[name] = [gOld, gNew];

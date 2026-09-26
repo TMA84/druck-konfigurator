@@ -21,6 +21,55 @@ function readSTL(buf){
 }
 function parseSTL(name,buf){return makeGeom(name,readSTL(buf))}
 
+/* Blick senkrecht nach unten über ein XY-Raster – gemeinsam für Überhanganalyse und Ausrichtung.
+   below(): 'inner' = auf gleicher Höhe liegt eine nach oben zeigende Fläche (Innenfläche zweier
+   unverschmolzener Körper, z. B. Tinkercad-Export) → kein Überhang; 'part' = Material des Teils
+   weiter unten; 'bed' = frei bis zum Bett. sample(): große Dreiecke an mehreren Punkten (≈ 2 mm). */
+const PROBE_BED_TOL=0.2, PROBE_COPLANAR=0.05, PROBE_MAX_CELLS=96, PROBE_MAX_SUB=6;
+function makeDownProbe(pos){
+  const n=pos.length/9;
+  let mnx=Infinity,mny=Infinity,mnz=Infinity,mxx=-Infinity,mxy=-Infinity,mxz=-Infinity;
+  for(let i=0;i<pos.length;i+=3){
+    const x=pos[i],y=pos[i+1],z=pos[i+2];
+    if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y;if(z<mnz)mnz=z;if(z>mxz)mxz=z;
+  }
+  const cells=Math.max(1,Math.min(PROBE_MAX_CELLS,Math.ceil(Math.sqrt(n/4))));
+  const cw=Math.max((mxx-mnx)/cells,1e-6),ch=Math.max((mxy-mny)/cells,1e-6);
+  const cellX=x=>Math.min(cells-1,Math.max(0,Math.floor((x-mnx)/cw))), cellY=y=>Math.min(cells-1,Math.max(0,Math.floor((y-mny)/ch)));
+  const grid=Array.from({length:cells*cells},()=>[]);
+  for(let i=0;i<n;i++){
+    const o=i*9;
+    const x0=cellX(Math.min(pos[o],pos[o+3],pos[o+6])),x1=cellX(Math.max(pos[o],pos[o+3],pos[o+6]));
+    const y0=cellY(Math.min(pos[o+1],pos[o+4],pos[o+7])),y1=cellY(Math.max(pos[o+1],pos[o+4],pos[o+7]));
+    for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++)grid[gy*cells+gx].push(i);
+  }
+  const upFacing=o=>(pos[o+3]-pos[o])*(pos[o+7]-pos[o+1])-(pos[o+4]-pos[o+1])*(pos[o+6]-pos[o])>0;
+  function below(px,py,pz,self){
+    let res='bed';
+    for(const j of grid[cellY(py)*cells+cellX(px)]){
+      if(j===self)continue;
+      const o=j*9,x0=pos[o],y0=pos[o+1],x1=pos[o+3],y1=pos[o+4],x2=pos[o+6],y2=pos[o+7];
+      const d=(y1-y2)*(x0-x2)+(x2-x1)*(y0-y2);
+      if(!d)continue;
+      const a=((y1-y2)*(px-x2)+(x2-x1)*(py-y2))/d,b=((y2-y0)*(px-x2)+(x0-x2)*(py-y2))/d,c=1-a-b;
+      if(a<0||b<0||c<0)continue;
+      const z=a*pos[o+2]+b*pos[o+5]+c*pos[o+8];
+      if(Math.abs(z-pz)<=PROBE_COPLANAR){if(upFacing(o))return 'inner'}
+      else if(z<pz&&z>mnz+PROBE_BED_TOL)res='part';
+    }
+    return res;
+  }
+  // Dreieck i in m² Teildreiecke zerlegen und deren Mittelpunkte prüfen; cb(ergebnis, teilfläche)
+  function sample(i,area,cb){
+    const o=i*9,m=Math.max(1,Math.min(PROBE_MAX_SUB,Math.ceil(Math.sqrt(area/4)))),w=area/(m*m);
+    for(let a=0;a<m;a++)for(let b=0;a+b<m;b++)for(let flip=0;flip<(a+b<m-1?2:1);flip++){
+      const fa=(a+(flip?2:1)/3)/m,fb=(b+(flip?2:1)/3)/m,fc=1-fa-fb;
+      cb(below(fa*pos[o]+fb*pos[o+3]+fc*pos[o+6],fa*pos[o+1]+fb*pos[o+4]+fc*pos[o+7],fa*pos[o+2]+fb*pos[o+5]+fc*pos[o+8],i),w);
+    }
+  }
+  return {mnz,mxz,below,sample};
+}
+
 // Dreiecke → Analyse-Grundlage (Maße, Winkel je Fläche, Bettkontakt); Bett = tiefster Punkt.
 function makeGeom(name,pos){
   const n=pos.length/9;
@@ -44,7 +93,10 @@ function makeGeom(name,pos){
     vol+=(ax*(by*cz-bz*cy)-ay*(bx*cz-bz*cx)+az*(bx*cy-by*cx))/6;
   }
   let bedArea=0;for(let i=0;i<n;i++)if(bed[i]&&ang[i]>80)bedArea+=area[i];
-  return {name,pos,n,ang,area,bed,total,bedArea,vol:Math.abs(vol),x:mx[0]-mn[0],y:mx[1]-mn[1],z:mx[2]-mn[2],mn,mx};
+  // Anteil nach unten zeigender Flächen, der nur Innenfläche ist (zählt nicht als Überhang)
+  const hidden=new Float32Array(n);
+  if(n>1){const probe=makeDownProbe(pos);for(let i=0;i<n;i++){if(bed[i]||ang[i]<=0||!area[i])continue;let h=0;probe.sample(i,area[i],(r,w)=>{if(r==='inner')h+=w});hidden[i]=h/area[i]}}
+  return {name,pos,n,ang,area,bed,hidden,total,bedArea,vol:Math.abs(vol),x:mx[0]-mn[0],y:mx[1]-mn[1],z:mx[2]-mn[2],mn,mx};
 }
 
 function analyze(geom,th){
@@ -53,8 +105,9 @@ function analyze(geom,th){
   for(let i=0;i<geom.n;i++){
     if(geom.bed[i])continue;
     const a=geom.ang[i];
-    if(a>th)flagged+=geom.area[i];
-    if(a>80)ceiling+=geom.area[i];
+    const ar=geom.area[i]*(1-(geom.hidden?geom.hidden[i]:0));
+    if(a>th)flagged+=ar;
+    if(a>80)ceiling+=ar;
   }
   const ratio=flagged/Math.max(1,geom.total);
   let level;

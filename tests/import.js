@@ -90,6 +90,17 @@ check('3MF threemf', r.threemf && r.threemf.plates.length === 2 && r.threemf.set
 r = imp([{ name: 'mw.zip', bytes: fflate.zipSync({ 'projekt.3mf': tmf, 'teil.stl': stlBytes(boxTris(0, 0, 0, 5, 5, 5)) }) }]);
 check('ZIP: 3MF hat Vorrang', r.parts.length === 2 && r.threemf && r.notes.some(n => /ignoriert/.test(n)), r.notes.join('|'));
 
+// 6b) Befunde der Prüfung: Splitter erweitert die Box; Einheit gilt auch für Verschiebungen; Namensraum-Präfixe
+const splinter = [[15, 0, 0], [15, 1, 0], [15, 0, 1]];
+r = imp([{ name: 'splitter.stl', bytes: stlBytes([...boxTris(0, 0, 0, 10, 10, 10), splinter, ...boxTris(15.02, 0, 0, 25, 10, 10)]) }]);
+check('Splitter verbindet berührende Körper', r.parts.length === 1, r.parts.length);
+const inchModel = '<?xml version="1.0"?><m:model unit="inch" xmlns:m="x"><m:resources>' +
+  meshXml(1, boxTris(0, 0, 0, 1, 1, 1)).replace(/<(\/?)(object|mesh|vertices|vertex|triangles|triangle)\b/g, '<$1m:$2') +
+  '</m:resources><m:build><m:item objectid="1" transform="1 0 0 0 1 0 0 0 1 2 0 0"/></m:build></m:model>';
+r = imp([{ name: 'zoll.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(inchModel) }) }]);
+{ const g = r.parts[0] && K.makeGeom('z', r.parts[0].pos);
+  check('Zoll-3MF mit Präfixen: 25,4 mm groß, um 50,8 mm verschoben', g && Math.abs(g.x - 25.4) < 1e-3 && Math.abs(g.mn[0] - 50.8) < 1e-3, g && g.x + ' / ' + g.mn[0]); }
+
 // 7) Fehlerfälle
 let err = '';
 try { imp([{ name: 'foto.png', bytes: new Uint8Array(4) }]); } catch (e) { err = e.message; }

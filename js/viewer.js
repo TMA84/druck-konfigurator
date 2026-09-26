@@ -12,6 +12,7 @@ const Viewer = (() => {
   let wireframeOn = false;
   const clip = { on: false, axis: 'x', fraction: 0, plane: null, helper: null };
   const measure = { on: false, points: [], markers: [], line: null, onChange: () => {} };
+  const pick = { on: false, onPick: null };   // Fläche anklicken → Dreiecksindex
   const AXIS_INDEX = { x: 0, y: 1, z: 2 };
   const AXIS_VECTORS = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 
@@ -112,7 +113,8 @@ const Viewer = (() => {
     const geom = geomRef, c = mesh.geometry.attributes.color.array;
     for (let i = 0; i < geom.n; i++) {
       const a = geom.ang[i];
-      const col = geom.bed[i] ? COLORS.bed : a > th ? COLORS.over : (a > th * .6 && a > 0) ? COLORS.near : COLORS.ok;
+      const inner = geom.hidden && geom.hidden[i] > 0.5; // Innenfläche unverschmolzener Körper
+      const col = geom.bed[i] ? COLORS.bed : inner ? COLORS.ok : a > th ? COLORS.over : (a > th * .6 && a > 0) ? COLORS.near : COLORS.ok;
       for (let v = 0; v < 3; v++) { const k = (i * 3 + v) * 3; c[k] = col[0]; c[k + 1] = col[1]; c[k + 2] = col[2]; }
     }
     mesh.geometry.attributes.color.needsUpdate = true;
@@ -172,12 +174,17 @@ const Viewer = (() => {
     if (onChange) measure.onChange = onChange;
     clearMeasurement();
   }
+  // Einmaliges Anklicken einer Fläche; Messen wird dafür pausiert.
+  function setPick(on, onPick) {
+    pick.on = on; pick.onPick = on ? onPick : null;
+    if (renderer) renderer.domElement.style.cursor = on ? 'crosshair' : '';
+  }
   function initPicking() {
     const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
     let down = null;
     renderer.domElement.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
     renderer.domElement.addEventListener('pointerup', e => {
-      if (!measure.on || !mesh || !down) return;
+      if ((!measure.on && !pick.on) || !mesh || !down) return;
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_TOLERANCE_PX) return;
       const rect = renderer.domElement.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -185,9 +192,11 @@ const Viewer = (() => {
       raycaster.setFromCamera(ndc, camera);
       // Der Raycaster kennt keine Schnittebene: weggeschnittene Treffer (negative Seite) überspringen.
       const hit = raycaster.intersectObject(mesh).find(h => !clip.on || clip.plane.distanceToPoint(h.point) >= 0);
-      if (hit) addMeasurePoint(hit.point.clone());
+      if (!hit) return;
+      if (pick.on) { const cb = pick.onPick; setPick(false); if (cb) cb(hit.faceIndex); return; }
+      addMeasurePoint(hit.point.clone());
     });
   }
 
-  return { available, init, show, clear, colorize, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure };
+  return { available, init, show, clear, colorize, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
 })();

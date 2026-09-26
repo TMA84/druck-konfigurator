@@ -22,7 +22,7 @@ async function loadFiles(files){
   try{
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
     const imp=importModels(entries,fflate);
-    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,geom:makeGeom(p.name,p.pos),extruder:p.extruder||null,plate:p.plate||1,objectId:p.objectId||null}));
+    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),extruder:p.extruder||null,plate:p.plate||1,objectId:p.objectId||null}));
     showProject({name:imp.name,parts,threemf:imp.threemf,notes:imp.notes});
   }catch(e){
     $('fileinfo').textContent='Modell konnte nicht gelesen werden: '+e.message+'. Bitte die Datei prüfen oder erneut exportieren.';

@@ -186,7 +186,9 @@ function arrangeParts(geoms, tpl) {
       places[it.i] = { plate: pi, x: ox + it.x0 + geoms[it.i].x / 2, y: oy + r.y0 + r.depth / 2 };
     }));
   });
-  return { places, plateCount: plates.length };
+  // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
+  const oversize = geoms.map((g, i) => i).filter(i => geoms[i].x > bw || geoms[i].y > bd);
+  return { places, plateCount: plates.length, oversize };
 }
 
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
