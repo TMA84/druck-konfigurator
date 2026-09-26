@@ -82,6 +82,13 @@ for (const [i, c] of CASES.entries()) {
   const r = K.compute(inp, geom, { getMat: K.getMat, settings: K.store.settings });
   const tpl = K.exportTemplate(c.printer, '0.4');
   const { bytes } = K.build3mf(tpl, r, geom, c.slot, fflate, c.live);
+  // 0) Orca-GUI übernimmt nur Schlüssel aus different_settings_to_system → jede Änderung muss dort stehen
+  const ps = JSON.parse(fflate.strFromU8(fflate.unzipSync(bytes)['Metadata/project_settings.config']));
+  const listed = ps.different_settings_to_system.map(s => s.split(';'));
+  const unlisted = K.plannedChanges(r, c.slot, c.live).filter(p => p.key in ps && !listed[p.perSlot ? 1 + p.index : 0].includes(p.key));
+  check(unlisted.length === 0 && listed.length === ps.filament_settings_id.length + 2, `Änderungsliste vollständig (${listed.length} Gruppen)` + (unlisted.length ? ': fehlt ' + unlisted.map(p => p.key).join(',') : ''));
+  const wantPreset = (ps.filament_type[c.slot] || '').toUpperCase();
+  check(ps.filament_settings_id[c.slot] === (tpl.filamentPresets[wantPreset] || ps.filament_settings_id[c.slot]) && ps.filament_settings_id[c.slot].includes(wantPreset), `Slot ${c.slot + 1} Preset „${ps.filament_settings_id[c.slot]}“ passt zu ${wantPreset}`);
   const dir = path.join(OUT, 'case' + i); fs.mkdirSync(dir);
   const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
   console.log(`\nFall ${i + 1}: ${c.printer} · ${r.m.name} · ${r.ob.label} · Slot ${c.slot + 1} · ${geom.name}`);

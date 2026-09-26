@@ -80,16 +80,48 @@ function plannedChanges(r, slot, liveSlots) {
 }
 
 // Neue project_settings (Kopie) + Liste der tatsächlichen Änderungen gegenüber der Vorlage.
+/* OrcaSlicer-GUI lädt beim Öffnen eines Projekts die genannten System-Presets neu und übernimmt aus
+   der Datei nur die Schlüssel, die in different_settings_to_system stehen (Aufbau wie von Orca selbst
+   gespeichert: [Prozess, Filament 1..n, Drucker], Schlüssel mit ";" getrennt). Ohne diese Liste
+   landen in der Oberfläche die Presetwerte statt der exportierten (beobachtet 2026-09-26). */
+function filamentSlotTypes(r, slot, liveSlots, n) {
+  const types = Array(n).fill(null);
+  (liveSlots || []).forEach((s, i) => { if (i < n && s.type) types[i] = s.type; });
+  types[slot] = ORCA_KIND[r.m.kind] || types[slot];
+  return types;
+}
+
 function buildProjectSettings(tpl, r, slot, liveSlots) {
   const settings = JSON.parse(JSON.stringify(tpl.settings));
   const changes = [];
+  const nFil = settings.filament_settings_id.length;
+  const groups = nFil + 2; // Prozess, Filamente, Drucker
+  const tplDiff = tpl.settings.different_settings_to_system || [];
+  const diff = Array.from({ length: groups }, (_, i) => new Set(String(tplDiff[i] || '').split(';').filter(Boolean)));
+  const inherits = Array.from({ length: groups }, (_, i) => (tpl.settings.inherits_group || [])[i] || '');
+
+  // 1) Jeder Slot bekommt das System-Preset seines Filamenttyps (sofern Orca eines kennt)
+  const presets = tpl.filamentPresets || {};
+  filamentSlotTypes(r, slot, liveSlots, nFil).forEach((type, i) => {
+    const preset = type && presets[String(type).toUpperCase()];
+    if (!preset || settings.filament_settings_id[i] === preset) return;
+    changes.push({ label: 'Slot ' + (i + 1) + ' Preset', key: 'filament_settings_id', before: settings.filament_settings_id[i], after: preset });
+    settings.filament_settings_id[i] = preset;
+    diff[1 + i].clear();    // Abweichungen der alten (Benutzer-)Presets gelten nicht mehr
+    inherits[1 + i] = '';   // direkt ein System-Preset
+  });
+
+  // 2) Berechnete Werte schreiben und als „geändert“ vermerken
   for (const c of plannedChanges(r, slot, liveSlots)) {
     if (!(c.key in settings)) continue; // Schlüssel kennt diese Orca-Version nicht → Vorlage unverändert
     if (c.perSlot && !(c.index < settings[c.key].length)) continue; // mehr Druckerslots als in der Vorlage
     const before = c.perSlot ? settings[c.key][c.index] : settings[c.key];
     if (c.perSlot) settings[c.key][c.index] = c.value; else settings[c.key] = c.value;
+    diff[c.perSlot ? 1 + c.index : 0].add(c.key);
     if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
   }
+  settings.different_settings_to_system = diff.map(s => [...s].join(';'));
+  settings.inherits_group = inherits;
   return { settings, changes };
 }
 

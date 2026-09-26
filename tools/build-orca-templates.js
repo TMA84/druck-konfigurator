@@ -9,6 +9,26 @@ const fflate = require('../vendor/fflate.min.js');
 const ROOT = path.join(__dirname, '..');
 const TEMPLATE_DIR = path.join(ROOT, 'templates');
 const OUT = path.join(ROOT, 'js', 'orca-templates.js');
+const ORCA_PROFILES = process.env.ORCA_PROFILES || 'C:/Program Files/OrcaSlicer/resources/profiles';
+
+// System-Filamentpresets je Drucker/Düse aus der Orca-Installation: Filamenttyp → Presetname.
+// Damit bekommt jeder Slot im Export das Preset, das zum echten Filament passt.
+const PRESET_SOURCES = {
+  kobra_s1: { '0.4': { vendor: 'Anycubic', re: /^Anycubic (.+) @Anycubic Kobra S1 0\.4 nozzle$/ } },
+  snapmaker_u1: { '0.4': { vendor: 'Snapmaker', re: /^Snapmaker (.+) @U1$/ } }
+};
+function filamentPresets(printer, nozzle) {
+  const src = (PRESET_SOURCES[printer] || {})[nozzle];
+  if (!src) return {};
+  const dir = path.join(ORCA_PROFILES, src.vendor, 'filament');
+  if (!fs.existsSync(dir)) { console.warn(`WARNUNG: ${dir} fehlt – Export behält die Presetnamen der Vorlage`); return {}; }
+  const presets = {};
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
+    const name = f.slice(0, -5), m = src.re.exec(name);
+    if (m) presets[m[1].toUpperCase()] = name;  // z. B. PETG → "Anycubic PETG @Anycubic Kobra S1 0.4 nozzle"
+  }
+  return presets;
+}
 
 // printable_area: ["0x0","250x0","250x250","0x250"] → Mittelpunkt des Druckbetts
 function bedCenter(area) {
@@ -33,8 +53,9 @@ const templates = {};
 for (const f of fs.readdirSync(TEMPLATE_DIR).filter(f => /^[a-z0-9_]+_\d+(\.\d+)?\.3mf$/.test(f)).sort()) {
   const [, printer, nozzle] = f.match(/^(.+)_(\d+(?:\.\d+)?)\.3mf$/);
   const tpl = readTemplate(path.join(TEMPLATE_DIR, f));
+  tpl.filamentPresets = filamentPresets(printer, nozzle);
   (templates[printer] = templates[printer] || {})[nozzle] = tpl;
-  console.log(`${f}: ${tpl.printerPreset}, ${tpl.slots.length} Slots, Bettmitte ${tpl.bedCenter.join('/')}, Orca ${tpl.orcaVersion}`);
+  console.log(`${f}: ${tpl.printerPreset}, ${tpl.slots.length} Slots, Bettmitte ${tpl.bedCenter.join('/')}, Orca ${tpl.orcaVersion}, ${Object.keys(tpl.filamentPresets).length} Filamentpresets`);
 }
 fs.writeFileSync(OUT, "'use strict';\n/* ERZEUGT von tools/build-orca-templates.js aus templates/*.3mf – nicht von Hand bearbeiten. */\n" +
   'const ORCA_TEMPLATES=' + JSON.stringify(templates) + ';\n');
