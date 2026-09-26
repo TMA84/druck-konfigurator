@@ -245,6 +245,7 @@ async function runSmoke(opts={}){
   /* 13) 3MF-Export */
   menuClick('export3mf');ok($('exportDlg').open,'3MF-Dialog öffnet');
   ok(document.querySelectorAll('input[name="slot"]').length===4,'4 Slots aus der Vorlage');
+  ok(/Slot, in dem dein PLA steckt/.test($('slotHint').textContent),'Hinweis nennt das gewählte Filament ('+$('slotHint').textContent.slice(0,45)+')');
   document.querySelector('input[name="slot"][value="2"]').click();await wait(30);
   ok($('changesTitle').textContent.match(/\d+ Werte/),'Änderungsliste: '+$('changesTitle').textContent);
   ok($('slotWarn').classList.contains('hidden'),'Slot 3 (PLA) passt zu PLA: kein Hinweis');

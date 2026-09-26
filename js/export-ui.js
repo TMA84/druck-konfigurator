@@ -61,6 +61,10 @@ function renderExportDialog(){
   const {extra,notes,partSlot}=slotPlan(plan.jobs,r,slot);
   const {settings,changes}=buildProjectSettings(tpl,r,slot,live,extra);
   renderPartPlan(tpl,plan,partSlot,notes,settings);
+  // Das Tool weiß ohne Belegung nicht, was im Drucker steckt: den Nutzer den passenden Slot wählen lassen
+  const kinds=[...new Set(plan.jobs.filter(j=>j.slot===null).map(j=>ORCA_KIND[j.r.m.kind]||j.r.m.name))];
+  $('slotHint').innerHTML=kinds.length>1?'<b>Wähle den Slot, in dem das Filament der Teile ohne eigenen Slot steckt</b> – siehe Tabelle unten.'
+    :'<b>Wähle den Slot, in dem dein '+esc(kinds[0]||ORCA_KIND[r.m.kind]||r.m.name)+' steckt</b> – die Werte in der Datei gelten für '+esc(kinds[0]||ORCA_KIND[r.m.kind]||r.m.name)+'.';
   const kind=ORCA_KIND[r.m.kind]||'PLA',s=dialogSlots(tpl)[slot];
   const warn=$('slotWarn');
   const where={live:'laut Drucker',manual:'laut deiner Eingabe',template:'in deiner Vorlage'}[slotSource(tpl).kind];

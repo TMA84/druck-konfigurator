@@ -412,3 +412,5 @@ table.changes td.bad { color: var(--bad); }
 .slot-edit-row select { padding: 5px 8px; }
 .slot-edit-row input[type="color"] { width: 44px; height: 30px; padding: 0; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: none; }
 .slot-edit-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
+
+.slot-hint { margin: 2px 0 8px; font-size: 13px; color: var(--ink-2); }
