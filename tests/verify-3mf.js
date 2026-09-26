@@ -59,6 +59,7 @@ function parseGcode(text) {
   let x = null, y = null, type = ''; const bb = [Infinity, Infinity, -Infinity, -Infinity];
   const nozzleCmds = [], bedCmds = [];
   let supportMoves = 0;
+  const unretracts = []; // reine E-Bewegungen ohne XY nach vorne = Zurückschieben nach einem Rückzug
   for (const line of text.split('\n')) {
     if (line.startsWith(';TYPE:')) type = line.slice(6).trim();
     const mk = /^G9111 bedTemp=(\d+) extruderTemp=(\d+)/.exec(line); // Anycubic-Startmakro (Kobra S1)
@@ -67,11 +68,12 @@ function parseGcode(text) {
     const tb = /^M1[49]0 .*?S(\d+)/.exec(line); if (tb && +tb[1] > 0) bedCmds.push(+tb[1]);
     if (!/^G[01] /.test(line)) continue;
     if (/^Support/i.test(type) && / E\.?\d/.test(line)) supportMoves++;
+    const ue = /^G1 E(\.?\d[\d.]*) F/.exec(line); if (ue) unretracts.push(+ue[1]);
     const gx = /X(-?[\d.]+)/.exec(line), gy = /Y(-?[\d.]+)/.exec(line), ge = /E([\d.]+)/.exec(line);
     if (gx) x = +gx[1]; if (gy) y = +gy[1];
     if (ge && +ge[1] > 0 && x !== null && y !== null && /wall/i.test(type)) { bb[0] = Math.min(bb[0], x); bb[1] = Math.min(bb[1], y); bb[2] = Math.max(bb[2], x); bb[3] = Math.max(bb[3], y); }
   }
-  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds, supportMoves };
+  return { cfg, filament, maxZ, bb, nozzleCmds, bedCmds, supportMoves, unretracts };
 }
 
 let failures = 0;
@@ -113,6 +115,12 @@ for (const [i, c] of (ONLY_MW ? [] : CASES).entries()) {
   }
   // 1b) Stützen werden tatsächlich gedruckt, wenn sie empfohlen sind – und sonst nicht
   check(r.supOn ? g.supportMoves > 0 : g.supportMoves === 0, `Stützen im G-Code: ${g.supportMoves} Bahnen (empfohlen: ${r.supOn ? 'ja' : 'nein'})`);
+  // 1c) Rückzug tatsächlich mit der berechneten Länge (häufigster Wert beim Zurückschieben)
+  if (g.unretracts.length) {
+    const cnt = {}; g.unretracts.forEach(v => { cnt[v] = (cnt[v] || 0) + 1; });
+    const mode = +Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
+    check(Math.abs(mode - r.m.retrLen) < 1e-6, `Rückzug im G-Code ${mode} mm = ${r.m.retrLen} mm (${g.unretracts.length} Rückzüge)`);
+  } else check(false, 'keine Rückzüge im G-Code gefunden');
   // 2) Das Modell druckt mit dem gewählten Slot
   check(g.filament === String(c.slot + 1), `Slot: erwartet ${c.slot + 1}, G-Code "; filament: ${g.filament}"`);
   // 3) Tatsächliche Befehle: Düsen- und Betttemperatur

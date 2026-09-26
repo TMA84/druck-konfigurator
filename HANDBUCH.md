@@ -151,7 +151,7 @@ Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Druck
 4. **Was geändert wird** – alle Werte, die gegenüber deiner Orca-Vorlage geändert werden.
 5. **3MF speichern** – die Datei landet in deinem Download-Ordner, z. B. `modell_KobraS1_Slot2.3mf`.
 
-In der Datei stehen: Druckerprofil aus der Vorlage, die berechneten Filament- und Prozesswerte, die Stützen, je Teil der Slot und abweichende Werte als **Objekt-Einstellung**. Mehrere Teile werden nebeneinander aufs Bett gelegt; passt nicht alles, kommt eine weitere Platte dazu.
+In der Datei stehen: Druckerprofil aus der Vorlage, die berechneten Filament- und Prozesswerte (auch Lüfter in der ersten Schicht, Rückzug und Z-Hop je Filament), die Stützen, je Teil der Slot und abweichende Werte als **Objekt-Einstellung**. Mehrere Teile werden nebeneinander aufs Bett gelegt; passt nicht alles, kommt eine weitere Platte dazu.
 
 > Die **Schichthöhe** gilt in Orca für die ganze Platte. Empfiehlt das Tool für einzelne Teile eine andere, steht das als Hinweis im Dialog.
 
