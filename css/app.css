@@ -134,7 +134,15 @@ main { flex: 1; min-height: 0; position: relative; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
 
 /* ================= Datenblatt ================= */
-.sheet { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 22px; align-items: start; }
+/* Drei Spalten: Auswahl | Modell (Teile, Lage, Bohrlöcher) | Datenblatt. Mittlere Breite: Modell unter der Auswahl. */
+.sheet { max-width: 1480px; margin: 0 auto; display: grid; grid-template-columns: 280px 300px minmax(0, 1fr); grid-template-areas: "inputs model result"; gap: 22px; align-items: start; }
+.inputs { grid-area: inputs; }
+.model-col { grid-area: model; position: sticky; top: 0; display: grid; gap: 14px; max-height: calc(100dvh - var(--topbar-h) - var(--tabs-h) - 60px); overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+.result { grid-area: result; }
+@media (max-width: 1240px) {
+  .sheet { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "inputs result" "model result"; }
+  .inputs, .model-col { position: static; max-height: none; overflow: visible; }
+}
 .eyebrow { font-family: var(--f-display); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); transition: color var(--t-norm); }
 
 /* Die linke Spalte klebt beim Scrollen oben; wird sie höher als das Fenster (viele Teile, Lage, Bohrlöcher),
@@ -328,7 +336,7 @@ body.dragging #stage { outline: 3px dashed var(--accent); outline-offset: -8px; 
   .machine { flex-wrap: wrap; }
   .tabs { padding: 0 16px; }
   #viewSettings { padding: 16px; }
-  .sheet { grid-template-columns: 1fr; }
+  .sheet { grid-template-columns: 1fr; grid-template-areas: "inputs" "model" "result"; }
   .inputs { position: static; }
   .result { padding: 18px 16px; }
   .result-head h2 { font-size: 24px; }
