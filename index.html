@@ -233,8 +233,17 @@
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="export3mfSave">3MF speichern</button></div></dialog>
 
-<dialog id="linkDlg" aria-labelledby="linkTitle"><div class="ed-head"><h2 id="linkTitle">Drucker-Verbindung</h2><div class="muted">IP-Adressen deiner Drucker im Heimnetz. Das Tool fragt darüber nur die Filament-Belegung ab (Moonraker, nur lesend). Funktioniert, wenn das Tool über „Konfigurator starten.cmd“ läuft.</div></div>
+<dialog id="linkDlg" aria-labelledby="linkTitle"><div class="ed-head"><h2 id="linkTitle">Drucker-Verbindung</h2><div class="muted">IP-Adressen deiner Drucker im Heimnetz. Das Tool fragt darüber nur die Filament-Belegung ab (nie Steuerbefehle). Funktioniert, wenn das Tool über „Konfigurator starten.cmd“ läuft.</div></div>
   <div class="ed-body">
+    <div class="note link-req">
+      <b>Nur mit Klipper/Moonraker.</b> Mit Werksfirmware geht das nicht – dann stattdessen beim Export unter „Belegung eintragen“ von Hand angeben.<br>
+      Moonraker bringt eine Fremd-Firmware mit (nicht vom Hersteller, Installation auf eigene Verantwortung):
+      <ul>
+        <li><b>Kobra S1:</b> <a href="https://jbatonnet.github.io/Rinkhals/" target="_blank" rel="noopener">Rinkhals</a></li>
+        <li><b>Snapmaker U1:</b> <a href="https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware" target="_blank" rel="noopener">Extended Firmware von paxx12</a></li>
+      </ul>
+      Installationsanleitung jeweils beim Projekt selbst.
+    </div>
     <div class="ed-row"><label for="host_kobra_s1">Anycubic Kobra S1</label><div class="ed-in"><input id="host_kobra_s1" inputmode="decimal" placeholder="z. B. 192.168.1.50" autocomplete="off"><button class="btn sec" type="button" data-test="kobra_s1">Testen</button></div></div>
     <p class="muted small link-result" id="linkRes_kobra_s1"></p>
     <div class="ed-row"><label for="host_snapmaker_u1">Snapmaker U1</label><div class="ed-in"><input id="host_snapmaker_u1" inputmode="decimal" placeholder="z. B. 192.168.1.51" autocomplete="off"><button class="btn sec" type="button" data-test="snapmaker_u1">Testen</button></div></div>

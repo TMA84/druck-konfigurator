@@ -250,6 +250,10 @@ body.dragging .model-card { border-color: var(--accent); background: var(--accen
 .note.ok { background: var(--ok-soft); border-color: var(--ok-rule); }
 .note.bad { background: var(--bad-soft); border-color: var(--bad-rule); color: #5e1510; }
 .supportbox { background: var(--info-soft); border-color: var(--info-rule); }
+.note.link-req { margin-top: 0; }
+.note.link-req ul { margin: 6px 0 4px; padding-left: 20px; }
+.note.link-req li { margin: 2px 0; }
+.note.link-req a { color: inherit; text-decoration: underline; }
 .supportbox h3 { margin: 0 0 6px; font-family: var(--f-display); font-weight: 600; font-size: 16px; color: var(--info); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; font-size: 14px; }
 

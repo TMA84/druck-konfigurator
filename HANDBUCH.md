@@ -144,13 +144,20 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 
 ## 8. Drucker-Verbindung (Filament-Belegung live)
 
-> Nur mit **Rinkhals** (Kobra S1) oder **Moonraker/Klipper** – mit der Originalfirmware geht das nicht. Dann die Belegung im Export-Dialog von Hand eintragen.
+> **Nur mit Klipper/Moonraker.** Mit der Werksfirmware geht das bei keinem der beiden Drucker – dann stattdessen die Belegung im Export-Dialog unter „Belegung eintragen“ von Hand angeben (siehe [Kapitel 9](#9-3mf-für-orcaslicer-speichern)).
 
 Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Drucker im Heimnetz ein und testest die Verbindung. Das Tool fragt dann beim Export die **tatsächliche Filament-Belegung** (Typ und Farbe je Slot) ab.
 
-- Voraussetzung: Der Drucker läuft mit **Moonraker/Klipper** (Kobra S1 mit Rinkhals, Snapmaker U1) und das Tool wurde über `Konfigurator starten.cmd` gestartet.
+**Voraussetzung: Moonraker.** Das bringt bei beiden Druckern eine Fremd-Firmware mit – nicht vom Hersteller, Installation und Nutzung auf eigene Verantwortung, Anleitung jeweils beim Projekt selbst:
+
+- **Anycubic Kobra S1:** [Rinkhals](https://jbatonnet.github.io/Rinkhals/)
+- **Snapmaker U1:** [Extended Firmware von paxx12](https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware)
+
+Weiteres:
+
 - Das Tool **liest nur** – es sendet keine Befehle an den Drucker.
-- Antwortet der Drucker nicht, wird die Belegung aus deiner Orca-Vorlage verwendet.
+- Läuft der Drucker ohne Moonraker (Werksfirmware), bleibt die Belegung aus deiner Orca-Vorlage – oder trage sie unter „Belegung eintragen“ selbst ein.
+- Antwortet der Drucker trotz Moonraker nicht, wird ebenfalls die Vorlage verwendet.
 
 ---
 

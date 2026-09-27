@@ -33,7 +33,7 @@ Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
 
 - Windows, macOS oder Linux mit aktuellem Browser (Chrome, Edge, Firefox, Safari) – getestet ist Windows mit Chrome; auf Mac und Linux sollte es genauso laufen, Rückmeldungen willkommen
 - OrcaSlicer (Vorlagen erstellt mit 2.4.2)
-- Nur für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1); Start dann unter Windows über `Konfigurator starten.cmd`, unter Mac/Linux im Terminal mit `python3 tools/serve.py` und im Browser `http://127.0.0.1:8765` öffnen. In der Online-Version geht die Live-Abfrage nicht (der Browser blockiert Anfragen von einer https-Seite an den Drucker im Heimnetz).
+- Nur für die Live-Belegung: Python 3.8+ und ein Drucker mit Klipper/Moonraker – bei Werksfirmware nicht der Fall, siehe [Haftungsausschluss](#haftungsausschluss) und Handbuch. Start dann unter Windows über `Konfigurator starten.cmd`, unter Mac/Linux im Terminal mit `python3 tools/serve.py` und im Browser `http://127.0.0.1:8765` öffnen. In der Online-Version geht die Live-Abfrage nicht (der Browser blockiert Anfragen von einer https-Seite an den Drucker im Heimnetz).
 
 ## Hinweise
 
@@ -64,7 +64,7 @@ Die Nutzung erfolgt auf eigene Verantwortung. Der Druck-Konfigurator ist ein pri
 2. **Keine Haftung für Schäden an Drucker und Zubehör.** Für Schäden an Düse, Druckplatte (z. B. PETG auf glatter PEI-Platte ohne Trennmittel), Hotend oder anderen Teilen, für Verstopfungen, Fehldrucke oder verbrauchtes Material wird keine Haftung übernommen.
 3. **Keine zugesicherte Eignung der gedruckten Teile.** Ob ein Teil für eine sicherheitskritische oder tragende Anwendung, für den Kontakt mit Lebensmitteln oder als Kinderspielzeug geeignet ist, beurteilt allein der Nutzer. Auch die Bohrloch-Verstärkung ersetzt keine Festigkeitsprüfung.
 4. **Gesundheit und Sicherheit.** Beim Drucken – besonders mit ABS und ASA – entstehen Dämpfe und ultrafeine Partikel: Raum gut lüften, nicht in Wohn- oder Schlafräumen drucken. 3D-Drucker nicht unbeaufsichtigt betreiben.
-5. **Drucker-Verbindung.** Die optionale Live-Abfrage liest über Moonraker nur die Filament-Belegung und sendet keine Steuerbefehle. Die Nutzung erfolgt trotzdem auf eigene Verantwortung.
+5. **Drucker-Verbindung.** Die optionale Live-Abfrage liest über Moonraker nur die Filament-Belegung und sendet keine Steuerbefehle. Moonraker läuft nicht mit der Werksfirmware, sondern erfordert eine Fremd-Firmware (z. B. Rinkhals oder die Extended Firmware von paxx12) – deren Installation und Nutzung liegt vollständig in der Verantwortung des Nutzers.
 6. **Marken.** Dieses Projekt steht in keiner Verbindung zu Anycubic, Snapmaker, Bambu Lab, Makerworld oder OrcaSlicer. Produkt- und Markennamen werden nur zur Beschreibung verwendet und gehören ihren Inhabern.
 7. **Fremde Modelle.** Wer Projekte anderer (z. B. von Makerworld) mit dem Tool umstellt, ist selbst für die Einhaltung ihrer Lizenz verantwortlich – etwa „nicht kommerziell“ oder „keine Weitergabe“.
 

@@ -17,6 +17,7 @@ f.onload=()=>{const w=f.contentWindow,d=w.document;
   if(q.get('tip'))d.querySelector('.spec .help').focus();
   if(q.get('export')){d.getElementById('export3mf').click();const s=d.querySelector('input[name="slot"][value="'+q.get('export')+'"]');if(s)s.click()}
   if(q.get('menu'))d.querySelectorAll('.menu-btn')[+q.get('menu')].click();
+  if(q.get('link')){d.querySelectorAll('.menu-btn')[1].click();d.querySelector('[data-action="link"]').click()}
  });
 };
 </script>
