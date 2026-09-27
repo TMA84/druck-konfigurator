@@ -18,6 +18,10 @@ Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** berec
 
 ## Schnellstart
 
+**Online ausprobieren:** https://wolfb63-del.github.io/druck-konfigurator/ – läuft direkt im Browser, auch auf Mac, Linux und Tablet (ohne Live-Abfrage vom Drucker).
+
+**Oder herunterladen:**
+
 1. **Code → Download ZIP**, entpacken.
 2. Doppelklick auf **`index.html`** – keine Installation nötig.
 3. Drucker wählen, Modell ins Fenster ziehen, **Export → 3MF für OrcaSlicer**.
@@ -26,9 +30,9 @@ Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
 
 ## Voraussetzungen
 
-- Windows, aktueller Browser (Chrome, Edge, Firefox)
+- Windows, macOS oder Linux mit aktuellem Browser (Chrome, Edge, Firefox, Safari) – getestet ist Windows mit Chrome; auf Mac und Linux sollte es genauso laufen, Rückmeldungen willkommen
 - OrcaSlicer (Vorlagen erstellt mit 2.4.2)
-- Nur für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1); Start dann über `Konfigurator starten.cmd`
+- Nur für die Live-Belegung: Python 3.8+ und ein Drucker mit Moonraker/Klipper (Kobra S1 mit Rinkhals, Snapmaker U1); Start dann unter Windows über `Konfigurator starten.cmd`, unter Mac/Linux im Terminal mit `python3 tools/serve.py` und im Browser `http://127.0.0.1:8765` öffnen. In der Online-Version geht die Live-Abfrage nicht (der Browser blockiert Anfragen von einer https-Seite an den Drucker im Heimnetz).
 
 ## Hinweise
 
