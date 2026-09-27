@@ -14,7 +14,7 @@
     <div class="printer-switch" role="radiogroup" aria-label="Drucker">
       <button type="button" role="radio" data-printer="kobra_s1" aria-checked="true"><small>Anycubic</small>Kobra S1</button>
       <button type="button" role="radio" data-printer="snapmaker_u1" aria-checked="false" tabindex="-1"><small>Snapmaker</small>U1</button>
-      <button type="button" role="radio" data-printer="orca" aria-checked="false" tabindex="-1" title="Anderen Drucker aus den OrcaSlicer-Profilen wählen"><small id="printerOrcaVendor">Anderer</small><span id="printerOrcaLabel">Drucker …</span></button>
+      <button type="button" role="radio" data-printer="orca" aria-checked="false" tabindex="-1" id="printerOrcaBtn" title="Anderen Drucker aus den OrcaSlicer-Profilen wählen"><small id="printerOrcaVendor">Anderer</small><span id="printerOrcaLabel">Drucker …</span><i class="orca-edit" aria-hidden="true">✎</i></button>
     </div>
     <select id="printer" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="kobra_s1">Anycubic Kobra S1 Combo</option><option value="snapmaker_u1">Snapmaker U1</option><option value="orca">Anderer Drucker</option></select>
     <div class="nozzle"><span>Düse <span class="help" id="nozHelp" title="Weicht deine Düse vom Referenzprofil ab, rechnet das Programm Temperatur, Volumenstrom, Schichthöhe und Linienbreite um.">?</span></span>

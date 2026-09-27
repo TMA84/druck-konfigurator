@@ -1,6 +1,7 @@
 <!doctype html><meta charset="utf-8"><style>body{margin:0}iframe{border:0;width:100vw;height:100vh;display:block}body{overflow:hidden}</style>
 <!-- Hilfsseite für Sichtprüfungen: ?printer=snapmaker_u1&model=1|2&tab=3d&menu=2&export=3 – headless-Screenshot über http://127.0.0.1 laden. -->
-<script>try{localStorage.setItem("druckKonfigurator.disclaimer",new URLSearchParams(location.search).get("disclaimer")?"0":"1")}catch(e){}</script>
+<script>try{localStorage.setItem("druckKonfigurator.disclaimer",new URLSearchParams(location.search).get("disclaimer")?"0":"1")}catch(e){}
+try{if(new URLSearchParams(location.search).get('orca')){localStorage.setItem('kobraS1Konfigurator.v4',JSON.stringify({last:{printer:'orca',orcaPrinter:{vendor:'Creality',name:'Creality Ender-3 V3 SE 0.4 nozzle'}},profiles:{},settings:{}}))}}catch(e){}</script>
 <iframe id="f" src="../index.html"></iframe>
 <script>
 const q=new URLSearchParams(location.search);

@@ -22,6 +22,8 @@ function loadOrcaVendor(vendor) {
 
 // Nur Düsen, für die das Tool umrechnen kann (NOZ-Tabelle)
 const pickerNozzleOk = n => !!NOZ[nkey(n)];
+// In der Kopfzeile steht der Hersteller schon als Zeile darüber – im Modellnamen nicht wiederholen
+const shortModelLabel = (label, vendor) => { const f = vendorLabel(vendor); return label.startsWith(f + ' ') ? label.slice(f.length + 1) : label; };
 
 // Gewählten Orca-Drucker aktivieren (lädt die Herstellerdaten, stellt Düse passend ein)
 async function activateOrcaPrinter(vendor, name) {
@@ -30,8 +32,9 @@ async function activateOrcaPrinter(vendor, name) {
   if (!entry) throw Error('Drucker nicht gefunden: ' + name);
   PRINTERS.orca = entry;
   store.last.orcaPrinter = { vendor, name };
-  $('printerOrcaLabel').textContent = entry.label;
-  $('printerOrcaVendor').textContent = vendor === 'BBL' ? 'Bambu Lab' : vendor;
+  $('printerOrcaLabel').textContent = shortModelLabel(entry.label, vendor);
+  $('printerOrcaVendor').textContent = vendorLabel(vendor);
+  $('printerOrcaBtn').title = entry.label + ' – zum Ändern anklicken';
   $('printer').value = 'orca';
   $('printer').dispatchEvent(new Event('change'));
   if (pickerNozzleOk(entry.orca.nozzle)) { $('nozD').value = nkey(entry.orca.nozzle); $('nozD').dispatchEvent(new Event('change')); }
@@ -81,6 +84,8 @@ $('pickerDlg').addEventListener('click', e => { if (e.target === e.currentTarget
 if (store.last.printer === 'orca' && store.last.orcaPrinter) {
   activateOrcaPrinter(store.last.orcaPrinter.vendor, store.last.orcaPrinter.name).catch(() => { /* bleibt beim S1 */ });
 } else if (store.last.orcaPrinter && ORCA_PRINTER_INDEX.vendors[store.last.orcaPrinter.vendor]) {
-  $('printerOrcaLabel').textContent = store.last.orcaPrinter.name.replace(/ \d+(\.\d+)? nozzle$/, '');
+  const fullName = store.last.orcaPrinter.name.replace(/ \d+(\.\d+)? nozzle$/, '');
+  $('printerOrcaLabel').textContent = shortModelLabel(fullName, store.last.orcaPrinter.vendor);
   $('printerOrcaVendor').textContent = vendorLabel(store.last.orcaPrinter.vendor);
+  $('printerOrcaBtn').title = fullName + ' – zum Auswählen anklicken';
 }

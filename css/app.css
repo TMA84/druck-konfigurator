@@ -441,7 +441,10 @@ table.changes td.bad { color: var(--bad); }
 .mini-label { position: absolute; left: 8px; top: 6px; font-size: 11px; color: var(--hud-ink); background: var(--hud-bg); padding: 2px 6px; border-radius: var(--r-s); pointer-events: none; }
 
 /* Druckerauswahl (Orca-Profile) */
+.printer-switch button[data-printer="orca"] { position: relative; padding-right: 28px; }
 .printer-switch button[data-printer="orca"] span { display: block; max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.printer-switch button[data-printer="orca"] .orca-edit { position: absolute; right: 8px; bottom: 7px; font-style: normal; font-size: 13px; opacity: .55; }
+.printer-switch button[data-printer="orca"]:hover .orca-edit, .printer-switch button[data-printer="orca"][aria-checked="true"] .orca-edit { opacity: .9; }
 #pickerDlg { max-width: 620px; width: calc(100vw - 32px); }
 .picker-row { display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; margin-top: 8px; }
 .picker-row select, .picker-row input { padding: 7px 9px; font: inherit; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: var(--sheet); }
