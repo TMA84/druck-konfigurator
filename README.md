@@ -1,11 +1,12 @@
-# Druck-Konfigurator für Kobra S1 und Snapmaker U1
+# Druck-Konfigurator für OrcaSlicer
 
-Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – mit Überhang-Analyse, Lage-Vorschlag, Einstellungen je Teil und Umstellung von Makerworld-Projekten auf den eigenen Drucker.
+Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – mit Überhang-Analyse, Lage-Vorschlag, Einstellungen je Teil und Umstellung von Makerworld-Projekten auf den eigenen Drucker. Läuft mit **rund 990 Druckern aus den OrcaSlicer-Profilen**; für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** liegen eigene, getestete Vorlagen bei.
 
 ![Übersicht](docs/img/uebersicht.png)
 
 ## Was es kann
 
+- **Rund 990 Drucker:** dieselbe Liste wie in OrcaSlicer – Geschwindigkeiten und Beschleunigung werden auf das Profil des gewählten Druckers begrenzt
 - **Modell laden:** STL (auch mit mehreren Körpern), mehrere Dateien, 3MF, Makerworld-ZIP
 - **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
 - **Datenblatt:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung
@@ -48,10 +49,12 @@ node tests/compare-v4.js      # gleiche Ergebnisse wie v4
 node tests/import.js          # Import (STL/ZIP/3MF)
 node tests/orient.js          # Lage-Bewertung
 node tests/export-project.js  # Makerworld-Umstellung
+node tests/holes.js           # Bohrloch-Erkennung
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
+node tests/verify-orca-printers.js  # 3MF für beliebige Drucker gegen die OrcaSlicer-CLI (dauert lang)
 ```
 
-Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei). Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`.
+Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei). Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`. Druckerliste neu erzeugen, wenn eine neue OrcaSlicer-Version installiert ist: `node tools/build-orca-printers.js`.
 
 ## Haftungsausschluss
 

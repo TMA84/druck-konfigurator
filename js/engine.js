@@ -105,7 +105,8 @@ function orcaWarningText(r){
 function compute(I,geom,ctx){
   const printer=PRINTERS[I.printer]||PRINTERS.kobra_s1;
   const mk=I.material,o=I.object,g=I.goal,l=I.load,s=I.support,sl=I.supportLevel;
-  const m=ctx.getMat(mk),ob=OBJ[o],tpu=m.kind==='tpu',sp=supportProfile(sl,tpu);
+  // Beliebiger Orca-Drucker: Geschwindigkeiten, Beschleunigung und Volumenstrom höchstens so hoch wie in seinem Orca-Profil
+  const m=printer.orca&&typeof orcaLimitMaterial==='function'?orcaLimitMaterial(ctx.getMat(mk),printer.orca):ctx.getMat(mk),ob=OBJ[o],tpu=m.kind==='tpu',sp=supportProfile(sl,tpu);
   const effectiveStatus=(m.status==='tested'&&!printer.testedOK)?'generic':m.status;
   const short=m.name;
   const base=Object.assign({},tpu?ob.tpu:ob.pla);
@@ -246,6 +247,8 @@ function compute(I,geom,ctx){
   if(m.abrasive&&!NOZZLE_MATERIALS[mSel].hardened)danger.push('Faserverstärktes Filament schleift nicht gehärtete Düsen ('+esc(NOZZLE_MATERIALS[mSel].label)+') schnell aus. Nur mit gehärteter Stahldüse drucken.');
   if(m.abrasive&&dSel==='0.25')danger.push('Faserverstärkte Filamente verstopfen 0,25-mm-Düsen leicht – mindestens 0,4 mm, besser 0,6 mm verwenden.');
   if(tpu&&o==='multicolor'&&printer.multicolorSystem==='ace')danger.push('TPU in der Regel nicht über die ACE-Pro-Station zuführen, sondern über den externen Spulenhalter (Herstellerangabe prüfen).');
+  if(printer.orca&&printer.orca.fixedStartTemp&&printer.orca.fixedStartTemp!==nozzle)danger.push('Der Start-G-Code im OrcaSlicer-Profil von '+esc(printer.label)+' heizt fest auf '+printer.orca.fixedStartTemp+' °C – Orca setzt dann keine eigene Düsentemperatur, gedruckt wird mit '+printer.orca.fixedStartTemp+' statt '+nozzle+' °C. Im Druckerprofil den Start-G-Code auf „M109 S[nozzle_temperature_initial_layer]“ ändern.');
+  if(printer.orca)warn.push('<b>'+esc(printer.label)+':</b> Temperaturen und Materialwerte stammen aus Tests am Kobra S1 und sind hier allgemeine Startwerte. Geschwindigkeiten, Beschleunigung und Volumenstrom sind auf das OrcaSlicer-Profil dieses Druckers begrenzt. Ersten Druck beobachten und über „Werte anpassen“ nachjustieren.');
   if(printer.id==='snapmaker_u1')warn.push('<b>Snapmaker U1:</b> Temperatur- und Geschwindigkeitswerte sind von Anycubic-Tests übernommen, nicht auf dem U1 gegengetestet. Der U1 kann mechanisch deutlich mehr (CoreXY, laut Hersteller bis 500 mm/s) – vorsichtig steigern und die ersten Schichten sowie die Schichtvorschau genau beobachten.');
 
   if(m.notes)warn.push('<b>Deine Notizen:</b> '+esc(m.notes).replace(/\n/g,'<br>'));

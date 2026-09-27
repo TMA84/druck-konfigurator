@@ -7,7 +7,8 @@ function updateExportMenu(r){
   const btn=$('export3mf'),note=$('export3mfNote');
   const tpl=exportTemplate(r.printer.id,r.dSel);
   let reason='';
-  if(!tpl)reason='nur mit 0,4-mm-Düse (keine Vorlage für '+de(+r.dSel,r.dSel==='0.25'?2:1)+' mm)';
+  if(!tpl&&r.printer.orca)reason='Düse passt nicht zum Orca-Profil ('+de(+r.printer.orca.nozzle,2)+' mm) – unter „Drucker …“ das Profil mit '+de(+r.dSel,2)+' mm wählen';
+  else if(!tpl)reason='nur mit 0,4-mm-Düse (keine Vorlage für '+de(+r.dSel,r.dSel==='0.25'?2:1)+' mm)';
   else if(!project)reason='zuerst ein Modell laden';
   btn.disabled=!!reason;
   note.textContent=reason||'Slot wählen und speichern';
@@ -164,7 +165,7 @@ function save3mf(){
       :build3mf(tpl,r,plan.jobs,slot,fflate,live);
     const slotsUsed=new Set(plan.jobs.map(j=>j.slot===null?slot:j.slot));
     const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
-    const short=r.printer.id==='snapmaker_u1'?'U1':'KobraS1';
+    const short=r.printer.id==='snapmaker_u1'?'U1':r.printer.id==='orca'?r.printer.label.replace(/[^w.-]+/g,''):'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'_'+short+(slotsUsed.size===1?'_Slot'+(slot+1):'_'+slotsUsed.size+'Slots')+'.3mf';
     document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);

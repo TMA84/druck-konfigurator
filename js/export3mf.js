@@ -15,6 +15,7 @@ const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße vers
 const objectPath = k => '/3D/Objects/object_' + k + '.model';
 
 function exportTemplate(printerId, nozD) {
+  if (printerId === 'orca') return typeof orcaActiveTemplate === 'function' ? orcaActiveTemplate(nozD) : null;
   return (ORCA_TEMPLATES[printerId] || {})[nozD] || null;
 }
 
@@ -159,6 +160,10 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = []) {
     settings.filament_settings_id[i] = preset;
     diff[1 + i].clear();    // Abweichungen der alten (Benutzer-)Presets gelten nicht mehr
     inherits[1 + i] = '';   // direkt ein System-Preset
+    // Kennt die Vorlage die Werte des Profils (Orca-Drucker), auch diese in den Slot übernehmen –
+    // sonst rechnet die Orca-CLI mit den Werten des vorigen Profils (die Oberfläche lädt sie neu).
+    const vals = tpl.filamentValues && tpl.filamentValues[String(type).toUpperCase()];
+    if (vals) for (const [k, v] of Object.entries(vals)) if (k !== 'filament_settings_id' && Array.isArray(settings[k]) && i < settings[k].length) settings[k][i] = Array.isArray(v) ? v[0] : v;
   });
 
   // 2) Berechnete Werte schreiben und als „geändert“ vermerken

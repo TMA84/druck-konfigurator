@@ -96,6 +96,8 @@ function syncPrinterSwitch(){
   printerButtons.forEach(b=>b.setAttribute('aria-checked',String(b.dataset.printer===$('printer').value)));
 }
 printerButtons.forEach(b=>b.addEventListener('click',()=>{
+  // „Anderer Drucker“ öffnet immer die Auswahl (auch zum Wechseln des Modells)
+  if(b.dataset.printer==='orca'){openPrinterPicker();return}
   if($('printer').value===b.dataset.printer)return;
   $('printer').value=b.dataset.printer;
   $('printer').dispatchEvent(new Event('change'));

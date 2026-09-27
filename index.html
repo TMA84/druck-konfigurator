@@ -14,8 +14,9 @@
     <div class="printer-switch" role="radiogroup" aria-label="Drucker">
       <button type="button" role="radio" data-printer="kobra_s1" aria-checked="true"><small>Anycubic</small>Kobra S1</button>
       <button type="button" role="radio" data-printer="snapmaker_u1" aria-checked="false" tabindex="-1"><small>Snapmaker</small>U1</button>
+      <button type="button" role="radio" data-printer="orca" aria-checked="false" tabindex="-1" title="Anderen Drucker aus den OrcaSlicer-Profilen wählen"><small id="printerOrcaVendor">Anderer</small><span id="printerOrcaLabel">Drucker …</span></button>
     </div>
-    <select id="printer" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="kobra_s1">Anycubic Kobra S1 Combo</option><option value="snapmaker_u1">Snapmaker U1</option></select>
+    <select id="printer" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="kobra_s1">Anycubic Kobra S1 Combo</option><option value="snapmaker_u1">Snapmaker U1</option><option value="orca">Anderer Drucker</option></select>
     <div class="nozzle"><span>Düse <span class="help" id="nozHelp" title="Weicht deine Düse vom Referenzprofil ab, rechnet das Programm Temperatur, Volumenstrom, Schichthöhe und Linienbreite um.">?</span></span>
       <span class="nozzle-row">
         <select id="nozD" aria-label="Düsendurchmesser"><option value="0.25">0,25 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
@@ -228,6 +229,14 @@
   <div class="ed-body"><div id="myList"></div></div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
 
+<dialog id="pickerDlg" aria-labelledby="pickerTitle"><div class="ed-head"><h2 id="pickerTitle">Drucker wählen</h2><div class="muted">Alle Drucker aus den OrcaSlicer-Profilen. Geschwindigkeiten kommen aus dem Orca-Profil des Druckers, Temperaturen und Materialwerte aus den Tests am Kobra S1 (allgemeine Startwerte).</div></div>
+  <div class="ed-body picker">
+    <div class="picker-row"><label for="pickVendor">Hersteller</label><select id="pickVendor"></select></div>
+    <div class="picker-row"><label for="pickSearch">Suchen</label><input id="pickSearch" type="search" placeholder="z. B. Ender, MK4, P1S" autocomplete="off"></div>
+    <ul id="pickList" class="pick-list"></ul>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Schließen</button></div></dialog>
+
 <dialog id="disclaimerDlg" aria-labelledby="disclaimerTitle"><div class="ed-head"><h2 id="disclaimerTitle">Haftungsausschluss</h2><div class="muted">Bitte kurz lesen – Nutzung auf eigene Verantwortung.</div></div>
   <div class="ed-body disclaimer">
     <ol>
@@ -267,6 +276,8 @@
 <script src="vendor/fflate.min.js"></script>
 <script src="js/orca-templates.js"></script>
 <script src="js/export3mf.js"></script>
+<script src="js/orca-printers/index.js"></script>
+<script src="js/orca-generic.js"></script>
 <script src="js/printer-link.js"></script>
 <script src="js/viewer.js"></script>
 <script src="js/miniview.js"></script>
@@ -276,5 +287,6 @@
 <script src="js/orient-ui.js"></script>
 <script src="js/part-settings.js"></script>
 <script src="js/holes-ui.js"></script>
+<script src="js/printer-picker.js"></script>
 </body>
 </html>

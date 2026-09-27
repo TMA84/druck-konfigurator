@@ -292,6 +292,23 @@ async function runSmoke(opts={}){
     ok(/unbekannt/.test($('slotSource').textContent)&&!(store.settings.manualSlots||{})[$('printer').value]&&!/PLA|PETG/.test($('slotList').textContent),'Eingabe löschen: Belegung wieder unbekannt, keine Typen aus der Vorlage');
     $('exportDlg').close();}
 
+  /* Anderer Drucker aus den Orca-Profilen: Auswahl, Datenblatt, Export mit dessen Profil, zurück zum S1 */
+  { document.querySelector('.printer-switch [data-printer="orca"]').click();
+    ok($('pickerDlg').open&&$('pickVendor').options.length>50,'Druckerauswahl öffnet ('+$('pickVendor').options.length+' Hersteller)');
+    $('pickVendor').value='Creality';$('pickVendor').dispatchEvent(new Event('change'));
+    $('pickSearch').value='Ender-3 V3 SE';$('pickSearch').dispatchEvent(new Event('input'));
+    const pick=$('pickList').querySelector('[data-pick="Creality Ender-3 V3 SE 0.4 nozzle"]');
+    ok(!!pick,'Suche findet den Ender-3 V3 SE mit 0,4-mm-Düse');
+    pick.click();for(let i=0;i<50&&document.body.dataset.printer!=='orca';i++)await wait(100);
+    ok(document.body.dataset.printer==='orca'&&$('printerOrcaLabel').textContent.includes('Ender-3 V3 SE')&&!$('pickerDlg').open,'Ender-3 V3 SE aktiv, Kopfzeile zeigt ihn');
+    ok(/allgemeine Startwerte/.test($('warning').textContent)&&lastResult.sp_outer<=60,'Datenblatt: Hinweis + Außenwand auf Orca-Profil begrenzt ('+lastResult.sp_outer+' mm/s)');
+    if(!geom)await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
+    menuClick('export3mf');await wait(60);$('export3mfSave').click();await wait(150);
+    const fo=downloads.filter(d=>d.name.endsWith('.3mf')).pop(),zo=fflate.unzipSync(await blobBytes(fo)),po=JSON.parse(fflate.strFromU8(zo['Metadata/project_settings.config']));
+    ok(po.printer_settings_id==='Creality Ender-3 V3 SE 0.4 nozzle'&&/Ender3V3SE/.test(po.print_settings_id)&&JSON.stringify(po.printable_area).includes('220x220'),'3MF mit Ender-Druckerprofil, Prozessprofil und 220er Bett ('+fo.name+')');
+    document.querySelector('.printer-switch [data-printer="kobra_s1"]').click();await wait(80);
+    ok(document.body.dataset.printer==='kobra_s1','Zurück zum Kobra S1');}
+
   if(opts.hosts){
     sel('material','petg');
     document.querySelector('[data-action="link"]').click();ok($('linkDlg').open,'Dialog Drucker-Verbindung');
