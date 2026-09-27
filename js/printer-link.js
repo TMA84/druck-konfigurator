@@ -39,14 +39,18 @@ const SLOT_ADAPTERS = {
   }
 };
 
-function linkAvailable() { return location.protocol === 'http:' || location.protocol === 'https:'; }
+// Nur über den lokalen Server (http). file:// blockiert der Drucker per CORS, eine https-Seite (Online-Version)
+// darf der Browser nicht an ein http-Gerät im Heimnetz fragen lassen.
+function linkAvailable() { return location.protocol === 'http:'; }
 
 // Liefert {slots, host, time} oder wirft einen Fehler mit verständlicher Meldung.
 async function fetchLiveSlots(printerId, host) {
   const adapter = SLOT_ADAPTERS[printerId];
   if (!adapter) throw Error('für diesen Drucker gibt es keine Live-Abfrage');
   if (!host) throw Error('keine IP-Adresse eingetragen');
-  if (!linkAvailable()) throw Error('Live-Abfrage nur beim Start über „Konfigurator starten.cmd“ (nicht per Doppelklick auf index.html)');
+  if (!linkAvailable()) throw Error(location.protocol === 'https:'
+    ? 'Live-Abfrage geht in der Online-Version nicht – dafür das Tool herunterladen und über den lokalen Server starten'
+    : 'Live-Abfrage nur beim Start über „Konfigurator starten.cmd“ bzw. tools/serve.py (nicht per Doppelklick auf index.html)');
   for (let attempt = 1; ; attempt++) {
     try { return await querySlotsOnce(adapter, host); }
     catch (e) { if (attempt >= LINK_ATTEMPTS || !e.retryable) throw e; }
