@@ -4,7 +4,7 @@
 
 // Menüpunkt nach jeder Neuberechnung aktualisieren (aufgerufen aus update()).
 function updateExportMenu(r){
-  const btn=$('export3mf'),note=$('export3mfNote');
+  const btn=$('export3mf'),note=$('export3mfNote'),cta=$('export3mfCta'),ctaNote=$('export3mfCtaNote');
   const tpl=exportTemplate(r.printer.id,r.dSel);
   let reason='';
   if(!tpl&&r.printer.orca)reason='Düse passt nicht zum Orca-Profil ('+de(+r.printer.orca.nozzle,2)+' mm) – unter „Drucker …“ das Profil mit '+de(+r.dSel,2)+' mm wählen';
@@ -12,7 +12,10 @@ function updateExportMenu(r){
   else if(!project)reason='zuerst ein Modell laden';
   btn.disabled=!!reason;
   note.textContent=reason||'Slot wählen und speichern';
+  cta.disabled=!!reason;
+  ctaNote.textContent=reason||'öffnet den Dialog zur Slot-Wahl';
 }
+$('export3mfCta').addEventListener('click',openExportDialog);
 
 const printerHost=id=>((store.settings.printerHosts||{})[id]||'').trim();
 function slotKey(printerId){return 'exportSlot_'+printerId}

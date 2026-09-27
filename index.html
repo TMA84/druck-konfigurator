@@ -139,6 +139,18 @@
         <div id="summary" class="muted"></div>
       </header>
       <div id="danger" class="note bad"></div>
+
+      <section class="export-cta" aria-labelledby="exportCtaTitle">
+        <div class="export-cta-text">
+          <span class="eyebrow" id="exportCtaTitle">Nächster Schritt</span>
+          <p><b>Fertige Projektdatei für OrcaSlicer:</b> Alle Werte unten, die Stützen und der gewählte Filament-Slot landen direkt in einer 3MF-Datei. In OrcaSlicer nur noch <b>Datei → Projekt öffnen</b> und slicen.</p>
+        </div>
+        <div class="export-cta-action">
+          <button type="button" class="btn-accent" id="export3mfCta" disabled>3MF für OrcaSlicer speichern</button>
+          <small id="export3mfCtaNote"></small>
+        </div>
+      </section>
+
       <div id="settings" class="spec"></div>
       <div id="supportGuide" class="supportbox"></div>
 
@@ -202,6 +214,11 @@
 
 <dialog id="exportDlg" aria-labelledby="exportTitle"><div class="ed-head"><h2 id="exportTitle">3MF für OrcaSlicer</h2><div class="muted" id="exportSub"></div></div><p id="sizeWarn" class="note bad hidden" role="alert"></p>
   <div class="ed-body">
+    <ol class="export-steps">
+      <li>Unten den <b>Filament-Slot</b> wählen (oder Belegung eintragen/vom Drucker laden).</li>
+      <li><b>3MF speichern</b> anklicken – die Datei landet in deinem Download-Ordner.</li>
+      <li>In OrcaSlicer über <b>Datei → Projekt öffnen</b> laden (nicht „Importieren“) und slicen.</li>
+    </ol>
     <fieldset class="slots"><legend id="slotLegend">Filament-Slot</legend>
       <div class="slot-source"><span id="slotSource" class="muted">Belegung unbekannt</span><span class="slot-actions"><button class="linkbtn" type="button" id="slotEditBtn">Belegung eintragen</button><button class="linkbtn" type="button" id="slotReload">Vom Drucker laden</button></span></div>
       <div id="slotEdit" class="slot-edit hidden"><p class="muted small">Was steckt gerade in welchem Slot? Bleibt gespeichert, bis du es änderst.</p><div id="slotEditRows"></div>
