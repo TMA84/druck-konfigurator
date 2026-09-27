@@ -154,6 +154,7 @@ async function runSmoke(opts={}){
   await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));await wait(300);
   ok(!$('orientBox').classList.contains('hidden')&&/Stützen/.test($('orientInfo').textContent),'Ausrichtung: aktuelle Lage bewertet ('+$('orientInfo').textContent+')');
   ok(!$('orientSuggest').classList.contains('hidden'),'Ausrichtung: Vorschlag angezeigt');
+  ok(!$('miniView').classList.contains('hidden')&&$('miniView').querySelector('canvas')&&$('miniView').clientHeight>100,'Kleine 3D-Vorschau in der Modell-Spalte sichtbar');
   $('orientSuggest').querySelector('[data-orient="apply"]').click();await wait(300);
   ok(Math.abs(geom.z-25)<1e-3&&analyze(geom,45).level==='none'&&$('orientSuggest').classList.contains('hidden'),'Vorschlag übernommen: keine Stützen mehr ('+$('orientInfo').textContent+')');
   document.querySelector('.orient-tools [data-orient="x"]').click();await wait(50);

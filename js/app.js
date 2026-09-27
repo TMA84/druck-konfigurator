@@ -75,10 +75,12 @@ function showModel(g){
   // Ohne Renderer bleibt der Hinweis „3D-Ansicht nicht verfügbar“ sichtbar (wie in v4).
   if(Viewer.show(g))$('viewerEmpty').classList.add('hidden');
   Viewer.colorize(+$('thresh').value);
+  if(miniReady){$('miniView').classList.remove('hidden');MiniView.show(g);MiniView.colorize(+$('thresh').value)}
   update();
 }
 function clearModel(){
   Viewer.clear();
+  if(miniReady){MiniView.clear();$('miniView').classList.add('hidden')}
   $('ohBar').classList.add('hidden');$('info').textContent='';
   document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=''});
   $('modelCard').classList.remove('loaded');$('modelBadge').classList.add('hidden');
@@ -86,7 +88,7 @@ function clearModel(){
   $('viewerEmpty').classList.remove('hidden');
 }
 
-$('thresh').addEventListener('input',()=>{$('threshVal').textContent=$('thresh').value+'°';Viewer.colorize(+$('thresh').value);update()});
+$('thresh').addEventListener('input',()=>{$('threshVal').textContent=$('thresh').value+'°';Viewer.colorize(+$('thresh').value);if(miniReady)MiniView.colorize(+$('thresh').value);update()});
 
 /* ================= DRUCKER-UMSCHALTUNG ================= */
 const printerButtons=[...document.querySelectorAll('.printer-switch [data-printer]')];
@@ -222,6 +224,9 @@ toggleButton('btnMeasure',on=>Viewer.setMeasure(on,text=>{$('measureLabel').text
 $('clipSlider').addEventListener('input',()=>Viewer.setClipFraction(Number($('clipSlider').value)/100));
 
 /* ================= START (aus v4) ================= */
+// Kleine 3D-Vorschau in der Modell-Spalte (fällt ohne WebGL einfach weg)
+let miniReady=false;
+if(MiniView.available()){try{MiniView.init($('miniView'));miniReady=true}catch(e){/* ohne Vorschau weiter */}}
 if(Viewer.available()){
   try{Viewer.init($('stage'))}catch(e){$('viewerEmpty').textContent='3D-Ansicht konnte nicht gestartet werden. Die Analyse funktioniert trotzdem.'}
 }else $('viewerEmpty').textContent='3D-Ansicht nicht verfügbar (three.js fehlt im Ordner vendor/). Die Analyse und alle Empfehlungen funktionieren trotzdem.';

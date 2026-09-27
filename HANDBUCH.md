@@ -91,6 +91,7 @@ Unter **Lage auf dem Bett** bewertet das Tool, wie viele Stützen die aktuelle L
 - **Fläche aufs Bett …** – wechselt in die 3D-Ansicht; die Fläche anklicken, die unten liegen soll (Esc bricht ab).
 - **↻ X / ↻ Y / ↻ Z** – um 90° drehen. **Original** – Lage aus der Datei.
 - Bei mehreren Teilen: **Alle Teile nach Vorschlag ausrichten**.
+- Unter der Modell-Karte zeigt eine **kleine 3D-Vorschau** das gewählte Teil in seiner aktuellen Lage – rot eingefärbte Flächen brauchen Stützen. Ziehen dreht die Ansicht, das Mausrad zoomt.
 
 Bei 3MF-Projekten bleibt die Lage des Designers erhalten; Drehen ist dort gesperrt.
 

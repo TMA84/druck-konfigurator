@@ -428,3 +428,10 @@ table.changes td.bad { color: var(--bad); }
 .disclaimer ol { margin: 6px 0 8px; padding-left: 20px; }
 .disclaimer li { margin: 6px 0; font-size: 14px; line-height: 1.45; }
 .footnote .linkbtn { font-size: inherit; padding: 0; }
+
+/* Kleine 3D-Vorschau unter der Modell-Karte */
+.mini-view { position: relative; height: 240px; border-radius: var(--r-m); overflow: hidden; background: var(--stage-bg); border: 1px solid var(--rule-strong); }
+.mini-view.hidden { display: none; }
+.mini-view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.mini-view canvas:active { cursor: grabbing; }
+.mini-label { position: absolute; left: 8px; top: 6px; font-size: 11px; color: var(--hud-ink); background: var(--hud-bg); padding: 2px 6px; border-radius: var(--r-s); pointer-events: none; }
