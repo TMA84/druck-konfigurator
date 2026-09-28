@@ -154,7 +154,9 @@ async function runSmoke(opts={}){
   await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));await wait(300);
   ok(!$('orientBox').classList.contains('hidden')&&/Stützen/.test($('orientInfo').textContent),'Ausrichtung: aktuelle Lage bewertet ('+$('orientInfo').textContent+')');
   ok(!$('orientSuggest').classList.contains('hidden'),'Ausrichtung: Vorschlag angezeigt');
-  ok(!$('miniView').classList.contains('hidden')&&$('miniView').querySelector('canvas')&&$('miniView').clientHeight>100,'Kleine 3D-Vorschau in der Modell-Spalte sichtbar');
+  { const was=document.body.dataset.tab; setTab('settings'); // die kleine Vorschau steht im Tab „Druckwerte“ (seit der Aufteilung in Arbeitsschritte)
+    ok(!$('miniView').classList.contains('hidden')&&$('miniView').querySelector('canvas')&&$('miniView').clientHeight>100,'Kleine 3D-Vorschau im Tab Druckwerte sichtbar');
+    setTab(was); }
   $('orientSuggest').querySelector('[data-orient="apply"]').click();await wait(300);
   ok(Math.abs(geom.z-25)<1e-3&&analyze(geom,45).level==='none'&&$('orientSuggest').classList.contains('hidden'),'Vorschlag übernommen: keine Stützen mehr ('+$('orientInfo').textContent+')');
   document.querySelector('.orient-tools [data-orient="x"]').click();await wait(50);
@@ -277,7 +279,7 @@ async function runSmoke(opts={}){
   { if(!geom)await dropFile(stlFile('pilz.stl',[[15,15,0,25,25,20],[0,0,20,40,40,25]]));
     menuClick('export3mf');await wait(50);
     $('slotEditBtn').click();
-    ok(!$('slotEdit').classList.contains('hidden')&&document.querySelectorAll('[data-slot-type]').length===4,'Eintragen: 4 Slots zum Ausfüllen');
+    ok($('slotDlg').open&&document.querySelectorAll('[data-slot-type]').length===4,'Eintragen: 4 Slots zum Ausfüllen');
     const t=document.querySelector('[data-slot-type="1"]');t.value='PETG';document.querySelector('[data-slot-colour="1"]').value='#101010';
     document.querySelector('[data-slot-type="3"]').value='';
     $('slotEditSave').click();await wait(50);

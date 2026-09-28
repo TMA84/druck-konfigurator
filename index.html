@@ -31,52 +31,57 @@
       <div class="menu-list" role="menu" id="menuDatei">
         <button type="button" role="menuitem" data-action="open">Modell öffnen … <small>STL, 3MF, ZIP</small></button>
         <button type="button" role="menuitem" id="clear">Modell entfernen</button>
+        <hr>
+        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst ein Modell laden</small></button>
+        <hr>
+        <span class="menu-group">Weitere Exporte</span>
+        <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON für OrcaSlicer</button>
+        <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON für OrcaSlicer</button>
+        <button type="button" role="menuitem" id="printBtn">Datenblatt drucken / PDF …</button>
+        <button type="button" role="menuitem" id="copyBtn">Datenblatt als Text kopieren</button>
       </div>
     </div>
     <div class="menu">
-      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuProfile">Profile</button>
+      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuProfile"><span aria-hidden="true">⚙</span> Einstellungen</button>
       <div class="menu-list" role="menu" id="menuProfile">
+        <span class="menu-group">Filamente</span>
         <button type="button" role="menuitem" id="editMat">Filamentwerte anpassen …</button>
         <button type="button" role="menuitem" id="newMat">Neues Filament …</button>
         <button type="button" role="menuitem" data-action="profiles">Meine Profile …</button>
-        <hr>
         <button type="button" role="menuitem" id="importBtn">Profile importieren …</button>
         <button type="button" role="menuitem" id="exportBtn" data-toast="Profile als Datei gespeichert">Profile exportieren</button>
         <hr>
-        <button type="button" role="menuitem" id="settingsBtn">Düsen-Umrechnung …</button>
+        <span class="menu-group">Drucker</span>
         <button type="button" role="menuitem" data-action="link">Drucker-Verbindung …</button>
-      </div>
-    </div>
-    <div class="menu">
-      <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuExport">Export</button>
-      <div class="menu-list" role="menu" id="menuExport">
-        <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst ein Modell laden</small></button>
+        <button type="button" role="menuitem" id="settingsBtn">Düsen-Umrechnung …</button>
         <hr>
-        <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON</button>
-        <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON</button>
-        <hr>
-        <button type="button" role="menuitem" id="printBtn">Drucken / PDF …</button>
-        <button type="button" role="menuitem" id="copyBtn">Als Text kopieren</button>
+        <span class="menu-group">Farben &amp; Kosten</span>
+        <button type="button" role="menuitem" data-action="slots">Filament-Slots …</button>
+        <button type="button" role="menuitem" data-action="purge">Farbwechsel &amp; Spülmenge …</button>
+        <button type="button" role="menuitem" data-action="costs">Preise &amp; Sätze …</button>
       </div>
     </div>
     <button type="button" class="menu-btn help-btn" data-action="help" aria-label="Hilfe">?</button>
   </nav>
 </header>
 
-<div class="tabs noprint" role="tablist" aria-label="Ansicht">
-  <button type="button" role="tab" id="tabSettings" aria-controls="viewSettings" aria-selected="true">Einstellungen</button>
-  <button type="button" role="tab" id="tab3d" aria-controls="view3d" aria-selected="false">3D-Ansicht <span id="modelBadge" class="tab-badge hidden">Modell</span></button>
+<div class="tabs noprint" role="tablist" aria-label="Arbeitsschritte">
+  <button type="button" role="tab" id="tab3d" aria-controls="view3d" aria-selected="false"><span class="tab-step">1</span>Modell <span id="modelBadge" class="tab-badge hidden">geladen</span></button>
+  <button type="button" role="tab" id="tabSettings" aria-controls="viewSettings" aria-selected="true"><span class="tab-step">2</span>Druckwerte</button>
+  <button type="button" role="tab" id="tabSlice" aria-controls="viewSlice" aria-selected="false"><span class="tab-step">3</span>Slicen &amp; Kosten <span id="sliceBadge" class="tab-badge hidden"></span></button>
+  <button type="button" role="tab" id="tabPrinter" aria-controls="viewPrinter" aria-selected="false"><span class="tab-step">4</span>Drucker <span id="printerBadge" class="tab-badge hidden"></span></button>
 </div>
 
 <main>
 <section id="viewSettings" role="tabpanel" aria-labelledby="tabSettings" class="view">
   <h1 id="mainTitle" class="print-only">Druck-Konfigurator</h1>
-  <div class="sheet">
+  <div class="sheet sheet-2">
 
     <aside class="inputs" aria-label="Auswahl">
       <div id="partScope" class="part-scope hidden" aria-live="polite">
         <span class="eyebrow">Einstellungen für Teil</span>
         <b id="partScopeName"></b>
+        <label for="partPick">Teil</label><select id="partPick" aria-label="Teil wählen"></select>
         <label for="partSlot">Slot</label><select id="partSlot"></select>
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
@@ -101,10 +106,164 @@
       <div class="field"><label for="supportLevel">Stützreduzierung <span class="help" title="Wirkt nur, wenn Stützen nötig sind. Weniger Stützen sparen Material, erhöhen aber das Risiko für Durchhängen.">?</span></label><select id="supportLevel"><option value="safe">Stark und sicher</option><option value="balanced" selected>Ausgewogen</option><option value="reduced">Stark reduziert</option><option value="minimal">Minimal – gerade noch haltend</option></select></div>
 
       <div id="storeWarn" class="note bad hidden"></div>
+      <div id="miniView" class="mini-view noprint hidden" role="img" aria-label="3D-Vorschau: Lage des gewählten Teils auf dem Bett"><span class="mini-label">Lage auf dem Bett · ziehen zum Drehen</span></div>
     </aside>
 
-    <aside class="model-col noprint" aria-label="Modell">
-      <div class="model-card noprint" id="modelCard">
+
+    <article class="result" aria-labelledby="title">
+      <header class="result-head">
+        <span class="eyebrow" id="resultPrinter">Startprofil</span>
+        <h2 id="title">Empfohlenes Startprofil</h2>
+        <div id="summary" class="muted"></div>
+      </header>
+      <div id="danger" class="note bad"></div>
+
+
+      <div id="settings" class="spec"></div>
+      <div id="supportGuide" class="supportbox"></div>
+
+      <details class="fold">
+        <summary><span id="orderedTitle">Einstellungen in Slicer-Reihenfolge</span></summary>
+        <p class="muted" id="orderedIntro"></p><div id="orderedSettings"></div>
+      </details>
+      <details class="fold">
+        <summary>Stützparameter</summary>
+        <div id="supportParams"></div>
+      </details>
+      <details class="fold" id="hintsFold" open>
+        <summary>Hinweise</summary>
+        <div id="warning" class="note"></div><div id="checks" class="note ok"></div>
+      </details>
+      <details class="fold">
+        <summary>OrcaSlicer-Import (JSON)</summary>
+        <p class="muted">Über <b>Datei → Weitere Exporte → Filament-/Process-JSON</b> speichern und in OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug ist ein Hardware-Profil deines Druckers und bleibt bewusst außen vor – den Wert oben manuell unter Printer Settings → Extruder eintragen.</p>
+        <div id="orcaNote" class="note"></div>
+      </details>
+    </article>
+  </div>
+  <p class="muted footnote">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen. · <button class="linkbtn" type="button" data-action="disclaimer">Haftungsausschluss</button></p>
+</section>
+
+<section id="viewSlice" role="tabpanel" aria-labelledby="tabSlice" class="view view-slice" hidden>
+  <div class="slice-grid">
+    <aside class="slice-side">
+      <section id="costPanel" class="side-panel noprint" aria-labelledby="costPanelTitle">
+        <span class="eyebrow" id="costPanelTitle">Kosten</span>
+        <p id="costPanelInfo" class="muted small"></p>
+        <table id="costTable" class="cost-table hidden"><tbody></tbody></table>
+        <label class="wb-toggle small" title="Nach jeder Änderung an Einstellungen oder Modell neu slicen (kurz verzögert)"><input type="checkbox" id="costAuto"> automatisch neu berechnen</label>
+        <div class="field-links"><button class="btn sec" type="button" id="costRun">Kosten berechnen</button><button class="btn sec hidden" type="button" id="previewOpen">Slice-Vorschau</button><button class="linkbtn" type="button" data-action="costs">Preise &amp; Sätze …</button></div>
+      </section>
+      <section class="export-cta" aria-labelledby="exportCtaTitle">
+        <div class="export-cta-text">
+          <span class="eyebrow" id="exportCtaTitle">Ausgabe</span>
+          <p><b>Drucken</b> schickt die geslicte Platte direkt an den Kobra S1. Oder als <b>3MF für OrcaSlicer</b> speichern (Werte, Stützen, Slots) und dort über <b>Datei → Projekt öffnen</b> laden.</p>
+        </div>
+        <div class="export-cta-action">
+          <button type="button" class="btn-accent hidden" id="sendOpen">Drucken …</button>
+          <button type="button" class="btn-accent" id="export3mfCta" disabled>3MF für OrcaSlicer speichern</button>
+          <small id="export3mfCtaNote"></small>
+        </div>
+      </section>
+      <section id="slotPanel" class="side-panel noprint" aria-labelledby="slotPanelTitle">
+        <span class="eyebrow" id="slotPanelTitle">Filament-Slots</span>
+        <ul id="slotPanelList" class="slot-panel-list"></ul>
+        <p id="slotPanelSource" class="muted small"></p>
+        <div id="slotPanelConnect" class="slot-connect hidden"><input id="slotPanelHost" inputmode="decimal" placeholder="IP des Druckers, z. B. 192.168.1.50" autocomplete="off" aria-label="IP-Adresse des Druckers"><button class="btn sec" type="button" id="slotPanelConnectBtn">Verbinden</button></div>
+        <div class="field-links"><button class="linkbtn" type="button" data-action="slots">✎ Bearbeiten / überschreiben</button><button class="linkbtn" type="button" id="slotPanelReload">Vom Drucker laden</button></div>
+      </section>
+      <section id="purgePanel" class="side-panel noprint hidden" aria-labelledby="purgePanelTitle">
+        <span class="eyebrow" id="purgePanelTitle">Farbwechsel &amp; Spülmenge</span>
+        <div class="field"><label for="purgePanelFlush">Spülmenge am Drucker <span class="help" title="Stellst du am Touchscreen ein (ACE-Menü → Spülmenge). Hier eintragen, was dort eingestellt ist – danach richten sich die Abfall-Schätzung und die Wechselzeit in der 3MF.">?</span></label><select id="purgePanelFlush"></select></div>
+        <p id="purgePanelInfo" class="muted small"></p>
+        <div class="field-links"><button class="linkbtn" type="button" data-action="purge">Eigene Messwerte …</button></div>
+      </section>
+    </aside>
+    <section id="previewDlg" class="preview-panel" aria-labelledby="previewTitle">
+  <div class="preview-bar">
+    <b id="previewTitle">Vorschau</b>
+    <label>Platte <select id="pvPlate"></select></label>
+    <label>Farben <select id="pvColour"><option value="type">nach Linienart</option><option value="tool">nach Filament (Slot)</option></select></label>
+    <label class="pv-only"><input type="checkbox" id="pvOnly"> nur diese Schicht</label>
+    <a class="btn sec" id="pvDownload" href="#" download>G-Code herunterladen</a>
+    <button class="btn" type="button" id="pvSend">An Drucker senden …</button>
+  </div>
+  <div class="preview-main">
+    <div id="pvStage" class="preview-stage"><p id="pvStatus" class="preview-status">Die Vorschau erscheint nach dem Slicen.</p></div>
+    <div class="preview-side">
+      <div class="pv-layer"><input type="range" id="pvLayer" min="0" max="0" value="0" orient="vertical" aria-label="Schicht"><output id="pvLayerLabel"></output></div>
+      <ul id="pvLegend" class="pv-legend"></ul>
+      <p id="pvStats" class="muted small"></p>
+    </div>
+  </div>
+</section>
+  </div>
+</section>
+
+<section id="viewPrinter" role="tabpanel" aria-labelledby="tabPrinter" class="view workbench" hidden>
+  <div id="wbNoLink" class="wb-card wb-nolink hidden">
+    <h2>Drucker-Werkbank</h2>
+    <p>Druckauftrag, Kamera, Temperaturen, Achsen und ACE deines Kobra S1 – über den LAN-Modus der Werksfirmware.</p>
+    <p class="muted" id="wbNoLinkWhy"></p>
+    <div class="slot-connect"><input id="wbHost" inputmode="decimal" placeholder="IP des Druckers, z. B. 192.168.1.50" autocomplete="off" aria-label="IP-Adresse des Druckers"><button class="btn" type="button" id="wbConnect">Verbinden</button></div>
+  </div>
+  <div id="wbGrid" class="wb-grid hidden">
+    <section class="wb-card wb-job" aria-labelledby="wbJobT">
+      <div class="wb-head"><h3 id="wbJobT">Druckauftrag</h3><span id="wbState" class="wb-pill"></span></div>
+      <div id="wbJob"></div>
+      <div class="wb-actions"><button class="btn sec" type="button" id="wbPause">Pausieren</button><button class="btn sec" type="button" id="wbResume">Fortsetzen</button><button class="btn danger" type="button" id="wbStop">Abbrechen</button></div>
+    </section>
+    <section class="wb-card wb-cam" aria-labelledby="wbCamT">
+      <div class="wb-head"><h3 id="wbCamT">Kamera</h3><button class="btn sec" type="button" id="wbCamBtn">Kamera starten</button></div>
+      <div class="wb-video"><video id="wbVideo" muted playsinline></video><p id="wbCamNote" class="wb-video-note">Kamera aus</p></div>
+    </section>
+    <section class="wb-card" aria-labelledby="wbSetT">
+      <div class="wb-head"><h3 id="wbSetT">Druckeinstellungen</h3></div>
+      <div class="wb-temps">
+        <div class="wb-temp"><span>Düse</span><b id="wbNozCur">–</b><small id="wbNozTgt"></small><input id="wbNozIn" type="number" min="0" max="300" step="5" aria-label="Düse Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="0">Setzen</button></div>
+        <div class="wb-temp"><span>Heizbett</span><b id="wbBedCur">–</b><small id="wbBedTgt"></small><input id="wbBedIn" type="number" min="0" max="110" step="5" aria-label="Bett Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="1">Setzen</button></div>
+      </div>
+      <div class="wb-presets"><span class="muted small">Vorheizen:</span><button class="linkbtn" type="button" data-wb-preset="pla">PLA 215/60</button><button class="linkbtn" type="button" data-wb-preset="petg">PETG 240/75</button><button class="linkbtn" type="button" data-wb-preset="asa">ASA/ABS 250/95</button><button class="linkbtn" type="button" data-wb-preset="off">Aus</button></div>
+      <div class="wb-fans">
+        <label>Bauteillüfter <input type="range" min="0" max="100" step="5" id="wbFan0" data-wb-fan="fan_speed_pct"><output></output></label>
+        <label>Zusatzlüfter <input type="range" min="0" max="100" step="5" id="wbFan1" data-wb-fan="aux_fan_speed_pct"><output></output></label>
+        <label>Gehäuselüfter <input type="range" min="0" max="100" step="5" id="wbFan2" data-wb-fan="box_fan_level"><output></output></label>
+      </div>
+      <div class="wb-row"><label class="wb-toggle"><input type="checkbox" id="wbLight"> Licht</label><span class="muted small" id="wbSpeed"></span></div>
+    </section>
+    <section class="wb-card" aria-labelledby="wbAxT">
+      <div class="wb-head"><h3 id="wbAxT">Achsen</h3><span id="wbPos" class="muted small"></span></div>
+      <p id="wbAxNote" class="note hidden">Während eines Drucks gesperrt.</p>
+      <div class="wb-jog">
+        <div class="wb-pad">
+          <span></span><button type="button" data-wb-jog="2,1" title="Y +">Y+</button><span></span>
+          <button type="button" data-wb-jog="1,0" title="X −">X−</button><button type="button" data-wb-home="4" title="X/Y nach Hause">⌂ XY</button><button type="button" data-wb-jog="1,1" title="X +">X+</button>
+          <span></span><button type="button" data-wb-jog="2,0" title="Y −">Y−</button><span></span>
+        </div>
+        <div class="wb-z"><button type="button" data-wb-jog="3,1" title="Z +">Z+</button><button type="button" data-wb-home="3" title="Z nach Hause">⌂ Z</button><button type="button" data-wb-jog="3,0" title="Z −">Z−</button></div>
+      </div>
+      <div class="wb-row"><label>Schritt <select id="wbStep"><option value="1">1 mm</option><option value="10" selected>10 mm</option><option value="50">50 mm</option></select></label><button class="linkbtn" type="button" id="wbMotorsOff">Motoren aus</button></div>
+      <p class="muted small">Nicht referenzierte Achsen fährt der Drucker nicht – erst ⌂ drücken. Z+ senkt beim Kobra S1 das Bett (Abstand zur Düse wird größer).</p>
+    </section>
+    <section class="wb-card" aria-labelledby="wbAceT">
+      <div class="wb-head"><h3 id="wbAceT">ACE-Verwaltung</h3><span id="wbAceTemp" class="muted small"></span></div>
+      <ul id="wbAceSlots" class="wb-ace"></ul>
+      <div class="wb-row"><label class="wb-toggle"><input type="checkbox" id="wbAutoFeed"> Automatisch nachfüllen</label></div>
+      <div class="wb-dry"><span>Trocknen</span><input id="wbDryTemp" type="number" min="35" max="55" step="5" value="45" aria-label="Trockentemperatur"><span class="muted small">°C</span><input id="wbDryMin" type="number" min="30" max="1440" step="30" value="240" aria-label="Trockendauer"><span class="muted small">min</span><button class="btn sec" type="button" id="wbDry">Starten</button></div>
+      <p id="wbDryState" class="muted small"></p>
+    </section>
+    <section class="wb-card" aria-labelledby="wbPrT">
+      <div class="wb-head"><h3 id="wbPrT">Drucker</h3><span id="wbConn" class="wb-pill"></span></div>
+      <dl id="wbInfo" class="wb-info"></dl>
+      <div class="wb-row"><button class="linkbtn" type="button" data-action="link">Verbindung ändern …</button><button class="linkbtn" type="button" id="wbRaw">Rohdaten</button></div>
+      <pre id="wbRawOut" class="wb-raw hidden"></pre>
+    </section>
+  </div>
+</section>
+
+<section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view view-model" hidden>
+  <aside class="model-col noprint" aria-label="Modell">
+    <div class="model-card noprint" id="modelCard">
         <div class="model-head"><span class="eyebrow">Modell</span><button class="linkbtn" type="button" data-action="open">Modell öffnen</button></div>
         <div id="fileinfo">Noch keine Datei geladen.</div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
@@ -120,6 +279,13 @@
           </div>
           <button type="button" id="orientAll" class="linkbtn hidden" data-orient="all">Alle Teile nach Vorschlag ausrichten</button>
         </section>
+        <section id="bodyBox" class="bodies hidden" aria-labelledby="bodyTitle">
+          <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><label class="muted small body-show"><input type="checkbox" id="bodyShow"> Farben zeigen</label></div>
+          <p id="bodyInfo"></p>
+          <ul id="bodyList" class="body-list"></ul>
+          <div id="bodyJoin" class="body-join hidden"><label for="bodyJoinSel">Mit Teil vereinen</label><select id="bodyJoinSel"></select><button type="button" id="bodyJoinBtn">Vereinen</button></div>
+          <button type="button" id="bodySplit" class="linkbtn hidden">In einzelne Teile trennen</button>
+        </section>
         <section id="holeBox" class="holes hidden" aria-labelledby="holeTitle">
           <span class="eyebrow" id="holeTitle">Bohrlöcher verstärken</span>
           <p id="holeInfo"></p>
@@ -129,54 +295,7 @@
         <p class="oh-info muted"></p>
         <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
-      <div id="miniView" class="mini-view noprint hidden" role="img" aria-label="3D-Vorschau: Lage des gewählten Teils auf dem Bett"><span class="mini-label">Lage auf dem Bett · ziehen zum Drehen</span></div>
-    </aside>
-
-    <article class="result" aria-labelledby="title">
-      <header class="result-head">
-        <span class="eyebrow" id="resultPrinter">Startprofil</span>
-        <h2 id="title">Empfohlenes Startprofil</h2>
-        <div id="summary" class="muted"></div>
-      </header>
-      <div id="danger" class="note bad"></div>
-
-      <section class="export-cta" aria-labelledby="exportCtaTitle">
-        <div class="export-cta-text">
-          <span class="eyebrow" id="exportCtaTitle">Nächster Schritt</span>
-          <p><b>Fertige Projektdatei für OrcaSlicer:</b> Alle Werte unten, die Stützen und der gewählte Filament-Slot landen direkt in einer 3MF-Datei. In OrcaSlicer nur noch <b>Datei → Projekt öffnen</b> und slicen.</p>
-        </div>
-        <div class="export-cta-action">
-          <button type="button" class="btn-accent" id="export3mfCta" disabled>3MF für OrcaSlicer speichern</button>
-          <small id="export3mfCtaNote"></small>
-        </div>
-      </section>
-
-      <div id="settings" class="spec"></div>
-      <div id="supportGuide" class="supportbox"></div>
-
-      <details class="fold" open>
-        <summary><span id="orderedTitle">Einstellungen in Slicer-Reihenfolge</span></summary>
-        <p class="muted" id="orderedIntro"></p><div id="orderedSettings"></div>
-      </details>
-      <details class="fold">
-        <summary>Stützparameter</summary>
-        <div id="supportParams"></div>
-      </details>
-      <details class="fold" id="hintsFold" open>
-        <summary>Hinweise</summary>
-        <div id="warning" class="note"></div><div id="checks" class="note ok"></div>
-      </details>
-      <details class="fold">
-        <summary>OrcaSlicer-Import (JSON)</summary>
-        <p class="muted">Über <b>Export → Filament-JSON / Process-JSON</b> speichern und in OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug ist ein Hardware-Profil deines Druckers und bleibt bewusst außen vor – den Wert oben manuell unter Printer Settings → Extruder eintragen.</p>
-        <div id="orcaNote" class="note"></div>
-      </details>
-    </article>
-  </div>
-  <p class="muted footnote">Druck-Konfigurator v5 (Basis v4) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen. · <button class="linkbtn" type="button" data-action="disclaimer">Haftungsausschluss</button></p>
-</section>
-
-<section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view" hidden>
+  </aside>
   <div id="stage">
     <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
     <div id="info" class="hud"></div>
@@ -220,38 +339,101 @@
       <li>In OrcaSlicer über <b>Datei → Projekt öffnen</b> laden (nicht „Importieren“) und slicen.</li>
     </ol>
     <fieldset class="slots"><legend id="slotLegend">Filament-Slot</legend>
-      <div class="slot-source"><span id="slotSource" class="muted">Belegung unbekannt</span><span class="slot-actions"><button class="linkbtn" type="button" id="slotEditBtn">Belegung eintragen</button><button class="linkbtn" type="button" id="slotReload">Vom Drucker laden</button></span></div>
-      <div id="slotEdit" class="slot-edit hidden"><p class="muted small">Was steckt gerade in welchem Slot? Bleibt gespeichert, bis du es änderst.</p><div id="slotEditRows"></div>
-        <div class="slot-edit-foot"><button class="btn sec" type="button" id="slotEditReset">Eingabe löschen</button><button class="btn sec" type="button" id="slotEditCancel">Abbrechen</button><button class="btn" type="button" id="slotEditSave">Belegung speichern</button></div></div>
+      <div class="slot-source"><span id="slotSource" class="muted">Belegung unbekannt</span><span class="slot-actions"><button class="linkbtn" type="button" id="slotEditBtn">Slots bearbeiten</button><button class="linkbtn" type="button" id="slotReload">Vom Drucker laden</button></span></div>
       <p id="slotHint" class="slot-hint"></p>
       <div id="slotList" class="slot-list"></div></fieldset>
     <div id="slotWarn" class="note hidden"></div>
     <div id="partPlan" class="hidden"><h3 class="plan-title">Teile</h3><div id="partPlanTable"></div><ul id="partPlanNotes" class="plan-notes"></ul>
       <button class="linkbtn hidden" type="button" id="matchLive">Filament der Teile passend zur Belegung wählen</button></div>
+    <div id="purgeBox" class="purge hidden"><h3 class="plan-title">Farbwechsel und Abfall</h3><p id="purgeInfo"></p>
+      <div class="purge-set"><label for="aceFlush">Spülmenge am Drucker</label><select id="aceFlush"></select></div>
+      <p id="purgeHint" class="muted small"></p></div>
     <details class="fold" id="changesFold"><summary id="changesTitle">Was geändert wird</summary><div id="changesList"></div></details>
     <p class="muted small">Druckerprofil, Start-G-Code, Rückzug und alle übrigen Werte kommen unverändert aus deiner Orca-Vorlage. Nach dem Öffnen in OrcaSlicer die Vorschau prüfen.</p>
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="export3mfSave">3MF speichern</button></div></dialog>
 
-<dialog id="linkDlg" aria-labelledby="linkTitle"><div class="ed-head"><h2 id="linkTitle">Drucker-Verbindung</h2><div class="muted">IP-Adressen deiner Drucker im Heimnetz. Das Tool fragt darüber nur die Filament-Belegung ab (nie Steuerbefehle). Funktioniert, wenn das Tool über „Konfigurator starten.cmd“ läuft.</div></div>
+<dialog id="linkDlg" aria-labelledby="linkTitle"><div class="ed-head"><h2 id="linkTitle">Drucker-Verbindung</h2><div class="muted">IP-Adresse deines Druckers im Heimnetz. Das Tool liest darüber die Filament-Belegung; mit der Werksfirmware kann es außerdem die ACE-Einstellungen (Slot-Filament, Nachfüllen) ändern – nie Druck- oder Bewegungsbefehle. Funktioniert, wenn das Tool über den Server läuft (Container oder „Konfigurator starten.cmd“).</div></div>
   <div class="ed-body">
     <div class="note link-req">
-      <b>Nur mit Klipper/Moonraker.</b> Mit Werksfirmware geht das nicht – dann stattdessen beim Export unter „Belegung eintragen“ von Hand angeben.<br>
-      Moonraker bringt eine Fremd-Firmware mit (nicht vom Hersteller, Installation auf eigene Verantwortung):
+      <b>Werksfirmware (Kobra S1):</b> am Drucker <i>Einstellungen → Netzwerk → LAN-Modus</i> einschalten. Im LAN-Modus ist der Drucker nicht mit der Anycubic-Cloud verbunden (keine App-Fernsteuerung).<br>
+      <b>Oder Klipper/Moonraker</b> über eine Fremd-Firmware (nicht vom Hersteller, Installation auf eigene Verantwortung):
       <ul>
         <li><b>Kobra S1:</b> <a href="https://jbatonnet.github.io/Rinkhals/" target="_blank" rel="noopener">Rinkhals</a></li>
-        <li><b>Snapmaker U1:</b> <a href="https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware" target="_blank" rel="noopener">Extended Firmware von paxx12</a></li>
+        <li data-link-printer="snapmaker_u1"><b>Snapmaker U1:</b> <a href="https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware" target="_blank" rel="noopener">Extended Firmware von paxx12</a></li>
       </ul>
       Installationsanleitung jeweils beim Projekt selbst.
     </div>
     <div class="ed-row"><label for="host_kobra_s1">Anycubic Kobra S1</label><div class="ed-in"><input id="host_kobra_s1" inputmode="decimal" placeholder="z. B. 192.168.1.50" autocomplete="off"><button class="btn sec" type="button" data-test="kobra_s1">Testen</button></div></div>
+    <div class="ed-row"><label for="mode_kobra_s1">Verbindung</label><div class="ed-in"><select id="mode_kobra_s1"><option value="auto">Automatisch</option><option value="lan">Werksfirmware (LAN-Modus)</option><option value="moonraker">Rinkhals (Moonraker)</option></select></div></div>
     <p class="muted small link-result" id="linkRes_kobra_s1"></p>
-    <div class="ed-row"><label for="host_snapmaker_u1">Snapmaker U1</label><div class="ed-in"><input id="host_snapmaker_u1" inputmode="decimal" placeholder="z. B. 192.168.1.51" autocomplete="off"><button class="btn sec" type="button" data-test="snapmaker_u1">Testen</button></div></div>
-    <p class="muted small link-result" id="linkRes_snapmaker_u1"></p>
+    <div id="aceBox" class="ace-box hidden">
+      <label class="ace-auto"><input type="checkbox" id="aceAutoFeed"> Automatisch nachfüllen, wenn eine Rolle leer ist</label>
+      <details class="fold"><summary>Rohdaten vom Drucker</summary><pre id="aceRaw"></pre></details>
+    </div>
+    <div class="ed-row" data-link-printer="snapmaker_u1"><label for="host_snapmaker_u1">Snapmaker U1</label><div class="ed-in"><input id="host_snapmaker_u1" inputmode="decimal" placeholder="z. B. 192.168.1.51" autocomplete="off"><button class="btn sec" type="button" data-test="snapmaker_u1">Testen</button></div></div>
+    <p class="muted small link-result" id="linkRes_snapmaker_u1" data-link-printer="snapmaker_u1"></p>
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="linkSave">Speichern</button></div></dialog>
 
-<dialog id="profilesDlg" aria-labelledby="profilesTitle"><div class="ed-head"><h2 id="profilesTitle">Meine Profile</h2><div class="muted">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert – über <b>Profile → Profile exportieren</b> sichern oder teilen.</div></div>
+<dialog id="slotDlg" aria-labelledby="slotDlgTitle"><div class="ed-head"><h2 id="slotDlgTitle">Filament-Slots</h2><div class="muted" id="slotDlgSub">Material und Farbe je Slot. Mit Drucker-Verbindung liest das Tool die ACE aus; <b>Überschreiben</b> setzt deine eigene Angabe an die Stelle des Druckers. Ohne Verbindung gilt, was du hier einträgst.</div></div>
+  <div class="ed-body">
+    <div class="slot-dlg-source"><span id="slotDlgSource" class="muted"></span><button class="linkbtn" type="button" id="slotDlgReload">Vom Drucker laden</button></div>
+    <div id="slotEditRows" class="slot-edit"></div>
+    <label class="slot-edit-printer hidden" id="slotEditPrinterRow"><input type="checkbox" id="slotEditPrinter"> Überschriebene Slots auch in die ACE schreiben (Werksfirmware) – dann gilt wieder, was der Drucker meldet</label>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" id="slotEditReset">Eigene Angaben löschen</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="slotEditSave">Speichern</button></div></dialog>
+
+
+<dialog id="sendDlg" aria-labelledby="sendTitle"><div class="ed-head"><h2 id="sendTitle">An Drucker senden und drucken</h2><div class="muted" id="sendSub"></div></div>
+  <div class="ed-body">
+    <div class="ed-row"><label for="sendPlate">Platte</label><div class="ed-in"><select id="sendPlate"></select></div></div>
+    <p id="sendState" class="note"></p>
+    <h3 class="plan-title">Filament: Werkzeug im G-Code → ACE-Slot</h3>
+    <div id="sendMap"></div>
+    <div class="ed-group"><h4>Vor dem Druck</h4>
+      <label class="wb-toggle"><input type="checkbox" id="sendLevel" checked> Bett automatisch vermessen (empfohlen)</label>
+      <label class="wb-toggle"><input type="checkbox" id="sendFlow"> Flusskalibrierung</label>
+      <label class="wb-toggle"><input type="checkbox" id="sendLapse"> Zeitraffer aufnehmen</label>
+    </div>
+    <p class="muted small">Das Tool lädt den G-Code dieser Platte auf den Drucker und startet ihn – genau der Stand der letzten Kostenberechnung. Bett frei? Richtige Druckplatte? Filament in den Slots?</p>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="sendGo">Jetzt drucken</button></div></dialog>
+
+<dialog id="costDlg" aria-labelledby="costDlgTitle"><div class="ed-head"><h2 id="costDlgTitle">Kosten: Preise &amp; Sätze</h2><div class="muted">Grundlage der Kostenkalkulation. Verbrauch und Druckzeit kommen aus dem exakten Slicen mit OrcaSlicer, der Spülabfall aus „Farbwechsel &amp; Spülmenge“.</div></div>
+  <div class="ed-body">
+    <div class="ed-group"><h4>Preis je Filamenttyp (€/kg)</h4>
+      <div id="cdTypes"></div>
+      <div class="ed-row"><label for="cdDefault">Andere / unbekannt</label><div class="ed-in"><input id="cdDefault" inputmode="decimal"><span class="u">€/kg</span></div></div>
+      <p class="muted small">Preis der Rolle geteilt durch ihr Gewicht, z. B. 22 € für 1 kg = 22 €/kg. Leer = der Preis „Andere / unbekannt“. Gilt für jedes Filament dieses Typs – auch für Slots, die nur die ACE kennt (z. B. Farben des Designers).</p></div>
+    <details class="fold"><summary>Abweichender Preis für einzelne Filamente</summary>
+      <div id="cdMaterials"></div>
+      <p class="muted small">Nur ausfüllen, wenn ein Filament mehr oder weniger kostet als sein Typ. Aufgeführt sind die Filamente des geladenen Projekts und alle mit eigenem Preis.</p></details>
+    <div class="ed-group"><h4>Strom &amp; Maschine</h4>
+      <div class="ed-row"><label for="cdPower">Leistung beim Drucken</label><div class="ed-in"><input id="cdPower" inputmode="decimal"><span class="u">W</span></div></div>
+      <div class="ed-row"><label for="cdKwh">Strompreis</label><div class="ed-in"><input id="cdKwh" inputmode="decimal"><span class="u">€/kWh</span></div></div>
+      <div class="ed-row"><label for="cdWear">Verschleiß / Abschreibung</label><div class="ed-in"><input id="cdWear" inputmode="decimal"><span class="u">€/h</span></div></div>
+      <p class="muted small">Leistung: Mittelwert über den Druck (Heizbett und Düse heizen nur zeitweise). Verschleiß: z. B. Druckerpreis ÷ erwartete Druckstunden, plus Düsen und Druckplatten.</p></div>
+    <div class="ed-group"><h4>Verkauf (optional)</h4>
+      <div class="ed-row"><label for="cdMarkup">Aufschlag</label><div class="ed-in"><input id="cdMarkup" inputmode="decimal"><span class="u">%</span></div></div>
+      <div class="ed-row"><label for="cdVat">MwSt.</label><div class="ed-in"><input id="cdVat" inputmode="decimal"><span class="u">%</span></div></div></div>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn sec" type="button" id="cdReset">Standardwerte</button><button class="btn" type="button" id="cdSave">Speichern</button></div></dialog>
+
+<dialog id="purgeDlg" aria-labelledby="purgeTitle"><div class="ed-head"><h2 id="purgeTitle">Farbwechsel &amp; Spülmenge</h2><div class="muted">Kobra S1 mit ACE: Die Firmware spült bei jedem Farbwechsel selbst in den Abfallschacht. Die Menge stellst du am Touchscreen ein (ACE-Menü → Spülmenge, 0,1–3,0). Hier trägst du ein, was dort eingestellt ist – danach richten sich die Schätzung im Export-Dialog und die Wechselzeit in der 3MF.</div></div>
+  <div class="ed-body">
+    <div class="ed-group"><h4>Am Drucker eingestellt</h4>
+      <div class="ed-row"><label for="pgFlush">Spülmenge</label><div class="ed-in"><select id="pgFlush"></select></div></div>
+      <p class="muted small" id="pgModel"></p></div>
+    <div class="ed-group"><h4>Eigene Messung (optional)</h4>
+      <p class="muted small">Leer lassen = Werte aus der Referenzmessung (PLA). Selbst messen: nach einem mehrfarbigen Druck den Abfall wiegen und durch die Zahl der Wechsel teilen (steht im Export-Dialog bzw. in Orca unter „Filamentwechsel“); die Zeit je Wechsel mit der Stoppuhr am Drucker.</p>
+      <div class="ed-row"><label for="pgGrams">Abfall je Wechsel</label><div class="ed-in"><input id="pgGrams" inputmode="decimal" placeholder=""><span class="u">g</span></div></div>
+      <div class="ed-row"><label for="pgSeconds">Zeit je Wechsel</label><div class="ed-in"><input id="pgSeconds" inputmode="decimal" placeholder=""><span class="u">s</span></div></div>
+      <p class="muted small">Die eigenen Werte gelten für die oben gewählte Spülmenge. Stellst du am Drucker später einen anderen Wert ein, hier neu messen oder leeren.</p></div>
+  </div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn sec" type="button" id="pgReset">Standard (1,5, ohne eigene Messung)</button><button class="btn" type="button" id="pgSave">Speichern</button></div></dialog>
+
+<dialog id="profilesDlg" aria-labelledby="profilesTitle"><div class="ed-head"><h2 id="profilesTitle">Meine Profile</h2><div class="muted">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert – über <b>⚙ Einstellungen → Profile exportieren</b> sichern oder teilen.</div></div>
   <div class="ed-body"><div id="myList"></div></div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
 
@@ -293,6 +475,7 @@
 <script src="vendor/OrbitControls.js"></script>
 <script src="js/util.js"></script>
 <script src="js/data.js"></script>
+<script src="js/config.js"></script>
 <script src="js/stl.js"></script>
 <script src="js/import.js"></script>
 <script src="js/orient.js"></script>
@@ -302,6 +485,8 @@
 <script src="vendor/fflate.min.js"></script>
 <script src="js/orca-templates.js"></script>
 <script src="js/export3mf.js"></script>
+<script src="js/purge.js"></script>
+<script src="js/costs.js"></script>
 <script src="js/orca-printers/index.js"></script>
 <script src="js/orca-generic.js"></script>
 <script src="js/printer-link.js"></script>
@@ -313,6 +498,12 @@
 <script src="js/orient-ui.js"></script>
 <script src="js/part-settings.js"></script>
 <script src="js/holes-ui.js"></script>
+<script src="js/bodies-ui.js"></script>
+<script src="js/costs-ui.js"></script>
+<script src="js/preview-ui.js"></script>
+<script src="vendor/flv.min.js"></script>
+<script src="js/workbench-ui.js"></script>
+<script src="js/send-ui.js"></script>
 <script src="js/printer-picker.js"></script>
 </body>
 </html>

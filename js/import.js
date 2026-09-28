@@ -1,7 +1,8 @@
 'use strict';
 /* Modell-Import: STL (auch mit mehreren Körpern), mehrere Dateien, ZIP (z. B. von Makerworld)
    und 3MF (Orca/Bambu/Makerworld). Kein DOM-Zugriff – tests/import.js prüft das in Node.
-   Ergebnis: { name, parts:[{name, pos, objectId?, extruder?, plate?}], threemf|null, notes:[] }.
+   Ergebnis: { name, parts:[{name, pos, objectId?, extruder?, plate?, bodies?}], threemf|null, notes:[] }.
+   bodies (nur bei mehreren Körpern): [{name, count, partId?, extruder?}] – Dreiecke je Körper in Reihenfolge von pos.
    pos ist ein flaches Dreiecksarray in Druckbett-Koordinaten (wie in der Quelldatei platziert). */
 
 const MAX_BODIES = 200;     // mehr getrennte Körper → eher ein zerfallenes Netz als ein Teilesatz
@@ -23,10 +24,24 @@ function bboxOf(pos, tris) {
 }
 const boxesTouch = (a, b) => [0, 1, 2].every(k => a.mn[k] <= b.mx[k] + TOUCH_MM && b.mn[k] <= a.mx[k] + TOUCH_MM);
 
+// Vorzeichenbehaftetes Volumen einer Hülle: negativ = nach innen gerichtet (Hohlraum eines Hohlkörpers)
+function signedVolume(pos, tris) {
+  let v = 0;
+  for (const t of tris) {
+    const o = t * 9, ax = pos[o], ay = pos[o + 1], az = pos[o + 2], bx = pos[o + 3], by = pos[o + 4], bz = pos[o + 5], cx = pos[o + 6], cy = pos[o + 7], cz = pos[o + 8];
+    v += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  }
+  return v / 6;
+}
+const boxInside = (a, b) => [0, 1, 2].every(k => a.mn[k] >= b.mn[k] - TOUCH_MM && a.mx[k] <= b.mx[k] + TOUCH_MM);
+
 /* Zerlegt ein Netz in getrennte Teile. Körper, deren Hüllquader sich berühren oder überlappen,
    bleiben ein Teil – das deckt Hohlkörper (Innenwand), unverschmolzene Tinkercad-Exporte
-   (Stiel + Hut) und Einsätze ab. Getrennt wird nur, was auch auf dem Bett getrennt liegt. */
-function splitBodies(pos) {
+   (Stiel + Hut) und Einsätze ab. Getrennt wird nur, was auch auf dem Bett getrennt liegt.
+   Ergebnis je Teil: {pos, bodies:[Dreiecksanzahl je Körper]} – die Körper eines Teils liegen
+   hintereinander in pos und können beim Export eigene Slots bekommen (Mehrfarbdruck). Eine nach
+   innen gerichtete Hülle (Hohlraum) gehört zum Körper, der sie umschließt. */
+function splitBodyGroups(pos) {
   const n = pos.length / 9;
   const parent = new Int32Array(n).map((_, i) => i);
   const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
@@ -39,7 +54,7 @@ function splitBodies(pos) {
   }
   const groups = new Map();
   for (let t = 0; t < n; t++) { const r = find(t); (groups.get(r) || groups.set(r, []).get(r)).push(t); }
-  if (groups.size === 1 || groups.size > MAX_BODIES) return [pos];
+  if (groups.size === 1 || groups.size > MAX_BODIES) return [{ pos, bodies: [n] }];
 
   let bodies = [...groups.values()].map(tris => ({ tris, ...bboxOf(pos, tris) }));
   bodies.sort((a, b) => b.tris.length - a.tris.length);
@@ -51,27 +66,37 @@ function splitBodies(pos) {
     for (let k = 0; k < 3; k++) { main.mn[k] = Math.min(main.mn[k], b.mn[k]); main.mx[k] = Math.max(main.mx[k], b.mx[k]); }
     return false;
   });
+  // Hohlräume (nach innen gerichtete Hüllen) in den kleinsten umschließenden Körper
+  const shells = bodies.filter(b => signedVolume(pos, b.tris) >= 0);
+  for (const b of bodies) {
+    if (shells.includes(b)) continue;
+    const host = shells.filter(h => boxInside(b, h)).sort((x, y) => x.tris.length - y.tris.length)[0];
+    if (host) for (const t of b.tris) host.tris.push(t); else shells.push(b);
+  }
   // Berührende Körper zusammenfassen, bis sich nichts mehr ändert (der gemeinsame Quader wächst mit)
-  let kept = bodies, merged = true;
+  let kept = shells.map(b => ({ mn: [...b.mn], mx: [...b.mx], members: [b] })), merged = true;
   while (merged) {
     merged = false;
     for (let i = 0; i < kept.length && !merged; i++) for (let j = i + 1; j < kept.length; j++) {
       const A = kept[i], B = kept[j];
       if (!boxesTouch(A, B)) continue;
-      for (const t of B.tris) A.tris.push(t);
+      A.members.push(...B.members);
       for (let k = 0; k < 3; k++) { A.mn[k] = Math.min(A.mn[k], B.mn[k]); A.mx[k] = Math.max(A.mx[k], B.mx[k]); }
       kept.splice(j, 1); merged = true; break;
     }
   }
-  if (kept.length === 1) return [pos];
-  // Reihenfolge wie im Bett: von vorne links nach hinten rechts
-  kept.sort((a, b) => (a.mn[1] - b.mn[1]) || (a.mn[0] - b.mn[0]));
-  return kept.map(b => {
-    const out = new Float32Array(b.tris.length * 9);
-    b.tris.sort((x, y) => x - y).forEach((t, j) => out.set(pos.subarray(t * 9, t * 9 + 9), j * 9));
-    return out;
+  // Reihenfolge wie im Bett: von vorne links nach hinten rechts (Teile und Körper darin)
+  const frontLeft = (a, b) => (a.mn[1] - b.mn[1]) || (a.mn[0] - b.mn[0]);
+  kept.sort(frontLeft);
+  return kept.map(g => {
+    g.members.sort(frontLeft);
+    const out = new Float32Array(g.members.reduce((s, b) => s + b.tris.length, 0) * 9);
+    let j = 0;
+    for (const b of g.members) for (const t of b.tris.sort((x, y) => x - y)) out.set(pos.subarray(t * 9, t * 9 + 9), 9 * j++);
+    return { pos: out, bodies: g.members.map(b => b.tris.length) };
   });
 }
+const splitBodies = pos => splitBodyGroups(pos).map(g => g.pos);
 
 /* ---------- 3MF lesen ---------- */
 const attrsOf = tag => { const o = {}; tag.replace(/([\w:]+)="([^"]*)"/g, (_, k, v) => { o[k] = v; }); return o; };
@@ -103,8 +128,9 @@ function parseModelXML(text) {
       const vs = [];
       for (const v of meshXml[2].matchAll(tagRe('vertex'))) { const va = attrsOf(v[1]); vs.push(+va.x * unit, +va.y * unit, +va.z * unit); }
       const ts = [];
-      for (const t of meshXml[2].matchAll(tagRe('triangle'))) { const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3); }
-      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts) };
+      let painted = false; // Bambu/Orca-Farbbemalung je Dreieck (paint_color) = Mehrfarbdruck ohne eigene Körper (painted: auch Farb-Modifikatoren)
+      for (const t of meshXml[2].matchAll(tagRe('triangle'))) { const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3); if (ta.paint_color) painted = true; }
+      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted };
     }
     for (const c of body.matchAll(tagRe('component'))) {
       const ca = attrsOf(c[1]);
@@ -126,7 +152,7 @@ function parseModelSettings(text) {
   const meta = (xml, key) => { const m = new RegExp('<metadata key="' + key + '" value="([^"]*)"').exec(xml); return m ? m[1] : null; };
   for (const m of text.matchAll(blockRe('object'))) {
     const head = m[2].split('<part')[0], parts = new Map();
-    for (const p of m[2].matchAll(blockRe('part'))) { const pa = attrsOf(p[1] || ''); parts.set(pa.id, { subtype: pa.subtype || 'normal_part', extruder: meta(p[2], 'extruder') }); }
+    for (const p of m[2].matchAll(blockRe('part'))) { const pa = attrsOf(p[1] || ''); parts.set(pa.id, { subtype: pa.subtype || 'normal_part', extruder: meta(p[2], 'extruder'), name: meta(p[2], 'name') }); }
     objects.set(attrsOf(m[1] || '').id, { name: meta(head, 'name'), extruder: meta(head, 'extruder'), parts });
   }
   for (const m of text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)) {
@@ -153,10 +179,12 @@ function parse3MF(fileName, zip, zipLib) {
   const seen = new Map(); // Build-Items je Objekt zählen → Instanznummer
 
   // Alle Dreiecke eines Objekts (rekursiv über Komponenten) mit der Gesamttransformation sammeln
-  function collect(path, id, T, skipPart, out, depth) {
+  // volumes (nur oberste Ebene): je Bauteil {partId, count} – das sind die Körper des Objekts
+  function collect(path, id, T, skipPart, out, depth, volumes, flags = {}) {
     if (depth > 8) throw Error('verschachtelte Komponenten zu tief');
     const obj = model(path).objects.get(id);
     if (!obj) throw Error('Objekt ' + id + ' fehlt in ' + path);
+    if (obj.mesh && obj.mesh.painted) flags.painted = true;
     if (obj.mesh) {
       const { v, t } = obj.mesh;
       for (let i = 0; i < t.length; i++) {
@@ -166,7 +194,9 @@ function parse3MF(fileName, zip, zipLib) {
     }
     for (const c of obj.components) {
       if (skipPart(c.objectid)) continue;
-      collect(c.path ? c.path.replace(/^\//, '') : path, c.objectid, mulTransform(c.transform, T), () => false, out, depth + 1);
+      const before = out.length;
+      collect(c.path ? c.path.replace(/^\//, '') : path, c.objectid, mulTransform(c.transform, T), () => false, out, depth + 1, null, flags);
+      if (volumes && out.length > before) volumes.push({ partId: c.objectid, count: (out.length - before) / 9 });
     }
   }
 
@@ -180,13 +210,21 @@ function parse3MF(fileName, zip, zipLib) {
     const skipPart = pid => { const p = ms && ms.parts.get(pid); const skip = !!p && p.subtype !== 'normal_part'; if (skip) skipped++; return skip; };
     const instance = seen.get(item.objectid) || 0;
     seen.set(item.objectid, instance + 1);
-    const out = [];
-    collect(rootPath, item.objectid, item.transform, skipPart, out, 0);
+    const out = [], volumes = [], flags = {};
+    collect(rootPath, item.objectid, item.transform, skipPart, out, 0, volumes, flags);
+    // Modifikator mit eigenem Slot (z. B. Text/Logo des Designers) färbt das Teil – ebenfalls mehrfarbig
+    if (ms && [...ms.parts.values()].some(p => p.subtype === 'modifier_part' && p.extruder && p.extruder !== ms.extruder)) flags.painted = true;
     if (!out.length) return;
+    // Mehrere Bauteile im Objekt = Körper mit eigenem Slot (Mehrfarbig); Name und Slot aus model_settings
+    const bodies = volumes.length > 1 && volumes.reduce((s, v) => s + v.count, 0) === out.length / 9
+      ? volumes.map((v, j) => { const p = ms && ms.parts.get(v.partId);
+        return { name: unxml((p && p.name) || 'Körper ' + (j + 1)), count: v.count, partId: v.partId, extruder: p && p.extruder ? +p.extruder : null }; })
+      : null;
     parts.push({
       name: unxml((ms && ms.name) || obj.name || 'Objekt ' + item.objectid),
       pos: Float32Array.from(out), objectId: item.objectid, instance,
-      extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid + '#' + instance) || 1, printable: item.printable
+      extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid + '#' + instance) || 1, printable: item.printable,
+      ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {})
     });
   });
   if (!parts.length) throw Error('keine druckbaren Objekte in ' + fileName);
@@ -199,9 +237,10 @@ function parse3MF(fileName, zip, zipLib) {
 /* ---------- Einstieg ---------- */
 function stlParts(fileName, bytes) {
   const pos = readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-  const bodies = splitBodies(pos);
+  const groups = splitBodyGroups(pos);
   const base = fileName.replace(/^.*[\\/]/, '');
-  return bodies.map((p, i) => ({ name: bodies.length > 1 ? base + ' · Teil ' + (i + 1) : base, pos: p }));
+  return groups.map((g, i) => ({ name: groups.length > 1 ? base + ' · Teil ' + (i + 1) : base, pos: g.pos,
+    ...(g.bodies.length > 1 ? { bodies: g.bodies.map((count, j) => ({ name: 'Körper ' + (j + 1), count })) } : {}) }));
 }
 
 // entries: [{name, bytes: Uint8Array}] – ausgewählte oder gezogene Dateien

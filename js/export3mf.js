@@ -63,6 +63,13 @@ function supportChanges(r) {
   return out;
 }
 
+// Herstellerbereich aus dem Datenblatt („230–260 °C“), immer inklusive der tatsächlichen Drucktemperatur
+function nozzleRange(r) {
+  const n = (String(r.m.range || '').match(/\d{3}/g) || []).map(Number), t = Number(r.nozzle);
+  const lo = n.length ? Math.min(...n) : t - 10, hi = n.length ? Math.max(...n) : t + 10;
+  return [Math.min(lo, t), Math.max(hi, t)];
+}
+
 /* Liefert die Werte, die in project_settings.config geschrieben werden, jeweils mit
    Beschriftung, damit Dialog und Test dieselbe Liste verwenden. slot ist 0-basiert.
    liveSlots (optional): echte Belegung vom Drucker [{type, colour}] – Typ und Farbe aller
@@ -80,6 +87,11 @@ function plannedChanges(r, slot, liveSlots) {
   fil('Filamenttyp', 'filament_type', ORCA_KIND[r.m.kind] || 'PLA');
   fil('Düse', 'nozzle_temperature', r.nozzle);
   fil('Düse erste Schicht', 'nozzle_temperature_initial_layer', r.nozzle);
+  // Empfohlener Bereich des Filaments – sonst bleibt der PLA-Bereich der Vorlage (190–240 °C) stehen, und Orca
+  // verweigert Mehrfarbdrucke mit ASA/ABS/PETG („nozzle temperatures are incompatible“, beobachtet 2026-09-28)
+  const [lo, hi] = nozzleRange(r);
+  fil('Temperaturbereich von', 'nozzle_temperature_range_low', lo);
+  fil('Temperaturbereich bis', 'nozzle_temperature_range_high', hi);
   BED_TEMP_KEYS.forEach(k => { fil('Heizbett (' + k.replace('_temp', '') + ')', k, r.m.bed); fil('Heizbett erste Schicht (' + k.replace('_temp', '') + ')', k + '_initial_layer', r.m.bed); });
   fil('Lüfter min.', 'fan_min_speed', r.m.fan);
   fil('Lüfter max.', 'fan_max_speed', r.m.fan);
@@ -141,8 +153,9 @@ function filamentSlotTypes(r, slot, liveSlots, n, extra = []) {
 }
 
 /* extra: [{slot, r}] – weitere Slots, die Teile mit eigenem Filament belegen. Dort werden nur die
-   Filamentwerte (Temperaturen, Lüfter, Fluss …) aus dem Ergebnis dieses Teils geschrieben. */
-function buildProjectSettings(tpl, r, slot, liveSlots, extra = []) {
+   Filamentwerte (Temperaturen, Lüfter, Fluss …) aus dem Ergebnis dieses Teils geschrieben.
+   machine: [{label, key, value}] – Druckerwerte (z. B. Filamentwechsel-Zeit passend zur Spülmenge). */
+function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = []) {
   const settings = JSON.parse(JSON.stringify(tpl.settings));
   const changes = [];
   const nFil = settings.filament_settings_id.length;
@@ -176,6 +189,13 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = []) {
     const before = c.perSlot ? settings[c.key][c.index] : settings[c.key];
     if (c.perSlot) settings[c.key][c.index] = c.value; else settings[c.key] = c.value;
     diff[c.perSlot ? 1 + c.index : 0].add(c.key);
+    if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
+  }
+  for (const c of machine) {
+    if (!(c.key in settings)) continue;
+    const before = settings[c.key];
+    settings[c.key] = c.value;
+    diff[groups - 1].add(c.key);
     if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
   }
   settings.different_settings_to_system = diff.map(s => [...s].join(';'));
@@ -220,11 +240,20 @@ function meshObjectXML(pos, center, id) {
     verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n';
 }
 
-// Netz-Datei eines Teils: das Teil selbst (id) und seine Modifikatoren (mods: [{id, pos}])
-function meshModelXML(geom, id = 1, mods = []) {
+/* Körper eines Teils (Mehrfarbdruck): bodies = [{name, start, count, slot}] – Dreiecksbereiche in geom.pos.
+   Jeder Körper wird ein eigenes Orca-Bauteil; slot null = Slot des Teils. Der erste Körper behält die
+   Id des Teils, weitere liegen weit über denen der Teile und Modifikatoren. */
+const BODY_ID_BASE = 1000000;
+function bodyVolumes(geom, bodies, k) {
+  if (!bodies || bodies.length < 2) return [{ id: k, name: geom.name, pos: geom.pos, slot: null }];
+  return bodies.map((b, j) => ({ id: j ? BODY_ID_BASE + k * 1000 + j : k, name: b.name, pos: geom.pos.subarray(b.start * 9, (b.start + b.count) * 9), slot: b.slot ?? null }));
+}
+
+// Netz-Datei eines Teils: seine Körper (vols: [{id, pos}]) und Modifikatoren (mods: [{id, pos}])
+function meshModelXML(geom, vols, mods = []) {
   const center = [(geom.mn[0] + geom.mx[0]) / 2, (geom.mn[1] + geom.mx[1]) / 2, (geom.mn[2] + geom.mx[2]) / 2];
   return '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n' +
-    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n' + meshObjectXML(geom.pos, center, id) +
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n' + vols.map(v => meshObjectXML(v.pos, center, v.id)).join('') +
     mods.map(m => meshObjectXML(m.pos, center, m.id)).join('') + ' </resources>\n <build/>\n</model>\n';
 }
 
@@ -276,14 +305,19 @@ function arrangeParts(geoms, tpl) {
 }
 
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
+/* Dateiversion im Bambu-Format, wie sie die Orca-Vorlagen tragen. Neuere Angaben (z. B. Bambu Studio 2.7.1 bei
+   Makerworld-Projekten) lehnt die Orca-Kommandozeile ab: „File Version 2.7.1.62 not supported by current cli
+   version 2.4.2“ (beobachtet 2026-09-28) – die Orca-Oberfläche öffnet sie trotzdem. */
+const BBL_FILE_VERSION = '02.06.00.51';
 const MODEL_OPEN = '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n';
 const REL_TYPE = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel';
 
 function modelSettingsXML(objs, plateCount) {
   const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + o.extruder + '"/>\n' +
     o.overrides.map(c => '    <metadata key="' + c.key + '" value="' + xmlEsc(c.value) + '"/>\n').join('') +
-    '    <part id="' + o.k + '" subtype="normal_part">\n      <metadata key="name" value="' + o.name + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="source_file" value="' + o.name + '"/>\n' +
-    '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="0"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n' +
+    o.vols.map((v, j) => '    <part id="' + v.id + '" subtype="normal_part">\n      <metadata key="name" value="' + xmlEsc(v.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
+      (v.slot !== null ? '      <metadata key="extruder" value="' + (v.slot + 1) + '"/>\n' : '') + '      <metadata key="source_file" value="' + o.name + '"/>\n' +
+      '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="' + j + '"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n').join('') +
     (o.mods || []).map(m => '    <part id="' + m.id + '" subtype="modifier_part">\n      <metadata key="name" value="' + xmlEsc(m.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
       HOLE_MOD_SETTINGS.map(([k, v]) => '      <metadata key="' + k + '" value="' + v + '"/>\n').join('') + '    </part>\n').join('') + '  </object>\n';
   const instance = o => '    <model_instance>\n      <metadata key="object_id" value="' + o.id + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + o.k + '"/>\n    </model_instance>\n';
@@ -302,7 +336,10 @@ function modelSettingsXML(objs, plateCount) {
 function slotPlan(items, r, slot) {
   const partSlot = p => (p.slot === null || p.slot === undefined ? slot : p.slot);
   const extra = [], notes = [];
-  for (const p of items) {
+  // Körper mit eigenem Slot belegen diesen Slot mit dem Filament ihres Teils
+  const users = items.flatMap(p => [p, ...(p.bodies || []).filter(b => b.slot !== null && b.slot !== undefined)
+    .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot }))]);
+  for (const p of users) {
     const ps = partSlot(p), pr = p.r || r;
     if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(p.geom.name + ': ' + pr.m.name + ' im selben Slot wie ' + r.m.name + ' – es gelten die Filamentwerte von ' + r.m.name + '.'); continue; }
     const other = extra.find(e => e.slot === ps);
@@ -313,16 +350,90 @@ function slotPlan(items, r, slot) {
   return { extra, notes, partSlot };
 }
 
-function build3mfFiles(tpl, r, parts, slot, liveSlots) {
+/* ---------- Reinigungsturm (Prime-Turm) je Platte platzieren ----------
+   Die Vorlage kennt nur eine feste Turmposition. Steht dort ein Teil, bricht die Orca-Kommandozeile ab
+   („gcode path conflicts found between WipeTower and …“, beobachtet 2026-09-28 mit einem 200 × 200-mm-Teil).
+   Je Platte mit mehr als einem Slot: freie Stelle nahe der Vorlagenposition; sonst die Teile nach vorne links
+   rücken; geht auch das nicht, ohne Turm (beim Kobra S1 spült die Firmware ohnehin in den Schacht).
+   Größe vorsichtig geschätzt: Breite laut Profil, Tiefe 25 mm, dazu Brim und Rippen. wipe_tower_x/y = Ecke vorne links. */
+const TOWER_DEPTH_MM = 25, TOWER_CLEAR_MM = 5, TOWER_EDGE_MM = 3, TOWER_STEP_MM = 5;
+const firstNum = v => Number(Array.isArray(v) ? v[0] : v);
+function bedMin(tpl) {
+  const pts = (tpl.settings.printable_area || []).map(p => p.split('x').map(Number));
+  return pts.length ? [0, 1].map(k => Math.min(...pts.map(p => p[k]))) : [0, 0];
+}
+function towerFootprint(settings) {
+  const w = firstNum(settings.prime_tower_width) || 35, brim = firstNum(settings.prime_tower_brim_width) || 0;
+  const rib = settings.wipe_tower_wall_type === 'rib' ? (firstNum(settings.wipe_tower_extra_rib_length) || 0) : 0;
+  return { w, d: TOWER_DEPTH_MM, pad: brim + rib / 2 + 2 };
+}
+function findTowerSpot(rects, [x0, y0, x1, y1], fp, prefer) {
+  let best = null;
+  for (let x = x0 + TOWER_EDGE_MM + fp.pad; x + fp.w + fp.pad <= x1 - TOWER_EDGE_MM; x += TOWER_STEP_MM)
+    for (let y = y0 + TOWER_EDGE_MM + fp.pad; y + fp.d + fp.pad <= y1 - TOWER_EDGE_MM; y += TOWER_STEP_MM) {
+      const t = [x - fp.pad, y - fp.pad, x + fp.w + fp.pad, y + fp.d + fp.pad];
+      if (rects.some(o => o[0] - TOWER_CLEAR_MM < t[2] && t[0] < o[2] + TOWER_CLEAR_MM && o[1] - TOWER_CLEAR_MM < t[3] && t[1] < o[3] + TOWER_CLEAR_MM)) continue;
+      const dist = Math.hypot(x - prefer[0], y - prefer[1]);
+      if (!best || dist < best.dist) best = { x, y, dist };
+    }
+  return best && [best.x, best.y];
+}
+/* plates: [{rects:[[x0,y0,x1,y1]] in Bettkoordinaten, slots:Set}] – Index = Platte − 1.
+   Ergebnis: {xs, ys, shifts:[[dx,dy]], notes, disable} – shifts rücken die Teile einer Platte. */
+function planTowers(settings, tpl, plates) {
+  const fp = towerFootprint(settings), [mx, my] = bedMin(tpl), [bw, bd] = bedSize(tpl), bed = [mx, my, mx + bw, my + bd];
+  const prefer = [firstNum(settings.wipe_tower_x) || mx + bw / 2, firstNum(settings.wipe_tower_y) || my + bd / 2];
+  const res = { xs: [], ys: [], shifts: [], notes: [], disable: false };
+  const off = String(settings.enable_prime_tower) === '0';
+  plates.forEach((p, i) => {
+    let pos = null, shift = [0, 0];
+    if (!off && p.slots.size > 1 && p.rects.length) {
+      pos = findTowerSpot(p.rects, bed, fp, prefer);
+      if (!pos) {
+        shift = [mx + TOWER_EDGE_MM + 2 - Math.min(...p.rects.map(r => r[0])), my + TOWER_EDGE_MM + 2 - Math.min(...p.rects.map(r => r[1]))];
+        pos = findTowerSpot(p.rects.map(r => [r[0] + shift[0], r[1] + shift[1], r[2] + shift[0], r[3] + shift[1]]), bed, fp, prefer);
+        if (pos) res.notes.push('Platte ' + (i + 1) + ': Teile nach vorne links gerückt, damit der Reinigungsturm Platz hat.');
+        else { shift = [0, 0]; res.disable = true; res.notes.push('Platte ' + (i + 1) + ': kein Platz für den Reinigungsturm – die 3MF ist ohne Turm (beim Kobra S1 spült die Firmware in den Schacht).'); }
+      }
+    }
+    res.xs.push(String(pos ? pos[0] : prefer[0])); res.ys.push(String(pos ? pos[1] : prefer[1])); res.shifts.push(shift);
+  });
+  return res;
+}
+// Turmposition (und ggf. „ohne Turm“) in die Einstellungen; Orca übernimmt nur gelistete Prozessschlüssel
+function applyTowers(settings, changes, plan) {
+  const mark = key => { const g = settings.different_settings_to_system; if (Array.isArray(g) && !String(g[0] || '').split(';').includes(key)) g[0] = g[0] ? g[0] + ';' + key : key; };
+  const set = (label, key, value) => { const before = settings[key]; settings[key] = value; mark(key); if (JSON.stringify(before) !== JSON.stringify(value)) changes.push({ label, key, before: Array.isArray(before) ? before.join(', ') : before, after: Array.isArray(value) ? value.join(', ') : value }); };
+  if (plan.disable) set('Reinigungsturm', 'enable_prime_tower', '0');
+  else { set('Reinigungsturm X je Platte', 'wipe_tower_x', plan.xs); set('Reinigungsturm Y je Platte', 'wipe_tower_y', plan.ys); }
+}
+
+function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   const items = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom ? p : { geom: p });
   const list = items.map(p => p.geom);
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
-  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra);
+  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra, machine);
   const { places, plateCount } = arrangeParts(list, tpl);
+  {
+    // Reinigungsturm je Platte: Teile in Bettkoordinaten der Platte (arrangeParts versetzt Platten wie Orca)
+    const [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(plateCount));
+    const origin = pi => [(pi % cols) * bw * PLATE_STRIDE, -Math.floor(pi / cols) * bd * PLATE_STRIDE];
+    const plates = Array.from({ length: plateCount }, () => ({ rects: [], slots: new Set(), idx: [] }));
+    items.forEach((p, i) => {
+      const pl = places[i], [ox, oy] = origin(pl.plate), g = p.geom, q = plates[pl.plate];
+      q.rects.push([pl.x - ox - g.x / 2, pl.y - oy - g.y / 2, pl.x - ox + g.x / 2, pl.y - oy + g.y / 2]);
+      q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); });
+      q.idx.push(i);
+    });
+    const tp = planTowers(settings, tpl, plates);
+    plates.forEach((q, pi) => { const [dx, dy] = tp.shifts[pi]; if (dx || dy) q.idx.forEach(i => { places[i] = { ...places[i], x: places[i].x + dx, y: places[i].y + dy }; }); });
+    applyTowers(settings, changes, tp);
+    notes.push(...tp.notes);
+  }
   const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
   // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
   const objs = items.map((p, i) => ({ g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
-    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: holeMods(i + 1, p.holes) }));
+    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: holeMods(i + 1, p.holes), vols: bodyVolumes(p.geom, p.bodies, i + 1) }));
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
@@ -330,8 +441,9 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
     '3D/_rels/3dmodel.model.rels': XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
       objs.map(o => ' <Relationship Target="' + objectPath(o.k) + '" Id="rel-' + o.k + '" Type="' + REL_TYPE + '"/>\n').join('') + '</Relationships>\n',
     '3D/3dmodel.model': XML_HEAD + MODEL_OPEN +
-      ' <metadata name="Application">BambuStudio-02.06.00.51</metadata>\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">' + title + '</metadata>\n <resources>\n' +
-      objs.map(o => '  <object id="' + o.id + '" p:UUID="' + uuid(o.k, '61cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <components>\n    <component p:path="' + objectPath(o.k) + '" objectid="' + o.k + '" p:UUID="' + uuid(o.k, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n' +
+      ' <metadata name="Application">BambuStudio-' + BBL_FILE_VERSION + '</metadata>\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>\n <metadata name="BambuStudio:3mfVersion">1</metadata>\n <metadata name="Title">' + title + '</metadata>\n <resources>\n' +
+      objs.map(o => '  <object id="' + o.id + '" p:UUID="' + uuid(o.k, '61cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <components>\n' +
+        o.vols.map(v => '    <component p:path="' + objectPath(o.k) + '" objectid="' + v.id + '" p:UUID="' + uuid(v.id, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') +
         o.mods.map(m => '    <component p:path="' + objectPath(o.k) + '" objectid="' + m.id + '" p:UUID="' + uuid(m.id, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') +
         '   </components>\n  </object>\n').join('') +
       ' </resources>\n <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n' +
@@ -339,10 +451,10 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots) {
       ' </build>\n</model>\n',
     'Metadata/model_settings.config': modelSettingsXML(objs, plateCount),
     'Metadata/project_settings.config': JSON.stringify(settings, null, 4),
-    'Metadata/slice_info.config': XML_HEAD + '<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.06.00.51"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
+    'Metadata/slice_info.config': XML_HEAD + '<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="' + BBL_FILE_VERSION + '"/>\n    <header_item key="OrcaSlicer-Version" value="' + xmlEsc(tpl.orcaVersion) + '"/>\n  </header>\n</config>\n',
     'Metadata/filament_sequence.json': JSON.stringify(Object.fromEntries(Array.from({ length: plateCount }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }])))
   };
-  objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.k, o.mods); });
+  objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.vols, o.mods); });
   return { files, changes, plateCount, objectChanges, notes };
 }
 
@@ -381,19 +493,56 @@ function patchObjectHead(head, extruder, own, computedKeys) {
   return h;
 }
 
-/* jobs: [{geom, r, slot, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip. */
-function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf) {
+// Slot eines Bauteils (Körper) im Objekt setzen; extruder null = Slot des Objekts (Eintrag entfernen)
+function patchPartExtruder(ms, objectId, partId, extruder) {
+  const pid = String(partId).replace(/[^\w-]/g, '');
+  const objRe = new RegExp('(<object id="' + objectId + '">[\\s\\S]*?</object>)');
+  return ms.replace(objRe, obj => obj.replace(new RegExp('(<part id="' + pid + '"[^>]*>)([\\s\\S]*?)(</part>)'), (all, open, body, close) => {
+    const re = /[ \t]*<metadata key="extruder" value="[^"]*"\/>\n?/;
+    body = body.replace(re, '');
+    if (extruder !== null) body = body.replace(/^(\n?)/, '$1      <metadata key="extruder" value="' + extruder + '"/>\n');
+    return open + body + close;
+  }));
+}
+
+/* jobs: [{geom, r, slot, bodies?, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip. */
+function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, machine) {
   const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate }));
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
   const nFil = tpl.settings.filament_settings_id.length;
   items.forEach(j => { if (partSlot(j) >= nFil) notes.push(j.geom.name + ': Slot ' + (partSlot(j) + 1) + ' gibt es an deinem Drucker nicht – bitte in Orca zuweisen.'); });
-  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra.filter(e => e.slot < nFil));
+  items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(j.geom.name + ' · ' + b.name + ': Slot ' + (b.slot + 1) + ' gibt es an deinem Drucker nicht – Slot ' + nFil + ' wird verwendet.'); }));
+  const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra.filter(e => e.slot < nFil), machine);
   const { shifts, oversize } = plateShifts(items, tpl);
   oversize.forEach(id => notes.push('Platte ' + id + ' ist größer als dein Druckbett – in Orca prüfen.'));
+  {
+    // Reinigungsturm je Platte (Platten-Ids 1..n); Teile nach der Verschiebung auf die Bettmitte
+    const count = Math.max(1, ...items.map(j => j.plate || 1)), [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(count));
+    const plates = Array.from({ length: count }, () => ({ rects: [], slots: new Set() }));
+    for (const j of items) {
+      const id = j.plate || 1, [sx, sy] = shifts.get(id) || [0, 0], pi = id - 1, ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
+      plates[pi].rects.push([j.geom.mn[0] + sx - ox, j.geom.mn[1] + sy - oy, j.geom.mx[0] + sx - ox, j.geom.mx[1] + sy - oy]);
+      plates[pi].slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) plates[pi].slots.add(Math.min(b.slot, nFil - 1)); });
+      if (j.part && j.part.painted) plates[pi].slots.add('bemalt'); // Farben des Designers → mehrfarbig, Turm nötig
+    }
+    const tp = planTowers(settings, tpl, plates);
+    tp.shifts.forEach(([dx, dy], pi) => { if ((dx || dy) && shifts.has(pi + 1)) { const [sx, sy] = shifts.get(pi + 1); shifts.set(pi + 1, [sx + dx, sy + dy]); } });
+    applyTowers(settings, changes, tp);
+    notes.push(...tp.notes);
+  }
 
   const out = {};
   for (const [name, data] of Object.entries(threemf.zip)) if (!PLATE_SLICE_FILES.test(name)) out[name] = data;
   out['Metadata/project_settings.config'] = zipLib.strToU8(JSON.stringify(settings, null, 4));
+  // Dateiversion auf die der eigenen Vorlage setzen (sonst verweigert die Orca-Kommandozeile neuere Bambu-Dateien)
+  const setVersion = (name, re, value) => { if (out[name]) out[name] = zipLib.strToU8(zipLib.strFromU8(out[name]).replace(re, value)); };
+  setVersion('3D/3dmodel.model', /(<metadata name="Application">)[^<]*(<\/metadata>)/, '$1BambuStudio-' + BBL_FILE_VERSION + '$2');
+  // Mit OrcaSlicer-Angabe prüft Orca gegen die eigene Version statt gegen die Bambu-Version
+  const model = zipLib.strFromU8(out['3D/3dmodel.model']);
+  if (!/<metadata name="OrcaSlicer">/.test(model))
+    out['3D/3dmodel.model'] = zipLib.strToU8(model.replace(/(<metadata name="Application">[^<]*<\/metadata>)/, '$1\n <metadata name="OrcaSlicer">' + xmlEsc(tpl.orcaVersion) + '</metadata>'));
+  else setVersion('3D/3dmodel.model', /(<metadata name="OrcaSlicer">)[^<]*(<\/metadata>)/, '$1' + xmlEsc(tpl.orcaVersion) + '$2');
+  setVersion('Metadata/slice_info.config', /(header_item key="X-BBL-Client-Version" value=")[^"]*(")/, '$1' + BBL_FILE_VERSION + '$2');
 
   // Build-Items verschieben (Translation = letzte drei Werte der Matrix)
   const rootPath = Object.keys(out).find(k => /^3D\/3dmodel\.model$/i.test(k));
@@ -425,14 +574,15 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf) {
     const esc = String(j.part.objectId).replace(/[^\w-]/g, '');
     if (!new RegExp('<object id="' + esc + '">').test(ms)) { notes.push(j.geom.name + ': keine Objekt-Einstellungen in der 3MF – Slot und eigene Werte bitte in Orca prüfen.'); continue; }
     ms = ms.replace(new RegExp('(<object id="' + esc + '">)([\\s\\S]*?)(?=<part\\b|</object>)'), (all, open, body) => patchObjectHead(open + body, Math.min(partSlot(j), nFil - 1) + 1, own, computedKeys));
+    for (const b of j.bodies || []) if (b.partId != null) ms = patchPartExtruder(ms, esc, b.partId, b.slot == null ? null : Math.min(b.slot, nFil - 1) + 1);
   }
   out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
   return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: shifts.size };
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
-function build3mf(tpl, r, parts, slot, zipLib, liveSlots) {
-  const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots);
+function build3mf(tpl, r, parts, slot, zipLib, liveSlots, machine) {
+  const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots, machine);
   const entries = {};
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
   return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount, objectChanges, notes };

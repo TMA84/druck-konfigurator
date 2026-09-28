@@ -46,7 +46,7 @@ const vendorLabel = v => (v === 'BBL' ? 'Bambu Lab' : v);
 function fillPickerVendors() {
   const sel = $('pickVendor');
   if (sel.options.length) return;
-  const vendors = Object.keys(ORCA_PRINTER_INDEX.vendors).sort((a, b) => vendorLabel(a).localeCompare(vendorLabel(b), 'de'));
+  const vendors = Object.keys(ORCA_PRINTER_INDEX.vendors).filter(vendorEnabled).sort((a, b) => vendorLabel(a).localeCompare(vendorLabel(b), 'de'));
   sel.innerHTML = vendors.map(v => '<option value="' + esc(v) + '">' + esc(vendorLabel(v)) + ' (' + Object.keys(ORCA_PRINTER_INDEX.vendors[v].printers).length + ')</option>').join('');
 }
 function renderPickerList() {
@@ -64,7 +64,7 @@ function renderPickerList() {
 function openPrinterPicker() {
   fillPickerVendors();
   const last = store.last.orcaPrinter;
-  if (last && ORCA_PRINTER_INDEX.vendors[last.vendor]) $('pickVendor').value = last.vendor;
+  if (last && ORCA_PRINTER_INDEX.vendors[last.vendor] && vendorEnabled(last.vendor)) $('pickVendor').value = last.vendor;
   $('pickSearch').value = '';
   renderPickerList();
   $('pickerDlg').showModal();
@@ -80,8 +80,10 @@ $('pickList').addEventListener('click', async e => {
 });
 $('pickerDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
-// Beim Start den zuletzt gewählten Orca-Drucker wiederherstellen
-if (store.last.printer === 'orca' && store.last.orcaPrinter) {
+// Beim Start den zuletzt gewählten Orca-Drucker wiederherstellen (nur, wenn sein Hersteller angeboten wird)
+if (store.last.orcaPrinter && !vendorEnabled(store.last.orcaPrinter.vendor)) {
+  if (store.last.printer === 'orca') { $('printer').value = 'kobra_s1'; $('printer').dispatchEvent(new Event('change')); }
+} else if (store.last.printer === 'orca' && store.last.orcaPrinter) {
   activateOrcaPrinter(store.last.orcaPrinter.vendor, store.last.orcaPrinter.name).catch(() => { /* bleibt beim S1 */ });
 } else if (store.last.orcaPrinter && ORCA_PRINTER_INDEX.vendors[store.last.orcaPrinter.vendor]) {
   const fullName = store.last.orcaPrinter.name.replace(/ \d+(\.\d+)? nozzle$/, '');

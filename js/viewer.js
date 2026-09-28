@@ -108,7 +108,9 @@ const Viewer = (() => {
   }
 
   // Überhang-Einfärbung, unverändert aus v4.
+  let paint = null, lastTh = 45;
   function colorize(th) {
+    lastTh = th;
     if (!mesh || !geomRef) return;
     const geom = geomRef, c = mesh.geometry.attributes.color.array;
     for (let i = 0; i < geom.n; i++) {
@@ -117,8 +119,12 @@ const Viewer = (() => {
       const col = geom.bed[i] ? COLORS.bed : inner ? COLORS.ok : a > th ? COLORS.over : (a > th * .6 && a > 0) ? COLORS.near : COLORS.ok;
       for (let v = 0; v < 3; v++) { const k = (i * 3 + v) * 3; c[k] = col[0]; c[k + 1] = col[1]; c[k + 2] = col[2]; }
     }
+    // Körperfarben (Mehrfarbdruck) überdecken die Überhangfarben: [{start, count, rgb:[r,g,b]}]
+    if (paint) for (const b of paint) for (let i = b.start; i < b.start + b.count && i < geom.n; i++)
+      for (let v = 0; v < 3; v++) { const k = (i * 3 + v) * 3; c[k] = b.rgb[0]; c[k + 1] = b.rgb[1]; c[k + 2] = b.rgb[2]; }
     mesh.geometry.attributes.color.needsUpdate = true;
   }
+  function setPaint(p) { paint = p && p.length ? p : null; colorize(lastTh); }
 
   function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; }
   function setAxes(on) { if (axes) axes.visible = on; }
@@ -198,5 +204,5 @@ const Viewer = (() => {
     });
   }
 
-  return { available, init, show, clear, colorize, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
+  return { available, init, show, clear, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
 })();

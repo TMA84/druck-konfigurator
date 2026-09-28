@@ -7,6 +7,18 @@ Die Dateien in `vendor/` stammen von Dritten und stehen unter deren Lizenz, nich
 | `vendor/three.min.js` | [three.js](https://github.com/mrdoob/three.js) r128 | MIT, Copyright © 2010–2021 three.js authors |
 | `vendor/OrbitControls.js` | three.js (examples/js) r128 | MIT, Copyright © 2010–2021 three.js authors |
 | `vendor/fflate.min.js` | [fflate](https://github.com/101arrowz/fflate) 0.8.2 | MIT, Copyright © Arjun Barrett |
+| `vendor/flv.min.js` | [flv.js](https://github.com/bilibili/flv.js) 1.6.2 | Apache-2.0, Copyright © Bilibili; Lizenztext in `vendor/flv.js-LICENSE.txt` |
+
+Vom Server genutzte Python-Pakete (`requirements.txt`, im Container installiert, nicht mitgeliefert):
+
+| Paket | Lizenz |
+|---|---|
+| [paho-mqtt](https://github.com/eclipse-paho/paho.mqtt.python) 2.1.0 | EPL-2.0 / EDL-1.0 |
+| [cryptography](https://github.com/pyca/cryptography) | Apache-2.0 / BSD |
+
+**Im Container-Image** (nicht im Repository): [OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer) 2.4.2, AGPL-3.0, unverändert als offizielles Linux-AppImage heruntergeladen und entpackt; der Quelltext steht unter der verlinkten Adresse (Tag `v2.4.2`). Der Konfigurator ruft Orca nur als eigenes Programm über die Kommandozeile auf.
+
+Die Anbindung der Anycubic-Werksfirmware (`tools/anycubic_lan.py`) ist eigener Code nach der Protokollbeschreibung des Projekts [anycubic-lan](https://github.com/Nino6689/anycubic-lan) (docs/PROTOCOL.md, MIT, Copyright © 2026 Nino Bondonno); die ACE-Konfigurationswerte stammen aus der Dokumentation von [Rinkhals](https://github.com/rinkhals-community/Rinkhals). Hochladen und Druckstart folgen den beobachteten Abläufen in [kobra-connect](https://github.com/rvanderp3/kobra-connect) (docs/mqtt-commands.md, Apache-2.0) und [anycubic-orca-plugin](https://github.com/ianloic/anycubic-orca-plugin) (AGPL-3.0; nur Protokollfakten übernommen, kein Code).
 
 ## MIT-Lizenz (Wortlaut)
 

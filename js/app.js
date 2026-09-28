@@ -23,7 +23,7 @@ async function loadFiles(files){
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
     const imp=importModels(entries,fflate);
     // slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers
-    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null}));
+    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted}));
     showProject({name:imp.name,parts,threemf:imp.threemf,notes:imp.notes});
   }catch(e){
     $('fileinfo').textContent='Modell konnte nicht gelesen werden: '+e.message+'. Bitte die Datei prüfen oder erneut exportieren.';
@@ -61,7 +61,7 @@ function renderPartList(){
     const slot=p.slot!=null?'<span class="pslot" style="background:'+col+'"></span>Slot '+(p.slot+1)+' · ':'';
     const plate=project.threemf&&project.threemf.plates.length>1?'Platte '+p.plate+' · ':'';
     return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
-      '<span class="pmeta">'+slot+plate+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
+      '<span class="pmeta">'+slot+plate+(p.bodies?p.bodies.length+' Körper · ':'')+(p.painted?'Farben vom Designer · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
   }).join('');
 }
 $('partList').addEventListener('click',e=>{const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
@@ -197,15 +197,18 @@ window.addEventListener('afterprint',()=>{document.querySelectorAll('details.fol
 
 /* ================= TABS ================= */
 const TAB_KEY='druckKonfigurator.tab';
-const tabs={settings:[$('tabSettings'),$('viewSettings')],'3d':[$('tab3d'),$('view3d')]};
+// Reihenfolge = Arbeitsschritte (Pfeiltasten gehen sie der Reihe nach durch)
+const tabs={'3d':[$('tab3d'),$('view3d')],settings:[$('tabSettings'),$('viewSettings')],slice:[$('tabSlice'),$('viewSlice')],printer:[$('tabPrinter'),$('viewPrinter')]};
 function setTab(name){
   Object.entries(tabs).forEach(([k,[btn,view]])=>{const on=k===name;btn.setAttribute('aria-selected',String(on));view.hidden=!on});
   document.body.dataset.tab=name;
   try{localStorage.setItem(TAB_KEY,name)}catch(e){/* nur Komfort */}
+  if(typeof onWorkbenchTab==='function')onWorkbenchTab(name==='printer');
+  if(name==='slice'&&typeof refreshSlicePreview==='function')refreshSlicePreview();
 }
 Object.entries(tabs).forEach(([k,[btn]])=>btn.addEventListener('click',()=>setTab(k)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{
-  if(['ArrowLeft','ArrowRight'].includes(e.key)){const next=document.body.dataset.tab==='3d'?'settings':'3d';setTab(next);tabs[next][0].focus()}
+  if(['ArrowLeft','ArrowRight'].includes(e.key)){const order=Object.keys(tabs),i=order.indexOf(document.body.dataset.tab),next=order[(i+(e.key==='ArrowRight'?1:order.length-1))%order.length];setTab(next);tabs[next][0].focus()}
 });
 
 /* ================= VIEWER-BEDIENUNG (aus 3dView) ================= */
@@ -240,7 +243,8 @@ if(store.last.nozD&&NOZ[nkey(store.last.nozD)])$('nozD').value=store.last.nozD;
 if(store.last.nozM&&NOZZLE_MATERIALS[store.last.nozM]&&currentPrinter().nozzleOptions.includes(store.last.nozM))$('nozM').value=store.last.nozM;
 if(!storageOK)persist();
 syncPrinterSwitch();
-try{if(localStorage.getItem(TAB_KEY)==='3d')setTab('3d')}catch(e){/* nur Komfort */}
+// Start: zuletzt genutzter Schritt, beim ersten Mal „Modell“
+try{const t=localStorage.getItem(TAB_KEY);setTab(tabs[t]?t:'3d')}catch(e){setTab('3d')}
 
 /* Haftungsausschluss: beim ersten Start (und nach inhaltlicher Änderung, neue Versionsnummer) einmal bestätigen.
    Ist kein Speichern möglich, erscheint er bei jedem Start – lieber einmal zu oft als gar nicht. */

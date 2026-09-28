@@ -1,5 +1,9 @@
 'use strict';
-/* Live-Abfrage der Filament-Belegung über Moonraker – nur lesende GET-Anfragen.
+/* Live-Abfrage der Filament-Belegung.
+   Kobra S1 mit Werksfirmware (LAN-Modus): über den eigenen Server (/api/anycubic/…, tools/anycubic_lan.py),
+   der Browser kann das verschlüsselte MQTT des Druckers nicht selbst sprechen. Dort lassen sich auch
+   ACE-Einstellungen schreiben (Slot-Filament, Nachfüllen).
+   Über Moonraker – nur lesende GET-Anfragen:
    Kobra S1 (Rinkhals): Objekt filament_hub → ACE-Slots.
    Snapmaker U1 (paxx/Klipper): Objekt print_task_config → Arrays je Werkzeugkopf.
    Funktioniert nur, wenn die Seite über http://127.0.0.1 läuft (Moonraker-CORS);
@@ -43,8 +47,66 @@ const SLOT_ADAPTERS = {
 // darf der Browser nicht an ein http-Gerät im Heimnetz fragen lassen.
 function linkAvailable() { return location.protocol === 'http:'; }
 
-// Liefert {slots, host, time} oder wirft einen Fehler mit verständlicher Meldung.
+/* ---------- Werksfirmware (LAN-Modus) über den eigenen Server ---------- */
+const LAN_PRINTERS = ['kobra_s1'];
+const linkMode = printerId => ((store.settings.printerLinkMode || {})[printerId]) || 'auto';
+let healthInfo = null;
+// Was kann der Server? {lan: LAN-Modus (paho-mqtt + cryptography), slicer: Orca-Version oder null}
+function serverHealth() {
+  if (!healthInfo) healthInfo = location.protocol.startsWith('http')
+    ? fetch('/api/health').then(r => r.ok ? r.json() : {}, () => ({})) : Promise.resolve({});
+  return healthInfo;
+}
+const lanServerAvailable = () => serverHealth().then(j => !!j.lan);
+async function lanApi(path, opts) {
+  let res, data = {};
+  try { res = await fetch(path, opts); data = await res.json(); }
+  catch (e) { throw Error('Server des Konfigurators nicht erreichbar'); }
+  if (!res.ok) { const err = Error(data.error || ('Server antwortet mit HTTP ' + res.status)); err.kind = data.kind; throw err; }
+  return data;
+}
+// Slots aller ACE-Einheiten hintereinander (Slot 5 = Box 2, Slot 1)
+async function fetchLanStatus(host) {
+  const st = await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host));
+  const slots = [];
+  (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : 'leer', present: s.present, box: box.id, index: s.index })));
+  if (!slots.length) throw Error(st.has_ace === 0 ? 'Am Drucker ist keine ACE angeschlossen' : 'Drucker meldet keine ACE-Slots');
+  return { slots, host, time: new Date(), via: 'lan', status: st };
+}
+// Einstellungen schreiben: nur, was tools/anycubic_lan.py freigibt (WRITABLE)
+function lanCommand(host, type, action, data) {
+  return lanApi('/api/anycubic/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, type, action, data }) });
+}
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
+// slots: [{box, index, type, colour}] – je ACE-Einheit ein Befehl
+async function writeLanSlots(host, slots) {
+  const byBox = new Map();
+  slots.forEach(s => (byBox.get(s.box) || byBox.set(s.box, []).get(s.box)).push({ index: s.index, type: s.type, color: hexToRgb(s.colour) }));
+  for (const [id, list] of byBox) {
+    const r = await lanCommand(host, 'multiColorBox', 'setInfo', { multi_color_box: [{ id, slots: list }] });
+    if (!r.ok) throw Error('Drucker hat die Slot-Angabe abgelehnt' + (r.msg ? ': ' + r.msg : ''));
+  }
+}
+
+// Liefert {slots, host, time, via} oder wirft einen Fehler mit verständlicher Meldung.
+// Kobra S1: je nach Einstellung Werksfirmware (LAN) und/oder Moonraker; „auto“ versucht LAN zuerst.
 async function fetchLiveSlots(printerId, host) {
+  if (LAN_PRINTERS.includes(printerId) && host && linkMode(printerId) !== 'moonraker') {
+    const mode = linkMode(printerId);
+    if (await lanServerAvailable()) {
+      try { return await fetchLanStatus(host); }
+      catch (e) {
+        if (mode === 'lan') throw e;
+        try { return await fetchMoonrakerSlots(printerId, host); }
+        catch (e2) { throw Error('Werksfirmware: ' + e.message + ' · Moonraker: ' + e2.message); }
+      }
+    }
+    if (mode === 'lan') throw Error('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt)');
+  }
+  return fetchMoonrakerSlots(printerId, host);
+}
+
+async function fetchMoonrakerSlots(printerId, host) {
   const adapter = SLOT_ADAPTERS[printerId];
   if (!adapter) throw Error('für diesen Drucker gibt es keine Live-Abfrage');
   if (!host) throw Error('keine IP-Adresse eingetragen');
@@ -63,7 +125,7 @@ async function querySlotsOnce(adapter, host) {
     const res = await fetch('http://' + host + ':' + MOONRAKER_PORT + '/printer/objects/query?' + adapter.query, { signal: ctrl.signal });
     if (!res.ok) throw Error('Drucker antwortet mit HTTP ' + res.status);
     const data = await res.json();
-    return { slots: adapter.parse((data.result || {}).status || {}), host, time: new Date() };
+    return { slots: adapter.parse((data.result || {}).status || {}), host, time: new Date(), via: 'moonraker' };
   } catch (e) {
     const err = e.name === 'AbortError' ? Error('Drucker unter ' + host + ' antwortet nicht (Zeitüberschreitung)')
       : e instanceof TypeError ? Error('Drucker unter ' + host + ' nicht erreichbar oder Zugriff blockiert') : null;

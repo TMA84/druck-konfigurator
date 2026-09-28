@@ -14,9 +14,9 @@ const ORCA = process.env.ORCA || 'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verify3mf-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf', 'purge'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
-const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,build3mf,plannedChanges,findHoles})', ctx);
+const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,build3mf,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
 
 /* ---------- Testmodelle ---------- */
 function boxTris(x0, y0, z0, x1, y1, z1) {
@@ -210,6 +210,62 @@ if (!ONLY_MW) {
     check(temps[0] === String(rB.nozzle) && temps[1] === String(rA.nozzle), `Düsentemperaturen je Slot ${temps.slice(0, 2).join('/')} = ${rB.nozzle}/${rA.nozzle}`);
     check(cfg.wall_loops === String(rB.w) && cfg.enable_support === '0', `Globale Werte vom Würfel (Wände ${cfg.wall_loops}, Stützen ${cfg.enable_support})`);
   } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
+/* ---------- Mehrfarbig: ein Teil, zwei Körper – Stiel im Standard-Slot 1, Hut in Slot 3 ---------- */
+if (!ONLY_MW) {
+  const inp = { printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'multicolor', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const geom = MODELS.mushroom, r = K.compute(inp, geom, { getMat: K.getMat, settings: K.store.settings });
+  const tpl = K.exportTemplate('kobra_s1', '0.4');
+  const bodies = [{ name: 'Stiel', start: 0, count: 12, slot: null }, { name: 'Hut', start: 12, count: 12, slot: 2 }];
+  // Spülmenge 1,0 am Drucker → kürzere Wechselzeit als Druckerwert in der Datei
+  const loadTime = String(Math.round(K.aceChangeSeconds(1.0, +tpl.settings.machine_load_filament_time) * 1000) / 1000);
+  const { bytes } = K.build3mf(tpl, r, [{ geom, r, bodies }], 0, fflate, null, [{ label: 'Wechselzeit', key: 'machine_load_filament_time', value: loadTime }]);
+  const z = fflate.unzipSync(bytes), ms = fflate.strFromU8(z['Metadata/model_settings.config']);
+  const ps = JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));
+  console.log('\nMehrfarbig: pilz.stl mit 2 Körpern (Stiel Slot 1, Hut Slot 3)');
+  check((ms.match(/subtype="normal_part"/g) || []).length === 2 && /<metadata key="name" value="Hut"\/>[\s\S]*?<metadata key="extruder" value="3"\/>/.test(ms), 'Zwei Bauteile, Hut mit Slot 3 in model_settings');
+  check(ps.filament_type[2] === 'PLA' && ps.nozzle_temperature[2] === String(r.nozzle), `Slot 3 bekommt die PLA-Werte (${ps.filament_type[2]}, ${ps.nozzle_temperature[2]} °C)`);
+  const dir = path.join(OUT, 'mehrfarbig'); fs.mkdirSync(dir);
+  const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+  try {
+    execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 });
+    const text = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.gcode'))), 'utf8');
+    check(/^; filament: (1,3|3,1)$/m.test(text), 'Beide Slots im Einsatz: ' + (text.match(/^; filament: .*$/m) || ['?'])[0]);
+    // Werkzeugwechsel: bis z = 20 nur T0 (Stiel), darüber T2 (Hut)
+    let zc = 0, tool = null; const toolAt = [];
+    for (const line of text.split('\n')) {
+      const zm = /^;Z:([\d.]+)/.exec(line); if (zm) zc = +zm[1];
+      const tm = /^T(\d)\b/.exec(line); if (tm) tool = +tm[1];
+      if (/^G1 .*E\.?\d/.test(line) && /X|Y/.test(line) && tool !== null) toolAt.push([zc, tool]);
+    }
+    const low = new Set(toolAt.filter(([h]) => h > 0 && h < 19.5).map(([, t]) => t)), high = new Set(toolAt.filter(([h]) => h > 20.5).map(([, t]) => t));
+    check(low.has(0) && !low.has(2) && high.has(2) && !high.has(0), `Stiel mit T0 (${[...low]}), Hut mit T2 (${[...high]})`);
+    const g = parseGcode(text);
+    check(Math.abs(g.maxZ - geom.z) < 0.3, `Höhe ${g.maxZ} = ${geom.z}`);
+    const est = K.estimateColourChanges([{ geom, slot: null, bodies, plate: 1 }], 0, r.layer, r.firstLayer), orcaChanges = +(text.match(/^; total filament change = (\d+)/m) || [])[1];
+    check(est === orcaChanges, `Farbwechsel geschätzt ${est} = Orca ${orcaChanges}`);
+    check(g.cfg.machine_load_filament_time === loadTime, `Wechselzeit für Spülmenge 1,0 im G-Code: ${g.cfg.machine_load_filament_time} = ${loadTime}`);
+  } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
+/* ---------- Reinigungsturm: großes zweifarbiges Teil – Turm darf nicht auf dem Teil stehen (sonst bricht Orca ab) ---------- */
+if (!ONLY_MW) {
+  const box = (x0, y0, z0, x1, y1, z1) => boxTris(x0, y0, z0, x1, y1, z1);
+  for (const [label, size, tower] of [['150 mm', 150, true], ['215 mm', 215, false]]) {
+    const g = stl('turm' + size + '.stl', [...box(0, 0, 0, size, size, 2), ...box(10, 10, 2, size - 10, 30, 2.6)]);
+    const inp = { printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'multicolor', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+    const r = K.compute(inp, g, { getMat: K.getMat, settings: K.store.settings });
+    const { bytes, notes } = K.build3mf(K.exportTemplate('kobra_s1', '0.4'), r, [{ geom: g, r, bodies: [{ name: 'Platte', start: 0, count: 12, slot: null }, { name: 'Schrift', start: 12, count: 12, slot: 1 }] }], 0, fflate);
+    console.log('\nReinigungsturm, zweifarbiges Teil ' + label);
+    const dir = path.join(OUT, 'turm' + size); fs.mkdirSync(dir);
+    const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+    try {
+      execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 });
+      const text = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.gcode'))), 'utf8');
+      check(/^;TYPE:Prime tower/m.test(text) === tower, (tower ? 'Mit Turm geslict (Turm neben dem Teil)' : 'Ohne Turm geslict – kein Platz') + (notes.length ? ' · ' + notes.join(' ') : ''));
+    } catch (e) { check(false, 'Orca-CLI fehlgeschlagen (Turm auf dem Teil?): ' + (e.stderr || e.message).toString().slice(0, 200)); }
+  }
 }
 
 /* ---------- Bohrloch-Verstärkung: Platte mit zwei Löchern, eines mit Modifikator (100 % Füllung) ---------- */

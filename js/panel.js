@@ -78,7 +78,10 @@ function update(){
   if(typeof renderOrient==='function')renderOrient();
   if(typeof renderPartScope==='function')renderPartScope();
   if(typeof renderHoles==='function')renderHoles();
+  if(typeof renderBodies==='function')renderBodies();
   if(typeof updateExportMenu==='function')updateExportMenu(r);
+  if(typeof renderSidePanels==='function')renderSidePanels();
+  if(typeof renderCostPanel==='function')renderCostPanel();
   if(typeof enhanceHelp==='function')enhanceHelp();
 }
 

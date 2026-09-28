@@ -20,13 +20,15 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 8. [Drucker-Verbindung (Filament-Belegung live)](#8-drucker-verbindung-filament-belegung-live)
 9. [3MF für OrcaSlicer speichern](#9-3mf-für-orcaslicer-speichern)
 10. [Makerworld-Projekte umstellen](#10-makerworld-projekte-umstellen)
-11. [3D-Ansicht](#11-3d-ansicht)
+11. [3D-Ansicht](#11-3d-ansicht-schritt--modell)
 12. [Grenzen und bekannte Einschränkungen](#12-grenzen-und-bekannte-einschränkungen)
 13. [Probleme lösen](#13-probleme-lösen)
 
 ---
 
 ## 1. Installation und Start
+
+**Als Container (empfohlen für die Drucker-Verbindung):** auf dem NAS oder Heimserver im Projektordner `docker compose up -d --build`, dann im Browser `http://<IP-des-NAS>:8765/` – von jedem Gerät im Heimnetz. Die Seite hat keine Anmeldung: nur im Heimnetz betreiben, nicht ins Internet freigeben. Eigene Filamentwerte speichert weiterhin jeder Browser für sich (über **Profile exportieren/importieren** übertragen).
 
 **Online:** https://wolfb63-del.github.io/druck-konfigurator/ – ohne Download, auch auf Mac, Linux und Tablet. Die Live-Abfrage vom Drucker geht dort nicht; „Belegung eintragen“ schon. Eigene Filamentwerte speichert der Browser getrennt von der heruntergeladenen Version.
 
@@ -37,7 +39,7 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
    - **Normal:** Doppelklick auf **`index.html`**. Alles funktioniert; die Filament-Belegung trägst du einmal im Export-Dialog ein (siehe [Kapitel 9](#9-3mf-für-orcaslicer-speichern)).
    - **Mit Live-Abfrage** (nur Rinkhals/Moonraker, braucht Python): unter Windows Doppelklick auf **`Konfigurator starten.cmd`**; unter Mac/Linux im Projektordner im Terminal `python3 tools/serve.py` eingeben und im Browser `http://127.0.0.1:8765` öffnen. Es öffnet sich ein schwarzes Fenster (lokaler Webserver) und der Browser mit dem Tool. Das Fenster offen lassen, solange du das Tool benutzt. Der Server ist nur auf deinem PC erreichbar. Direkt geöffnet (`index.html`) blockiert der Browser die Antworten der Drucker.
 
-> Deine eigenen Filamentwerte speichert der Browser getrennt je Startart. Bleib deshalb bei einer Startart – oder übertrage die Werte über **Profile → Profile exportieren/importieren**.
+> Deine eigenen Filamentwerte speichert der Browser getrennt je Startart. Bleib deshalb bei einer Startart – oder übertrage die Werte über **⚙ Einstellungen → Profile exportieren/importieren**.
 
 ---
 
@@ -45,23 +47,31 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 ![Übersicht](docs/img/uebersicht.png)
 
-- **Kopfzeile:** Drucker umschalten (**Kobra S1** / **U1** / **Anderer Drucker …**), Düsengröße und Düsenmaterial.
+- **Kopfzeile:** Drucker umschalten (**Kobra S1** / **Anderer Anycubic …**), Düsengröße und Düsenmaterial. Zurzeit bietet das Tool nur Anycubic-Drucker an; der Snapmaker U1 und die übrigen Hersteller sind ausgeblendet (`index.html?alle-drucker` zeigt sie).
 
-### Anderer Drucker
+### Anderer Anycubic-Drucker
 
-Über **Anderer Drucker …** wählst du aus rund 990 Druckern von 63 Herstellern – dieselbe Liste wie in OrcaSlicer. Hersteller wählen, Namen eintippen (z. B. „Ender“, „MK4“, „P1S“), Drucker mit passender Düse anklicken.
+Über **Anderer Anycubic …** wählst du aus den Anycubic-Druckern der OrcaSlicer-Profile (z. B. Kobra 3, Kobra S1 Max, Kobra X). Namen eintippen, Drucker mit passender Düse anklicken. (Mit `index.html?alle-drucker`: rund 990 Drucker von 63 Herstellern.)
 
 - **Geschwindigkeiten, Beschleunigung und Volumenstrom** höchstens so hoch wie im OrcaSlicer-Profil des Druckers – ein langsamer Drucker bleibt bei seinen Werten, TPU trotzdem langsam.
 - **Temperaturen und Materialwerte** stammen aus den Tests am Kobra S1 und gelten hier als allgemeine Startwerte.
 - Die **3MF** enthält Druckerprofil, Prozessprofil und passende Filamentprofile des Herstellers aus OrcaSlicer; Orca lädt beim Öffnen genau diese Profile.
 - Heizt der Start-G-Code eines Herstellerprofils fest auf eine Temperatur (bei rund 20 Profilen, z. B. LONGER LK10), warnt das Datenblatt – Orca würde sonst mit dieser festen Temperatur drucken.
 - Kobra S1 und U1 nutzen weiterhin deine eigenen Orca-Vorlagen und die Live-Abfrage.
+- **Arbeitsschritte (Registerkarten)** – der Reihe nach von links nach rechts:
+
+  | Schritt | Inhalt |
+  |---|---|
+  | **① Modell** | große 3D-Ansicht; daneben Teileliste, Lage auf dem Bett, Mehrfarbig, Bohrlöcher |
+  | **② Druckwerte** | je Teil Filament, Objektart, Priorität, Belastung, Support – rechts das Datenblatt; die lange Liste „Einstellungen in OrcaSlicer-Reihenfolge“ ist eingeklappt |
+  | **③ Slicen & Kosten** | Kosten (automatisch neu berechnet), Ausgabe (**Drucken …**, **3MF für OrcaSlicer speichern**), Filament-Slots, Spülmenge – rechts die Slice-Vorschau |
+  | **④ Drucker** | Werkbank: Druckauftrag, Kamera, Temperaturen, Achsen, ACE |
+
+  Die Registerkarte **① Modell** zeigt „geladen“, **③** den Gesamtpreis, **④** den Druckfortschritt. Die Pfeiltasten ←/→ wechseln zwischen den Schritten.
 - **Menüs:**
-  - **Datei** – Modell öffnen, Modell entfernen
-  - **Profile** – Filamentwerte anpassen, neues Filament, eigene Profile, Import/Export, Düsen-Umrechnung, Drucker-Verbindung
-  - **Export** – 3MF für OrcaSlicer, Filament-/Process-JSON, Drucken/PDF, als Text kopieren
+  - **Datei** – Modell öffnen, Modell entfernen, 3MF für OrcaSlicer; unter **Weitere Exporte** Filament-/Process-JSON, Datenblatt drucken/als PDF, Datenblatt als Text kopieren
+  - **⚙ Einstellungen** – *Filamente* (Werte anpassen, neues Filament, eigene Profile, Import/Export), *Drucker* (Drucker-Verbindung, Düsen-Umrechnung), *Farben & Kosten* (Filament-Slots, Farbwechsel & Spülmenge, Preise & Sätze)
   - **?** – Kurzhilfe
-- **Registerkarten:** **Einstellungen** (Auswahl und Datenblatt) und **3D-Ansicht**.
 - Neben vielen Werten steht ein **?** – mit der Maus darauf zeigen (oder antippen) für eine Erklärung.
 
 ---
@@ -83,11 +93,43 @@ Körper, die sich berühren oder überlappen, bleiben ein Teil – z. B. Hohlkö
 
 ## 4. Mehrere Teile
 
-Bei mehreren Teilen erscheint in der Modellkarte eine **Teileliste**. Jede Zeile zeigt Name, Maße, Slot und ob das Teil Stützen braucht.
+Bei mehreren Teilen erscheint im Schritt **① Modell** eine **Teileliste**. Jede Zeile zeigt Name, Maße, Slot und ob das Teil Stützen braucht.
 
-- **Anklicken wählt ein Teil.** Das Formular links, das Datenblatt und die 3D-Ansicht gelten dann für dieses Teil – oben im Formular steht **„Einstellungen für Teil“** mit dem Namen.
+- **Anklicken wählt ein Teil.** Die Druckwerte, das Datenblatt und die 3D-Ansicht gelten dann für dieses Teil. In **② Druckwerte** steht oben **„Einstellungen für Teil“** – dort wählst du das Teil auch direkt über **Teil**, ohne zurück zum Modell zu wechseln.
 - Jedes Teil merkt sich **eigenes Filament, Objektart, Priorität, Belastung, Support und Stützreduzierung**.
 - Über **Slot** kannst du jedem Teil einen eigenen Filament-Slot geben. „Wie beim Export gewählt“ bedeutet: Das Teil bekommt den Standard-Slot aus dem Export-Dialog.
+
+### Mehrfarbig: mehrere Farben in einem Teil
+
+Besteht ein Teil aus mehreren **Körpern**, zeigt der Schritt **① Modell** den Kasten **Mehrfarbig**. Körper sind:
+
+- Körper einer STL, die sich berühren oder überlappen (z. B. Schrift auf einer Platte, Stiel und Hut),
+- die Bauteile eines Objekts in einer 3MF (die Slots des Designers werden übernommen),
+- Dateien, die du selbst vereint hast (siehe unten).
+
+Jeder Körper bekommt über die Auswahl rechts einen eigenen **Slot** – und damit die Farbe, die in diesem Slot steckt. „wie Teil“ heißt: Er bekommt den Slot des Teils. Fährst du mit der Maus über eine Zeile, leuchtet der Körper in der Vorschau gelb auf; **Farben zeigen** färbt alle Körper in der Farbe ihres Slots (live vom Drucker oder aus deiner Belegung, sonst Ersatzfarben).
+
+Steht dasselbe Objekt einer 3MF auf mehreren Platten, gilt die Farbwahl für **alle Platten** – Orca speichert sie je Objekt. Der Kasten nennt dann, auf welchen Platten das Objekt steht.
+
+Ein Körper hat dieselben Werte wie sein Teil – gedacht ist das für Farbwechsel. In der 3MF wird jeder Körper ein eigenes Bauteil mit eigenem Slot; der Export-Dialog listet ihn unter dem Teil mit „↳“ auf.
+
+**Mehrere Dateien zu einem Teil vereinen:** Viele mehrfarbige Modelle kommen als eine STL je Farbe, alle an derselben Stelle. Wähle eine Datei, dann unter **Mit Teil vereinen** die zweite und **Vereinen**. Die Lage aus den Dateien bleibt, eine Drehung wird zurückgesetzt. **In einzelne Teile trennen** macht das wieder rückgängig. Bei Makerworld-3MF gibt es beides nicht, dort bleiben die Objekte des Designers.
+
+Hohlräume (die Innenwand eines Hohlkörpers) gelten nicht als eigener Körper. Körper, die sich Eckpunkte teilen (ein zusammenhängendes Netz), bleiben ein Körper – dann die Farben als getrennte Dateien exportieren.
+
+### Farbwechsel und Abfall (Kobra S1)
+
+Beim Kobra S1 spült die Firmware bei jedem Farbwechsel selbst in den Abfallschacht – der Slicer schreibt nur den Wechselbefehl. Der Export-Dialog zeigt deshalb bei mehrfarbigen Projekten eine Schätzung: **wie viele Farbwechsel**, wie viel **Abfall** und wie lange die Wechsel dauern. Die Zahl der Wechsel rechnet das Tool wie OrcaSlicer (mit der Orca-Kommandozeile verglichen); Abfall und Zeit stammen aus einer Messung mit PLA (100 Wechsel).
+
+Die Menge stellst du **am Drucker** ein: Touchscreen, ACE-Menü, **Spülmenge** (0,1–3,0, ab Werk 1,5). Im Dialog wählst du unter **Spülmenge am Drucker**, was dort eingestellt ist – die Datei bekommt dann die passende Wechselzeit, damit Orca die Druckzeit richtig schätzt.
+
+| Spülmenge | Abfall je Wechsel | Zeit je Wechsel | Ergebnis im Test |
+|---|---|---|---|
+| 1,5 (Werk) | ≈ 1,1 g | ≈ 2 min 6 s | sauber |
+| **1,0 (empfohlen)** | ≈ 0,8 g | ≈ 1 min 47 s | genauso sauber, rund 30 % weniger Abfall |
+| 0,5 | ≈ 0,45 g | ≈ 1 min 28 s | Farben mischen sich (Weiß wird rosa), Kleckse fallen teils aufs Bett |
+
+Bei Schwarz → Weiß oder Silk-Filament eher 1,2–1,5. Am meisten spart, wer **weniger wechselt**: mehrere Teile gleichzeitig drucken (sie teilen sich die Wechsel jeder Schicht) und Farbe nur in wenigen Schichten einsetzen, z. B. Schrift oben auf einer Fläche statt durch die ganze Höhe.
 
 ---
 
@@ -144,30 +186,119 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 
 ## 8. Drucker-Verbindung (Filament-Belegung live)
 
-> **Nur mit Klipper/Moonraker.** Mit der Werksfirmware geht das bei keinem der beiden Drucker – dann stattdessen die Belegung im Export-Dialog unter „Belegung eintragen“ von Hand angeben (siehe [Kapitel 9](#9-3mf-für-orcaslicer-speichern)).
+Unter **⚙ Einstellungen → Drucker-Verbindung** trägst du die IP-Adresse deines Druckers im Heimnetz ein, wählst die **Verbindung** und testest sie. Das Tool fragt dann beim Export die **tatsächliche Filament-Belegung** (Typ und Farbe je Slot) ab. Das Tool muss dafür über den Server laufen (Container oder `Konfigurator starten.cmd`).
 
-Unter **Profile → Drucker-Verbindung** trägst du die IP-Adressen deiner Drucker im Heimnetz ein und testest die Verbindung. Das Tool fragt dann beim Export die **tatsächliche Filament-Belegung** (Typ und Farbe je Slot) ab.
+### Kobra S1 mit Werksfirmware (LAN-Modus)
 
-**Voraussetzung: Moonraker.** Das bringt bei beiden Druckern eine Fremd-Firmware mit – nicht vom Hersteller, Installation und Nutzung auf eigene Verantwortung, Anleitung jeweils beim Projekt selbst:
+1. Am Drucker **Einstellungen → Netzwerk → LAN-Modus** einschalten. Im LAN-Modus ist der Drucker nicht mit der Anycubic-Cloud verbunden – die Anycubic-App kann ihn dann nicht fernsteuern.
+2. Im Tool die IP-Adresse eintragen, **Verbindung: Automatisch** oder **Werksfirmware (LAN-Modus)**, **Testen**.
+
+Das Tool meldet sich wie Anycubics eigener Slicer am Drucker an (Anmeldung über Port 18910, danach verschlüsselte Verbindung über Port 9883). Die Zugangsdaten wechselt der Drucker; das Tool speichert sie nicht. Möglich ist dann:
+
+- **Belegung lesen** – Typ und Farbe je ACE-Slot, auch mehrere ACE-Einheiten.
+- **Slot-Filament am Drucker ändern:** in den [Filament-Slots](#filament-slots) einen Slot überschreiben und **Überschriebene Slots auch in die ACE schreiben** anhaken – dann landet die Angabe in der ACE (wie am Touchscreen). Leere Slots lassen sich so nicht „leer setzen“.
+- **Automatisch nachfüllen** (Runout-Nachschub aus einem anderen Slot) ein- oder ausschalten – erscheint nach einem erfolgreichen Test.
+- **Rohdaten vom Drucker** ansehen (ohne die geheime Upload-Adresse).
+
+Das Tool sendet **keine Druck-, Bewegungs- oder Heizbefehle** – nur diese Einstellungen. Die **Spülmenge** meldet die Firmware über diese Verbindung nach bisherigem Stand nicht; sie bleibt am Touchscreen (siehe [Farbwechsel und Abfall](#farbwechsel-und-abfall-kobra-s1)). Das Protokoll ist nicht von Anycubic dokumentiert, sondern nachvollzogen; ein Firmware-Update kann es ändern.
+
+### Rinkhals/Moonraker
+
+Mit **Verbindung: Rinkhals (Moonraker)** liest das Tool die Belegung über Moonraker (nur lesend). Das bringt eine Fremd-Firmware mit – nicht vom Hersteller, Installation und Nutzung auf eigene Verantwortung, Anleitung beim Projekt selbst:
 
 - **Anycubic Kobra S1:** [Rinkhals](https://jbatonnet.github.io/Rinkhals/)
 - **Snapmaker U1:** [Extended Firmware von paxx12](https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware)
 
 Weiteres:
 
-- Das Tool **liest nur** – es sendet keine Befehle an den Drucker.
-- Läuft der Drucker ohne Moonraker (Werksfirmware), bleibt die Belegung aus deiner Orca-Vorlage – oder trage sie unter „Belegung eintragen“ selbst ein.
-- Antwortet der Drucker trotz Moonraker nicht, wird ebenfalls die Vorlage verwendet.
+- Über Moonraker **liest** das Tool nur.
+- **Automatisch** versucht zuerst den LAN-Modus, dann Moonraker.
+- Ohne Verbindung trägst du die Belegung in den Filament-Slots selbst ein.
+
+### Filament-Slots
+
+Im Schritt **③ Slicen & Kosten** zeigt der Abschnitt **Filament-Slots** jeden Slot mit Farbe, Material und Herkunft (vom Drucker, überschrieben, eigene Angabe) – ist eine Verbindung eingerichtet, liest das Tool die ACE beim Öffnen einmal aus. Darunter stellst du unter **Farbwechsel & Spülmenge** die Spülmenge ein und siehst die Schätzung für das geladene Projekt.
+
+Bearbeiten über **✎ Bearbeiten / überschreiben**, **⚙ Einstellungen → Filament-Slots …** oder **Slots bearbeiten** im Export-Dialog stellst du je Slot **Material und Farbe** ein.
+
+- **Mit Drucker-Verbindung** zeigt jede Zeile, was die ACE meldet (mit RFID-Rollen automatisch richtig). Stimmt das nicht – z. B. Rolle ohne RFID-Chip, anderes Material als eingelesen –, hakst du **Überschreiben** an oder änderst einfach Material/Farbe (der Haken setzt sich dann selbst). Überschriebene Slots nehmen immer deine Angabe, auch nach dem nächsten Auslesen.
+- **Ohne Verbindung** gilt, was du einträgst – bis du es änderst (z. B. nach einem Spulenwechsel).
+- **Eigene Angaben löschen** nimmt alle Überschreibungen zurück.
+- Mit der Werksfirmware kannst du überschriebene Slots zusätzlich **in die ACE schreiben**; danach meldet der Drucker sie selbst und die Überschreibung entfällt.
+
+Die Slots bestimmen Filamenttyp und Farbe in der 3MF, die Vorauswahl im Export-Dialog und die Farben in der Vorschau („Farben zeigen“).
+
+### Farbwechsel & Spülmenge einstellen
+
+**⚙ Einstellungen → Farbwechsel & Spülmenge …** enthält dieselbe Einstellung wie der Export-Dialog: die **Spülmenge**, die am Drucker eingestellt ist. Zusätzlich kannst du **eigene Messwerte** eintragen – Abfall und Zeit je Farbwechsel, wenn dein Filament anders spült als die Referenzmessung. Selbst messen: Abfall nach einem mehrfarbigen Druck wiegen und durch die Zahl der Wechsel teilen. Die eigenen Werte gelten für die gewählte Spülmenge; wechselst du sie im Export-Dialog, verwirft das Tool sie.
+
+
+### Kostenkalkulation
+
+Im Schritt **③ Slicen & Kosten** unter **Kosten** steht der Preis des geladenen Projekts. Mit **automatisch neu berechnen** (Standard) rechnet das Tool nach jeder Änderung an Einstellungen oder Modell von selbst neu – kurz verzögert, damit mehrere Klicks nur einmal geslict werden; **Kosten berechnen** löst es von Hand aus. Das Tool baut dafür dieselbe 3MF wie beim Speichern und lässt sie auf dem Server **exakt mit OrcaSlicer slicen** – Verbrauch je Slot und Druckzeit kommen also aus Orca, nicht aus einer Schätzung. Das dauert je nach Modell Sekunden bis Minuten. Voraussetzung: das Tool läuft im Container (Orca ist dort enthalten) oder lokal mit installiertem OrcaSlicer.
+
+| Posten | Rechnung |
+|---|---|
+| **Filament** je Slot | Gramm laut Orca × Preis des Filamenttyps in diesem Slot (inklusive Prime-Turm) |
+| **Spülabfall** (Kobra S1) | Farbwechsel laut Orca × Abfall je Wechsel (aus „Farbwechsel & Spülmenge“) × mittlerer Filamentpreis |
+| **Strom** | Leistung × Druckzeit × Strompreis |
+| **Verschleiß** | Druckzeit × Satz je Stunde |
+| **Aufschlag, MwSt.** | optional, z. B. wenn du für andere druckst |
+
+Preise und Sätze stellst du unter **Preise & Sätze …** ein (auch **⚙ Einstellungen → Preise & Sätze …**): den **Preis je Filamenttyp** (PLA, PETG, ABS, ASA, TPU) und für alles andere, dazu Leistung, Strompreis, Verschleiß, Aufschlag und MwSt. Kostet ein einzelnes Filament mehr oder weniger als sein Typ, trägst du es unter „Abweichender Preis für einzelne Filamente“ ein. Slots ohne Filamentprofil – etwa Farben des Designers – rechnet das Tool mit dem Typ, den die ACE meldet. Änderst du dort etwas, rechnet das Tool sofort neu, ohne erneut zu slicen. Änderst du das Projekt (Filament, Slot, Lage …), steht beim Ergebnis **Veraltet** – dann neu berechnen.
+
+Brauchen die Filamente zu unterschiedliche Temperaturen (z. B. PLA und ASA in einem Druck), slict Orca nicht; das Tool sagt das dann.
+
+### Slice-Vorschau
+
+Im Schritt **③ Slicen & Kosten** steht rechts die **Vorschau**: der geslicte G-Code als Schichtansicht – zum Prüfen, ohne OrcaSlicer zu öffnen. Sie lädt nach jedem Slicen neu.
+
+- **Platte** wählen, mit dem **Schichtregler** (oder den Pfeiltasten ↑/↓) durch die Schichten gehen; **nur diese Schicht** zeigt eine einzelne.
+- **Farben nach Linienart** (Außenwand, Füllung, Stützen, Reinigungsturm …) oder **nach Filament** – dann in den Farben deiner Slots (von der ACE gelesen). Sehr dunkles Filament erscheint grau, damit man es sieht.
+- Einträge der Legende anklicken blendet sie aus und wieder ein.
+- **G-Code herunterladen** speichert den G-Code der Platte – derselbe, den OrcaSlicer mit dieser 3MF erzeugt.
+
+Die Vorschau zeigt nur Druckbahnen (keine Fahrwege). Das Tool hebt die letzten fünf Slice-Aufträge auf; ältere muss man neu berechnen.
 
 ---
+
+### Drucker-Werkbank (Tab „Drucker“)
+
+Mit der Werksfirmware im LAN-Modus steuerst du den Kobra S1 im Tab **Drucker** – das Tool muss über den Server laufen (Container oder `Konfigurator starten.cmd`). Ist noch keine Verbindung eingerichtet, fragt der Tab nach der IP-Adresse.
+
+| Bereich | Was geht |
+|---|---|
+| **Druckauftrag** | Name, Fortschritt, Schicht, gedruckte und verbleibende Zeit; **Pausieren**, **Fortsetzen**, **Abbrechen** (mit Rückfrage). Der Reiter „Drucker“ zeigt den Fortschritt in Prozent. |
+| **Kamera** | Live-Bild der Druckerkamera (**Kamera starten**). Braucht einen Browser mit MSE (Chrome, Edge, Firefox, Safari am Mac). |
+| **Druckeinstellungen** | Zieltemperatur Düse und Bett (bis 300 / 110 °C), Vorheizen für PLA, PETG, ASA/ABS oder **Aus**, Bauteil-, Zusatz- und Gehäuselüfter, Licht. Die Druckgeschwindigkeit (Leise/Standard/Sport) wird angezeigt; ändern geht nur am Drucker. |
+| **Achsen** | X/Y/Z um 1, 10 oder 50 mm fahren, **⌂ XY** und **⌂ Z** referenzieren, Motoren aus. **Während eines Drucks gesperrt.** Nicht referenzierte Achsen fährt der Drucker nicht. |
+| **ACE-Verwaltung** | Slots mit Material, Farbe und RFID; **Laden**/**Zurück** je Slot (während eines Drucks gesperrt), **Automatisch nachfüllen**, **Trocknen** mit Temperatur und Dauer. |
+| **Drucker** | Modell, Firmware, IP, Zustand, Verbindung; **Rohdaten** zum Nachsehen. |
+
+Das Tool fragt den Stand alle paar Sekunden ab, solange der Tab offen ist; der Server hält dafür eine Verbindung zum Drucker und beendet sie nach 10 Minuten ohne Zugriff. Jeder Befehl wird auf dem Server geprüft (erlaubte Befehle, Wertebereiche, Sperren während des Drucks).
+
+**Nicht dabei**, weil nicht belegt: Druckgeschwindigkeit ändern, Dateien auf dem Drucker verwalten.
+
+Drucke, die über LAN gestartet wurden (auch aus Anycubics Slicer oder diesem Tool), haben die Auftragsnummer −1 – das ist normal, Pause und Abbruch senden sie so.
+
+### Direkt drucken
+
+Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder **An Drucker senden …** in der Vorschau) den Druck einer Platte, ohne OrcaSlicer zu öffnen:
+
+1. **Platte** wählen. Der Dialog fragt den Drucker ab: frei? Ist er beschäftigt, lässt er sich nicht starten.
+2. Die Tabelle zeigt je Werkzeug im G-Code, aus welchem **ACE-Slot** gedruckt wird (Werkzeug T0 = Slot 1 usw.) und was dort steckt. Passt Material oder Slot nicht (leer, anderes Material), steht es rot da – die Temperaturen im G-Code gelten für das geslicte Material. Dann Filament tauschen oder neu slicen; „Trotzdem drucken“ geht auf eigene Verantwortung.
+3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
+4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
+
+Gedruckt wird genau der Stand der letzten Kostenberechnung. Hast du danach etwas geändert, erscheint **Drucken …** erst nach einer neuen Berechnung. Der Server prüft vor dem Start noch einmal, dass der Drucker frei ist und der G-Code für dieses Modell geslict wurde. Vor dem ersten Druck: Bett frei, richtige Druckplatte?
 
 ## 9. 3MF für OrcaSlicer speichern
 
 ![Export-Dialog](docs/img/export.png)
 
-Der Knopf **„3MF für OrcaSlicer speichern“** direkt oben im Datenblatt (oder **Export → 3MF für OrcaSlicer …** im Menü) öffnet den Dialog:
+Der Knopf **„3MF für OrcaSlicer speichern“** im Schritt **③ Slicen & Kosten** unter **Ausgabe** (oder **Datei → 3MF für OrcaSlicer …**) öffnet den Dialog:
 
-1. **Belegung prüfen** – was steckt in welchem Slot? **Belegung eintragen** öffnet je Slot eine Auswahl für Filamenttyp und Farbe; das bleibt gespeichert, bis du es änderst (z. B. nach einem Spulenwechsel). **Eingabe löschen** entfernt sie wieder. Ohne Eingabe oder Live-Abfrage zeigt das Tool nur die Slot-Nummern – welches Filament wo steckt, weißt du selbst am besten. Mit Rinkhals/Moonraker holt **Vom Drucker laden** die Belegung automatisch.
+1. **Belegung prüfen** – was steckt in welchem Slot? **Slots bearbeiten** öffnet die [Filament-Slots](#filament-slots) (auch über **⚙ Einstellungen → Filament-Slots …**). Mit Drucker-Verbindung holt **Vom Drucker laden** die Belegung aus der ACE.
 2. **Slot wählen** – bei einem Teil der Slot, bei mehreren der Standard-Slot für Teile ohne eigenen Slot.
 3. Bei mehreren Teilen zeigt die Tabelle **Teil · Slot · Filament · eigene Werte**. Passt das Filament eines Teils nicht zum Slot, hilft **„Filament … passend zur Belegung wählen“**.
 4. **Was geändert wird** – alle Werte, die gegenüber deiner Orca-Vorlage geändert werden.
@@ -182,7 +313,7 @@ In der Datei stehen: Druckerprofil aus der Vorlage, die berechneten Filament- un
 
 ## 10. Makerworld-Projekte umstellen
 
-Viele Makerworld-3MFs sind für Bambu-Drucker eingestellt. Lädst du so eine Datei, zeigt die Modellkarte „Ursprünglich für: …“. Beim Export:
+Viele Makerworld-3MFs sind für Bambu-Drucker eingestellt. Lädst du so eine Datei, zeigt **① Modell** „Ursprünglich für: …“. Beim Export:
 
 - **bleiben erhalten:** Geometrie, Lage, Platten, Farbzuweisung und Bemalung des Designers,
 - **werden ersetzt:** alle Drucker-, Filament- und Prozesseinstellungen durch dein S1- bzw. U1-Profil mit den berechneten Werten,
@@ -192,14 +323,14 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 
 ---
 
-## 11. 3D-Ansicht
+## 11. 3D-Ansicht (Schritt ① Modell)
 
 ![3D-Ansicht](docs/img/ansicht3d.png)
 
 - Maus: **links ziehen** drehen, **rechts ziehen** verschieben, **Rad** zoomen.
 - **Überhangwinkel** (unten): Flächen steiler als dieser Winkel werden rot markiert; grau = liegt auf dem Bett.
 - **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben), **Messen** (zwei Punkte anklicken).
-- **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Modellkarte.
+- **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Spalte daneben unter „Lage auf dem Bett“.
 
 ---
 
@@ -217,7 +348,7 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 | Problem | Lösung |
 |---|---|
 | Fehlermeldung beim Laden nach einem Update, z. B. „… is not defined“ | Der Browser hat alte Dateien gespeichert. Einmal **Strg + F5** drücken. |
-| „Drucker antwortet nicht“ | IP prüfen (Profile → Drucker-Verbindung → Testen), Drucker eingeschaltet und im selben Netz? Das Tool muss über `Konfigurator starten.cmd` laufen. Der Kobra S1 antwortet manchmal langsam – **Vom Drucker laden** erneut klicken. |
+| „Drucker antwortet nicht“ | IP prüfen (⚙ Einstellungen → Drucker-Verbindung → Testen), Drucker eingeschaltet und im selben Netz? Das Tool muss über `Konfigurator starten.cmd` laufen. Der Kobra S1 antwortet manchmal langsam – **Vom Drucker laden** erneut klicken. |
 | „Python wurde nicht gefunden“ | Python installieren (beim Setup „Add python.exe to PATH“ anhaken) oder `index.html` direkt öffnen. |
 | Menüpunkt „3MF für OrcaSlicer“ ist grau | Zuerst ein Modell laden und die 0,4-mm-Düse wählen. |
 | Werte in Orca weichen ab | Die 3MF über **Datei → Projekt öffnen** laden (nicht als Modell importieren – dann übernimmt Orca nur die Geometrie). |
