@@ -63,16 +63,17 @@ function renderBodies() {
   const slots = slotChoices(), own = part.slot ?? null;
   const places = samePlacements(part), plates = [...new Set(places.map(p => p.plate || 1))].sort((a, b) => a - b);
   $('bodyInfo').innerHTML = multi
-    ? part.bodies.length + ' Körper – jeder kann einen eigenen Slot und damit eine eigene Farbe bekommen. „wie Teil“ = ' + (own === null ? 'Slot aus dem Export-Dialog' : 'Slot ' + (own + 1)) + '.' +
-      (places.length > 1 ? ' Gilt für alle ' + places.length + ' Platzierungen dieses Objekts (Platte ' + plates.join(', ') + ').' : '')
-    : 'Gehören mehrere Dateien zu <b>einem</b> mehrfarbigen Modell (z. B. je Farbe eine STL), hier zu einem Teil vereinen – die Lage aus den Dateien bleibt.';
+    ? t('{n} Körper – jeder kann einen eigenen Slot und damit eine eigene Farbe bekommen. „wie Teil“ = {slot}.', { n: part.bodies.length, slot: own === null ? t('Slot aus dem Export-Dialog') : 'Slot ' + (own + 1) }) +
+      (places.length > 1 ? t(' Gilt für alle {n} Platzierungen dieses Objekts (Platte {plates}).', { n: places.length, plates: plates.join(', ') }) : '')
+    : t('Gehören mehrere Dateien zu <b>einem</b> mehrfarbigen Modell (z. B. je Farbe eine STL), hier zu einem Teil vereinen – die Lage aus den Dateien bleibt.');
   if (multi) {
     const dims = bodyDims(part);
     $('bodyList').innerHTML = part.bodies.map((b, j) => {
-      const opts = '<option value="">wie Teil</option>' + slots.map(s => '<option value="' + s.idx + '"' + (b.slot === s.idx ? ' selected' : '') + '>Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) : '') + '</option>').join('');
+      const note = typeof slotOriginNote === 'function' ? slotOriginNote() : '';
+      const opts = '<option value="">' + t('wie Teil') + '</option>' + slots.map(s => '<option value="' + s.idx + '"' + (b.slot === s.idx ? ' selected' : '') + '>Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) + note : '') + '</option>').join('');
       return '<li data-body="' + j + '"><span class="pslot" style="background:' + slotColour(bodySlot(part, b), slots) + '"></span>' +
-        '<span class="bname" title="' + esc(b.name) + '">' + esc(b.name) + '<small>' + dims[j].map(v => de(v, v < 10 ? 1 : 0)).join('×') + ' mm</small></span>' +
-        '<select data-body-slot="' + j + '" aria-label="Slot für ' + esc(b.name) + '">' + opts + '</select></li>';
+        '<span class="bname" title="' + esc(t(b.name)) + '">' + esc(t(b.name)) + '<small>' + dims[j].map(v => de(v, v < 10 ? 1 : 0)).join('×') + ' mm</small></span>' +
+        '<select data-body-slot="' + j + '" aria-label="' + t('Slot für {name}', { name: esc(t(b.name)) }) + '">' + opts + '</select></li>';
     }).join('');
   } else $('bodyList').innerHTML = '';
   $('bodyJoin').classList.toggle('hidden', !joinable);
@@ -93,6 +94,7 @@ $('bodyShow').addEventListener('change', () => paintBodies(project && project.pa
 
 function replaceParts(parts, selected) {
   project.parts = parts;
+  if (!project.threemf) project.platesFixed = false;
   parts.forEach((p, i) => { p.id = i; });
   $('partList').classList.toggle('hidden', parts.length < 2);
   selectPart(selected);
@@ -107,7 +109,7 @@ function joinParts(i, j) {
   const joined = { ...a, origPos, R: IDENTITY3, geom: makeGeom(a.name, origPos), bodies, holes: [], holeGeom: null, holeCands: null };
   const parts = project.parts.map(p => p === a ? joined : p).filter(p => p !== b);
   replaceParts(parts, parts.indexOf(joined));
-  toast(b.name + ' mit ' + a.name + ' vereint (' + bodies.length + ' Körper)');
+  toast(t('{b} mit {a} vereint ({n} Körper)', { b: b.name, a: a.name, n: bodies.length }));
 }
 $('bodyJoinBtn').addEventListener('click', () => { const j = +$('bodyJoinSel').value; if (Number.isInteger(j)) joinParts(project.selected, j); });
 
@@ -119,5 +121,5 @@ $('bodySplit').addEventListener('click', () => {
     return { ...part, name, origPos, geom: makeGeom(name, rotatePositions(origPos, part.R)), slot: b.slot ?? part.slot ?? null, input: part.input && { ...part.input }, bodies: null, holes: [], holeGeom: null, holeCands: null };
   });
   replaceParts([...project.parts.slice(0, i), ...pieces, ...project.parts.slice(i + 1)], i);
-  toast(part.name + ' in ' + pieces.length + ' Teile getrennt');
+  toast(t('{name} in {n} Teile getrennt', { name: part.name, n: pieces.length }));
 });

@@ -22,10 +22,10 @@ const SLOT_ADAPTERS = {
     query: 'filament_hub',
     parse: status => {
       const hub = ((status.filament_hub || {}).filament_hubs || [])[0];
-      if (!hub || !Array.isArray(hub.slots)) throw Error('keine ACE-Daten (filament_hub) gefunden');
+      if (!hub || !Array.isArray(hub.slots)) throw Error(t('keine ACE-Daten (filament_hub) gefunden'));
       return hub.slots.slice().sort((a, b) => a.index - b.index).map(s => {
         const c = Array.isArray(s.color) ? s.color : [136, 136, 136];
-        return { type: normType(s.type), colour: '#' + hex2(c[0]) + hex2(c[1]) + hex2(c[2]), name: normType(s.type) || 'leer', present: s.status === 'ready' };
+        return { type: normType(s.type), colour: '#' + hex2(c[0]) + hex2(c[1]) + hex2(c[2]), name: normType(s.type) || t('leer'), present: s.status === 'ready' };
       });
     }
   },
@@ -33,7 +33,7 @@ const SLOT_ADAPTERS = {
     query: 'print_task_config',
     parse: status => {
       const p = status.print_task_config;
-      if (!p || !Array.isArray(p.filament_type)) throw Error('keine Werkzeugkopf-Daten (print_task_config) gefunden');
+      if (!p || !Array.isArray(p.filament_type)) throw Error(t('keine Werkzeugkopf-Daten (print_task_config) gefunden'));
       return p.filament_type.map((t, i) => {
         const rgba = String((p.filament_color_rgba || [])[i] || '888888FF');
         const vendor = (p.filament_vendor || [])[i] || '';
@@ -61,16 +61,16 @@ const lanServerAvailable = () => serverHealth().then(j => !!j.lan);
 async function lanApi(path, opts) {
   let res, data = {};
   try { res = await fetch(path, opts); data = await res.json(); }
-  catch (e) { throw Error('Server des Konfigurators nicht erreichbar'); }
-  if (!res.ok) { const err = Error(data.error || ('Server antwortet mit HTTP ' + res.status)); err.kind = data.kind; throw err; }
+  catch (e) { throw Error(t('Server des Konfigurators nicht erreichbar')); }
+  if (!res.ok) { const err = Error(data.error ? t(data.error) : t('Server antwortet mit HTTP {status}', { status: res.status })); err.kind = data.kind; throw err; }
   return data;
 }
 // Slots aller ACE-Einheiten hintereinander (Slot 5 = Box 2, Slot 1)
 async function fetchLanStatus(host) {
   const st = await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host));
   const slots = [];
-  (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : 'leer', present: s.present, box: box.id, index: s.index })));
-  if (!slots.length) throw Error(st.has_ace === 0 ? 'Am Drucker ist keine ACE angeschlossen' : 'Drucker meldet keine ACE-Slots');
+  (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : t('leer'), present: s.present, box: box.id, index: s.index })));
+  if (!slots.length) throw Error(st.has_ace === 0 ? t('Am Drucker ist keine ACE angeschlossen') : t('Drucker meldet keine ACE-Slots'));
   return { slots, host, time: new Date(), via: 'lan', status: st };
 }
 // Einstellungen schreiben: nur, was tools/anycubic_lan.py freigibt (WRITABLE)
@@ -84,7 +84,7 @@ async function writeLanSlots(host, slots) {
   slots.forEach(s => (byBox.get(s.box) || byBox.set(s.box, []).get(s.box)).push({ index: s.index, type: s.type, color: hexToRgb(s.colour) }));
   for (const [id, list] of byBox) {
     const r = await lanCommand(host, 'multiColorBox', 'setInfo', { multi_color_box: [{ id, slots: list }] });
-    if (!r.ok) throw Error('Drucker hat die Slot-Angabe abgelehnt' + (r.msg ? ': ' + r.msg : ''));
+    if (!r.ok) throw Error(r.msg ? t('Drucker hat die Slot-Angabe abgelehnt: {msg}', { msg: t(r.msg) }) : t('Drucker hat die Slot-Angabe abgelehnt'));
   }
 }
 
@@ -98,21 +98,21 @@ async function fetchLiveSlots(printerId, host) {
       catch (e) {
         if (mode === 'lan') throw e;
         try { return await fetchMoonrakerSlots(printerId, host); }
-        catch (e2) { throw Error('Werksfirmware: ' + e.message + ' · Moonraker: ' + e2.message); }
+        catch (e2) { throw Error(t('Werksfirmware: {lan} · Moonraker: {moonraker}', { lan: e.message, moonraker: e2.message })); }
       }
     }
-    if (mode === 'lan') throw Error('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt)');
+    if (mode === 'lan') throw Error(t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt)'));
   }
   return fetchMoonrakerSlots(printerId, host);
 }
 
 async function fetchMoonrakerSlots(printerId, host) {
   const adapter = SLOT_ADAPTERS[printerId];
-  if (!adapter) throw Error('für diesen Drucker gibt es keine Live-Abfrage');
-  if (!host) throw Error('keine IP-Adresse eingetragen');
+  if (!adapter) throw Error(t('für diesen Drucker gibt es keine Live-Abfrage'));
+  if (!host) throw Error(t('keine IP-Adresse eingetragen'));
   if (!linkAvailable()) throw Error(location.protocol === 'https:'
-    ? 'Live-Abfrage geht in der Online-Version nicht – dafür das Tool herunterladen und über den lokalen Server starten'
-    : 'Live-Abfrage nur beim Start über „Konfigurator starten.cmd“ bzw. tools/serve.py (nicht per Doppelklick auf index.html)');
+    ? t('Live-Abfrage geht in der Online-Version nicht – dafür das Tool herunterladen und über den lokalen Server starten')
+    : t('Live-Abfrage nur beim Start über „Konfigurator starten.cmd“ bzw. tools/serve.py (nicht per Doppelklick auf index.html)'));
   for (let attempt = 1; ; attempt++) {
     try { return await querySlotsOnce(adapter, host); }
     catch (e) { if (attempt >= LINK_ATTEMPTS || !e.retryable) throw e; }
@@ -123,12 +123,12 @@ async function querySlotsOnce(adapter, host) {
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), LINK_TIMEOUT_MS);
   try {
     const res = await fetch('http://' + host + ':' + MOONRAKER_PORT + '/printer/objects/query?' + adapter.query, { signal: ctrl.signal });
-    if (!res.ok) throw Error('Drucker antwortet mit HTTP ' + res.status);
+    if (!res.ok) throw Error(t('Drucker antwortet mit HTTP {status}', { status: res.status }));
     const data = await res.json();
     return { slots: adapter.parse((data.result || {}).status || {}), host, time: new Date(), via: 'moonraker' };
   } catch (e) {
-    const err = e.name === 'AbortError' ? Error('Drucker unter ' + host + ' antwortet nicht (Zeitüberschreitung)')
-      : e instanceof TypeError ? Error('Drucker unter ' + host + ' nicht erreichbar oder Zugriff blockiert') : null;
+    const err = e.name === 'AbortError' ? Error(t('Drucker unter {host} antwortet nicht (Zeitüberschreitung)', { host }))
+      : e instanceof TypeError ? Error(t('Drucker unter {host} nicht erreichbar oder Zugriff blockiert', { host })) : null;
     if (err) { err.retryable = true; throw err; }
     throw e;
   } finally { clearTimeout(timer); }

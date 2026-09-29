@@ -16,7 +16,7 @@ function readSTL(buf){
     while((m=re.exec(text)))arr.push(+m[1],+m[2],+m[3]);
     arr.length-=arr.length%9; pos=new Float32Array(arr);
   }
-  if(!pos.length)throw Error('Keine gültigen Dreiecke gefunden');
+  if(!pos.length)throw Error(t('Keine gültigen Dreiecke gefunden'));
   return pos;
 }
 function parseSTL(name,buf){return makeGeom(name,readSTL(buf))}
@@ -73,7 +73,7 @@ function makeDownProbe(pos){
 // Dreiecke → Analyse-Grundlage (Maße, Winkel je Fläche, Bettkontakt); Bett = tiefster Punkt.
 function makeGeom(name,pos){
   const n=pos.length/9;
-  if(!n)throw Error('Keine gültigen Dreiecke gefunden');
+  if(!n)throw Error(t('Keine gültigen Dreiecke gefunden'));
   let mn=[Infinity,Infinity,Infinity],mx=[-Infinity,-Infinity,-Infinity];
   for(let i=0;i<pos.length;i+=3){for(let k=0;k<3;k++){const v=pos[i+k];if(v<mn[k])mn[k]=v;if(v>mx[k])mx[k]=v}}
   // per-face data: overhang angle from vertical (90 = flat ceiling, 0 = wall, <0 = faces up), area, "on bed"

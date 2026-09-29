@@ -48,6 +48,24 @@ if slicer.find_orca():
         check("Slot 1 und 3 verbraucht, 2 und 4 nicht", t["grams"][0] > 1 and t["grams"][2] > 1 and t["grams"][1] == 0 and t["grams"][3] == 0, t["grams"])
         check("1 Farbwechsel", t["changes"] == 1, t["changes"])
         check("Druckzeit plausibel (10–120 min)", 600 < t["time_s"] < 7200, t["time_s"])
+        # Zwei Platten: alles, dann nur Platte 2 neu (Platte 1 übernommen)
+        two = subprocess.run(["node", os.path.join(ROOT, "tests", "make-test-3mf.js"), "platten"], capture_output=True, check=True).stdout
+        full = slicer.slice_3mf(two)
+        check("zwei Platten geslict", [p["plate"] for p in full["plates"]] == [1, 2] and full["sliced"] == 2, full["plates"])
+        part = slicer.slice_3mf(two, plates=[2], count=2, reuse=full["job"])
+        check("nur Platte 2 neu geslict", part["sliced"] == 1 and [p["reused"] for p in part["plates"]] == [True, False], part["plates"])
+        check("übernommene Platte gleich", part["plates"][0]["total_g"] == full["plates"][0]["total_g"] and part["plates"][0]["time_s"] == full["plates"][0]["time_s"])
+        check("Summe wie beim vollen Slicen", abs(part["total"]["total_g"] - full["total"]["total_g"]) < 0.05, (part["total"], full["total"]))
+        check("G-Code beider Platten im neuen Auftrag", all(slicer.job_file(part["job"], n, "gcode") for n in (1, 2)))
+        # Kostenwerte in der 3MF kommen im G-Code an (auch für OrcaSlicer/AnycubicSlicerNext selbst)
+        costly = slicer.slice_3mf(subprocess.run(["node", os.path.join(ROOT, "tests", "make-test-3mf.js"), "kosten"], capture_output=True, check=True).stdout)
+        with open(slicer.job_file(costly["job"], 1, "gcode"), "rb") as f:
+            f.seek(-slicer.TAIL_BYTES, 2) if os.path.getsize(f.name) > slicer.TAIL_BYTES else None
+            tail = f.read().decode("utf-8", "replace")
+        check("time_cost 0,35 €/h in der 3MF", "; time_cost = 0.35" in tail)
+        check("filament_cost je Slot", "; filament_cost = 25,30,27.5,40" in tail)
+        gone = slicer.slice_3mf(two, plates=[2], count=2, reuse="0" * 16)
+        check("fehlender Auftrag: alles geslict", gone["sliced"] == 2, gone["plates"])
     else:
         print("Hinweis: kein Test-3MF (node fehlt) – echtes Slicen übersprungen")
 else:

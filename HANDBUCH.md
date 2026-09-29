@@ -48,6 +48,7 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 ![Übersicht](docs/img/uebersicht.png)
 
 - **Kopfzeile:** Drucker umschalten (**Kobra S1** / **Anderer Anycubic …**), Düsengröße und Düsenmaterial. Zurzeit bietet das Tool nur Anycubic-Drucker an; der Snapmaker U1 und die übrigen Hersteller sind ausgeblendet (`index.html?alle-drucker` zeigt sie).
+- **Sprache und Darstellung** (oben rechts): **DE / EN** stellt die Oberfläche auf Deutsch oder Englisch um (ohne Auswahl nach Browsersprache). **☀ / A / ☾** wählt hell, automatisch (wie das System) oder dunkel. Beides merkt sich der Browser.
 
 ### Anderer Anycubic-Drucker
 
@@ -98,6 +99,26 @@ Bei mehreren Teilen erscheint im Schritt **① Modell** eine **Teileliste**. Jed
 - **Anklicken wählt ein Teil.** Die Druckwerte, das Datenblatt und die 3D-Ansicht gelten dann für dieses Teil. In **② Druckwerte** steht oben **„Einstellungen für Teil“** – dort wählst du das Teil auch direkt über **Teil**, ohne zurück zum Modell zu wechseln.
 - Jedes Teil merkt sich **eigenes Filament, Objektart, Priorität, Belastung, Support und Stützreduzierung**.
 - Über **Slot** kannst du jedem Teil einen eigenen Filament-Slot geben. „Wie beim Export gewählt“ bedeutet: Das Teil bekommt den Standard-Slot aus dem Export-Dialog.
+
+### Farben des Designers
+
+Bei Makerworld-/Orca-3MF mit mehreren Farben zeigt **① Modell** den Kasten **Farben des Designers**: jede Farbe (Farbfeld, wofür sie genutzt wird) und daneben den Slot deiner ACE, auf dem sie gedruckt wird. Über die Auswahl legst du eine Farbe auf einen anderen Slot, z. B. den Schriftzug auf den Slot mit schwarzem ASA statt auf den mit grünem PLA. Das gilt für Objekte, Körper und Farb-Modifikatoren (Schriftzüge, Logos). Eigene Slot-Änderungen an diesen Teilen werden dabei ersetzt. **Wie vom Designer** stellt alles zurück. Flächen, die der Designer mit dem Farbpinsel bemalt hat, behalten ihren Slot – das geht nur in OrcaSlicer.
+
+**Warum das wichtig ist:** PLA (≈ 200–220 °C) und ASA/ABS/PETG (≈ 240–260 °C) lassen sich nicht auf einer Platte mischen – OrcaSlicer lehnt das ab. Das Tool prüft das vor dem Slicen und sagt, welche Slots sich beißen. Lösung: die Farben auf Slots mit derselben Filamentart legen oder passendes Filament einlegen.
+
+Steht auf einer Plattenkarte „Slot 1: braucht ABS, eingelegt ist ASA“, passt das Filament der Teile (② Druckwerte → Filament) nicht zur ACE. **Filament aus dem ACE übernehmen** stellt es um.
+
+### Platten
+
+Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Bett (Teile in Slot-Farbe, das gewählte umrandet), die Teile darauf, die genutzten Slots und – rot – wenn ein Slot anderes Filament braucht als eingelegt ist.
+
+- Zuerst verteilt das Tool alle Teile **automatisch** auf möglichst wenige Platten.
+- Über die Auswahl neben einem Teil schiebst du es auf eine andere oder eine **neue Platte**. Ab dann gilt deine Zuordnung; passt eine Platte nicht mehr, kommt der Rest auf eine weitere. **Platzsparend anordnen** verwirft die Zuordnung.
+- **Anzahl** (− / +) legt Kopien des gewählten Teils an. Kopien teilen Einstellungen, Slot und Farben; weniger stellen entfernt die letzten Kopien.
+- Makerworld-3MF behalten die Platten des Designers; hier nur Anzeige – verschieben in OrcaSlicer.
+- Passt ein Teil nicht in den **Bauraum** (Breite, Tiefe oder Höhe), steht es hier und in der 3D-Ansicht rot.
+
+In **③ Slicen & Kosten** stehen dann **Zeit, Filament und Kosten je Platte** und eine empfohlene **Reihenfolge**: erst alles, was mit dem eingelegten Filament druckt, danach gruppiert nach Spulentausch. Änderst du nur eine Platte, slict der Server nur diese neu („neu geslict: 1 von 4“), der Rest bleibt.
 
 ### Mehrfarbig: mehrere Farben in einem Teil
 
@@ -175,6 +196,16 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 **Düsen-Umrechnung:** Für 0,25/0,6/0,8 mm und andere Düsenmaterialien rechnet das Tool die Werte um. Der 3MF-Export ist derzeit nur mit der **0,4-mm-Düse** möglich.
 
 ---
+
+### Werte für diesen Auftrag anpassen
+
+Die Werte im Datenblatt sind ein **Vorschlag**. Willst du für diesen Druck etwas anders – z. B. mehr Wände, eine andere Füllung oder Stützen erzwingen –, klick über dem Datenblatt auf **✎ Werte für diesen Auftrag anpassen**:
+
+- Links steht je Wert der **Vorschlag**, rechts trägst du deinen Wert ein. **Leer = Vorschlag.** Das **×** nimmt einen einzelnen Wert zurück, **Alle leeren** alle.
+- Anpassen lassen sich: Düse und Heizbett (°C), Schichthöhe, Wandlinien, obere/untere Schichten, Fülldichte, Füllmuster (Gyroid, Kubisch, Gitter, Waben, Linien, Dreiecke, Kreuzschraffur, Blitz), Geschwindigkeit von Außenwand, Innenwand und Füllung, Lüfter, Stützen (an/aus) und Brim.
+- Die angepassten Werte gelten **überall**: im Datenblatt (orange markiert, mit dem Vorschlag daneben), in der 3MF, beim Slicen, in den Kosten und beim Drucken.
+- Sie gelten **je Teil** – bei mehreren Teilen für das gewählte Teil (und alle Platzierungen desselben Objekts); **Für alle Teile des Projekts übernehmen** setzt sie für alle.
+- Anders als **Werte anpassen** beim Filament (das ändert dein Filamentprofil dauerhaft) gilt die Anpassung nur für das geladene Projekt.
 
 ## 7. Eigene Filamentwerte und Profile
 
@@ -290,11 +321,15 @@ Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder 
 3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
 4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
 
+**Mehrere Platten nacheinander:** **Alle Platten nacheinander …** legt im Tab **Drucker** eine **Warteschlange** in der empfohlenen Reihenfolge an. Du startest jede Platte selbst (**Drucken …**, mit derselben Slot-Prüfung). Ist sie fertig, meldet das Tool **„Platte 2 fertig – Bett abräumen“** – als Hinweis, mit ● im Fenstertitel und, wenn du es erlaubst, als Browser-Benachrichtigung (nur über `localhost` oder HTTPS). Danach mit einem Klick die nächste. Das Tool startet nie von selbst: Das Bett muss vorher leer sein. Oben steht die Restzeit aller Platten; **Überspringen**, **Nochmal** und **Beenden** (ein laufender Druck läuft weiter). Die Warteschlange bleibt beim Neuladen der Seite erhalten.
+
 Gedruckt wird genau der Stand der letzten Kostenberechnung. Hast du danach etwas geändert, erscheint **Drucken …** erst nach einer neuen Berechnung. Der Server prüft vor dem Start noch einmal, dass der Drucker frei ist und der G-Code für dieses Modell geslict wurde. Vor dem ersten Druck: Bett frei, richtige Druckplatte?
 
 ## 9. 3MF für OrcaSlicer speichern
 
 ![Export-Dialog](docs/img/export.png)
+
+Die Datei öffnet auch der **AnycubicSlicerNext** (geprüft mit 1.4.1.1): gleiche Werte, Slots, Farben und Platten; Gramm und Druckzeit weichen wegen der älteren Orca-Basis leicht ab (im Test 8,1 statt 7,9 g, 51 statt 55 min). **Kosten im Slicer:** Die 3MF enthält deine Preise aus **Preise & Sätze** – Filamentpreis je Slot (`filament_cost`) und Maschinenkosten je Stunde (`time_cost` = Leistung × Strompreis + Verschleiß). Beide Slicer zeigen damit nach dem Slicen fast dieselben Kosten wie ③; Spülabfall der ACE, Aufschlag und MwSt. kennen sie nicht.
 
 Der Knopf **„3MF für OrcaSlicer speichern“** im Schritt **③ Slicen & Kosten** unter **Ausgabe** (oder **Datei → 3MF für OrcaSlicer …**) öffnet den Dialog:
 
@@ -331,6 +366,7 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 - **Überhangwinkel** (unten): Flächen steiler als dieser Winkel werden rot markiert; grau = liegt auf dem Bett.
 - **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben), **Messen** (zwei Punkte anklicken).
 - **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Spalte daneben unter „Lage auf dem Bett“.
+- Die Drahtbox zeigt den **Bauraum** des Druckers. Ist sie rot, passt das Teil nicht hinein (der Hinweis oben nennt Breite, Tiefe oder Höhe) – Teil drehen oder in OrcaSlicer skalieren/teilen.
 
 ---
 

@@ -69,6 +69,8 @@ python tests/lan.py           # Werksfirmware/LAN-Modus gegen einen nachgebauten
 node tests/costs.js           # Kostenkalkulation
 python tests/slice.py         # Slicen für die Kosten (mit OrcaSlicer, sonst nur Parser)
 python tests/preview.py       # G-Code → Schichtvorschau
+node tests/overrides.js       # Werte je Auftrag anpassen
+node tests/plates.js          # Platten: Zuordnung, Reihenfolge nach Filament, Warteschlange
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
 node tests/verify-orca-printers.js  # 3MF für beliebige Drucker gegen die OrcaSlicer-CLI (dauert lang)
 ```

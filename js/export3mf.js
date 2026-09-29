@@ -7,9 +7,9 @@
 const ORCA_KIND = { pla: 'PLA', petg: 'PETG', abs: 'ABS', asa: 'ASA', tpu: 'TPU' };
 const BED_TEMP_KEYS = ['hot_plate_temp', 'textured_plate_temp', 'cool_plate_temp', 'eng_plate_temp'];
 const SEAM_ORCA = { Hinten: 'back', Ausgerichtet: 'aligned' };
-const ACCEL_KEYS = [['Beschleunigung Standard', 'default_acceleration'], ['Beschleunigung Außenwand', 'outer_wall_acceleration'],
-  ['Beschleunigung Innenwand', 'inner_wall_acceleration'], ['Beschleunigung massive Füllung', 'internal_solid_infill_acceleration'],
-  ['Beschleunigung Füllung', 'sparse_infill_acceleration'], ['Beschleunigung obere Fläche', 'top_surface_acceleration']];
+const ACCEL_KEYS = [[t('Beschleunigung Standard'), 'default_acceleration'], [t('Beschleunigung Außenwand'), 'outer_wall_acceleration'],
+  [t('Beschleunigung Innenwand'), 'inner_wall_acceleration'], [t('Beschleunigung massive Füllung'), 'internal_solid_infill_acceleration'],
+  [t('Beschleunigung Füllung'), 'sparse_infill_acceleration'], [t('Beschleunigung obere Fläche'), 'top_surface_acceleration']];
 const PART_GAP_MM = 8;          // Abstand zwischen Teilen beim Anordnen
 const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße versetzt ab (Spalten = ⌈√Platten⌉)
 const objectPath = k => '/3D/Objects/object_' + k + '.model';
@@ -20,7 +20,9 @@ function exportTemplate(printerId, nozD) {
 }
 
 // Gleiche Zuordnung wie buildOrcaProcessJSON: Gyroid ist in beiden Mustervorschlägen die Primärempfehlung.
-function orcaInfillPattern(pattern) { return pattern.indexOf('Gyroid') === 0 ? 'gyroid' : 'crosshatch'; }
+// Füllmuster (Datenblatt/Anpassung) → Orca; „Gyroid oder Kubisch“ (Empfehlung) = Gyroid
+const INFILL_PATTERNS = { Gyroid: 'gyroid', Kubisch: 'cubic', Gitter: 'grid', Waben: 'honeycomb', Linien: 'line', Dreiecke: 'triangles', Kreuzschraffur: 'crosshatch', Blitz: 'lightning' };
+function orcaInfillPattern(pattern) { return INFILL_PATTERNS[pattern] || (String(pattern).indexOf('Gyroid') === 0 ? 'gyroid' : 'crosshatch'); }
 const numStr = v => String(Math.round(Number(v) * 1000) / 1000);
 
 // Brim-Empfehlung ("5–8 mm", "Nicht nötig", "0–5 mm") → [brim_type, brim_width]; untere Grenze als Startwert.
@@ -38,28 +40,28 @@ function orcaBrim(brim) {
 function supportChanges(r) {
   const sp = r.sp, tpu = r.tpu;
   const out = [
-    ['Stützentyp', 'support_type', 'tree(auto)'],
-    ['Schwellenwinkel', 'support_threshold_angle', sp.angle],
-    ['Nur kritische Bereiche', 'support_critical_regions_only', 1],
-    ['Nur auf Druckplatte', 'support_on_build_plate_only', 1],
-    ['Kleine Überhänge entfernen', 'support_remove_small_overhang', sp.small === 'Ein' ? 1 : 0],
-    ['Raft', 'raft_layers', 0],
-    ['Oberer Z-Abstand', 'support_top_z_distance', numStr(r.supZ.top)],
-    ['Unterer Z-Abstand', 'support_bottom_z_distance', numStr(r.supZ.bottom)],
-    ['Stützen/Objekt XY-Abstand', 'support_object_xy_distance', numStr(lowerNum(sp.xy))],
-    ['Abstand erste Schicht', 'support_object_first_layer_gap', tpu ? '0.25' : '0.2'],
-    ['Obere Schnittstellenschichten', 'support_interface_top_layers', sp.iface],
-    ['Untere Schnittstellenschichten', 'support_interface_bottom_layers', 1],
-    ['Schnittstellenabstand', 'support_interface_spacing', numStr(lowerNum(sp.gap))],
-    ['Abstand Grundmuster', 'support_base_pattern_spacing', tpu ? '3' : '2.5'],
-    ['Wände um Stützen', 'tree_support_wall_count', 0],
-    ['Stützspitze', 'tree_support_tip_diameter', '0.8'],
-    ['Ast-Dichte', 'tree_support_top_rate', lowerNum(sp.density) + '%'],
-    ['Astabstand', 'tree_support_branch_distance_organic', numStr(lowerNum(sp.branch))],
-    ['Ast-Durchmesser', 'tree_support_branch_diameter_organic', '2']
+    [t('Stützentyp'), 'support_type', 'tree(auto)'],
+    [t('Schwellenwinkel'), 'support_threshold_angle', sp.angle],
+    [t('Nur kritische Bereiche'), 'support_critical_regions_only', 1],
+    [t('Nur auf Druckplatte'), 'support_on_build_plate_only', 1],
+    [t('Kleine Überhänge entfernen'), 'support_remove_small_overhang', sp.small === 'Ein' ? 1 : 0],
+    [t('Raft'), 'raft_layers', 0],
+    [t('Oberer Z-Abstand'), 'support_top_z_distance', numStr(r.supZ.top)],
+    [t('Unterer Z-Abstand'), 'support_bottom_z_distance', numStr(r.supZ.bottom)],
+    [t('Stützen/Objekt XY-Abstand'), 'support_object_xy_distance', numStr(lowerNum(sp.xy))],
+    [t('Abstand erste Schicht'), 'support_object_first_layer_gap', tpu ? '0.25' : '0.2'],
+    [t('Obere Schnittstellenschichten'), 'support_interface_top_layers', sp.iface],
+    [t('Untere Schnittstellenschichten'), 'support_interface_bottom_layers', 1],
+    [t('Schnittstellenabstand'), 'support_interface_spacing', numStr(lowerNum(sp.gap))],
+    [t('Abstand Grundmuster'), 'support_base_pattern_spacing', tpu ? '3' : '2.5'],
+    [t('Wände um Stützen'), 'tree_support_wall_count', 0],
+    [t('Stützspitze'), 'tree_support_tip_diameter', '0.8'],
+    [t('Ast-Dichte'), 'tree_support_top_rate', lowerNum(sp.density) + '%'],
+    [t('Astabstand'), 'tree_support_branch_distance_organic', numStr(lowerNum(sp.branch))],
+    [t('Ast-Durchmesser'), 'tree_support_branch_diameter_organic', '2']
   ];
   // Gleiches Material wie das Teil (Entscheidung 2026-09-26): 0 = Filament des Objekts
-  out.push(['Stützenfilament', 'support_filament', 0], ['Schnittstellenfilament', 'support_interface_filament', 0]);
+  out.push([t('Stützenfilament'), 'support_filament', 0], [t('Schnittstellenfilament'), 'support_interface_filament', 0]);
   return out;
 }
 
@@ -80,61 +82,61 @@ function plannedChanges(r, slot, liveSlots) {
   const proc = (label, key, v) => f.push([label, key, String(v), null]);
 
   (liveSlots || []).forEach((s, i) => {
-    if (s.colour) fil('Slot ' + (i + 1) + ' Farbe (Drucker)', 'filament_colour', s.colour, i);
-    if (i !== slot && s.type) fil('Slot ' + (i + 1) + ' Typ (Drucker)', 'filament_type', s.type, i);
+    if (s.colour) fil(t('Slot {n} Farbe (Drucker)', { n: i + 1 }), 'filament_colour', s.colour, i);
+    if (i !== slot && s.type) fil(t('Slot {n} Typ (Drucker)', { n: i + 1 }), 'filament_type', s.type, i);
   });
 
-  fil('Filamenttyp', 'filament_type', ORCA_KIND[r.m.kind] || 'PLA');
-  fil('Düse', 'nozzle_temperature', r.nozzle);
-  fil('Düse erste Schicht', 'nozzle_temperature_initial_layer', r.nozzle);
+  fil(t('Filamenttyp'), 'filament_type', ORCA_KIND[r.m.kind] || 'PLA');
+  fil(t('Düse'), 'nozzle_temperature', r.nozzle);
+  fil(t('Düse erste Schicht'), 'nozzle_temperature_initial_layer', r.nozzle);
   // Empfohlener Bereich des Filaments – sonst bleibt der PLA-Bereich der Vorlage (190–240 °C) stehen, und Orca
   // verweigert Mehrfarbdrucke mit ASA/ABS/PETG („nozzle temperatures are incompatible“, beobachtet 2026-09-28)
   const [lo, hi] = nozzleRange(r);
-  fil('Temperaturbereich von', 'nozzle_temperature_range_low', lo);
-  fil('Temperaturbereich bis', 'nozzle_temperature_range_high', hi);
-  BED_TEMP_KEYS.forEach(k => { fil('Heizbett (' + k.replace('_temp', '') + ')', k, r.m.bed); fil('Heizbett erste Schicht (' + k.replace('_temp', '') + ')', k + '_initial_layer', r.m.bed); });
-  fil('Lüfter min.', 'fan_min_speed', r.m.fan);
-  fil('Lüfter max.', 'fan_max_speed', r.m.fan);
-  fil('Max. Volumenstrom', 'filament_max_volumetric_speed', numStr(r.maxVol));
-  fil('Durchflussverhältnis', 'filament_flow_ratio', numStr(r.m.flow));
+  fil(t('Temperaturbereich von'), 'nozzle_temperature_range_low', lo);
+  fil(t('Temperaturbereich bis'), 'nozzle_temperature_range_high', hi);
+  BED_TEMP_KEYS.forEach(k => { fil(t('Heizbett ({plate})', { plate: k.replace('_temp', '') }), k, r.m.bed); fil(t('Heizbett erste Schicht ({plate})', { plate: k.replace('_temp', '') }), k + '_initial_layer', r.m.bed); });
+  fil(t('Lüfter min.'), 'fan_min_speed', r.m.fan);
+  fil(t('Lüfter max.'), 'fan_max_speed', r.m.fan);
+  fil(t('Max. Volumenstrom'), 'filament_max_volumetric_speed', numStr(r.maxVol));
+  fil(t('Durchflussverhältnis'), 'filament_flow_ratio', numStr(r.m.flow));
   // Lüfter erste Schicht und Z-Hop als Filament-Überschreibung je Slot. Den Rückzug schreibt das Tool
   // bewusst nicht: er hängt von Filament, Temperatur und Extruder ab, das Orca-Filamentprofil des Slots
   // bringt passende Werte mit (Entscheidung des Nutzers 2026-09-26, bisherige Standardwerte passten).
-  fil('Lüfter erste Schicht aus', 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
+  fil(t('Lüfter erste Schicht aus'), 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
-  if (isNum(r.m.zhop)) fil('Z-Hop', 'filament_z_hop', numStr(r.m.zhop));
+  if (isNum(r.m.zhop)) fil(t('Z-Hop'), 'filament_z_hop', numStr(r.m.zhop));
   if (r.m.pa !== null && r.m.pa !== undefined && r.m.pa !== '') {
-    fil('Pressure Advance', 'pressure_advance', numStr(r.m.pa));
-    fil('Pressure Advance aktiv', 'enable_pressure_advance', 1);
+    fil(t('Pressure Advance'), 'pressure_advance', numStr(r.m.pa));
+    fil(t('Pressure Advance aktiv'), 'enable_pressure_advance', 1);
   }
 
-  proc('Schichthöhe', 'layer_height', numStr(r.layer));
-  proc('Erste Schicht', 'initial_layer_print_height', numStr(r.firstLayer));
-  proc('Wandlinien', 'wall_loops', r.w);
-  proc('Fülldichte', 'sparse_infill_density', r.inf + '%');
-  proc('Füllmuster', 'sparse_infill_pattern', orcaInfillPattern(r.pattern));
-  proc('Obere Schichten', 'top_shell_layers', r.t);
-  proc('Untere Schichten', 'bottom_shell_layers', r.b);
-  proc('Außenwand', 'outer_wall_speed', r.sp_outer);
-  proc('Innenwand', 'inner_wall_speed', r.sp_inner);
-  proc('Füllung', 'sparse_infill_speed', r.sp_fill);
-  proc('Innere massive Füllung', 'internal_solid_infill_speed', r.sp_fill);
-  proc('Obere Fläche', 'top_surface_speed', r.top);
-  proc('Lückenfüllung', 'gap_infill_speed', r.m.gap);
-  proc('Erste Schicht Geschwindigkeit', 'initial_layer_speed', r.m.first);
-  proc('Travel', 'travel_speed', r.m.travel);
+  proc(t('Schichthöhe'), 'layer_height', numStr(r.layer));
+  proc(t('Erste Schicht'), 'initial_layer_print_height', numStr(r.firstLayer));
+  proc(t('Wandlinien'), 'wall_loops', r.w);
+  proc(t('Fülldichte'), 'sparse_infill_density', r.inf + '%');
+  proc(t('Füllmuster'), 'sparse_infill_pattern', orcaInfillPattern(r.pattern));
+  proc(t('Obere Schichten'), 'top_shell_layers', r.t);
+  proc(t('Untere Schichten'), 'bottom_shell_layers', r.b);
+  proc(t('Außenwand'), 'outer_wall_speed', r.sp_outer);
+  proc(t('Innenwand'), 'inner_wall_speed', r.sp_inner);
+  proc(t('Füllung'), 'sparse_infill_speed', r.sp_fill);
+  proc(t('Innere massive Füllung'), 'internal_solid_infill_speed', r.sp_fill);
+  proc(t('Obere Fläche'), 'top_surface_speed', r.top);
+  proc(t('Lückenfüllung'), 'gap_infill_speed', r.m.gap);
+  proc(t('Erste Schicht Geschwindigkeit'), 'initial_layer_speed', r.m.first);
+  proc(t('Travel'), 'travel_speed', r.m.travel);
   // Beschleunigung nur, wenn das Datenblatt sie vorgibt (TPU 800 mm/s²); sonst bleibt das Werksprofil.
   // Druckbewegungen werden begrenzt, Travel und erste Schicht (500 mm/s² in den Vorlagen) bleiben.
   if (Number(r.m.accel) > 0) ACCEL_KEYS.forEach(([label, key]) => proc(label, key, numStr(r.m.accel)));
-  proc('Stützen', 'enable_support', r.supOn ? 1 : 0);
+  proc(t('Stützen'), 'enable_support', r.supOn ? 1 : 0);
   if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
   const [brimType, brimWidth] = orcaBrim(r.brim);
-  proc('Brim', 'brim_type', brimType);
-  if (brimWidth) proc('Brim-Breite', 'brim_width', brimWidth);
-  if (SEAM_ORCA[r.seam]) proc('Nahtposition', 'seam_position', SEAM_ORCA[r.seam]);
+  proc(t('Brim'), 'brim_type', brimType);
+  if (brimWidth) proc(t('Brim-Breite'), 'brim_width', brimWidth);
+  if (SEAM_ORCA[r.seam]) proc(t('Nahtposition'), 'seam_position', SEAM_ORCA[r.seam]);
   if (r.o === 'watertight') {  // Lücken zwischen den Bahnen sind die typischen Undichtigkeiten
-    proc('Lückenfüllung', 'gap_fill_target', 'everywhere');
-    proc('Vertikale Schalendicke sicherstellen', 'ensure_vertical_shell_thickness', 'ensure_all');
+    proc(t('Lückenfüllung'), 'gap_fill_target', 'everywhere');
+    proc(t('Vertikale Schalendicke sicherstellen'), 'ensure_vertical_shell_thickness', 'ensure_all');
   }
   return f.map(([label, key, value, index]) => ({ label, key, value, perSlot: index !== null, index }));
 }
@@ -154,7 +156,8 @@ function filamentSlotTypes(r, slot, liveSlots, n, extra = []) {
 
 /* extra: [{slot, r}] – weitere Slots, die Teile mit eigenem Filament belegen. Dort werden nur die
    Filamentwerte (Temperaturen, Lüfter, Fluss …) aus dem Ergebnis dieses Teils geschrieben.
-   machine: [{label, key, value}] – Druckerwerte (z. B. Filamentwechsel-Zeit passend zur Spülmenge). */
+   machine: [{label, key, value, index?}] – Druckerwerte (z. B. Filamentwechsel-Zeit passend zur Spülmenge);
+   mit index ein Wert je Filament-Slot (z. B. filament_cost). */
 function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = []) {
   const settings = JSON.parse(JSON.stringify(tpl.settings));
   const changes = [];
@@ -169,7 +172,7 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
   filamentSlotTypes(r, slot, liveSlots, nFil, extra).forEach((type, i) => {
     const preset = type && presets[String(type).toUpperCase()];
     if (!preset || settings.filament_settings_id[i] === preset) return;
-    changes.push({ label: 'Slot ' + (i + 1) + ' Preset', key: 'filament_settings_id', before: settings.filament_settings_id[i], after: preset });
+    changes.push({ label: t('Slot {n} Preset', { n: i + 1 }), key: 'filament_settings_id', before: settings.filament_settings_id[i], after: preset });
     settings.filament_settings_id[i] = preset;
     diff[1 + i].clear();    // Abweichungen der alten (Benutzer-)Presets gelten nicht mehr
     inherits[1 + i] = '';   // direkt ein System-Preset
@@ -182,7 +185,7 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
   // 2) Berechnete Werte schreiben und als „geändert“ vermerken
   const extraFil = extra.flatMap(e => plannedChanges(e.r, e.slot, null)
     .filter(c => c.perSlot && c.index === e.slot)
-    .map(c => ({ ...c, label: 'Slot ' + (e.slot + 1) + ': ' + c.label })));
+    .map(c => ({ ...c, label: t('Slot {n}: {label}', { n: e.slot + 1, label: c.label }) })));
   for (const c of [...plannedChanges(r, slot, liveSlots), ...extraFil]) {
     if (!(c.key in settings)) continue; // Schlüssel kennt diese Orca-Version nicht → Vorlage unverändert
     if (c.perSlot && !(c.index < settings[c.key].length)) continue; // mehr Druckerslots als in der Vorlage
@@ -193,9 +196,11 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
   }
   for (const c of machine) {
     if (!(c.key in settings)) continue;
-    const before = settings[c.key];
-    settings[c.key] = c.value;
-    diff[groups - 1].add(c.key);
+    const slotted = c.index != null && Array.isArray(settings[c.key]);
+    if (slotted && !(c.index < settings[c.key].length)) continue;
+    const before = slotted ? settings[c.key][c.index] : settings[c.key];
+    if (slotted) settings[c.key][c.index] = c.value; else settings[c.key] = c.value;
+    diff[slotted ? 1 + c.index : groups - 1].add(c.key);
     if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
   }
   settings.different_settings_to_system = diff.map(s => [...s].join(';'));
@@ -271,37 +276,65 @@ function bedSize(tpl) {
   return [0, 1].map(k => Math.max(...pts.map(p => p[k])) - Math.min(...pts.map(p => p[k])));
 }
 
+// Bauraum [Breite, Tiefe, Höhe] in mm (Höhe aus printable_height, sonst unbegrenzt)
+function buildVolume(tpl) {
+  const h = +[].concat(tpl.settings.printable_height || [])[0];
+  return [...bedSize(tpl), h > 0 ? h : Infinity];
+}
+// Passt ein Teil (so wie es liegt) in den Bauraum? Liste der Überschreitungen, z. B. ['Höhe 262 > 250 mm']
+function volumeExcess(g, vol) {
+  const out = [];
+  [[t('Breite'), g.x, vol[0]], [t('Tiefe'), g.y, vol[1]], [t('Höhe'), g.z, vol[2]]].forEach(([n, v, max]) => { if (v > max + 0.01) out.push(t('{dim} {size} > {max} mm', { dim: n, size: de(v, 0), max: de(max, 0) })); });
+  return out;
+}
+
 /* Teile zeilenweise aufs Bett legen; passt keine Zeile mehr, beginnt eine neue Platte.
-   Ergebnis je Teil: {plate (0-basiert), x, y} = Mitte in Orca-Weltkoordinaten. */
-function arrangeParts(geoms, tpl) {
+   groups: Listen von Teil-Indizes, jede Gruppe beginnt auf einer eigenen Platte (Plattenzuordnung je Teil);
+   läuft eine Gruppe über, geht es auf einer zusätzlichen Platte weiter.
+   Ergebnis je Teil: {plate (0-basiert), x, y} = Mitte in Orca-Weltkoordinaten, lx/ly = Mitte auf der Platte. */
+function packPlates(geoms, groups, tpl) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = PART_GAP_MM;
-  const order = geoms.map((g, i) => i).sort((a, b) => geoms[b].y - geoms[a].y || geoms[b].x - geoms[a].x);
   const plates = [];   // je Platte Zeilen: {y0, depth, width, items:[{i, x0}]}
-  let rows = [];
-  plates.push(rows);
-  const nextY = () => rows.length ? rows[rows.length - 1].y0 + rows[rows.length - 1].depth + gap : 0;
-  for (const i of order) {
-    const g = geoms[i];
-    let row = rows.find(r => r.width + gap + g.x <= bw && g.y <= r.depth);
-    if (!row) {
-      if (rows.length && nextY() + g.y > bd) { rows = []; plates.push(rows); }
-      row = { y0: nextY(), depth: g.y, width: -gap, items: [] };
-      rows.push(row);
+  const sources = [];  // je Platte: aus welcher Gruppe (Plattennummer) sie stammt
+  for (const [gi, idx] of groups.entries()) {
+    const order = idx.slice().sort((a, b) => geoms[b].y - geoms[a].y || geoms[b].x - geoms[a].x);
+    let rows = []; plates.push(rows); sources.push(gi);
+    const nextY = () => rows.length ? rows[rows.length - 1].y0 + rows[rows.length - 1].depth + gap : 0;
+    for (const i of order) {
+      const g = geoms[i];
+      let row = rows.find(r => r.width + gap + g.x <= bw && g.y <= r.depth);
+      if (!row) {
+        if (rows.length && nextY() + g.y > bd) { rows = []; plates.push(rows); sources.push(gi); }
+        row = { y0: nextY(), depth: g.y, width: -gap, items: [] };
+        rows.push(row);
+      }
+      row.items.push({ i, x0: row.width + gap });
+      row.width += gap + g.x;
     }
-    row.items.push({ i, x0: row.width + gap });
-    row.width += gap + g.x;
   }
-  const cols = Math.ceil(Math.sqrt(plates.length)), places = [];
-  plates.forEach((prow, pi) => {
+  // leere Gruppen (Platte ohne Teile) weglassen
+  const used = plates.map((p, k) => [p, sources[k]]).filter(([p]) => p.length);
+  const cols = Math.ceil(Math.sqrt(used.length || 1)), places = [];
+  used.forEach(([prow, src], pi) => {
     const usedW = Math.max(...prow.map(r => r.width)), last = prow[prow.length - 1], usedD = last.y0 + last.depth;
-    const ox = (pi % cols) * bw * PLATE_STRIDE + bx - usedW / 2, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE + by - usedD / 2;
+    const lx0 = bx - usedW / 2, ly0 = by - usedD / 2;
+    const ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
     prow.forEach(r => r.items.forEach(it => {
-      places[it.i] = { plate: pi, x: ox + it.x0 + geoms[it.i].x / 2, y: oy + r.y0 + r.depth / 2 };
+      const lx = lx0 + it.x0 + geoms[it.i].x / 2, ly = ly0 + r.y0 + r.depth / 2;
+      places[it.i] = { plate: pi, x: ox + lx, y: oy + ly, lx, ly, group: src };
     }));
   });
   // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
-  const oversize = geoms.map((g, i) => i).filter(i => geoms[i].x > bw || geoms[i].y > bd);
-  return { places, plateCount: plates.length, oversize };
+  const vol = buildVolume(tpl), oversize = geoms.map((g, i) => i).filter(i => volumeExcess(geoms[i], vol).length);
+  const overflow = used.length > new Set(used.map(([, s]) => s)).size;
+  return { places, plateCount: used.length, oversize, overflow };
+}
+// Alle Teile automatisch auf möglichst wenige Platten (ohne feste Zuordnung)
+function arrangeParts(geoms, tpl) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl); }
+// Nach Plattenzuordnung je Teil (1-basiert); Platten in aufsteigender Reihenfolge, Lücken fallen weg
+function arrangeByPlate(items, tpl) {
+  const nums = [...new Set(items.map(p => p.plate || 1))].sort((a, b) => a - b);
+  return packPlates(items.map(p => p.geom), nums.map(n => items.map((p, i) => i).filter(i => (items[i].plate || 1) === n)), tpl);
 }
 
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -341,12 +374,12 @@ function slotPlan(items, r, slot) {
     .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot }))]);
   for (const p of users) {
     const ps = partSlot(p), pr = p.r || r;
-    if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(p.geom.name + ': ' + pr.m.name + ' im selben Slot wie ' + r.m.name + ' – es gelten die Filamentwerte von ' + r.m.name + '.'); continue; }
+    if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(t('{part}: {material} im selben Slot wie {main} – es gelten die Filamentwerte von {main}.', { part: p.geom.name, material: pr.m.name, main: r.m.name })); continue; }
     const other = extra.find(e => e.slot === ps);
     if (!other) extra.push({ slot: ps, r: pr });
-    else if (other.r.m.kind !== pr.m.kind) notes.push(p.geom.name + ': Slot ' + (ps + 1) + ' ist schon mit ' + other.r.m.name + ' belegt – es gelten dessen Filamentwerte.');
+    else if (other.r.m.kind !== pr.m.kind) notes.push(t('{part}: Slot {n} ist schon mit {material} belegt – es gelten dessen Filamentwerte.', { part: p.geom.name, n: ps + 1, material: other.r.m.name }));
   }
-  for (const p of items) if (p.r && Math.abs(p.r.layer - r.layer) > 1e-9) notes.push(p.geom.name + ': Schichthöhe ' + de(p.r.layer, 2) + ' mm empfohlen – Orca nutzt für alle Teile ' + de(r.layer, 2) + ' mm.');
+  for (const p of items) if (p.r && Math.abs(p.r.layer - r.layer) > 1e-9) notes.push(t('{part}: Schichthöhe {layer} mm empfohlen – Orca nutzt für alle Teile {used} mm.', { part: p.geom.name, layer: de(p.r.layer, 2), used: de(r.layer, 2) }));
   return { extra, notes, partSlot };
 }
 
@@ -392,8 +425,8 @@ function planTowers(settings, tpl, plates) {
       if (!pos) {
         shift = [mx + TOWER_EDGE_MM + 2 - Math.min(...p.rects.map(r => r[0])), my + TOWER_EDGE_MM + 2 - Math.min(...p.rects.map(r => r[1]))];
         pos = findTowerSpot(p.rects.map(r => [r[0] + shift[0], r[1] + shift[1], r[2] + shift[0], r[3] + shift[1]]), bed, fp, prefer);
-        if (pos) res.notes.push('Platte ' + (i + 1) + ': Teile nach vorne links gerückt, damit der Reinigungsturm Platz hat.');
-        else { shift = [0, 0]; res.disable = true; res.notes.push('Platte ' + (i + 1) + ': kein Platz für den Reinigungsturm – die 3MF ist ohne Turm (beim Kobra S1 spült die Firmware in den Schacht).'); }
+        if (pos) res.notes.push(t('Platte {n}: Teile nach vorne links gerückt, damit der Reinigungsturm Platz hat.', { n: i + 1 }));
+        else { shift = [0, 0]; res.disable = true; res.notes.push(t('Platte {n}: kein Platz für den Reinigungsturm – die 3MF ist ohne Turm (beim Kobra S1 spült die Firmware in den Schacht).', { n: i + 1 })); }
       }
     }
     res.xs.push(String(pos ? pos[0] : prefer[0])); res.ys.push(String(pos ? pos[1] : prefer[1])); res.shifts.push(shift);
@@ -404,8 +437,8 @@ function planTowers(settings, tpl, plates) {
 function applyTowers(settings, changes, plan) {
   const mark = key => { const g = settings.different_settings_to_system; if (Array.isArray(g) && !String(g[0] || '').split(';').includes(key)) g[0] = g[0] ? g[0] + ';' + key : key; };
   const set = (label, key, value) => { const before = settings[key]; settings[key] = value; mark(key); if (JSON.stringify(before) !== JSON.stringify(value)) changes.push({ label, key, before: Array.isArray(before) ? before.join(', ') : before, after: Array.isArray(value) ? value.join(', ') : value }); };
-  if (plan.disable) set('Reinigungsturm', 'enable_prime_tower', '0');
-  else { set('Reinigungsturm X je Platte', 'wipe_tower_x', plan.xs); set('Reinigungsturm Y je Platte', 'wipe_tower_y', plan.ys); }
+  if (plan.disable) set(t('Reinigungsturm'), 'enable_prime_tower', '0');
+  else { set(t('Reinigungsturm X je Platte'), 'wipe_tower_x', plan.xs); set(t('Reinigungsturm Y je Platte'), 'wipe_tower_y', plan.ys); }
 }
 
 function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
@@ -413,7 +446,9 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   const list = items.map(p => p.geom);
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra, machine);
-  const { places, plateCount } = arrangeParts(list, tpl);
+  // Plattenzuordnung je Teil beachten (plate 1-basiert); ohne Angabe alles automatisch
+  const { places, plateCount, overflow } = items.some(p => p.plate) ? arrangeByPlate(items, tpl) : arrangeParts(list, tpl);
+  if (overflow) notes.push(t('Nicht alle Teile einer Platte passen aufs Bett – sie stehen auf einer zusätzlichen Platte.'));
   {
     // Reinigungsturm je Platte: Teile in Bettkoordinaten der Platte (arrangeParts versetzt Platten wie Orca)
     const [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(plateCount));
@@ -475,7 +510,7 @@ function plateShifts(jobs, tpl) {
     const mny = Math.min(...on.map(j => j.geom.mn[1])), mxy = Math.max(...on.map(j => j.geom.mx[1]));
     const pi = id - 1, tx = (pi % cols) * bw * PLATE_STRIDE + bx, ty = -Math.floor(pi / cols) * bd * PLATE_STRIDE + by;
     shifts.set(id, [tx - (mnx + mxx) / 2, ty - (mny + mxy) / 2]);
-    if (mxx - mnx > bw || mxy - mny > bd) oversize.push(id);
+    if (mxx - mnx > bw || mxy - mny > bd || Math.max(...on.map(j => j.geom.z)) > buildVolume(tpl)[2] + 0.01) oversize.push(id);
   }
   return { shifts, oversize };
 }
@@ -505,16 +540,27 @@ function patchPartExtruder(ms, objectId, partId, extruder) {
   }));
 }
 
+/* Farb-Modifikatoren des Designers auf andere Slots legen: map {Slot des Designers (0-basiert): eigener Slot}.
+   Nur Modifikatoren (subtype modifier_part); Bemalung je Dreieck (paint_color) bleibt beim Slot des Designers. */
+function patchModifierExtruders(ms, objectId, map, nFil) {
+  const objRe = new RegExp('(<object id="' + objectId + '">[\\s\\S]*?</object>)');
+  return ms.replace(objRe, obj => obj.replace(/(<part\b[^>]*subtype="modifier_part"[^>]*>)([\s\S]*?)(<\/part>)/g, (all, open, body, close) =>
+    open + body.replace(/(<metadata key="extruder" value=")(\d+)("\/>)/, (m, a, v, b) => {
+      const to = map[+v - 1];
+      return to == null ? m : a + (Math.min(to, nFil - 1) + 1) + b;
+    }) + close));
+}
+
 /* jobs: [{geom, r, slot, bodies?, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip. */
 function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, machine) {
   const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate }));
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
   const nFil = tpl.settings.filament_settings_id.length;
-  items.forEach(j => { if (partSlot(j) >= nFil) notes.push(j.geom.name + ': Slot ' + (partSlot(j) + 1) + ' gibt es an deinem Drucker nicht – bitte in Orca zuweisen.'); });
-  items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(j.geom.name + ' · ' + b.name + ': Slot ' + (b.slot + 1) + ' gibt es an deinem Drucker nicht – Slot ' + nFil + ' wird verwendet.'); }));
+  items.forEach(j => { if (partSlot(j) >= nFil) notes.push(t('{part}: Slot {n} gibt es an deinem Drucker nicht – bitte in Orca zuweisen.', { part: j.geom.name, n: partSlot(j) + 1 })); });
+  items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(t('{part} · {body}: Slot {n} gibt es an deinem Drucker nicht – Slot {last} wird verwendet.', { part: j.geom.name, body: b.name, n: b.slot + 1, last: nFil })); }));
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra.filter(e => e.slot < nFil), machine);
   const { shifts, oversize } = plateShifts(items, tpl);
-  oversize.forEach(id => notes.push('Platte ' + id + ' ist größer als dein Druckbett – in Orca prüfen.'));
+  oversize.forEach(id => notes.push(t('Platte {n} ist größer als dein Druckbett – in Orca prüfen.', { n: id })));
   {
     // Reinigungsturm je Platte (Platten-Ids 1..n); Teile nach der Verschiebung auf die Bettmitte
     const count = Math.max(1, ...items.map(j => j.plate || 1)), [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(count));
@@ -572,9 +618,10 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     const own = objectOverrides(settings, j.r);
     if (own.length) objectChanges.push({ name: j.geom.name, changes: own });
     const esc = String(j.part.objectId).replace(/[^\w-]/g, '');
-    if (!new RegExp('<object id="' + esc + '">').test(ms)) { notes.push(j.geom.name + ': keine Objekt-Einstellungen in der 3MF – Slot und eigene Werte bitte in Orca prüfen.'); continue; }
+    if (!new RegExp('<object id="' + esc + '">').test(ms)) { notes.push(t('{part}: keine Objekt-Einstellungen in der 3MF – Slot und eigene Werte bitte in Orca prüfen.', { part: j.geom.name })); continue; }
     ms = ms.replace(new RegExp('(<object id="' + esc + '">)([\\s\\S]*?)(?=<part\\b|</object>)'), (all, open, body) => patchObjectHead(open + body, Math.min(partSlot(j), nFil - 1) + 1, own, computedKeys));
     for (const b of j.bodies || []) if (b.partId != null) ms = patchPartExtruder(ms, esc, b.partId, b.slot == null ? null : Math.min(b.slot, nFil - 1) + 1);
+    if (threemf.designMap && Object.keys(threemf.designMap).length) ms = patchModifierExtruders(ms, esc, threemf.designMap, nFil);
   }
   out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
   return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: shifts.size };

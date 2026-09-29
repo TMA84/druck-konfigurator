@@ -10,6 +10,7 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   POST /api/anycubic/print  {host, job, plate, name, options}  → G-Code einer geslicten Platte hochladen und drucken
   POST /api/anycubic/command  {host, type, action, data}  → nur freigegebene Einstellungen (WRITABLE)
   POST /api/slice  (3MF als application/octet-stream)  → Verbrauch je Slot und Druckzeit je Platte (OrcaSlicer), job-Id
+       ?plates=2,3&count=4&reuse=<job>                  → nur diese Platten neu slicen, die übrigen aus <job> übernehmen
   GET  /api/slice/<job>/plate_<n>.preview              → kompakte Schichtvorschau (tools/gcode_preview.py)
   GET  /api/slice/<job>/plate_<n>.gcode                → G-Code zum Herunterladen
 
@@ -126,7 +127,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._json(415, {"error": "3MF als application/octet-stream erwartet", "kind": "bad_request"})
             if length > slicer.MAX_BYTES:
                 return self._json(413, {"error": "3MF zu groß (höchstens 200 MB)", "kind": "bad_request"})
-            return self._api(lambda: slicer.slice_3mf(self.rfile.read(length)))
+            # ?plates=2,3&count=4&reuse=<job>: nur geänderte Platten neu slicen, die übrigen übernehmen
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
+            count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
+            reuse = q.get("reuse", [""])[0] or None
+            return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
         if path == "/api/anycubic/print":
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})

@@ -18,7 +18,7 @@ function applyVendorConfig() {
   }
   if (typeof document !== 'undefined' && APP_CONFIG.vendors && APP_CONFIG.vendors.length === 1) {
     const small = document.getElementById('printerOrcaVendor');
-    if (small && small.textContent === 'Anderer') small.textContent = 'Anderer ' + APP_CONFIG.vendors[0];
+    if (small && small.textContent === t('Anderer')) small.textContent = t('Anderer {vendor}', { vendor: APP_CONFIG.vendors[0] });
   }
 }
 applyVendorConfig();

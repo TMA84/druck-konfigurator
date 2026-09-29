@@ -2,6 +2,66 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.0.0] – 2026-09-29
+
+### Neu
+- **Englische Oberfläche.** Umschalter **DE / EN** oben rechts; ohne Auswahl nach Browsersprache. Alle Texte der Seite, Dialoge, Datenblatt, Kosten, Vorschau, Warteschlange, Werkbank und die Meldungen des Servers. Technik: `t('Deutscher Text {x}', {x})` (js/util.js), Wörterbücher `js/i18n/en-*.js`, feste Seitentexte übersetzt `js/i18n/dom.js` beim Laden. Werte, die in die 3MF oder zum Drucker gehen, bleiben unverändert; Zahlen im Format der Sprache.
+- **Modernes Erscheinungsbild** (`css/modern.css`): ruhige Flächen und Karten, Systemschrift, schlanke Kopfzeile, Tabs mit Unterstrich, weichere Felder und Knöpfe.
+- **Dunkelmodus:** ☀ / A / ☾ oben rechts – hell, automatisch (wie das System) oder dunkel (`js/theme.js`).
+
+### Geprüft
+- Englisch im Browser: alle vier Tabs und alle Dialoge ohne deutsche Reste (automatische Suche), Slicen mit Kosten je Platte. Deutsch: Bedientest 112/112, alle Node-Tests, 3MF-Regression gegen OrcaSlicer ok; Datenblatt-Ausgaben byte-gleich zu vorher (≈ 13.500 Vergleiche).
+
+## [8.5.0] – 2026-09-29
+
+### Neu
+- **Kosten auch im Slicer:** Die 3MF enthält die Preise aus „Preise & Sätze“ – `filament_cost` je Slot (Filament- bzw. Typpreis) und `time_cost` (Strom + Verschleiß je Stunde). OrcaSlicer und AnycubicSlicerNext rechnen damit selbst (ohne Spülabfall, Aufschlag, MwSt.).
+
+### Geprüft
+- **AnycubicSlicerNext 1.4.1.1** (Orca 2.3.1) öffnet und slict die 3MF des Tools: eine und zwei Platten, alle geprüften Werte gleich wie in OrcaSlicer 2.4.2 (Temperaturen, Schichthöhe, Wände, Füllung, Stützen, Slot-Farben, Wechselzeit, Turm); Gramm/Zeit leicht anders (8,09 statt 7,88 g, 51 statt 55 min). Mit Kostenwerten: Filamentkosten 0,35 € aus den eigenen Preisen.
+- `tests/slice.py` prüft die Kostenwerte im G-Code (18/18), `tests/verify-3mf.js` unverändert ok.
+
+## [8.4.0] – 2026-09-28
+
+### Neu
+- **Farben des Designers → Slot** (① Modell, Makerworld-/Orca-3MF): jede Farbe des Designers – Objekt, Körper oder Farb-Modifikator wie ein Schriftzug – auf einen beliebigen ACE-Slot legen. Modifikatoren werden in der 3MF umgeschrieben; Bemalung mit dem Farbpinsel bleibt beim Slot des Designers (Hinweis).
+- **Prüfung vor dem Slicen:** Mischt eine Platte PLA/TPU mit PETG/ABS/ASA, meldet das Tool das gleich verständlich („Slot 2 PLA zusammen mit Slot 1 ABS …“) mit Lösungsweg, statt Orca erst scheitern zu lassen. Auch auf der Plattenkarte.
+- **Filament aus dem ACE übernehmen:** Knopf bei „Slot 1: braucht ABS, eingelegt ist ASA“ stellt die Teile auf das Filament im Slot um (nur sichtbar, wenn er etwas ändert).
+
+### Behoben
+- Orcas Meldung zu unverträglichen Düsentemperaturen kam teils als „unbekannter Fehler“ an.
+- **Slice-Vorschau zeigte nach dem Laden eines neuen Modells noch das alte.** Jetzt verwirft ein neues Modell das letzte Slice-Ergebnis sofort (auch ein noch laufendes), die Vorschau ist leer bis zum neuen Slicen; schlägt das Slicen fehl, bleibt sie leer. Zeigt die Vorschau einen älteren Stand desselben Projekts, steht „älterer Stand“ daneben.
+
+## [8.3.0] – 2026-09-28
+
+### Neu
+- **Platten-Übersicht** (① Modell): je Platte eine Karte mit Draufsicht aufs Bett, Teilen, genutzten Slots und Hinweis, wenn ein Slot anderes Filament braucht als eingelegt. Teile per Auswahl auf eine andere oder **neue Platte** verschieben; **Platzsparend anordnen** verteilt wieder automatisch. **Anzahl** je Teil (Kopien teilen Einstellungen, Slot und Farben). Makerworld-3MF: Platten des Designers, nur Anzeige.
+- **Kosten und Zeit je Platte** (③): Tabelle mit Zeit, Farbwechseln, Filament und Kosten je Platte; Klick zeigt die Platte in der Vorschau.
+- **Nur geänderte Platten neu slicen:** Ändert sich nur eine Platte, slict OrcaSlicer nur diese (`--slice N`), die übrigen G-Codes übernimmt der Server aus dem letzten Stand (`/api/slice?plates=…&count=…&reuse=…`). Fehlt der alte Stand, wird alles geslict.
+- **Reihenfolge nach Filament:** Empfehlung, erst alle Platten mit dem eingelegten Filament zu drucken und dann gruppiert nach nötigem Spulentausch.
+- **Druck-Warteschlange** (④ Drucker): „Alle Platten nacheinander …“ legt die Platten in dieser Reihenfolge an. Ist eine Platte fertig, meldet das Tool **„Bett abräumen“** (auch als Browser-Benachrichtigung und ● im Fenstertitel); die nächste startet erst nach Klick über den Senden-Dialog mit Slot-Prüfung. Restzeit aller Platten, Überspringen, Nochmal; abgebrochene Platten kommen zurück in die Warteschlange. Überwacht auch, wenn ein anderer Tab offen ist.
+- **Bauraum beachten:** 3D-Ansicht zeigt den Bauraum des Druckers (Kobra S1: 250 × 250 × 250 mm) als Drahtbox, rot mit Hinweis, wenn das Teil nicht hineinpasst – jetzt auch in der **Höhe**. Plattenübersicht, 3MF-Dialog und Makerworld-Platten prüfen ebenfalls die Höhe. Die Slice-Vorschau zeigt das Druckbett mit Rand.
+
+### Geprüft
+- `tests/plates.js` (22 Prüfungen: geänderte Platten, Filamentbedarf, Reihenfolge, Warteschlange, Plattenzuordnung, Überlauf). `tests/slice.py` mit echtem OrcaSlicer: nur Platte 2 neu geslict, Platte 1 übernommen, Summe gleich (16/16). `tests/verify-3mf.js` unverändert ok. Im Browser: Kopien, Verschieben, Bauraum-Warnung (280 mm hoch), Teil-Neuslicen „1 von 2“, Warteschlange mit simuliertem Druckerstand (kein Befehl an den echten Drucker).
+
+## [8.2.0] – 2026-09-28
+
+### Neu
+- **Werte für diesen Auftrag anpassen** (② Druckwerte): Düse, Bett, Schichthöhe, Wände, Deck-/Bodenschichten, Fülldichte, Füllmuster, Geschwindigkeiten, Lüfter, Stützen, Brim – je Teil, Vorschlag daneben, leer = Vorschlag. Die Anpassung wirkt in `compute()` selbst, dadurch gleich in Datenblatt (markiert, mit Vorschlag), 3MF, Slicen, Kosten und Drucken. Auf Wunsch für alle Teile.
+- 3MF: weitere Füllmuster (kubisch, Gitter, Waben, Linien, Dreiecke, Kreuzschraffur, Blitz).
+
+### Geprüft
+- `tests/overrides.js` (13 Prüfungen: 3MF-Werte, Markierung, Vorschlag bleibt, gleicher Wert ≠ Abweichung, Stützen aus). Im Browser: Anpassung → Datenblatt markiert, 3MF mit 5 Wänden/50 %/kubisch/225 °C, Kosten automatisch neu (4,26 → 6,81 g).
+
+## [8.1.0] – 2026-09-28
+
+### Geändert
+- **Drucker-Seite neu gestaltet:** Statusleiste (Drucker, Firmware, Zustand, Verbindung, Licht) · Druckauftrag groß mit lesbarem Namen (aus „0928-1842-Name_plate(01)_ASA_0.16_…“ wird „Name“ + „Platte 1 · ASA · 0,16 mm“), Fortschritt, Schicht, **fertig um**, Filament bisher · Kamera groß · Temperaturen mit Heizbalken · ACE als Slot-Kacheln in Filamentfarbe mit Trocknen-Fortschritt · Achsen während eines Drucks nur als Hinweis. Knöpfe ohne Auftrag ausgeblendet.
+
+### Behoben
+- **Slots aus der ACE nach einem Fehlversuch:** Scheiterte das Lesen (z. B. Container ohne Heimnetz), blieb die Seite still bei den eigenen Angaben. Jetzt neuer Versuch alle 30 s und beim Zurückkehren ins Fenster; Auswahllisten zeigen „(eigene Angabe)“, solange die Werte nicht vom Drucker stammen.
+
 ## [8.0.0] – 2026-09-28
 
 ### Geändert

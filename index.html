@@ -4,6 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Druck-Konfigurator</title>
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/modern.css">
+<script src="js/theme.js"></script>
 </head>
 <body data-printer="kobra_s1" data-tab="settings">
 
@@ -63,6 +65,10 @@
     </div>
     <button type="button" class="menu-btn help-btn" data-action="help" aria-label="Hilfe">?</button>
   </nav>
+  <div class="top-prefs" role="group" aria-label="Sprache und Darstellung">
+    <span class="seg" role="group" aria-label="Sprache"><button type="button" data-lang="de" aria-pressed="false">DE</button><button type="button" data-lang="en" aria-pressed="false">EN</button></span>
+    <span class="seg" role="group" aria-label="Darstellung"><button type="button" data-theme-set="light" aria-pressed="false" title="Hell">☀</button><button type="button" data-theme-set="auto" aria-pressed="false" title="Automatisch (wie das System)">A</button><button type="button" data-theme-set="dark" aria-pressed="false" title="Dunkel">☾</button></span>
+  </div>
 </header>
 
 <div class="tabs noprint" role="tablist" aria-label="Arbeitsschritte">
@@ -115,6 +121,7 @@
         <span class="eyebrow" id="resultPrinter">Startprofil</span>
         <h2 id="title">Empfohlenes Startprofil</h2>
         <div id="summary" class="muted"></div>
+        <div class="ov-bar noprint"><button type="button" class="btn sec" id="ovOpen">✎ Werte für diesen Auftrag anpassen</button><span id="ovInfo" class="muted small"></span><button type="button" class="linkbtn hidden" id="ovReset">Alle Anpassungen zurücknehmen</button></div>
       </header>
       <div id="danger" class="note bad"></div>
 
@@ -151,6 +158,11 @@
         <span class="eyebrow" id="costPanelTitle">Kosten</span>
         <p id="costPanelInfo" class="muted small"></p>
         <table id="costTable" class="cost-table hidden"><tbody></tbody></table>
+        <div id="plateCosts" class="hidden">
+          <span class="eyebrow">Je Platte</span>
+          <table class="cost-table plate-costs"><thead><tr><th>Platte</th><th>Zeit</th><th>Filament</th><th>Kosten</th></tr></thead><tbody></tbody></table>
+          <p id="plateOrder" class="muted small"></p>
+        </div>
         <label class="wb-toggle small" title="Nach jeder Änderung an Einstellungen oder Modell neu slicen (kurz verzögert)"><input type="checkbox" id="costAuto"> automatisch neu berechnen</label>
         <div class="field-links"><button class="btn sec" type="button" id="costRun">Kosten berechnen</button><button class="btn sec hidden" type="button" id="previewOpen">Slice-Vorschau</button><button class="linkbtn" type="button" data-action="costs">Preise &amp; Sätze …</button></div>
       </section>
@@ -161,6 +173,7 @@
         </div>
         <div class="export-cta-action">
           <button type="button" class="btn-accent hidden" id="sendOpen">Drucken …</button>
+          <button type="button" class="btn sec hidden" id="queueStart" title="Alle Platten nacheinander drucken – nach jeder Platte meldet das Tool „Bett abräumen“, die nächste startest du mit einem Klick">Alle Platten nacheinander …</button>
           <button type="button" class="btn-accent" id="export3mfCta" disabled>3MF für OrcaSlicer speichern</button>
           <small id="export3mfCtaNote"></small>
         </div>
@@ -182,6 +195,7 @@
     <section id="previewDlg" class="preview-panel" aria-labelledby="previewTitle">
   <div class="preview-bar">
     <b id="previewTitle">Vorschau</b>
+    <span id="pvStale" class="pv-stale hidden" title="Das Projekt hat sich seit dem letzten Slicen geändert">älterer Stand</span>
     <label>Platte <select id="pvPlate"></select></label>
     <label>Farben <select id="pvColour"><option value="type">nach Linienart</option><option value="tool">nach Filament (Slot)</option></select></label>
     <label class="pv-only"><input type="checkbox" id="pvOnly"> nur diese Schicht</label>
@@ -208,56 +222,77 @@
     <div class="slot-connect"><input id="wbHost" inputmode="decimal" placeholder="IP des Druckers, z. B. 192.168.1.50" autocomplete="off" aria-label="IP-Adresse des Druckers"><button class="btn" type="button" id="wbConnect">Verbinden</button></div>
   </div>
   <div id="wbGrid" class="wb-grid hidden">
+    <header class="wb-bar">
+      <div class="wb-bar-main"><b id="wbName">Kobra S1</b><span id="wbMeta" class="muted small"></span></div>
+      <span id="wbState" class="wb-pill"></span>
+      <span id="wbConn" class="wb-pill"></span>
+      <label class="wb-toggle wb-light" title="Licht im Drucker"><input type="checkbox" id="wbLight"> Licht</label>
+      <span class="wb-bar-links"><button class="linkbtn" type="button" data-action="link">Verbindung …</button><button class="linkbtn" type="button" id="wbRaw">Rohdaten</button></span>
+    </header>
+    <pre id="wbRawOut" class="wb-raw hidden"></pre>
+
+    <section id="queueCard" class="wb-card wb-queue hidden" aria-labelledby="queueT">
+      <div class="wb-queue-head"><h3 id="queueT" class="wb-eyebrow">Warteschlange</h3><span id="queueSum" class="muted small"></span><button class="linkbtn" type="button" id="queueEnd">Beenden</button></div>
+      <div id="queueBanner" class="wb-queue-banner hidden" role="status"></div>
+      <ol id="queueList" class="wb-queue-list"></ol>
+    </section>
+
     <section class="wb-card wb-job" aria-labelledby="wbJobT">
-      <div class="wb-head"><h3 id="wbJobT">Druckauftrag</h3><span id="wbState" class="wb-pill"></span></div>
+      <h3 id="wbJobT" class="wb-eyebrow">Druckauftrag</h3>
       <div id="wbJob"></div>
       <div class="wb-actions"><button class="btn sec" type="button" id="wbPause">Pausieren</button><button class="btn sec" type="button" id="wbResume">Fortsetzen</button><button class="btn danger" type="button" id="wbStop">Abbrechen</button></div>
     </section>
     <section class="wb-card wb-cam" aria-labelledby="wbCamT">
-      <div class="wb-head"><h3 id="wbCamT">Kamera</h3><button class="btn sec" type="button" id="wbCamBtn">Kamera starten</button></div>
-      <div class="wb-video"><video id="wbVideo" muted playsinline></video><p id="wbCamNote" class="wb-video-note">Kamera aus</p></div>
+      <h3 id="wbCamT" class="visually-hidden">Kamera</h3>
+      <div class="wb-video"><video id="wbVideo" muted playsinline></video>
+        <p id="wbCamNote" class="wb-video-note">Kamera aus</p>
+        <button class="btn wb-cam-btn" type="button" id="wbCamBtn">Kamera starten</button></div>
     </section>
-    <section class="wb-card" aria-labelledby="wbSetT">
-      <div class="wb-head"><h3 id="wbSetT">Druckeinstellungen</h3></div>
+
+    <section class="wb-card wb-heat" aria-labelledby="wbSetT">
+      <h3 id="wbSetT" class="wb-eyebrow">Temperaturen &amp; Lüfter</h3>
       <div class="wb-temps">
-        <div class="wb-temp"><span>Düse</span><b id="wbNozCur">–</b><small id="wbNozTgt"></small><input id="wbNozIn" type="number" min="0" max="300" step="5" aria-label="Düse Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="0">Setzen</button></div>
-        <div class="wb-temp"><span>Heizbett</span><b id="wbBedCur">–</b><small id="wbBedTgt"></small><input id="wbBedIn" type="number" min="0" max="110" step="5" aria-label="Bett Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="1">Setzen</button></div>
+        <div class="wb-temp"><span class="wb-temp-name">Düse</span><b id="wbNozCur">–</b><small id="wbNozTgt"></small><i class="wb-heatbar"><i id="wbNozBar"></i></i>
+          <span class="wb-temp-set"><input id="wbNozIn" type="number" min="0" max="300" step="5" aria-label="Düse Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="0">Setzen</button></span></div>
+        <div class="wb-temp"><span class="wb-temp-name">Heizbett</span><b id="wbBedCur">–</b><small id="wbBedTgt"></small><i class="wb-heatbar"><i id="wbBedBar"></i></i>
+          <span class="wb-temp-set"><input id="wbBedIn" type="number" min="0" max="110" step="5" aria-label="Bett Zieltemperatur"><button class="btn sec" type="button" data-wb-temp="1">Setzen</button></span></div>
       </div>
-      <div class="wb-presets"><span class="muted small">Vorheizen:</span><button class="linkbtn" type="button" data-wb-preset="pla">PLA 215/60</button><button class="linkbtn" type="button" data-wb-preset="petg">PETG 240/75</button><button class="linkbtn" type="button" data-wb-preset="asa">ASA/ABS 250/95</button><button class="linkbtn" type="button" data-wb-preset="off">Aus</button></div>
+      <div class="wb-presets"><span class="muted small">Vorheizen</span><button class="wb-chip" type="button" data-wb-preset="pla">PLA 215/60</button><button class="wb-chip" type="button" data-wb-preset="petg">PETG 240/75</button><button class="wb-chip" type="button" data-wb-preset="asa">ASA/ABS 250/95</button><button class="wb-chip" type="button" data-wb-preset="off">Aus</button></div>
       <div class="wb-fans">
-        <label>Bauteillüfter <input type="range" min="0" max="100" step="5" id="wbFan0" data-wb-fan="fan_speed_pct"><output></output></label>
-        <label>Zusatzlüfter <input type="range" min="0" max="100" step="5" id="wbFan1" data-wb-fan="aux_fan_speed_pct"><output></output></label>
-        <label>Gehäuselüfter <input type="range" min="0" max="100" step="5" id="wbFan2" data-wb-fan="box_fan_level"><output></output></label>
+        <label>Bauteil <input type="range" min="0" max="100" step="5" id="wbFan0" data-wb-fan="fan_speed_pct"><output></output></label>
+        <label>Zusatz <input type="range" min="0" max="100" step="5" id="wbFan1" data-wb-fan="aux_fan_speed_pct"><output></output></label>
+        <label>Gehäuse <input type="range" min="0" max="100" step="5" id="wbFan2" data-wb-fan="box_fan_level"><output></output></label>
       </div>
-      <div class="wb-row"><label class="wb-toggle"><input type="checkbox" id="wbLight"> Licht</label><span class="muted small" id="wbSpeed"></span></div>
+      <p class="muted small" id="wbSpeed"></p>
     </section>
-    <section class="wb-card" aria-labelledby="wbAxT">
-      <div class="wb-head"><h3 id="wbAxT">Achsen</h3><span id="wbPos" class="muted small"></span></div>
-      <p id="wbAxNote" class="note hidden">Während eines Drucks gesperrt.</p>
-      <div class="wb-jog">
-        <div class="wb-pad">
-          <span></span><button type="button" data-wb-jog="2,1" title="Y +">Y+</button><span></span>
-          <button type="button" data-wb-jog="1,0" title="X −">X−</button><button type="button" data-wb-home="4" title="X/Y nach Hause">⌂ XY</button><button type="button" data-wb-jog="1,1" title="X +">X+</button>
-          <span></span><button type="button" data-wb-jog="2,0" title="Y −">Y−</button><span></span>
-        </div>
-        <div class="wb-z"><button type="button" data-wb-jog="3,1" title="Z +">Z+</button><button type="button" data-wb-home="3" title="Z nach Hause">⌂ Z</button><button type="button" data-wb-jog="3,0" title="Z −">Z−</button></div>
-      </div>
-      <div class="wb-row"><label>Schritt <select id="wbStep"><option value="1">1 mm</option><option value="10" selected>10 mm</option><option value="50">50 mm</option></select></label><button class="linkbtn" type="button" id="wbMotorsOff">Motoren aus</button></div>
-      <p class="muted small">Nicht referenzierte Achsen fährt der Drucker nicht – erst ⌂ drücken. Z+ senkt beim Kobra S1 das Bett (Abstand zur Düse wird größer).</p>
-    </section>
-    <section class="wb-card" aria-labelledby="wbAceT">
-      <div class="wb-head"><h3 id="wbAceT">ACE-Verwaltung</h3><span id="wbAceTemp" class="muted small"></span></div>
+
+    <section class="wb-card wb-acecard" aria-labelledby="wbAceT">
+      <div class="wb-head"><h3 id="wbAceT" class="wb-eyebrow">ACE</h3><span id="wbAceTemp" class="muted small"></span></div>
       <ul id="wbAceSlots" class="wb-ace"></ul>
-      <div class="wb-row"><label class="wb-toggle"><input type="checkbox" id="wbAutoFeed"> Automatisch nachfüllen</label></div>
-      <div class="wb-dry"><span>Trocknen</span><input id="wbDryTemp" type="number" min="35" max="55" step="5" value="45" aria-label="Trockentemperatur"><span class="muted small">°C</span><input id="wbDryMin" type="number" min="30" max="1440" step="30" value="240" aria-label="Trockendauer"><span class="muted small">min</span><button class="btn sec" type="button" id="wbDry">Starten</button></div>
-      <p id="wbDryState" class="muted small"></p>
+      <div id="wbDryBox" class="wb-drybox">
+        <div class="wb-dry-state"><b>Trocknen</b><span id="wbDryState" class="muted small">aus</span><i class="wb-heatbar"><i id="wbDryBar"></i></i></div>
+        <div class="wb-dry"><input id="wbDryTemp" type="number" min="35" max="55" step="5" value="45" aria-label="Trockentemperatur"><span class="muted small">°C</span><input id="wbDryMin" type="number" min="30" max="1440" step="30" value="240" aria-label="Trockendauer"><span class="muted small">min</span><button class="btn sec" type="button" id="wbDry">Starten</button></div>
+      </div>
+      <label class="wb-toggle"><input type="checkbox" id="wbAutoFeed"> Automatisch nachfüllen, wenn eine Rolle leer ist</label>
     </section>
-    <section class="wb-card" aria-labelledby="wbPrT">
-      <div class="wb-head"><h3 id="wbPrT">Drucker</h3><span id="wbConn" class="wb-pill"></span></div>
-      <dl id="wbInfo" class="wb-info"></dl>
-      <div class="wb-row"><button class="linkbtn" type="button" data-action="link">Verbindung ändern …</button><button class="linkbtn" type="button" id="wbRaw">Rohdaten</button></div>
-      <pre id="wbRawOut" class="wb-raw hidden"></pre>
+
+    <section class="wb-card wb-axes" aria-labelledby="wbAxT">
+      <div class="wb-head"><h3 id="wbAxT" class="wb-eyebrow">Achsen</h3><span id="wbPos" class="wb-pos"></span></div>
+      <p id="wbAxNote" class="wb-locked hidden">🔒 Während eines Drucks gesperrt.</p>
+      <div id="wbAxBody">
+        <div class="wb-jog">
+          <div class="wb-pad">
+            <span></span><button type="button" data-wb-jog="2,1" title="Y +">Y+</button><span></span>
+            <button type="button" data-wb-jog="1,0" title="X −">X−</button><button type="button" data-wb-home="4" title="X/Y nach Hause">⌂ XY</button><button type="button" data-wb-jog="1,1" title="X +">X+</button>
+            <span></span><button type="button" data-wb-jog="2,0" title="Y −">Y−</button><span></span>
+          </div>
+          <div class="wb-z"><button type="button" data-wb-jog="3,1" title="Z +">Z+</button><button type="button" data-wb-home="3" title="Z nach Hause">⌂ Z</button><button type="button" data-wb-jog="3,0" title="Z −">Z−</button></div>
+        </div>
+        <div class="wb-row"><label class="small">Schritt <select id="wbStep"><option value="1">1 mm</option><option value="10" selected>10 mm</option><option value="50">50 mm</option></select></label><button class="linkbtn" type="button" id="wbMotorsOff">Motoren aus</button></div>
+        <p class="muted small">Erst ⌂ referenzieren – sonst fährt der Drucker nicht. Z+ senkt beim Kobra S1 das Bett.</p>
+      </div>
     </section>
+    <dl id="wbInfo" class="hidden"></dl>
   </div>
 </section>
 
@@ -268,6 +303,19 @@
         <div id="fileinfo">Noch keine Datei geladen.</div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
         <p id="importNotes" class="muted hidden"></p>
+        <section id="designBox" class="plates hidden" aria-labelledby="designTitle">
+          <div class="orient-head"><span class="eyebrow" id="designTitle">Farben des Designers</span><button type="button" id="designReset" class="linkbtn hidden">Wie vom Designer</button></div>
+          <p class="muted small">Jede Farbe auf einen Slot deiner ACE legen – z. B. auf einen mit derselben Filamentart.</p>
+          <ul id="designList" class="design-list"></ul>
+          <p id="designNote" class="muted small hidden"></p>
+        </section>
+        <section id="plateBox" class="plates hidden" aria-labelledby="plateTitle">
+          <div class="orient-head"><span class="eyebrow" id="plateTitle">Platten</span><button type="button" id="plateAuto" class="linkbtn hidden" title="Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen">Platzsparend anordnen</button></div>
+          <p id="plateInfo" class="muted small"></p>
+          <div id="plateCopies" class="plate-copies"><span>Anzahl <b id="plateCopyName"></b></span><span class="stepper"><button type="button" id="plateCopyMinus" aria-label="Eine Kopie weniger">−</button><input id="plateCopyN" type="number" min="1" max="50" step="1" inputmode="numeric" aria-label="Anzahl des gewählten Teils"><button type="button" id="plateCopyPlus" aria-label="Eine Kopie mehr">+</button></span></div>
+          <p id="plateWarn" class="note bad small hidden"></p>
+          <ol id="plateList" class="plate-list"></ol>
+        </section>
         <section id="orientBox" class="orient hidden" aria-labelledby="orientTitle">
           <div class="orient-head"><span class="eyebrow" id="orientTitle">Lage auf dem Bett</span><span id="orientPart" class="muted"></span></div>
           <p id="orientInfo" aria-live="polite"></p>
@@ -299,6 +347,7 @@
   <div id="stage">
     <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
     <div id="info" class="hud"></div>
+    <p id="volWarn" class="hud vol-warn hidden" role="status"></p>
     <div id="controls" class="hud">
       <button id="btnWireframe" type="button">Wireframe</button>
       <button id="btnAxes" type="button" class="active">Achsen</button>
@@ -400,6 +449,11 @@
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="sendGo">Jetzt drucken</button></div></dialog>
 
+<dialog id="ovDlg" aria-labelledby="ovTitle"><div class="ed-head"><h2 id="ovTitle">Werte für diesen Auftrag anpassen</h2><div class="muted" id="ovSub">Der Vorschlag steht links. Trägst du einen Wert ein, gilt er statt des Vorschlags – im Datenblatt, in der 3MF, beim Slicen und für die Kosten. Leer = Vorschlag.</div></div>
+  <div class="ed-body"><div id="ovRows"></div>
+    <label class="wb-toggle hidden" id="ovAllRow"><input type="checkbox" id="ovAll"> Für alle Teile des Projekts übernehmen</label></div>
+  <div class="ed-foot"><button class="btn sec" type="button" id="ovClear">Alle leeren (Vorschlag)</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="ovSave">Übernehmen</button></div></dialog>
+
 <dialog id="costDlg" aria-labelledby="costDlgTitle"><div class="ed-head"><h2 id="costDlgTitle">Kosten: Preise &amp; Sätze</h2><div class="muted">Grundlage der Kostenkalkulation. Verbrauch und Druckzeit kommen aus dem exakten Slicen mit OrcaSlicer, der Spülabfall aus „Farbwechsel &amp; Spülmenge“.</div></div>
   <div class="ed-body">
     <div class="ed-group"><h4>Preis je Filamenttyp (€/kg)</h4>
@@ -474,6 +528,14 @@
 <script src="vendor/three.min.js"></script>
 <script src="vendor/OrbitControls.js"></script>
 <script src="js/util.js"></script>
+<script src="js/i18n/en-html.js"></script>
+<script src="js/i18n/en-sheet.js"></script>
+<script src="js/i18n/en-export.js"></script>
+<script src="js/i18n/en-slice.js"></script>
+<script src="js/i18n/en-app.js"></script>
+<script src="js/i18n/en-server.js"></script>
+<script src="js/i18n/en-ui.js"></script>
+<script src="js/i18n/dom.js"></script>
 <script src="js/data.js"></script>
 <script src="js/config.js"></script>
 <script src="js/stl.js"></script>
@@ -487,6 +549,7 @@
 <script src="js/export3mf.js"></script>
 <script src="js/purge.js"></script>
 <script src="js/costs.js"></script>
+<script src="js/plates.js"></script>
 <script src="js/orca-printers/index.js"></script>
 <script src="js/orca-generic.js"></script>
 <script src="js/printer-link.js"></script>
@@ -499,11 +562,15 @@
 <script src="js/part-settings.js"></script>
 <script src="js/holes-ui.js"></script>
 <script src="js/bodies-ui.js"></script>
+<script src="js/overrides-ui.js"></script>
 <script src="js/costs-ui.js"></script>
+<script src="js/design-ui.js"></script>
+<script src="js/plates-ui.js"></script>
 <script src="js/preview-ui.js"></script>
 <script src="vendor/flv.min.js"></script>
 <script src="js/workbench-ui.js"></script>
 <script src="js/send-ui.js"></script>
+<script src="js/queue-ui.js"></script>
 <script src="js/printer-picker.js"></script>
 </body>
 </html>

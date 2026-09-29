@@ -8,7 +8,7 @@ const Viewer = (() => {
   const CLICK_TOLERANCE_PX = 5;
 
   let renderer = null, scene, camera, controls, stage;
-  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100;
+  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100, volBox = null, volume = null;
   let wireframeOn = false;
   const clip = { on: false, axis: 'x', fraction: 0, plane: null, helper: null };
   const measure = { on: false, points: [], markers: [], line: null, onChange: () => {} };
@@ -64,6 +64,21 @@ const Viewer = (() => {
     grid.rotation.x = Math.PI / 2;
     scene.add(grid);
     axes.scale.setScalar(size * 0.75);
+  }
+
+  /* Bauraum des Druckers als Drahtbox um das Teil (Mitte wie das Teil, Boden z = 0); rot, wenn das Teil
+     nicht hineinpasst. vol = [Breite, Tiefe, Höhe] oder null. */
+  function setVolume(vol, over) {
+    volume = vol;
+    if (!renderer) return;
+    if (volBox) { scene.remove(volBox); volBox.geometry.dispose(); volBox.material.dispose(); volBox = null; }
+    if (!vol) return;
+    const h = isFinite(vol[2]) ? vol[2] : Math.max(vol[0], vol[1]);
+    const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol[0], vol[1], h));
+    volBox = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: over ? 0xe5514f : 0x5f7d9c, transparent: true, opacity: over ? 0.9 : 0.55 }));
+    volBox.position.set(0, 0, h / 2);
+    scene.add(volBox);
+    if (camera) { camera.far = Math.max(camera.far, Math.max(vol[0], vol[1], h) * 20); camera.updateProjectionMatrix(); }
   }
 
   function disposeMesh() {
@@ -158,7 +173,7 @@ const Viewer = (() => {
     measure.markers = [];
     if (measure.line) { scene.remove(measure.line); measure.line.geometry.dispose(); measure.line.material.dispose(); measure.line = null; }
     measure.points = [];
-    measure.onChange(measure.on ? 'Ersten Punkt anklicken …' : '');
+    measure.onChange(measure.on ? t('Ersten Punkt anklicken …') : '');
   }
   function addMeasurePoint(point) {
     if (measure.points.length >= 2) clearMeasurement();
@@ -170,9 +185,9 @@ const Viewer = (() => {
     if (measure.points.length === 2) {
       measure.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(measure.points), new THREE.LineBasicMaterial({ color: MARKER_COLOR }));
       scene.add(measure.line);
-      measure.onChange(`Abstand: ${measure.points[0].distanceTo(measure.points[1]).toFixed(2)} mm`);
+      measure.onChange(t('Abstand: {d} mm', { d: measure.points[0].distanceTo(measure.points[1]).toFixed(2) }));
     } else {
-      measure.onChange('Zweiten Punkt anklicken …');
+      measure.onChange(t('Zweiten Punkt anklicken …'));
     }
   }
   function setMeasure(on, onChange) {
@@ -204,5 +219,5 @@ const Viewer = (() => {
     });
   }
 
-  return { available, init, show, clear, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
+  return { available, init, show, clear, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
 })();

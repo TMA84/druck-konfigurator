@@ -14,6 +14,9 @@ const COST_DEFAULTS = {
   vatPct: 0          // MwSt. (z. B. 19), auf Summe + Aufschlag
 };
 
+// Sprache: t() aus js/util.js, in tests/costs.js (ohne util.js) nur die Platzhalter ersetzen
+const costT = (s, p) => typeof t === 'function' ? t(s, p) : s.replace(/\{(\w+)\}/g, (m, k) => p && k in p ? p[k] : m);
+
 /* slice: {total:{grams:[je Slot], time_s, changes}}
    slots: [{name, pricePerKg}] je Slot-Index (Filament in diesem Slot)
    purge: {gramsPerChange} oder null (kein Spülabfall, z. B. Werkzeugwechsler)
@@ -30,10 +33,10 @@ function computeCosts(slice, slots, purge, cfg) {
   });
   if (purge && purge.gramsPerChange > 0 && t.changes > 0) {
     const g = t.changes * purge.gramsPerChange, price = usedG > 0 ? usedEur / usedG * 1000 : c.pricePerKg;
-    lines.push({ key: 'purge', label: 'Spülabfall (' + t.changes + ' Wechsel)', grams: g, pricePerKg: price, eur: g / 1000 * price });
+    lines.push({ key: 'purge', label: costT('Spülabfall ({n} Wechsel)', { n: t.changes }), grams: g, pricePerKg: price, eur: g / 1000 * price });
   }
-  if (c.powerW > 0 && c.kwhPrice > 0) lines.push({ key: 'power', label: 'Strom', kwh: c.powerW / 1000 * hours, eur: c.powerW / 1000 * hours * c.kwhPrice });
-  if (c.wearPerHour > 0) lines.push({ key: 'wear', label: 'Verschleiß', hours, eur: hours * c.wearPerHour });
+  if (c.powerW > 0 && c.kwhPrice > 0) lines.push({ key: 'power', label: costT('Strom'), kwh: c.powerW / 1000 * hours, eur: c.powerW / 1000 * hours * c.kwhPrice });
+  if (c.wearPerHour > 0) lines.push({ key: 'wear', label: costT('Verschleiß'), hours, eur: hours * c.wearPerHour });
   const subtotal = lines.reduce((s, l) => s + l.eur, 0);
   const markup = subtotal * (c.markupPct || 0) / 100, vat = (subtotal + markup) * (c.vatPct || 0) / 100;
   const grams = lines.filter(l => l.grams).reduce((s, l) => s + l.grams, 0);

@@ -169,9 +169,9 @@ function parse3MF(fileName, zip, zipLib) {
   const text = p => zip[p] ? zipLib.strFromU8(zip[p]) : null;
   const rels = text('_rels/.rels') || '';
   const rootPath = ((/Target="\/?([^"]+\.model)"/.exec(rels) || [])[1]) || Object.keys(zip).find(k => /^3D\/[^/]+\.model$/i.test(k));
-  if (!rootPath || !zip[rootPath]) throw Error('kein 3D-Modell in der 3MF gefunden');
+  if (!rootPath || !zip[rootPath]) throw Error(t('kein 3D-Modell in der 3MF gefunden'));
   const models = new Map();
-  const model = p => { if (!models.has(p)) { const t = text(p); if (t === null) throw Error(p + ' fehlt'); models.set(p, parseModelXML(t)); } return models.get(p); };
+  const model = p => { if (!models.has(p)) { const xml = text(p); if (xml === null) throw Error(t('{file} fehlt', { file: p })); models.set(p, parseModelXML(xml)); } return models.get(p); };
   const root = model(rootPath);
   const settings = parseModelSettings(text('Metadata/model_settings.config'));
   const plateOf = new Map();
@@ -181,10 +181,10 @@ function parse3MF(fileName, zip, zipLib) {
   // Alle Dreiecke eines Objekts (rekursiv über Komponenten) mit der Gesamttransformation sammeln
   // volumes (nur oberste Ebene): je Bauteil {partId, count} – das sind die Körper des Objekts
   function collect(path, id, T, skipPart, out, depth, volumes, flags = {}) {
-    if (depth > 8) throw Error('verschachtelte Komponenten zu tief');
+    if (depth > 8) throw Error(t('verschachtelte Komponenten zu tief'));
     const obj = model(path).objects.get(id);
-    if (!obj) throw Error('Objekt ' + id + ' fehlt in ' + path);
-    if (obj.mesh && obj.mesh.painted) flags.painted = true;
+    if (!obj) throw Error(t('Objekt {id} fehlt in {file}', { id, file: path }));
+    if (obj.mesh && obj.mesh.painted) flags.painted = flags.paintTris = true;
     if (obj.mesh) {
       const { v, t } = obj.mesh;
       for (let i = 0; i < t.length; i++) {
@@ -213,7 +213,8 @@ function parse3MF(fileName, zip, zipLib) {
     const out = [], volumes = [], flags = {};
     collect(rootPath, item.objectid, item.transform, skipPart, out, 0, volumes, flags);
     // Modifikator mit eigenem Slot (z. B. Text/Logo des Designers) färbt das Teil – ebenfalls mehrfarbig
-    if (ms && [...ms.parts.values()].some(p => p.subtype === 'modifier_part' && p.extruder && p.extruder !== ms.extruder)) flags.painted = true;
+    const mods = ms ? [...new Set([...ms.parts.values()].filter(p => p.subtype === 'modifier_part' && p.extruder && p.extruder !== ms.extruder).map(p => +p.extruder))] : [];
+    if (mods.length) flags.painted = true;
     if (!out.length) return;
     // Mehrere Bauteile im Objekt = Körper mit eigenem Slot (Mehrfarbig); Name und Slot aus model_settings
     const bodies = volumes.length > 1 && volumes.reduce((s, v) => s + v.count, 0) === out.length / 9
@@ -224,13 +225,13 @@ function parse3MF(fileName, zip, zipLib) {
       name: unxml((ms && ms.name) || obj.name || 'Objekt ' + item.objectid),
       pos: Float32Array.from(out), objectId: item.objectid, instance,
       extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid + '#' + instance) || 1, printable: item.printable,
-      ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {})
+      ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {}), ...(mods.length ? { modifiers: mods } : {}), ...(flags.paintTris ? { paintTris: true } : {})
     });
   });
-  if (!parts.length) throw Error('keine druckbaren Objekte in ' + fileName);
-  if (skipped) notes.push(skipped + ' Modifier/Hilfskörper ausgelassen (werden nicht gedruckt).');
+  if (!parts.length) throw Error(t('keine druckbaren Objekte in {file}', { file: fileName }));
+  if (skipped) notes.push(t('{n} Modifier/Hilfskörper ausgelassen (werden nicht gedruckt).', { n: skipped }));
   let projectSettings = null;
-  try { projectSettings = JSON.parse(text('Metadata/project_settings.config') || 'null'); } catch (e) { notes.push('Einstellungen der 3MF nicht lesbar – nur die Geometrie wird verwendet.'); }
+  try { projectSettings = JSON.parse(text('Metadata/project_settings.config') || 'null'); } catch (e) { notes.push(t('Einstellungen der 3MF nicht lesbar – nur die Geometrie wird verwendet.')); }
   return { parts, notes, threemf: { name: fileName, zip, plates: settings.plates, settings: projectSettings } };
 }
 
@@ -251,18 +252,18 @@ function importModels(entries, zipLib) {
     if (/\.zip$/i.test(e.name)) {
       const zip = zipLib.unzipSync(e.bytes);
       const inner = Object.keys(zip).filter(k => MODEL_EXT.test(k) && !/(^|\/)(__MACOSX|\.)/.test(k) && zip[k].length);
-      if (!inner.length) notes.push(e.name + ': keine STL/3MF darin.');
+      if (!inner.length) notes.push(t('{file}: keine STL/3MF darin.', { file: e.name }));
       files.push(...inner.map(k => ({ name: k.replace(/^.*\//, ''), bytes: zip[k], from: e.name })));
     } else if (MODEL_EXT.test(e.name)) files.push(e);
-    else notes.push(e.name + ': nur STL, 3MF oder ZIP.');
+    else notes.push(t('{file}: nur STL, 3MF oder ZIP.', { file: e.name }));
   }
   // Makerworld-ZIPs enthalten oft dasselbe Modell als 3MF und als STLs: genau eine 3MF hat Vorrang.
   const tmf = files.filter(f => /\.3mf$/i.test(f.name));
   if (tmf.length === 1 && files.length > 1) {
-    notes.push('Die 3MF „' + tmf[0].name + '“ wird verwendet, ' + (files.length - 1) + ' weitere Datei(en) ignoriert.');
+    notes.push(t('Die 3MF „{file}“ wird verwendet, {n} weitere Datei(en) ignoriert.', { file: tmf[0].name, n: files.length - 1 }));
     files = tmf;
   }
-  if (!files.length) throw Error(notes.join(' ') || 'keine Modelldatei');
+  if (!files.length) throw Error(notes.join(' ') || t('keine Modelldatei'));
 
   const parts = [];
   let threemf = null;
@@ -273,7 +274,7 @@ function importModels(entries, zipLib) {
       if (files.length === 1) threemf = r.threemf;
     } else parts.push(...stlParts(f.name, f.bytes));
   }
-  if (files.length > 1 && tmf.length) notes.push('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.');
-  const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : parts.length + ' Teile';
+  if (files.length > 1 && tmf.length) notes.push(t('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.'));
+  const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : t('{n} Teile', { n: parts.length });
   return { name, parts, threemf, notes };
 }

@@ -21,13 +21,16 @@ $('printer').addEventListener('change',()=>{store.last.printer=$('printer').valu
 // Speichert und zeigt einen Hinweis, wenn der Browser kein dauerhaftes Speichern erlaubt.
 function persist(){
   const ok=saveStore(),w=$('storeWarn');
-  if(!ok){w.innerHTML='<b>Hinweis:</b> Dieser Browser erlaubt hier kein dauerhaftes Speichern. Deine Werte gelten nur bis zum Schließen – bitte über <b>Exportieren</b> sichern.';w.classList.remove('hidden')}
+  if(!ok){w.innerHTML=t('<b>Hinweis:</b> Dieser Browser erlaubt hier kein dauerhaftes Speichern. Deine Werte gelten nur bis zum Schließen – bitte über <b>Exportieren</b> sichern.');w.classList.remove('hidden')}
   else w.classList.add('hidden');
   return ok;
 }
 function currentInput(){
   const I={};
   ['printer','material','nozD','nozM','object','goal','load','support','supportLevel','thresh'].forEach(id=>{I[id]=$(id).value});
+  // Anpassungen des gewählten Teils (js/overrides-ui.js)
+  const part=project&&project.parts[project.selected];
+  if(part&&part.overrides)I.overrides=part.overrides;
   return I;
 }
 
@@ -35,7 +38,7 @@ function currentInput(){
 const KEY_ROWS=['Düse','Heizbett','Schichthöhe / erste Schicht'];
 function specCell(x){
   const h=helpFor(x[0],getMat($('material').value).kind);
-  return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])?' key':'')+'"><span class="k">'+esc(x[0])+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
+  return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])?' key':'')+(x[3]?' ov':'')+'"><span class="k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
     '<span class="v">'+x[1]+'</span>'+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</div>';
 }
 
@@ -43,35 +46,35 @@ function update(){
   if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
   const row=x=>rowHTML(x,r.m.kind);
-  $('mainTitle').textContent=r.printer.label+' – Druck-Konfigurator';
-  document.title=r.printer.label+' – Druck-Konfigurator';
-  $('orderedTitle').textContent='Einstellungen in '+r.printer.slicer+'-Reihenfolge';
-  $('orderedIntro').innerHTML='Die Bezeichnungen orientieren sich an '+esc(r.printer.slicer)+'. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.';
+  $('mainTitle').textContent=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
+  document.title=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
+  $('orderedTitle').textContent=t('Einstellungen in {slicer}-Reihenfolge',{slicer:r.printer.slicer});
+  $('orderedIntro').innerHTML=t('Die Bezeichnungen orientieren sich an {slicer}. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.',{slicer:esc(r.printer.slicer)});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
   document.body.dataset.printer=r.printer.id;
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
-  $('resultPrinter').textContent='Startprofil · '+r.printer.label;
+  $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
   $('settings').innerHTML=r.rows.map(specCell).join('');
-  $('orderedSettings').innerHTML=r.ordered.map(g=>'<div class="order-group"><div class="order-title">'+g[0]+'</div><div class="order-body">'+g[1].map(row).join('')+'</div></div>').join('');
-  $('title').textContent=r.m.name+' – '+r.ob.label+' · '+GOAL_LABEL[r.g];
+  $('orderedSettings').innerHTML=r.ordered.map(g=>'<div class="order-group"><div class="order-title">'+t(g[0])+'</div><div class="order-body">'+g[1].map(row).join('')+'</div></div>').join('');
+  $('title').textContent=r.m.name+' – '+t(r.ob.label)+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
-    esc(r.m.overridden?'Standardprofil mit deinen eigenen Werten.':r.m.src)+' Düse: '+esc(r.nozLabel)+'.';
+    esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src))+' '+t('Düse: {noz}.',{noz:esc(r.nozLabel)});
   orcaFilamentJson=buildOrcaFilamentJSON(r);
   orcaProcessJson=buildOrcaProcessJSON(r);
   $('orcaNote').innerHTML=orcaWarningText(r);
-  $('danger').innerHTML=r.danger.length?'<b>Achtung:</b><br>'+r.danger.map(esc).join('<br>'):'';
+  $('danger').innerHTML=r.danger.length?t('<b>Achtung:</b>')+'<br>'+r.danger.map(esc).join('<br>'):'';
   $('warning').innerHTML=r.warn.join('<br><br>');
-  $('checks').innerHTML='<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse '+esc(r.nozLabel)+' · Bett reinigen · erste Schicht beobachten'+(r.dryNeed&&r.m.dry?' · '+esc(r.m.dry):'')+(geom?'<br>STL-Maße und Überhanganalyse ('+r.a.th+'°) wurden berücksichtigt.':'');
-  $('supportGuide').innerHTML='<h3>Stützen-Empfehlung</h3><b>'+esc(r.sup)+'</b><br>'+esc(r.supNeed)+
-    (r.supOn?'<br><br><b>So stellst du es in '+esc(r.printer.slicer)+' ein:</b><br>1. <i>Stützstrukturen aktivieren</i> einschalten.<br>2. <i>Typ: Baum (automatisch)</i> und <i>nur kritische Bereiche</i> aktivieren.<br>3. <i>Schwellenwinkel: '+r.sp.angle+'°</i>.<br>4. <i>Nur auf Druckplatte</i> zuerst testen; bei unerreichbaren Innenflächen deaktivieren.<br>5. Raft aus. Immer die Schichtvorschau prüfen.':'<br><br>Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.');
-  if(r.a){const t=r.a.level==='none'?'Keine relevanten Überhänge über '+r.a.th+'° (Bodenfläche ausgenommen).':'Über '+r.a.th+'°: ca. '+de(r.a.flagged,0)+' mm² ('+de(r.a.ratio*100,1)+' % der Oberfläche, Bodenfläche ausgenommen).';document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=t})}
+  $('checks').innerHTML=t('<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse {noz} · Bett reinigen · erste Schicht beobachten',{noz:esc(r.nozLabel)})+(r.dryNeed&&r.m.dry?' · '+esc(t(r.m.dry)):'')+(geom?'<br>'+t('STL-Maße und Überhanganalyse ({th}°) wurden berücksichtigt.',{th:r.a.th}):'');
+  $('supportGuide').innerHTML='<h3>'+t('Stützen-Empfehlung')+'</h3><b>'+esc(t(r.sup))+'</b><br>'+esc(r.supNeed)+'<br><br>'+
+    (r.supOn?t('<b>So stellst du es in {slicer} ein:</b><br>1. <i>Stützstrukturen aktivieren</i> einschalten.<br>2. <i>Typ: Baum (automatisch)</i> und <i>nur kritische Bereiche</i> aktivieren.<br>3. <i>Schwellenwinkel: {angle}°</i>.<br>4. <i>Nur auf Druckplatte</i> zuerst testen; bei unerreichbaren Innenflächen deaktivieren.<br>5. Raft aus. Immer die Schichtvorschau prüfen.',{slicer:esc(r.printer.slicer),angle:r.sp.angle}):t('Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.'));
+  if(r.a){const txt=r.a.level==='none'?t('Keine relevanten Überhänge über {th}° (Bodenfläche ausgenommen).',{th:r.a.th}):t('Über {th}°: ca. {area} mm² ({pct} % der Oberfläche, Bodenfläche ausgenommen).',{th:r.a.th,area:de(r.a.flagged,0),pct:de(r.a.ratio*100,1)});document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=txt})}
   const tpu=r.tpu,sp=r.sp;
   if(r.supOn){
-    const p=[['Stützstrukturen','Aktivieren, nur kritische Bereiche'],['Typ','Baum (automatisch)'],['Schwellenwinkel',sp.angle+'°'],['Nur auf Druckplatte','zunächst aktivieren'],['Kleine Überhänge entfernen',sp.small],['Druckbasis/Raft','0 Schichten'],['Oberer Z-Abstand',de(r.supZ.top,2)+' mm'],['Unterer Z-Abstand',de(r.supZ.bottom,2)+' mm'],['Wände um Stützstrukturen','0'],['Abstand Grundmuster',tpu?'3,0 mm':'2,5–3,0 mm'],['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Oberer Schnittstellenabstand',sp.gap],['Stützen/Objekt XY-Abstand',sp.xy],['Stützen/Objekt Abstand erste Schicht',tpu?'0,25 mm':'0,20 mm'],['Stützspitze','0,8 mm'],['Ast-Dichte',sp.density],['Astabstand',sp.branch],['Stützast-Durchmesser','2,0 mm']];
-    $('supportParams').innerHTML='<div class="grid">'+p.map(x=>'<div><b>'+x[0]+'</b><br><span class="muted">'+x[1]+'</span></div>').join('')+'</div>';
+    const p=[['Stützstrukturen',t('Aktivieren, nur kritische Bereiche')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],['Nur auf Druckplatte',t('zunächst aktivieren')],['Kleine Überhänge entfernen',t(sp.small)],['Druckbasis/Raft',t('0 Schichten')],['Oberer Z-Abstand',de(r.supZ.top,2)+' mm'],['Unterer Z-Abstand',de(r.supZ.bottom,2)+' mm'],['Wände um Stützstrukturen','0'],['Abstand Grundmuster',tpu?de(3,1)+' mm':de(2.5,1)+'–'+de(3,1)+' mm'],['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Oberer Schnittstellenabstand',sp.gap],['Stützen/Objekt XY-Abstand',sp.xy],['Stützen/Objekt Abstand erste Schicht',tpu?de(0.25,2)+' mm':de(0.2,2)+' mm'],['Stützspitze',de(0.8,1)+' mm'],['Ast-Dichte',sp.density],['Astabstand',sp.branch],['Stützast-Durchmesser',de(2,1)+' mm']];
+    $('supportParams').innerHTML='<div class="grid">'+p.map(x=>'<div><b>'+t(x[0])+'</b><br><span class="muted">'+x[1]+'</span></div>').join('')+'</div>';
   }else{
-    $('supportParams').innerHTML='<p class="muted" style="margin:0">Für die aktuelle Auswahl'+(geom?' und dieses Modell':'')+' werden keine Stützen empfohlen. Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.</p>';
+    $('supportParams').innerHTML='<p class="muted" style="margin:0">'+(geom?t('Für die aktuelle Auswahl und dieses Modell werden keine Stützen empfohlen.'):t('Für die aktuelle Auswahl werden keine Stützen empfohlen.'))+' '+t('Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.')+'</p>';
   }
   lastResult=r;
   if(typeof renderPartList==='function')renderPartList();
@@ -81,6 +84,10 @@ function update(){
   if(typeof renderBodies==='function')renderBodies();
   if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof renderSidePanels==='function')renderSidePanels();
+  if(typeof renderOverrideBar==='function')renderOverrideBar();
+  if(typeof renderDesignColours==='function')renderDesignColours();
+  if(typeof renderPlates==='function')renderPlates();
+  if(geom&&typeof showVolume==='function')showVolume();
   if(typeof renderCostPanel==='function')renderCostPanel();
   if(typeof enhanceHelp==='function')enhanceHelp();
 }
@@ -90,33 +97,33 @@ function fillMaterialSelect(sel){
   const list=allMats(),cur=sel||$('material').value;
   const std=list.filter(m=>m.builtin),own=list.filter(m=>!m.builtin);
   const opt=m=>'<option value="'+esc(m.id)+'">'+(m.overridden?'★ ':'')+esc(m.name)+'</option>';
-  $('material').innerHTML=(own.length?'<optgroup label="Eigene Filamente">'+own.map(opt).join('')+'</optgroup>':'')+
-    '<optgroup label="Standardprofile (★ = mit eigenen Werten)">'+std.map(opt).join('')+'</optgroup>';
+  $('material').innerHTML=(own.length?'<optgroup label="'+t('Eigene Filamente')+'">'+own.map(opt).join('')+'</optgroup>':'')+
+    '<optgroup label="'+t('Standardprofile (★ = mit eigenen Werten)')+'">'+std.map(opt).join('')+'</optgroup>';
   $('material').value=list.some(m=>m.id===cur)?cur:'pla_hs';
   renderMyList();
 }
 function renderMyList(){
   const list=allMats().filter(m=>m.overridden||!m.builtin);
-  $('myList').innerHTML=list.length?list.map(m=>'<div class="mylist-item"><span>'+esc(m.name)+'<br><span class="muted" style="font-size:12px">'+(m.builtin?'Standardprofil, eigene Werte':'Eigenes Filament')+' · '+de(m.refD,m.refD===0.25?2:1)+' mm '+(NOZZLE_MATERIALS[m.refMat||'steel_hardened']||NOZZLE_MATERIALS.steel_hardened).label+'</span></span><button class="linkbtn" data-sel="'+esc(m.id)+'" type="button">Auswählen</button></div>').join('')
-    :'Noch keine eigenen Werte gespeichert.';
+  $('myList').innerHTML=list.length?list.map(m=>'<div class="mylist-item"><span>'+esc(m.name)+'<br><span class="muted" style="font-size:12px">'+(m.builtin?t('Standardprofil, eigene Werte'):t('Eigenes Filament'))+' · '+de(m.refD,m.refD===0.25?2:1)+' mm '+(NOZZLE_MATERIALS[m.refMat||'steel_hardened']||NOZZLE_MATERIALS.steel_hardened).label+'</span></span><button class="linkbtn" data-sel="'+esc(m.id)+'" type="button">'+t('Auswählen')+'</button></div>').join('')
+    :t('Noch keine eigenen Werte gespeichert.');
   $('myList').querySelectorAll('[data-sel]').forEach(b=>b.addEventListener('click',()=>{$('material').value=b.dataset.sel;store.last.material=b.dataset.sel;persist();update()}));
 }
 
 /* ================= EDITOR ================= */
 const FIELDS=[
- ['Allgemein',[
-  ['name','Profilname','text'],['kind','Filamenttyp','kind'],['abrasive','Faserverstärkt (Carbon/Glas)','bool'],
-  ['refD','Werte ermittelt mit Düse','refD'],['refMat','Düsenmaterial dabei','refMat']]],
- ['Temperaturen',[
-  ['nozzle','Düsentemperatur','tri','°C'],['range','Herstellerbereich (Rolle)','text'],['bed','Heizbett','num','°C'],['bedNote','Platte / Hinweis','text']]],
- ['Filamentprofil',[
-  ['maxVol','Max. Volumengeschwindigkeit','num','mm³/s'],['flow','Durchflussverhältnis','num',''],['pa','Pressure Advance (leer = weglassen)','numopt',''],
-  ['fanFirst','Lüfter erste Schicht','num','%'],['fan','Lüfter Folgeschichten','num','%'],
-  ['retrLen','Rückzug Länge','num','mm'],['retrSpeed','Rückzug Geschwindigkeit','num','mm/s'],['zhop','Z-Hop','num','mm']]],
- ['Geschwindigkeiten',[
-  ['first','Erste Schicht','num','mm/s'],['outer','Außenwand','tri','mm/s'],['inner','Innenwand','tri','mm/s'],['fill','Füllung','tri','mm/s'],
-  ['top','Obere Fläche','num','mm/s'],['gap','Lückenfüllung','num','mm/s'],['travel','Travel','num','mm/s'],['accel','Beschleunigung (0 = Werksprofil)','num','mm/s²']]],
- ['Notizen',[['dry','Trocknung','text'],['notes','Meine Erfahrungen','area']]]
+ [t('Allgemein'),[
+  ['name',t('Profilname'),'text'],['kind',t('Filamenttyp'),'kind'],['abrasive',t('Faserverstärkt (Carbon/Glas)'),'bool'],
+  ['refD',t('Werte ermittelt mit Düse'),'refD'],['refMat',t('Düsenmaterial dabei'),'refMat']]],
+ [t('Temperaturen'),[
+  ['nozzle',t('Düsentemperatur'),'tri','°C'],['range',t('Herstellerbereich (Rolle)'),'text'],['bed',t('Heizbett'),'num','°C'],['bedNote',t('Platte / Hinweis'),'text']]],
+ [t('Filamentprofil'),[
+  ['maxVol',t('Max. Volumengeschwindigkeit'),'num','mm³/s'],['flow',t('Durchflussverhältnis'),'num',''],['pa',t('Pressure Advance (leer = weglassen)'),'numopt',''],
+  ['fanFirst',t('Lüfter erste Schicht'),'num','%'],['fan',t('Lüfter Folgeschichten'),'num','%'],
+  ['retrLen',t('Rückzug Länge'),'num','mm'],['retrSpeed',t('Rückzug Geschwindigkeit'),'num','mm/s'],['zhop',t('Z-Hop'),'num','mm']]],
+ [t('Geschwindigkeiten'),[
+  ['first',t('Erste Schicht'),'num','mm/s'],['outer',t('Außenwand'),'tri','mm/s'],['inner',t('Innenwand'),'tri','mm/s'],['fill',t('Füllung'),'tri','mm/s'],
+  ['top',t('Obere Fläche'),'num','mm/s'],['gap',t('Lückenfüllung'),'num','mm/s'],['travel',t('Travel'),'num','mm/s'],['accel',t('Beschleunigung (0 = Werksprofil)'),'num','mm/s²']]],
+ [t('Notizen'),[['dry',t('Trocknung'),'text'],['notes',t('Meine Erfahrungen'),'area']]]
 ];
 const EDIT_KEYS=FIELDS.flatMap(g=>g[1].map(f=>f[0]));
 const dlg=$('editor');
@@ -128,13 +135,13 @@ function inputFor(f,v){
   const [k,,type,unit]=f;const id='ed_'+k;
   const u=unit?'<span class="u">'+unit+'</span>':'';
   if(type==='text')return '<div class="ed-in"><input id="'+id+'" value="'+esc(v??'')+'"></div>';
-  if(type==='area')return '<div class="ed-in"><textarea id="'+id+'" rows="3" placeholder="z. B. ab 225 °C weniger Fäden, Brim bei kleinen Teilen nötig …">'+esc(v??'')+'</textarea></div>';
+  if(type==='area')return '<div class="ed-in"><textarea id="'+id+'" rows="3" placeholder="'+t('z. B. ab 225 °C weniger Fäden, Brim bei kleinen Teilen nötig …')+'">'+esc(v??'')+'</textarea></div>';
   if(type==='num'||type==='numopt')return '<div class="ed-in"><input id="'+id+'" inputmode="decimal" value="'+(v===null||v===undefined||v===''?'':String(v).replace('.',','))+'">'+u+'</div>';
-  if(type==='bool')return '<div class="ed-in"><input type="checkbox" id="'+id+'"'+(v?' checked':'')+'> <span class="muted" style="font-size:13px">nur mit gehärteter Düse</span></div>';
+  if(type==='bool')return '<div class="ed-in"><input type="checkbox" id="'+id+'"'+(v?' checked':'')+'> <span class="muted" style="font-size:13px">'+t('nur mit gehärteter Düse')+'</span></div>';
   if(type==='kind')return '<div class="ed-in"><select id="'+id+'">'+Object.keys(KIND_LABEL).map(x=>'<option value="'+x+'"'+(x===v?' selected':'')+'>'+KIND_LABEL[x]+'</option>').join('')+'</select></div>';
   if(type==='refD')return '<div class="ed-in"><select id="'+id+'">'+Object.keys(NOZ).map(x=>'<option value="'+x+'"'+(nkey(v)===x?' selected':'')+'>'+de(+x,x==='0.25'?2:1)+' mm</option>').join('')+'</select></div>';
   if(type==='refMat')return '<div class="ed-in"><select id="'+id+'">'+['steel_hardened','steel_stainless','brass'].map(x=>'<option value="'+x+'"'+(x===(v||'steel_hardened')?' selected':'')+'>'+NOZZLE_MATERIALS[x].label+'</option>').join('')+'</select></div>';
-  if(type==='tri')return '<div class="ed-in"><div class="tri">'+[0,1,2].map(i=>'<div><input id="'+id+'_'+i+'" inputmode="decimal" value="'+String((v||[])[i]??'').replace('.',',')+'"><small>'+['Qualität','Ausgewogen','Schnell'][i]+'</small></div>').join('')+'</div>'+u+'</div>';
+  if(type==='tri')return '<div class="ed-in"><div class="tri">'+[0,1,2].map(i=>'<div><input id="'+id+'_'+i+'" inputmode="decimal" value="'+String((v||[])[i]??'').replace('.',',')+'"><small>'+t(['Qualität','Ausgewogen','Schnell'][i])+'</small></div>').join('')+'</div>'+u+'</div>';
   return '';
 }
 function readForm(){
@@ -149,8 +156,8 @@ function readForm(){
     else if(type==='num'){const n=num($(id).value);if(isNaN(n))errs.push(label);else out[k]=n}
     else if(type==='tri'){const a=[0,1,2].map(i=>num($(id+'_'+i).value));if(a.some(isNaN))errs.push(label);else out[k]=a}
   }));
-  if(!out.name)errs.push('Profilname');
-  if(out.maxVol<=0)errs.push('Max. Volumengeschwindigkeit muss größer 0 sein');
+  if(!out.name)errs.push(t('Profilname'));
+  if(out.maxVol<=0)errs.push(t('Max. Volumengeschwindigkeit muss größer 0 sein'));
   return {out,errs};
 }
 function openEditor(mode){
@@ -158,12 +165,12 @@ function openEditor(mode){
   let src,title,sub,isBuiltin=false,isOwn=false,overridden=false;
   if(mode==='edit'){
     src=getMat($('material').value);isBuiltin=!!src.builtin;isOwn=!src.builtin;overridden=!!src.overridden;
-    title='Werte anpassen: '+src.name;
-    sub=isBuiltin?'Deine Werte ersetzen das Standardprofil. „Auf Standard zurücksetzen“ stellt es wieder her.':'Eigenes Filament bearbeiten.';
+    title=t('Werte anpassen: {name}',{name:src.name});
+    sub=isBuiltin?t('Deine Werte ersetzen das Standardprofil. „Auf Standard zurücksetzen“ stellt es wieder her.'):t('Eigenes Filament bearbeiten.');
   }else{
-    src=Object.assign({},builtinOf('pla'),{name:'Neues Filament',notes:'',status:'user'});
-    title='Neues Filament anlegen';
-    sub='Startwerte werden vom gewählten Filamenttyp übernommen – danach deine eigenen Werte eintragen.';
+    src=Object.assign({},builtinOf('pla'),{name:t('Neues Filament'),notes:'',status:'user'});
+    title=t('Neues Filament anlegen');
+    sub=t('Startwerte werden vom gewählten Filamenttyp übernommen – danach deine eigenen Werte eintragen.');
   }
   $('edTitle').textContent=title;$('edSub').textContent=sub;
   const renderBody=vals=>{
@@ -174,20 +181,20 @@ function openEditor(mode){
     });
   };
   renderBody(src);
-  let foot='<button class="btn sec" type="button" id="edCancel">Abbrechen</button>';
-  if(isBuiltin&&overridden)foot+='<button class="btn danger" type="button" id="edReset">Auf Standard zurücksetzen</button>';
-  if(isOwn)foot+='<button class="btn danger" type="button" id="edDelete">Löschen</button>';
-  if(mode==='edit')foot+='<button class="btn sec" type="button" id="edCopy">Als neues Filament speichern</button>';
-  foot+='<button class="btn" type="button" id="edSave">Speichern</button>';
+  let foot='<button class="btn sec" type="button" id="edCancel">'+t('Abbrechen')+'</button>';
+  if(isBuiltin&&overridden)foot+='<button class="btn danger" type="button" id="edReset">'+t('Auf Standard zurücksetzen')+'</button>';
+  if(isOwn)foot+='<button class="btn danger" type="button" id="edDelete">'+t('Löschen')+'</button>';
+  if(mode==='edit')foot+='<button class="btn sec" type="button" id="edCopy">'+t('Als neues Filament speichern')+'</button>';
+  foot+='<button class="btn" type="button" id="edSave">'+t('Speichern')+'</button>';
   $('edFoot').innerHTML=foot;
   $('edCancel').onclick=closeDialog;
-  if($('edReset'))$('edReset').onclick=()=>{if(!confirm('Eigene Werte für „'+src.name+'“ löschen und Standardwerte wiederherstellen?'))return;delete store.profiles[src.id];persist();closeDialog();fillMaterialSelect(src.id);update()};
-  if($('edDelete'))$('edDelete').onclick=()=>{if(!confirm('Filament „'+src.name+'“ endgültig löschen?'))return;delete store.profiles[src.id];persist();closeDialog();fillMaterialSelect('pla_hs');update()};
+  if($('edReset'))$('edReset').onclick=()=>{if(!confirm(t('Eigene Werte für „{name}“ löschen und Standardwerte wiederherstellen?',{name:src.name})))return;delete store.profiles[src.id];persist();closeDialog();fillMaterialSelect(src.id);update()};
+  if($('edDelete'))$('edDelete').onclick=()=>{if(!confirm(t('Filament „{name}“ endgültig löschen?',{name:src.name})))return;delete store.profiles[src.id];persist();closeDialog();fillMaterialSelect('pla_hs');update()};
   const save=asNew=>{
     const {out,errs}=readForm();
-    if(errs.length){alert('Bitte prüfen: '+errs.join(', '));return}
+    if(errs.length){alert(t('Bitte prüfen: {list}',{list:errs.join(', ')}));return}
     let id;
-    if(asNew||mode==='new'){id='u'+Date.now().toString(36);if(asNew&&out.name===src.name)out.name+=' (Kopie)'}
+    if(asNew||mode==='new'){id='u'+Date.now().toString(36);if(asNew&&out.name===src.name)out.name+=' '+t('(Kopie)')}
     else id=src.id;
     store.profiles[id]=out;
     persist();closeDialog();fillMaterialSelect(id);store.last.material=id;persist();update();
@@ -203,18 +210,18 @@ $('newMat').addEventListener('click',()=>openEditor('new'));
 $('settingsBtn').addEventListener('click',()=>{
   const S=store.settings;
   const cp=currentPrinter();
-  $('edTitle').textContent='Düsen-Umrechnung';
-  $('edSub').textContent='Gilt, wenn deine Düse eine andere Metallfamilie hat als die Düse, mit der ein Profil ermittelt wurde. Die Standardprofile beziehen sich auf eine Stahldüse ('+esc(NOZZLE_MATERIALS[cp.nozzleDefault].label)+' beim '+esc(cp.label)+'); gehärteter und ungehärteter Stahl gelten hier als gleichwertig, nur Messing weicht ab.';
-  $('edBody').innerHTML='<div class="ed-group"><h4>Stahl (gehärtet oder Edelstahl) im Vergleich zu Messing</h4>'+
-    '<div class="ed-row"><label for="st_off">Temperaturaufschlag Stahl</label><div class="ed-in"><input id="st_off" inputmode="decimal" value="'+String(S.steelOffset).replace('.',',')+'"><span class="u">°C</span></div></div>'+
-    '<div class="ed-row"><label for="st_vol">Volumenstrom-Faktor Stahl</label><div class="ed-in"><input id="st_vol" inputmode="decimal" value="'+String(S.steelVol).replace('.',',')+'"><span class="u">× Messing</span></div></div>'+
-    '<p class="muted" style="font-size:13px">Stahl leitet Wärme schlechter als Messing. Üblich sind 5–10 °C mehr und etwas weniger Durchsatz. Beispiel: Profil mit Stahl ermittelt, du druckst mit Messing → Temperatur −5 °C, Volumenstrom ÷ 0,9.</p></div>';
-  $('edFoot').innerHTML='<button class="btn sec" type="button" id="edCancel">Abbrechen</button><button class="btn sec" type="button" id="stReset">Standard (5 °C / 0,9)</button><button class="btn" type="button" id="edSave">Speichern</button>';
+  $('edTitle').textContent=t('Düsen-Umrechnung');
+  $('edSub').textContent=t('Gilt, wenn deine Düse eine andere Metallfamilie hat als die Düse, mit der ein Profil ermittelt wurde. Die Standardprofile beziehen sich auf eine Stahldüse ({mat} beim {printer}); gehärteter und ungehärteter Stahl gelten hier als gleichwertig, nur Messing weicht ab.',{mat:esc(NOZZLE_MATERIALS[cp.nozzleDefault].label),printer:esc(cp.label)});
+  $('edBody').innerHTML='<div class="ed-group"><h4>'+t('Stahl (gehärtet oder Edelstahl) im Vergleich zu Messing')+'</h4>'+
+    '<div class="ed-row"><label for="st_off">'+t('Temperaturaufschlag Stahl')+'</label><div class="ed-in"><input id="st_off" inputmode="decimal" value="'+String(S.steelOffset).replace('.',',')+'"><span class="u">°C</span></div></div>'+
+    '<div class="ed-row"><label for="st_vol">'+t('Volumenstrom-Faktor Stahl')+'</label><div class="ed-in"><input id="st_vol" inputmode="decimal" value="'+String(S.steelVol).replace('.',',')+'"><span class="u">'+t('× Messing')+'</span></div></div>'+
+    '<p class="muted" style="font-size:13px">'+t('Stahl leitet Wärme schlechter als Messing. Üblich sind 5–10 °C mehr und etwas weniger Durchsatz. Beispiel: Profil mit Stahl ermittelt, du druckst mit Messing → Temperatur −5 °C, Volumenstrom ÷ 0,9.')+'</p></div>';
+  $('edFoot').innerHTML='<button class="btn sec" type="button" id="edCancel">'+t('Abbrechen')+'</button><button class="btn sec" type="button" id="stReset">'+t('Standard (5 °C / {f})',{f:de(0.9,1)})+'</button><button class="btn" type="button" id="edSave">'+t('Speichern')+'</button>';
   $('edCancel').onclick=closeDialog;
   $('stReset').onclick=()=>{$('st_off').value='5';$('st_vol').value='0,9'};
   $('edSave').onclick=()=>{
     const o=num($('st_off').value),v=num($('st_vol').value);
-    if(isNaN(o)||o<0||o>30||isNaN(v)||v<=0.3||v>1.5){alert('Bitte gültige Werte eingeben (Aufschlag 0–30 °C, Faktor 0,3–1,5).');return}
+    if(isNaN(o)||o<0||o>30||isNaN(v)||v<=0.3||v>1.5){alert(t('Bitte gültige Werte eingeben (Aufschlag 0–30 °C, Faktor 0,3–1,5).'));return}
     store.settings.steelOffset=o;store.settings.steelVol=v;persist();closeDialog();update();
   };
   openDialog();
@@ -234,17 +241,17 @@ $('importFile').addEventListener('change',()=>{
   r.onload=()=>{
     try{
       const d=JSON.parse(r.result);
-      if(!d||(d.format!=='druck-konfigurator'&&d.format!=='kobra-s1-konfigurator')||typeof d.profiles!=='object')throw Error('Keine Profildatei dieses Programms');
+      if(!d||(d.format!=='druck-konfigurator'&&d.format!=='kobra-s1-konfigurator')||typeof d.profiles!=='object')throw Error(t('Keine Profildatei dieses Programms'));
       const ids=Object.keys(d.profiles).filter(id=>{const p=d.profiles[id];return p&&typeof p==='object'&&p.name&&Array.isArray(p.nozzle)});
       const hasLast=d.last&&typeof d.last==='object'&&Object.keys(d.last).length>0;
-      if(!ids.length&&!hasLast)throw Error('Die Datei enthält weder eigene Profile noch eine gespeicherte Auswahl');
+      if(!ids.length&&!hasLast)throw Error(t('Die Datei enthält weder eigene Profile noch eine gespeicherte Auswahl'));
       const parts=[];
-      if(ids.length){const clash=ids.filter(id=>store.profiles[id]).length;parts.push(ids.length+' Profil(e)'+(clash?' ('+clash+' werden überschrieben)':''))}
-      if(hasLast)parts.push('die zuletzt gespeicherte Auswahl (Drucker, Filament, Düse, Objekt, Ziel)');
-      if(!confirm('Importieren: '+parts.join(' und ')+'?'))return;
+      if(ids.length){const clash=ids.filter(id=>store.profiles[id]).length;parts.push(clash?t('{n} Profil(e) ({c} werden überschrieben)',{n:ids.length,c:clash}):t('{n} Profil(e)',{n:ids.length}))}
+      if(hasLast)parts.push(t('die zuletzt gespeicherte Auswahl (Drucker, Filament, Düse, Objekt, Ziel)'));
+      if(!confirm(t('Importieren: {list}?',{list:parts.join(' '+t('und')+' ')})))return;
       if(ids.length)ids.forEach(id=>{store.profiles[id]=Object.assign({},P({}),d.profiles[id])});
       if(hasLast)Object.assign(store.last,d.last);
-      if(d.settings&&confirm('Auch die Düsen-Umrechnung aus der Datei übernehmen?'))Object.assign(store.settings,d.settings);
+      if(d.settings&&confirm(t('Auch die Düsen-Umrechnung aus der Datei übernehmen?')))Object.assign(store.settings,d.settings);
       persist();
       if(hasLast){
         if(store.last.printer&&PRINTERS[store.last.printer])$('printer').value=store.last.printer;
@@ -254,7 +261,7 @@ $('importFile').addEventListener('change',()=>{
         ['object','goal','load','support','supportLevel'].forEach(id=>{if(store.last[id]!==undefined)$(id).value=store.last[id]});
       }
       fillMaterialSelect(store.last.material);update();
-    }catch(e){alert('Import fehlgeschlagen: '+e.message)}
+    }catch(e){alert(t('Import fehlgeschlagen: {msg}',{msg:e.message}))}
     $('importFile').value='';
   };
   r.readAsText(f);
@@ -264,13 +271,13 @@ $('importFile').addEventListener('change',()=>{
 $('printBtn').addEventListener('click',()=>window.print());
 $('copyBtn').addEventListener('click',()=>{
   const strip=s=>String(s).replace(/<[^>]+>/g,'');
-  const lines=['DRUCK-KONFIGURATOR – '+$('title').textContent];
-  if(geom)lines.push('Modell: '+geom.name+' ('+de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm)');
-  lastOrdered.forEach(g=>{lines.push('');lines.push(g[0]);g[1].forEach(r=>lines.push('  '+r[0]+': '+strip(r[1])+(r[2]?' ('+strip(r[2])+')':'')))});
+  const lines=[t('DRUCK-KONFIGURATOR')+' – '+$('title').textContent];
+  if(geom)lines.push(t('Modell: {name} ({size} mm)',{name:geom.name,size:de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)}));
+  lastOrdered.forEach(g=>{lines.push('');lines.push(t(g[0]));g[1].forEach(r=>lines.push('  '+t(r[0])+': '+strip(r[1])+(r[2]?' ('+strip(r[2])+')':'')))});
   const dz=$('danger').innerText.trim();if(dz){lines.push('');lines.push(dz)}
-  const w=$('warning').innerText.trim();if(w){lines.push('');lines.push('Hinweise:');lines.push(w)}
+  const w=$('warning').innerText.trim();if(w){lines.push('');lines.push(t('Hinweise:'));lines.push(w)}
   const text=lines.join('\n'),btn=$('copyBtn');
-  const done=ok=>{btn.textContent=ok?'Kopiert':'Kopieren nicht möglich';setTimeout(()=>btn.textContent='Als Text kopieren',1800)};
+  const done=ok=>{btn.textContent=ok?t('Kopiert'):t('Kopieren nicht möglich');setTimeout(()=>btn.textContent=t('Als Text kopieren'),1800)};
   const fallback=()=>{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();done(ok)};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>done(true),fallback);else fallback();
 });
@@ -278,13 +285,13 @@ function downloadJSON(text,filename,btn,label){
   const blob=new Blob([text],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
-  if(btn){btn.textContent='Gespeichert ✓';setTimeout(()=>btn.textContent=label,1800)}
+  if(btn){btn.textContent=t('Gespeichert ✓');setTimeout(()=>btn.textContent=label,1800)}
 }
 $('orcaFilBtn').addEventListener('click',()=>{
-  const label='Filament-JSON speichern';
+  const label=t('Filament-JSON speichern');
   downloadJSON(orcaFilamentJson,'druck-konfigurator-'+currentPrinter().id+'-filament.json',$('orcaFilBtn'),label);
 });
 $('orcaProcBtn').addEventListener('click',()=>{
-  const label='Process-JSON speichern';
+  const label=t('Process-JSON speichern');
   downloadJSON(orcaProcessJson,'druck-konfigurator-'+currentPrinter().id+'-process.json',$('orcaProcBtn'),label);
 });
