@@ -19,11 +19,15 @@ async function open() {
   const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + PORT, '--user-data-dir=' + dir, '--no-first-run',
     '--window-size=' + W + ',' + H, '--lang=de-DE', '--hide-scrollbars', '--force-device-scale-factor=1', 'about:blank'], { stdio: 'ignore' });
   let page;
-  for (let i = 0; i < 100 && !page; i++) {
+  // auf langsamen CI-Rechnern braucht Chrome beim ersten Start länger – bis 30 s warten
+  for (let i = 0; i < 300 && !page && proc.exitCode === null; i++) {
     await sleep(100);
     try { page = (await (await fetch('http://127.0.0.1:' + PORT + '/json/list')).json()).find(t => t.type === 'page'); } catch (e) { /* startet noch */ }
   }
-  if (!page) throw Error('Chrome startet nicht: ' + CHROME);
+  if (!page) {   // Chrome beenden, sonst hält der Kindprozess Node am Leben und der Aufruf endet nie
+    proc.kill('SIGKILL');
+    throw Error('Chrome startet nicht: ' + CHROME + (proc.exitCode !== null ? ' (beendet mit ' + proc.exitCode + ')' : ''));
+  }
   const ws = new WebSocket(page.webSocketDebuggerUrl), pending = new Map(), events = [];
   let id = 0;
   await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = no; });
@@ -78,5 +82,5 @@ async function main() {
     }
   } finally { b2.close(); }
 }
-if (require.main === module) main().catch(e => { console.error(e.message); process.exitCode = 2; });
+if (require.main === module) main().catch(e => { console.error(e.message); process.exit(2); });
 module.exports = { open };
