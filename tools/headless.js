@@ -11,25 +11,38 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const CHROME = process.env.CHROME || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   : process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe') : 'google-chrome');
 const [W, H] = (process.env.SIZE || '1500x950').split('x').map(Number);
-const PORT = 9300 + Math.floor(Math.random() * 500);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function open() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dk-headless-'));
-  const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + PORT, '--user-data-dir=' + dir, '--no-first-run',
-    '--window-size=' + W + ',' + H, '--lang=de-DE', '--hide-scrollbars', '--force-device-scale-factor=1', 'about:blank'], { stdio: 'ignore' });
-  let spawnErr = null;
-  proc.on('error', e => { spawnErr = e; });
-  let page;
-  // auf langsamen CI-Rechnern braucht Chrome beim ersten Start länger – bis 30 s warten
-  for (let i = 0; i < 300 && !page && proc.exitCode === null && !spawnErr; i++) {
-    await sleep(100);
-    try { page = (await (await fetch('http://127.0.0.1:' + PORT + '/json/list')).json()).find(t => t.type === 'page'); } catch (e) { /* startet noch */ }
-  }
-  if (!page) {   // Chrome beenden, sonst hält der Kindprozess Node am Leben und der Aufruf endet nie
+/* Chrome starten; Chrome wählt den DevTools-Port selbst (--remote-debugging-port=0) und schreibt ihn in
+   DevToolsActivePort im Profilordner – kein Zusammenstoß mit belegten Ports. Auf langsamen CI-Rechnern bis zu
+   drei Versuche à 30 s; bei Fehlschlag Chrome beenden, sonst hält der Kindprozess Node am Leben. */
+async function launch() {
+  let last = '';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dk-headless-'));
+    const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--no-first-run',
+      '--window-size=' + W + ',' + H, '--lang=de-DE', '--hide-scrollbars', '--force-device-scale-factor=1', 'about:blank'], { stdio: 'ignore' });
+    let spawnErr = null, page = null;
+    proc.on('error', e => { spawnErr = e; });
+    for (let i = 0; i < 300 && !page && proc.exitCode === null && !spawnErr; i++) {
+      await sleep(100);
+      try {
+        const port = fs.readFileSync(path.join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
+        page = (await (await fetch('http://127.0.0.1:' + port + '/json/list')).json()).find(t => t.type === 'page');
+      } catch (e) { /* startet noch */ }
+    }
+    if (page) return { proc, dir, page };
     proc.kill('SIGKILL');
-    throw Error('Chrome startet nicht: ' + CHROME + (spawnErr ? ' (' + spawnErr.code + ')' : proc.exitCode !== null ? ' (beendet mit ' + proc.exitCode + ')' : ''));
+    last = spawnErr ? ' (' + spawnErr.code + ')' : proc.exitCode !== null ? ' (beendet mit ' + proc.exitCode + ')' : ' (keine Antwort nach 30 s)';
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch (e) { /* egal */ }
+    if (spawnErr) break;
+    console.error('Chrome-Start ' + attempt + ' fehlgeschlagen' + last + ' – neuer Versuch');
   }
+  throw Error('Chrome startet nicht: ' + CHROME + last);
+}
+
+async function open() {
+  const { proc, dir, page } = await launch();
   const ws = new WebSocket(page.webSocketDebuggerUrl), pending = new Map(), events = [];
   let id = 0;
   await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = no; });
