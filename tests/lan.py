@@ -178,7 +178,8 @@ class FakeBroker(threading.Thread):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"lights": [dict(self.light)]}})
                 elif (kind, action) == ("light", "control"):
                     self.light.update(msg["data"])
-                    self.reply(conn, kind, {"type": kind, "action": "control", "state": "done", "code": 200, "msgid": msg["msgid"], "data": dict(self.light)})
+                    # wie die Werksfirmware 2.7.2.7: Bestätigung ohne die msgid der Anfrage
+                    self.reply(conn, kind, {"type": kind, "action": "control", "state": "done", "code": 200, "msgid": "", "data": dict(self.light)})
                 elif (kind, action) == ("axis", "query"):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"coordinates": dict(self.pos)}})
                 elif (kind, action) == ("axis", "move"):
@@ -202,6 +203,10 @@ class FakeBroker(threading.Thread):
                 elif (kind, action) == ("multiColorBox", "setAutoFeed"):
                     self.ace["auto_feed"] = msg["data"]["multi_color_box"][0]["auto_feed"]
                     self.reply(conn, kind, {"type": kind, "action": "setAutoFeed", "state": "success", "code": 200, "msgid": msg["msgid"], "data": None})
+                elif (kind, action) == ("multiColorBox", "setDry"):
+                    self.ace["drying_status"] = msg["data"]["multi_color_box"][0]["drying_status"]
+                    # wie die Werksfirmware 2.7.2.7: Bestätigung ohne die msgid der Anfrage
+                    self.reply(conn, kind, {"type": kind, "action": "setDry", "state": "success", "code": 200, "msgid": "", "data": None})
                 elif (kind, action) == ("multiColorBox", "setInfo"):
                     for s in msg["data"]["multi_color_box"][0]["slots"]:
                         self.ace["slots"][s["index"]].update(type=s["type"], color=s["color"], edit_status=1)
@@ -318,7 +323,10 @@ res = lan.command("127.0.0.1", "tempature", "set", {"type": 2, "target_nozzle_te
 st = lan.status("127.0.0.1")
 check("Temperaturen gesetzt und gemeldet", res["ok"] and st["temps"]["target_nozzle_temp"] == 210 and st["temps"]["target_hotbed_temp"] == 60, st["temps"])
 lan.command("127.0.0.1", "fan", "setSpeed", {"fan_speed_pct": 40})
-lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
+res = lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
+check("Licht bestätigt, obwohl die Antwort keine msgid trägt", res["ok"], res)
+res = lan.command("127.0.0.1", "multiColorBox", "setDry", {"multi_color_box": [{"id": 0, "drying_status": {"status": 1, "target_temp": 45, "duration": 240}}]})
+check("Trocknen bestätigt, obwohl die Antwort keine msgid trägt", res["ok"] and broker.ace["drying_status"]["target_temp"] == 45, res)
 st = lan.status("127.0.0.1")
 check("Lüfter 40 % und Licht an", st["fans"]["fan_speed_pct"] == 40 and st["lights"] and st["lights"][0]["status"] == 1, (st["fans"], st["lights"]))
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})

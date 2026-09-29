@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.1.1] – 2026-09-29
+
+### Behoben
+- **Licht und Trocknen meldeten „Drucker hat den Befehl nicht bestätigt“**, obwohl der Drucker die Einstellung übernahm. Die Werksfirmware 2.7.2.7 bestätigt diese Befehle ohne die Nachrichten-Nummer der Anfrage; jetzt gilt auch die nächste Antwort derselben Art und Aktion als Bestätigung. Der Nachbau in `tests/lan.py` antwortet dafür wie die echte Firmware (49/49).
+
 ## [9.1.0] – 2026-09-29
 
 ### Neu

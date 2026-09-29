@@ -190,6 +190,7 @@ class PrinterLink:
         self.lock = threading.Lock()
         self.reports = {}          # Art → letzter Bericht (ohne Geheimnisse)
         self.waiters = {}          # msgid → [Event, Antwort]
+        self.waiters_ka = {}       # (Art, Aktion) → [[Event, Antwort], …] – Antworten ohne unsere msgid
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -310,6 +311,11 @@ class PrinterLink:
             else:
                 self.reports[kind] = doc
             w = self.waiters.get(doc.get("msgid") or "")
+            if not w:
+                # Die Werksfirmware bestätigt manche Befehle (Licht, Trocknen) ohne die msgid der Anfrage
+                # (beobachtet 2026-09-29, Firmware 2.7.2.7): dann gilt die nächste Antwort derselben Art und Aktion
+                pending = self.waiters_ka.get((kind, doc.get("action")))
+                w = next((x for x in pending or [] if not x[0].is_set()), None)
             if w:
                 w[1] = doc
                 w[0].set()
@@ -331,6 +337,7 @@ class PrinterLink:
         w = [threading.Event(), None]
         with self.lock:
             self.waiters[msgid] = w
+            self.waiters_ka.setdefault((kind, action), []).append(w)
         try:
             self.publish(kind, action, data, msgid, channel)
             if not w[0].wait(timeout):
@@ -339,6 +346,9 @@ class PrinterLink:
         finally:
             with self.lock:
                 self.waiters.pop(msgid, None)
+                lst = self.waiters_ka.get((kind, action)) or []
+                if w in lst:
+                    lst.remove(w)
 
     # -- Lesen --
     def data(self, kind):
