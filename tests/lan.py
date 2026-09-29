@@ -12,6 +12,7 @@ import re
 import socket
 import ssl
 import struct
+import time
 import tempfile
 import sys
 import threading
@@ -402,6 +403,17 @@ m = data.get("ams_settings", {})
 check("Werkzeuge 0 und 2 → ACE-Slots 0 und 2, Farbe und Typ aus dem G-Code", m.get("use_ams") and [(x["paint_index"], x["ams_index"], x["material_type"], x["paint_color"]) for x in m["ams_box_mapping"]] == [(0, 0, "PLA", [255, 0, 0, 255]), (2, 2, "PETG", [0, 0, 255, 255])], m)
 check("Bettnivellierung an, Zeitraffer aus", data.get("task_settings", {}).get("auto_leveling") == 1 and data["task_settings"]["timelapse"]["status"] == 0)
 check("Druck läuft danach", res["ok"] and res["job"] and res["job"]["name"] == "Schild_Platte1", res)
+
+# Kopfposition während des Drucks: nur auf Wunsch (status(pos=True)), sonst keine axis/query
+lan.POLL_S = 1
+axisq = lambda: sum(1 for _t, m in broker.commands if (m.get("type"), m.get("action")) == ("axis", "query"))
+n0 = axisq(); time.sleep(2.5)
+check("während des Drucks ohne Wunsch keine Positionsabfrage", axisq() == n0, axisq() - n0)
+lan.status("127.0.0.1", pos=True); n1 = axisq(); time.sleep(2.5)
+st = lan.status("127.0.0.1")
+check("mit pos=True wird die Position auch während des Drucks abgefragt", axisq() > n1 and st.get("position_age_s") is not None and st["position_age_s"] < 3, (axisq() - n1, st.get("position_age_s")))
+lan.get_link("127.0.0.1").pos_until = 0
+lan.POLL_S = 5
 try:
     lan.print_gcode("127.0.0.1", gtmp.name, "noch_einer.gcode"); check("zweiter Druck abgelehnt, solange einer läuft", False)
 except lan.LanError as e:

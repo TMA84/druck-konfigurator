@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.3.0] – 2026-09-29
+
+### Neu
+- **Druckkopf im 3D-Fortschritt:** geschätzt auf der aktuellen Schicht oder – Schalter **Echte Kopfposition** – an der Stelle, die der Drucker meldet (Abfrage auch während des Drucks, nur solange die Ansicht offen und der Schalter an ist; am Kobra S1 geprüft).
+- **Kommende Schichten** im 3D-Fortschritt durchsichtig (Standard), ausgeblendet oder voll – der aktuelle Stand bleibt sichtbar.
+
 ## [10.2.0] – 2026-09-29
 
 ### Neu

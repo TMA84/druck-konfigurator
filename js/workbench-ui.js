@@ -25,7 +25,9 @@ async function wbPoll() {
   if (document.body.dataset.tab !== 'printer') return;
   const host = wbHost();
   if (!host || !(await lanServerAvailable())) { wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : ''); return; }
-  try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); wb.err = ''; }
+  // pos=1: Kopfposition auch während des Drucks (Schalter in der 3D-Ansicht, js/live-ui.js)
+  const pos = typeof livePosWanted === 'function' && livePosWanted() ? '&pos=1' : '';
+  try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); wb.err = ''; }
   catch (e) { wb.err = t(e.message); }
   wbRender();
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);

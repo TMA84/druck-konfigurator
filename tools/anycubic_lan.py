@@ -193,6 +193,8 @@ class PrinterLink:
         self.waiters = {}          # msgid → [Event, Antwort]
         self.waiters_ka = {}       # (Art, Aktion) → [[Event, Antwort], …] – Antworten ohne unsere msgid
         self.recent = collections.deque(maxlen=40)   # (Zeit, Art, Aktion, msgid?, state, code) – zur Fehlersuche
+        self.seen = {}             # Art → Zeitpunkt des letzten Berichts
+        self.pos_until = 0         # bis dahin Kopfposition auch während des Drucks abfragen (status(…, pos=True))
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -263,8 +265,10 @@ class PrinterLink:
                         break
                     for kind, action in POLL_QUERIES:
                         self.publish(kind, action, None)
-                    if self.reports.get("info") and self._printing() is False:
-                        self.publish("axis", "query", None)   # Kopfposition nur, wenn nicht gedruckt wird
+                    # Kopfposition: ohne Druck immer; während des Drucks nur auf Wunsch (Schalter „Echte Kopfposition“
+                    # in der 3D-Ansicht; am S1 mit Firmware 2.7.2.7 geprüft 2026-09-29: frische Werte während des Drucks)
+                    if self.reports.get("info") and (self._printing() is False or time.time() < self.pos_until):
+                        self.publish("axis", "query", None)
                     for _ in range(POLL_S * 10):
                         if self.stopped or not self.connected.is_set():
                             break
@@ -304,6 +308,7 @@ class PrinterLink:
         doc = redact(doc)
         with self.lock:
             self.recent.append((time.time(), kind, doc.get("action"), bool(doc.get("msgid")), doc.get("state"), doc.get("code")))
+            self.seen[kind] = time.time()
             # Die Box-Liste nur aus Berichten, die sie vollständig enthalten (getInfo …); Bestätigungen und
             # Teilmeldungen (setInfo ohne Daten, autoUpdateInfo …) unter eigenem Schlüssel
             boxes = (doc.get("data") or {}).get("multi_color_box") if isinstance(doc.get("data"), dict) else None
@@ -467,11 +472,18 @@ def _job(project):
             "paused": bool(project.get("pause")), "filament_mm": project.get("supplies_usage")}
 
 
-def status(host):
-    """Gesamter Stand für Belegung und Werkbank (aus der stehenden Verbindung)."""
+POS_WHILE_PRINTING_S = 20   # so lange nach der letzten Anfrage mit pos=True weiter abfragen
+
+
+def status(host, pos=False):
+    """Gesamter Stand für Belegung und Werkbank (aus der stehenden Verbindung).
+    pos=True: Kopfposition auch während des Drucks abfragen (für die nächsten POS_WHILE_PRINTING_S Sekunden)."""
     link = _ready(host)
+    if pos:
+        link.pos_until = time.time() + POS_WHILE_PRINTING_S
     with link.lock:
         reps = dict(link.reports)
+        pos_age = time.time() - link.seen["axis"] if "axis" in link.seen else None
     data = lambda k: ((reps.get(k) or {}).get("data")) or {}
     info, peri, temp, fan, light, axis = data("info"), data("peripherie"), data("tempature"), data("fan"), data("light"), data("axis")
     t = info.get("temp") or {}
@@ -483,6 +495,7 @@ def status(host):
             "temps": temps, "fans": {k: fan.get(k, info.get(k)) for k in ("fan_speed_pct", "aux_fan_speed_pct", "box_fan_level")},
             "speed_mode": info.get("print_speed_mode"), "lights": lights,
             "position": (axis.get("coordinates") if isinstance(axis, dict) else None),
+            "position_age_s": round(pos_age, 1) if pos_age is not None else None,
             "camera": bool(peri.get("camera")), "has_ace": peri.get("multiColorBox"), "features": info.get("features") or {},
             "ace": ace_boxes({"multiColorBox": [reps["multiColorBox"]]} if "multiColorBox" in reps else {}),
             "connected": link.connected.is_set(), "error": link.error, "missing": [k for k, _ in POLL_QUERIES if k not in reps],

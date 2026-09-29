@@ -203,5 +203,14 @@ I18N.add({
  "Teil entfernen": "Remove part",
  "„{name}“ entfernen": "Remove “{name}”",
  "„{name}“ entfernt": "“{name}” removed",
- "Rückgängig": "Undo"
+ "Rückgängig": "Undo",
+ "Kommende Schichten": "Upcoming layers",
+ "durchsichtig": "transparent",
+ "ausblenden": "hide",
+ "voll": "solid",
+ "Kopf: echte Position": "head: real position",
+ "Kopf: geschätzt": "head: estimated",
+ "Kopfposition wird auch während des Drucks abgefragt (alle 5 s)": "The head position is also queried while printing (every 5 s)",
+ "Echte Kopfposition": "Real head position",
+ "Fragt die Kopfposition auch während des Drucks ab (alle 5 s)": "Also queries the head position while printing (every 5 s)"
 });

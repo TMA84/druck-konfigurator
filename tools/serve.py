@@ -6,6 +6,7 @@ einem Update alte und neue Skripte (beobachtet 2026-09-26: alte engine.js + neue
 API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/health                         → {"ok": true, "lan": <LAN-Modus verfügbar>}
   GET  /api/anycubic/status?host=<ip>      → Stand für Werkbank und Belegung (stehende Verbindung, alle 5 s)
+       &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS)
   POST /api/anycubic/print  {host, job, plate, name, options}  → G-Code einer geslicten Platte hochladen und drucken
   POST /api/anycubic/command  {host, type, action, data}  → nur freigegebene Einstellungen (WRITABLE)
@@ -180,8 +181,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             printer = preset_printer() if self._auth_ok() else None
             return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version(), "printer": printer})
         if url.path == "/api/anycubic/status":
-            host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
-            return self._api(lambda: anycubic_lan.status(host))
+            q = urllib.parse.parse_qs(url.query)
+            host, pos = q.get("host", [""])[0], q.get("pos", [""])[0] == "1"
+            return self._api(lambda: anycubic_lan.status(host, pos=pos))
         if url.path == "/api/printing/preview":
             # Schichtvorschau des laufenden Drucks (nur für Drucke, die das Tool gestartet hat) – Live-Ansicht in ④
             path = printed_preview(urllib.parse.parse_qs(url.query).get("name", [""])[0])
