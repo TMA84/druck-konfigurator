@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.1.2] – 2026-09-29
+
+### Neu
+- **Favicon:** Druckbett mit Schichten in Orange (`img/favicon.svg`, PNG 32 px und Apple-Touch-Icon 180 px), dazu Theme-Farbe für Browserleisten.
+
 ## [9.1.1] – 2026-09-29
 
 ### Behoben
