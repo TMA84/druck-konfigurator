@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.5.1] – 2026-09-29
+
+### Neu
+- **Slot für alle Teile übernehmen:** in ② neben der Slot-Auswahl („Für alle Teile übernehmen“) und in ③ unter den Filament-Slots („Slot N für alle Teile übernehmen“, erscheint, wenn die Teile verschiedene Slots haben). Körper mehrfarbiger Teile behalten ihre eigenen Slots; passt das Filament nicht zum Slot, wird es umgestellt.
+
 ## [9.5.0] – 2026-09-29
 
 ### Geändert

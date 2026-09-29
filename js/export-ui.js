@@ -385,12 +385,27 @@ function pickPrintSlot(i){
   toast((single?t('Druckt mit Slot {n}',{n:i+1}):t('Standard-Slot {n} für Teile ohne eigenen Slot',{n:i+1}))+(changed?' · '+t('Filament auf {type} umgestellt',{type:s.type}):''));
 }
 $('slotPanelList').addEventListener('click',e=>{const li=e.target.closest('[data-slot-pick]');if(li)pickPrintSlot(+li.dataset.slotPick)});
+/* Einen Slot für alle Teile (Grund-Slot; Körper mehrfarbiger Teile behalten ihren eigenen). slot = Zahl oder null
+   (= wie beim Export gewählt). Filament der Teile passend zum Slot umstellen. */
+function applySlotToAll(slot){
+  if(!project||!lastResult)return;
+  const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),def=+(store.last[slotKey(r.printer.id)]||0);
+  const s=tpl&&slotSource(tpl).slots[slot??def];let changed=0;
+  for(const p of project.parts){p.slot=slot;
+    if(s&&s.present&&s.type&&p.input){const m=materialForSlotType(s.type,p.input.material);if(m!==p.input.material){p.input.material=m;changed++}}}
+  loadPartIntoForm(project.parts[project.selected]);update();
+  toast(t('Slot {n} für alle {count} Teile',{n:(slot??def)+1,count:project.parts.length})+(changed?' · '+t('Filament auf {type} umgestellt',{type:s.type}):''));
+}
+$('slotPanelAll').addEventListener('click',()=>{if(lastResult)applySlotToAll(+(store.last[slotKey(lastResult.printer.id)]||0))});
 function renderSidePanels(){
   const r=lastResult,tpl=r&&exportTemplate(r.printer.id,r.dSel);
   $('slotPanel').classList.toggle('hidden',!tpl);
   if(tpl){
     const src=slotSource(tpl);
-    const used=slotsInUse();
+    const used=slotsInUse(),def=+(store.last[slotKey(r.printer.id)]||0);
+    const mixed=!!project&&project.parts.length>1&&project.parts.some(p=>(p.slot??def)!==def);
+    $('slotPanelAll').classList.toggle('hidden',!mixed);
+    if(mixed)$('slotPanelAll').textContent=t('Slot {n} für alle Teile übernehmen',{n:def+1});
     $('slotPanelList').innerHTML=src.slots.map((s,i)=>{
       const how=s.own?(src.kind==='live'?t('überschrieben'):t('eigene Angabe')):src.kind==='live'?(s.present?t('vom Drucker'):t('leer')):t('unbekannt');
       return '<li data-slot-pick="'+i+'" title="'+esc(t('Anklicken: mit diesem Slot drucken'))+'" class="'+(s.own&&src.kind==='live'?'ovr':'')+(used.has(i)?' pick':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small>'+(used.has(i)?'<span class="pick-tag">'+t('druckt damit')+'</span>':'')+'</span></li>';

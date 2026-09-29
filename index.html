@@ -95,6 +95,7 @@
         <b id="partScopeName"></b>
         <label for="partPick">Teil</label><select id="partPick" aria-label="Teil wählen"></select>
         <label for="partSlot">Slot</label><select id="partSlot"></select>
+        <button type="button" class="linkbtn" id="partSlotAll">Für alle Teile übernehmen</button>
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
         <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div></div>
@@ -187,6 +188,7 @@
       <section id="slotPanel" class="side-panel noprint" aria-labelledby="slotPanelTitle">
         <span class="eyebrow" id="slotPanelTitle">Filament-Slots</span>
         <ul id="slotPanelList" class="slot-panel-list"></ul>
+        <button type="button" class="linkbtn hidden" id="slotPanelAll"></button>
         <p id="slotPanelSource" class="muted small"></p>
         <div id="slotPanelConnect" class="slot-connect hidden"><input id="slotPanelHost" inputmode="decimal" placeholder="IP des Druckers, z. B. 192.168.1.50" autocomplete="off" aria-label="IP-Adresse des Druckers"><button class="btn sec" type="button" id="slotPanelConnectBtn">Verbinden</button></div>
         <div class="field-links"><button class="linkbtn" type="button" data-action="slots">✎ Bearbeiten / überschreiben</button><button class="linkbtn" type="button" id="slotPanelReload">Vom Drucker laden</button></div>

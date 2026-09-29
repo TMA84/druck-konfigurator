@@ -47,6 +47,7 @@ function renderPartScope() {
   $('partScope').classList.toggle('hidden', !project);
   if (!project) return;
   $('partScope').classList.toggle('single', !multi);
+  $('partSlotAll').classList.toggle('hidden', !multi);
   const p = project.parts[project.selected], sel = $('partSlot'), slots = slotChoices();
   $('partScopeName').textContent = p.name;
   // Teil hier wählen, ohne in den Tab „Modell“ zu wechseln
@@ -55,6 +56,10 @@ function renderPartScope() {
     slots.map(s => '<option value="' + s.idx + '">Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) + (typeof slotOriginNote === 'function' ? slotOriginNote() : '') : '') + '</option>').join('');
   sel.value = p.slot === null || p.slot === undefined || p.slot >= slots.length ? '' : String(p.slot);
 }
+$('partSlotAll').addEventListener('click', () => {
+  const v = $('partSlot').value;
+  applySlotToAll(v === '' ? null : +v);
+});
 $('partPick').addEventListener('change', () => { const i = +$('partPick').value; if (i !== project.selected) selectPart(i); });
 $('partSlot').addEventListener('change', () => {
   const p = project.parts[project.selected], v = $('partSlot').value;

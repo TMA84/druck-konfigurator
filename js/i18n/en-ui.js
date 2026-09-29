@@ -81,3 +81,9 @@ I18N.add({
   'Platzsparend: {n} statt {m} Platten. Die 3MF wird dafür neu aufgebaut – Farb-Modifikatoren und Bemalung des Designers gehen verloren.': 'Compact: {n} instead of {m} plates. The 3MF is rebuilt for this – the designer’s color modifiers and painting are lost.',
   'Platzsparend angeordnet wären es {n} statt {m} Platten.': 'Arranged compactly it would be {n} instead of {m} plates.'
 });
+// Slot für alle Teile (js/export-ui.js applySlotToAll)
+I18N.add({
+  'Für alle Teile übernehmen': 'Apply to all parts',
+  'Slot {n} für alle {count} Teile': 'Slot {n} for all {count} parts',
+  'Slot {n} für alle Teile übernehmen': 'Apply slot {n} to all parts'
+});

@@ -254,7 +254,7 @@ Weiteres:
 
 Im Schritt **③ Slicen & Kosten** zeigt der Abschnitt **Filament-Slots** jeden Slot mit Farbe, Material und Herkunft (vom Drucker, überschrieben, eigene Angabe) – ist eine Verbindung eingerichtet, liest das Tool die ACE beim Öffnen einmal aus. Darunter stellst du unter **Farbwechsel & Spülmenge** die Spülmenge ein und siehst die Schätzung für das geladene Projekt.
 
-**Mit welchem Slot gedruckt wird:** Slot in der Liste anklicken – er ist dann mit „druckt damit“ markiert. Bei einem Teil (auch einem einfarbigen) gilt das für dieses Teil, bei mehreren Teilen als Standard für alle Teile ohne eigenen Slot. Passt das Filament des Teils nicht zum Slot (z. B. PLA-Profil, im Slot liegt ASA), stellt das Tool es passend um. Denselben Slot wählst du auch in **② Druckwerte** unter **Einstellungen für Teil → Slot**.
+**Mit welchem Slot gedruckt wird:** Slot in der Liste anklicken – er ist dann mit „druckt damit“ markiert. Bei einem Teil (auch einem einfarbigen) gilt das für dieses Teil, bei mehreren Teilen als Standard für alle Teile ohne eigenen Slot. Passt das Filament des Teils nicht zum Slot (z. B. PLA-Profil, im Slot liegt ASA), stellt das Tool es passend um. Denselben Slot wählst du auch in **② Druckwerte** unter **Einstellungen für Teil → Slot**. **Für alle Teile übernehmen** (dort) bzw. **Slot N für alle Teile übernehmen** (unter der Slot-Liste) setzt einen Slot für alle Teile auf einmal; Körper mehrfarbiger Teile behalten ihre eigenen Slots.
 
 Bearbeiten über **✎ Bearbeiten / überschreiben**, **⚙ Einstellungen → Filament-Slots …** oder **Slots bearbeiten** im Export-Dialog stellst du je Slot **Material und Farbe** ein.
 
