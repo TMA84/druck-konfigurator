@@ -47,7 +47,7 @@ function renderSendDialog() {
       (have ? sw(ace.colour) + esc(have) : t('leer')) + (bad ? '<small>' + (have ? t('anderes Material als im G-Code') : t('kein Filament im Slot')) + '</small>' : '') + '</td></tr>';
   }).join('');
   $('sendMap').innerHTML = '<table class="changes"><thead><tr><th>' + t('Werkzeug') + '</th><th>G-Code</th><th>ACE</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-    (p && typeof spoolShortage === 'function' && spoolShortage(p.grams).length ? '<p class="note bad">' + esc(t('Zu wenig Filament:') + ' ' + spoolShortageText(spoolShortage(p.grams))) + '</p>' : '') +
+    (p && typeof spoolShortage === 'function' && spoolShortage(p.grams).length ? '<p class="note bad">' + esc(spoolShortagePrefix(spoolShortage(p.grams)) + ' ' + spoolShortageText(spoolShortage(p.grams))) + '</p>' : '') +
     (warn ? '<p class="note bad">' + t('{n} Slot(s) passen nicht zum G-Code. Temperaturen im G-Code gelten für das geslicte Material – erst Filament tauschen oder neu slicen.', { n: warn }) + '</p>' : '');
   $('sendGo').disabled = !free;
   $('sendGo').textContent = warn ? t('Trotzdem drucken') : t('Jetzt drucken');

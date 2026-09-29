@@ -1,7 +1,7 @@
 'use strict';
 /* Erzeugt docs/Handbuch.pdf aus HANDBUCH.md: kleiner Markdown-Umsetzer (nur was das Handbuch nutzt)
    → docs/handbuch.html → PDF über Chrome headless. Aufruf: node tools/build-handbuch.js
-   Chrome-Pfad per CHROME=<Pfad> änderbar. */
+   Chrome-Pfad per CHROME=<Pfad> änderbar (sonst Standardpfad je System, siehe tools/headless.js). */
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -11,7 +11,6 @@ const ROOT = path.join(__dirname, '..');
 const MD = path.join(ROOT, 'HANDBUCH.md');
 const HTML = path.join(ROOT, 'docs', 'handbuch.html');
 const PDF = path.join(ROOT, 'docs', 'Handbuch.pdf');
-const CHROME = process.env.CHROME || path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe');
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 // Anker wie GitHub: klein, Satzzeichen weg (Umlaute bleiben), Leerzeichen → "-"
@@ -80,8 +79,16 @@ a { color: #b0440b; text-decoration: none; }
 const body = toHtml(fs.readFileSync(MD, 'utf8'));
 fs.writeFileSync(HTML, '<!doctype html><html lang="de"><meta charset="utf-8"><title>Druck-Konfigurator – Handbuch</title><style>' + CSS + '</style><body>' + body + '</body></html>');
 console.log('→ ' + path.relative(ROOT, HTML));
-if (!fs.existsSync(CHROME)) { console.error('Chrome nicht gefunden (' + CHROME + ') – PDF nicht erzeugt. CHROME=<Pfad> setzen.'); process.exit(1); }
-execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--no-pdf-header-footer',
-  // eigenes Profil, sonst reicht Windows den Aufruf an ein schon offenes Chrome weiter
-  '--user-data-dir=' + fs.mkdtempSync(path.join(os.tmpdir(), 'handbuch-')), '--print-to-pdf=' + PDF, 'file:///' + HTML.replace(/\\/g, '/')], { stdio: 'ignore', timeout: 120000 });
-console.log('→ ' + path.relative(ROOT, PDF) + ' (' + Math.round(fs.statSync(PDF).size / 1024) + ' KB)');
+// PDF über das DevTools-Protokoll (tools/headless.js): zuverlässig auch am Mac, wo Chrome nach --print-to-pdf
+// nicht von selbst endet (2026-09-29)
+(async () => {
+  const { open } = require('./headless');
+  const b = await open();
+  try {
+    await b.go('file://' + (HTML.startsWith('/') ? '' : '/') + HTML.replace(/\\/g, '/'));
+    await new Promise(r => setTimeout(r, 1500));   // Bilder laden
+    const pdf = await b.send('Page.printToPDF', { printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false });
+    fs.writeFileSync(PDF, Buffer.from(pdf.data, 'base64'));
+  } finally { b.close(); }
+  console.log('→ ' + path.relative(ROOT, PDF) + ' (' + Math.round(fs.statSync(PDF).size / 1024) + ' KB)');
+})().catch(e => { console.error(e.message); process.exitCode = 2; });

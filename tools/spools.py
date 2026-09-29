@@ -11,6 +11,16 @@ Farbwechsel (anderer loaded_slot während eines Drucks): Spülabfall der ACE fü
 Erkennung: gleicher Slot mit gleicher sku/Farbe/Typ = dieselbe Spule. Sonst eine Spule aus dem Regal mit gleicher
 sku/Farbe/Typ (wieder eingelegt, die zuletzt gesehene) oder eine neue Spule (Füllgewicht 1000 g, änderbar).
 Spulen ohne RFID (von Hand am Drucker eingestellt) haben keine sku – dann zählen Typ und Farbe.
+Neu erkannte Spulen tragen needs_check: true, bis der Nutzer das Füllgewicht bestätigt oder ändert (die Seite fragt nach).
+Warnschwelle low_g (Standard 100 g): darunter zeigt die Seite die Spule rot und warnt vor dem Drucken.
+
+Export/Import (zwischen zwei Servern, z. B. Mac und Home-Assistant-Add-on): GET /api/spools/export liefert den ganzen
+Stand (export_state), POST {action: import, data, mode: merge|replace} spielt ihn ein (import_state).
+  replace: alles aus der Datei übernehmen – außer host und dem laufenden Zähler track dieses Servers.
+  merge:   Spulen zuordnen – zuerst über die id, sonst über gleiche sku/Typ/Farbe (bevorzugt im selben Slot, sonst eine
+           Spule im Regal, jede höchstens einmal). Bei einem Paar gewinnt der Eintrag mit dem späteren last_seen (id und
+           Slot bleiben die dieses Servers, der die ACE gerade sieht). Unbekannte Spulen kommen ins Regal (slot None).
+           Letzte Drucke werden vereinigt. host, flush, purge_g, low_g und track bleiben die dieses Servers.
 
 Daten: JSON-Datei $SPOOL_FILE oder $DATA_DIR/spools.json (Standard ~/.druck-konfigurator/spools.json, im Container /data).
 Der Server fragt den Drucker dafür dauerhaft ab (Tracker), sobald die Seite ihm die Adresse genannt hat.
@@ -25,6 +35,9 @@ import uuid
 DIAMETER_MM = 1.75
 DENSITY = {"PLA": 1.24, "PETG": 1.27, "ABS": 1.04, "ASA": 1.07, "TPU": 1.21, "PA": 1.14, "PC": 1.20, "PVA": 1.23, "HIPS": 1.04}
 DEFAULT_NET_G = 1000
+LOW_G_DEFAULT = 100
+EXPORT_FORMAT = "druck-konfigurator-spools"
+MAX_SPOOLS = 500
 FLUSH_DEFAULT = 1.5
 HISTORY = 50
 POLL_S = 5
@@ -52,7 +65,7 @@ def purge_g(flush):
 
 
 def empty_state():
-    return {"version": 1, "host": None, "flush": FLUSH_DEFAULT, "purge_g": None, "spools": [], "track": {}, "history": []}
+    return {"version": 1, "host": None, "flush": FLUSH_DEFAULT, "purge_g": None, "low_g": LOW_G_DEFAULT, "spools": [], "track": {}, "history": []}
 
 
 def load(path=None):
@@ -82,7 +95,7 @@ def remaining(sp):
 def view(state):
     """Für die Seite: Spulen mit Restmenge, Slot-Zuordnung, letzte Drucke."""
     spools = [dict(sp, remaining_g=remaining(sp)) for sp in state["spools"]]
-    return {"spools": spools, "host": state.get("host"), "flush": state.get("flush"), "purge_g": state.get("purge_g"),
+    return {"spools": spools, "host": state.get("host"), "flush": state.get("flush"), "purge_g": state.get("purge_g"), "low_g": state.get("low_g", LOW_G_DEFAULT),
             "history": state.get("history", [])[-HISTORY:], "track": state.get("track") or {}, "file": data_file()}
 
 
@@ -92,10 +105,11 @@ def _same(sp, s):
     return (sp.get("sku") or "") == (s.get("sku") or "")
 
 
-def new_spool(s, slot, now):
+def new_spool(s, slot, now, check=True):
     return {"id": uuid.uuid4().hex[:12], "sku": s.get("sku") or "", "type": s["type"], "colour": s["colour"], "rfid": bool(s.get("rfid")),
             "name": "", "brand": "Anycubic" if s.get("rfid") else "", "net_g": DEFAULT_NET_G, "used_g": 0.0, "purge_g": 0.0, "adjust_g": 0.0,
-            "slot": slot, "added": now, "last_seen": now, "notes": "", "archived": False}
+            "slot": slot, "added": now, "last_seen": now, "notes": "", "archived": False,
+            "needs_check": check}
 
 
 def sync_slots(state, slots, now=None):
@@ -190,10 +204,17 @@ def update(state, req):
             state["flush"] = f
         if "purge_g" in req:
             state["purge_g"] = float(req["purge_g"]) if req["purge_g"] else None
+        if req.get("low_g") is not None:
+            v = _num(req["low_g"])
+            if v is None or not 0 <= v <= 5000:
+                raise ValueError("Warnschwelle 0–5000 g")
+            state["low_g"] = v
         return "ok"
+    if a == "import":
+        return import_state(state, req.get("data"), req.get("mode"))
     if a == "add":
         s = {"type": str(req.get("type") or "PLA").upper(), "colour": str(req.get("colour") or "#FFFFFF"), "sku": "", "rfid": False}
-        sp = new_spool(s, None, time.time())
+        sp = new_spool(s, None, time.time(), check=False)   # von Hand angelegt: Füllgewicht gibt der Nutzer gleich ein
         state["spools"].append(sp)
         req = dict(req, id=sp["id"])
         a = "update"
@@ -223,7 +244,168 @@ def update(state, req):
         if not 0 <= r <= 20000:
             raise ValueError("Restmenge außerhalb 0–20000")
         sp["adjust_g"] = round(r - (sp["net_g"] - sp.get("used_g", 0) - sp.get("purge_g", 0)), 1)
+    if "needs_check" in req:
+        sp["needs_check"] = bool(req["needs_check"])
+    elif req.get("net_g") is not None or req.get("remaining_g") is not None:
+        sp["needs_check"] = False          # Gewicht bestätigt oder eingetragen
     return "gespeichert"
+
+
+def _num(v):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        return None
+    return float(v)
+
+
+def _str(d, k, maxlen, default=""):
+    v = d.get(k, default)
+    if v is None:
+        v = default
+    if not isinstance(v, str) or len(v) > maxlen:
+        raise ValueError("Feld „%s“ ungültig (Text bis %d Zeichen erwartet)" % (k, maxlen))
+    return v
+
+
+def _clean_spool(d, n):
+    """Eine Spule aus der Importdatei prüfen und in die eigene Form bringen."""
+    if not isinstance(d, dict):
+        raise ValueError("Spule %d ist kein Objekt" % n)
+    sid = _str(d, "id", 64)
+    if not sid or not all(c.isalnum() or c in "-_" for c in sid):
+        raise ValueError("Spule %d: ungültige id" % n)
+    sp = {"id": sid, "sku": _str(d, "sku", 64), "type": _str(d, "type", 32).upper() or "PLA", "colour": _str(d, "colour", 32) or "#FFFFFF",
+          "name": _str(d, "name", 200), "brand": _str(d, "brand", 100), "notes": _str(d, "notes", 1000)}
+    for k in ("rfid", "archived", "needs_check"):
+        v = d.get(k, False)
+        if not isinstance(v, bool):
+            raise ValueError("Spule %d: „%s“ muss wahr/falsch sein" % (n, k))
+        sp[k] = v
+    for k, lo, hi, default in (("net_g", 0, 20000, DEFAULT_NET_G), ("used_g", 0, 1e6, 0.0), ("purge_g", 0, 1e6, 0.0),
+                               ("adjust_g", -1e6, 1e6, 0.0), ("added", 0, 1e11, 0.0), ("last_seen", 0, 1e11, 0.0)):
+        v = _num(d.get(k, default))
+        if v is None or not lo <= v <= hi:
+            raise ValueError("Spule %d: „%s“ ungültig" % (n, k))
+        sp[k] = v
+    if d.get("price_per_kg") is not None:
+        v = _num(d["price_per_kg"])
+        if v is None or not 0 <= v <= 20000:
+            raise ValueError("Spule %d: „price_per_kg“ ungültig" % n)
+        sp["price_per_kg"] = v
+    slot = d.get("slot")
+    if slot is not None and (isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot < 64):
+        raise ValueError("Spule %d: ungültiger Slot" % n)
+    sp["slot"] = slot
+    return sp
+
+
+def _clean_history(lst):
+    if not isinstance(lst, list) or len(lst) > 1000:
+        raise ValueError("„history“ muss eine Liste sein")
+    out = []
+    for n, h in enumerate(lst, 1):
+        if not isinstance(h, dict) or not isinstance(h.get("used", {}), dict) or len(h.get("used", {})) > 64:
+            raise ValueError("Druck %d in „history“ ungültig" % n)
+        e = {"job": _str(h, "job", 500), "changes": 0, "used": {}}
+        for k in ("start", "end"):
+            e[k] = _num(h.get(k)) if h.get(k) is not None else None
+            if h.get(k) is not None and e[k] is None:
+                raise ValueError("Druck %d: „%s“ ungültig" % (n, k))
+        ch = h.get("changes", 0)
+        if isinstance(ch, bool) or not isinstance(ch, int) or not 0 <= ch <= 100000:
+            raise ValueError("Druck %d: „changes“ ungültig" % n)
+        e["changes"] = ch
+        for sid, g in h.get("used", {}).items():
+            if not isinstance(sid, str) or len(sid) > 64 or _num(g) is None:
+                raise ValueError("Druck %d: Verbrauch ungültig" % n)
+            e["used"][sid] = _num(g)
+        out.append(e)
+    return out[-HISTORY:]
+
+
+def validate_import(data):
+    """Importdatei prüfen. Gibt einen bereinigten Stand zurück oder wirft ValueError (deutsche Meldung)."""
+    if not isinstance(data, dict):
+        raise ValueError("Keine Spulendatei (JSON-Objekt erwartet)")
+    if data.get("format") not in (None, EXPORT_FORMAT) or not isinstance(data.get("spools"), list):
+        raise ValueError("Keine Spulendatei des Druck-Konfigurators")
+    if data.get("version", 1) != 1:
+        raise ValueError("Unbekannte Version der Spulendatei")
+    if len(data["spools"]) > MAX_SPOOLS:
+        raise ValueError("Zu viele Spulen (höchstens %d)" % MAX_SPOOLS)
+    spools = [_clean_spool(d, n) for n, d in enumerate(data["spools"], 1)]
+    ids, slots = set(), set()
+    for sp in spools:
+        if sp["id"] in ids:
+            raise ValueError("Spule %s kommt doppelt vor" % sp["id"])
+        ids.add(sp["id"])
+        if sp["slot"] is not None:
+            if sp["slot"] in slots:
+                raise ValueError("Slot %d ist doppelt belegt" % (sp["slot"] + 1))
+            slots.add(sp["slot"])
+    out = {"spools": spools, "history": _clean_history(data.get("history", []))}
+    for k, lo, hi in (("flush", 0.1, 3), ("purge_g", 0, 100), ("low_g", 0, 5000)):
+        if data.get(k) is not None:
+            v = _num(data[k])
+            if v is None or not lo <= v <= hi:
+                raise ValueError("„%s“ ungültig" % k)
+            out[k] = v
+    return out
+
+
+def import_state(state, data, mode):
+    """Export eines anderen Servers einspielen (Regeln siehe oben). Gibt {note, imported: {mode, total, added, updated}} zurück."""
+    if mode not in ("merge", "replace"):
+        raise ValueError("Import: Art „merge“ oder „replace“ angeben")
+    src = validate_import(data)
+    if mode == "replace":
+        state["spools"] = src["spools"]
+        state["history"] = src["history"]
+        state["flush"] = src.get("flush", FLUSH_DEFAULT)
+        state["purge_g"] = src.get("purge_g")
+        state["low_g"] = src.get("low_g", LOW_G_DEFAULT)
+        return {"note": "Spulen ersetzt", "imported": {"mode": mode, "total": len(src["spools"]), "added": len(src["spools"]), "updated": 0}}
+    own = state["spools"]
+    by_id = {sp["id"]: sp for sp in own}
+    taken, idmap, added, updated = set(), {}, 0, 0
+    for sp in src["spools"]:
+        t = by_id.get(sp["id"])
+        if t is None or t["id"] in taken:
+            cand = [x for x in own if x["id"] not in taken and _same(x, sp) and (x.get("slot") is None or x.get("slot") == sp["slot"])]
+            cand.sort(key=lambda x: (x.get("slot") is None or x.get("slot") != sp["slot"], -(x.get("last_seen") or 0)))
+            t = cand[0] if cand else None
+        if t is None:
+            new = dict(sp, slot=None)
+            if new["id"] in by_id:
+                new["id"] = uuid.uuid4().hex[:12]
+            own.append(new)
+            by_id[new["id"]] = new
+            taken.add(new["id"])
+            idmap[sp["id"]] = new["id"]
+            added += 1
+            continue
+        taken.add(t["id"])
+        idmap[sp["id"]] = t["id"]
+        if (sp.get("last_seen") or 0) > (t.get("last_seen") or 0):
+            keep = {"id": t["id"], "slot": t.get("slot"), "added": min(t.get("added") or sp["added"], sp["added"] or t.get("added") or 0)}
+            t.clear()
+            t.update(sp, **keep)
+            updated += 1
+    seen = {(h.get("job"), h.get("start")) for h in state.get("history", [])}
+    for h in src["history"]:
+        if (h["job"], h["start"]) not in seen:
+            state.setdefault("history", []).append(dict(h, used={idmap.get(k, k): g for k, g in h["used"].items()}))
+    state["history"] = sorted(state.get("history", []), key=lambda h: h.get("end") or 0)[-HISTORY:]
+    return {"note": "Spulen zusammengeführt", "imported": {"mode": mode, "total": len(src["spools"]), "added": added, "updated": updated}}
+
+
+def export_state(state, now=None):
+    """Ganzer Stand zum Herunterladen: (Dateiname, JSON-Bytes)."""
+    now = now or time.time()
+    out = {"format": EXPORT_FORMAT, "version": 1, "exported": round(now)}
+    out.update({k: state.get(k) for k in ("flush", "purge_g", "low_g", "spools", "history")})
+    out["host"] = state.get("host")
+    name = "spools-" + time.strftime("%Y-%m-%d", time.localtime(now)) + ".json"
+    return name, json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode()
 
 
 class Tracker:
@@ -277,9 +459,14 @@ def api_get(path=None):
         return view(load(path))
 
 
+def api_export(path=None):
+    with _lock:
+        return export_state(load(path))
+
+
 def api_post(req, path=None):
     with _lock:
         state = load(path)
         msg = update(state, req)
         save(state, path)
-        return dict(view(state), note=msg)
+        return dict(view(state), **(msg if isinstance(msg, dict) else {"note": msg}))

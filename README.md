@@ -73,11 +73,17 @@ python tests/slice.py         # Slicen für die Kosten (mit OrcaSlicer, sonst nu
 python tests/preview.py       # G-Code → Schichtvorschau
 node tests/overrides.js       # Werte je Auftrag anpassen
 node tests/plates.js          # Platten: Zuordnung, Reihenfolge nach Filament, Warteschlange
+node tests/export-project-arrange.js  # Makerworld-3MF anordnen/kombinieren/Kopien (mit OrcaSlicer)
+python tests/spools.py        # Filamentverwaltung (Erkennen, Verbrauch, Export/Import)
+python tests/printqueue.py    # Warteschlange auf dem Server
+python tests/ha_mqtt.py       # Home-Assistant-MQTT (gegen einen nachgebauten Broker)
+python tests/printed.py       # Vorschau gestarteter Drucke (3D-Fortschritt)
+node tools/headless.js smoke  # Bedientest im Chrome ohne Fenster (Server muss laufen)
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
 node tests/verify-orca-printers.js  # 3MF für beliebige Drucker gegen die OrcaSlicer-CLI (dauert lang)
 ```
 
-Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei; mit `index.html?alle-drucker`, weil er auch U1 und andere Hersteller prüft). Bedientest der Drucker-Verbindung ohne echten Drucker: `python tests/lan.py --serve` startet einen nachgebauten Kobra S1 unter 127.0.0.1. Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`. Druckerliste neu erzeugen, wenn eine neue OrcaSlicer-Version installiert ist: `node tools/build-orca-printers.js`.
+Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Datei; mit `index.html?alle-drucker`, weil er auch U1 und andere Hersteller prüft). Bedientest der Drucker-Verbindung ohne echten Drucker: `python tests/lan.py --serve` startet einen nachgebauten Kobra S1 unter 127.0.0.1. Handbuch-PDF neu erzeugen: `node tools/build-handbuch.js`; Bilder in docs/img: `node tools/build-screenshots.js` (Server muss laufen). Druckerliste neu erzeugen, wenn eine neue OrcaSlicer-Version installiert ist: `node tools/build-orca-printers.js`.
 
 ## Haftungsausschluss
 

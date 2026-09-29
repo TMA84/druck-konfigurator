@@ -3,16 +3,71 @@
    Filament (js/plates.js orderPlates). Ist eine Platte fertig, meldet das Tool „Bett abräumen“ (auch als
    Browser-Benachrichtigung); die nächste startet erst nach Klick – über den Senden-Dialog mit Slot-Prüfung.
    Nie automatisch: das Bett muss vorher leer sein.
+   Mit Server (GET api/queue → 200): Die Warteschlange liegt auf dem Server (tools/printqueue.py). Er schaut selbst
+   alle 5 s beim Drucker nach – fertige Platten erkennt er auch ohne offene Seite (und meldet sie an Home Assistant).
+   Die Seite fragt api/queue ab und meldet neue Ereignisse (event.seq > zuletzt gesehen) als Benachrichtigung.
+   Ohne Server (Datei geöffnet, alter Server): wie bisher im Browser –
    store.settings.queue = {name, slice:{job, plates}, materials:{slot:{kind,name}}, items:[{plate, time_s, total_g, state}], lastDone}
    Stand des Druckers: aus der Werkbank (wbPoll), sonst alle 20 s, solange eine Platte läuft. */
 
 const QUEUE_POLL_MS = 20000;
+const QUEUE_SRV_MS = { printing: 5000, active: 15000, idle: 60000 };
+const QUEUE_EVENT_MAX_AGE_S = 12 * 3600;   // ältere Ereignisse nicht mehr als Benachrichtigung
 const QUEUE_STATE = { wait: 'wartet', printing: 'druckt', done: 'fertig', skipped: 'übersprungen' };   // Anzeige (übersetzt mit t())
 let queueTimer = 0, queueSt = null;
-const queue = () => store.settings.queue || null;
+// Server-Warteschlange: srv = letzte Antwort von api/queue; mode null = noch unbekannt, 'server' | 'local'
+const qSrv = { mode: null, srv: null, timer: 0 };
+const queue = () => qSrv.mode === 'server' ? (qSrv.srv && qSrv.srv.queue) || null : store.settings.queue || null;
 function saveQueue(q) { store.settings.queue = q; persist(); }
 
-function startQueue() {
+async function queueServerDetect() {
+  if (!location.protocol.startsWith('http')) return 'local';
+  try {
+    const r = await fetch('api/queue');
+    if (!r.ok) return 'local';
+    qSrv.srv = await r.json();
+    return qSrv.srv && qSrv.srv.server ? 'server' : 'local';
+  } catch (e) { return 'local'; }
+}
+
+async function queueApi(body) {
+  const r = await lanApi('api/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  queueServerData(r);
+  return r;
+}
+
+// Antwort von api/queue übernehmen: Stand des Druckers, neue Ereignisse melden
+function queueServerData(r) {
+  qSrv.srv = r;
+  if (r.printer && (!queueSt || !queueSt.time || (r.printer.time || 0) * 1000 >= queueSt.time)) queueSt = Object.assign({}, r.printer, { time: (r.printer.time || 0) * 1000 });
+  const ev = r.event, seen = store.settings.queueSeen || 0;
+  if (ev && ev.seq > seen) {
+    store.settings.queueSeen = ev.seq; persist();
+    // nur, was noch gilt: Bett noch nicht abgeräumt (bzw. abgebrochen) und nicht zu alt
+    if (Date.now() / 1000 - (ev.time || 0) < QUEUE_EVENT_MAX_AGE_S && r.queue && (r.bed_clear || ev.kind === 'aborted')) notifyDone({ plate: ev.plate, aborted: ev.kind === 'aborted' }, r.queue);
+  } else if (!ev && r.seq > seen) { store.settings.queueSeen = r.seq; persist(); }
+  renderQueue();
+}
+
+async function queueSync() {
+  clearTimeout(qSrv.timer);
+  try { const r = await fetch('api/queue'); if (r.ok) queueServerData(await r.json()); } catch (e) { /* nächster Versuch */ }
+  const q = queue();
+  qSrv.timer = setTimeout(queueSync, !q ? QUEUE_SRV_MS.idle : q.items.some(i => i.state === 'printing') ? QUEUE_SRV_MS.printing : QUEUE_SRV_MS.active);
+}
+
+// Warteschlange aus dem Browser (ältere Version) einmalig auf den Server übernehmen
+async function queueMigrate() {
+  const local = store.settings.queue;
+  if (!local || queue()) { if (local && queue()) saveQueue(null); return; }
+  try {
+    await queueApi({ action: 'create', name: local.name, job: local.slice.job, plates: local.slice.plates, materials: local.materials,
+      order: local.items.map(i => ({ plate: i.plate, state: i.state })) });
+    saveQueue(null);
+  } catch (e) { /* bleibt lokal liegen, nächster Versuch beim nächsten Laden */ }
+}
+
+async function startQueue() {
   const s = costState.slice;
   if (!s || !s.job || s.plates.length < 2) return;
   const old = queue();
@@ -20,9 +75,16 @@ function startQueue() {
   const live = typeof slotChoices === 'function' ? slotChoices() : [];
   const o = orderPlates(s.plates, costState.materials, live.length ? live : null, slotMatchesKind);
   const materials = Object.fromEntries(Object.entries(costState.materials || {}).map(([k, m]) => [k, m ? { kind: m.kind, name: m.name } : null]));
-  saveQueue({ name: project ? project.name : 'Druck', created: Date.now(), materials,
-    slice: { job: s.job, plates: s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s, changes: p.changes })) },
-    items: o.list.map(n => { const p = s.plates.find(x => x.plate === n.plate); return { plate: n.plate, time_s: p.time_s, total_g: p.total_g, state: 'wait' }; }) });
+  const name = project ? project.name : 'Druck';
+  const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s, changes: p.changes }));
+  if (qSrv.mode === 'server') {
+    try { await queueApi({ action: 'create', name, job: s.job, plates, materials, order: o.list.map(n => n.plate) }); }
+    catch (e) { toast(t('Warteschlange nicht angelegt: {msg}', { msg: e.message })); return; }
+    queueSync();
+  } else {
+    saveQueue({ name, created: Date.now(), materials, slice: { job: s.job, plates },
+      items: o.list.map(n => { const p = s.plates.find(x => x.plate === n.plate); return { plate: n.plate, time_s: p.time_s, total_g: p.total_g, state: 'wait' }; }) });
+  }
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
   toast(t(o.changed ? 'Warteschlange mit {n} Platten angelegt – sortiert nach Filament' : 'Warteschlange mit {n} Platten angelegt', { n: s.plates.length }));
   setTab('printer');
@@ -32,6 +94,10 @@ function startQueue() {
 function queuePrint(plate) {
   const q = queue(); if (!q) return;
   openSendDialog(plate, { slice: q.slice, materials: q.materials, name: q.name, onStarted: p => {
+    if (qSrv.mode === 'server') {
+      queueApi({ action: 'started', plate: p }).then(() => queueSync(), e => toast(t('Warteschlange nicht aktualisiert: {msg}', { msg: e.message })));
+      return;
+    }
     const cur = queue(), it = cur && cur.items.find(i => i.plate === p);
     if (!it) return;
     Object.assign(it, { state: 'printing', started: Date.now(), seen: false, aborted: false });
@@ -50,9 +116,10 @@ function notifyDone(it, q) {
 }
 window.addEventListener('focus', () => { document.title = document.title.replace(/^● /, ''); });
 
-// Neuer Stand vom Drucker (Werkbank oder eigene Abfrage)
+// Neuer Stand vom Drucker (Werkbank oder eigene Abfrage). Mit Server schaltet der Server weiter – hier nur anzeigen.
 function onQueueStatus(st) {
-  queueSt = st;
+  queueSt = Object.assign({}, st, { time: Date.now() });
+  if (qSrv.mode !== 'local') { renderQueue(); return; }
   const q = queue(); if (!q) return;
   const cur = q.items.find(i => i.state === 'printing'), seen = cur && cur.seen;
   const done = queueTick(q, st);
@@ -63,6 +130,7 @@ function onQueueStatus(st) {
 
 async function queuePoll() {
   clearTimeout(queueTimer);
+  if (qSrv.mode !== 'local') return;
   const q = queue();
   if (!q || !q.items.some(i => i.state === 'printing')) return;
   if (document.body.dataset.tab !== 'printer') {   // im Drucker-Tab fragt die Werkbank ohnehin ab
@@ -77,7 +145,8 @@ function renderQueue() {
   card.classList.toggle('hidden', !q);
   if (!q) return;
   const st = queueSt, cur = q.items.find(i => i.state === 'printing'), next = queueNext(q);
-  const free = st && !st.printing, rest = queueRemaining(q, st), done = q.items.filter(i => i.state === 'done').length;
+  const free = st && !st.printing, done = q.items.filter(i => i.state === 'done').length;
+  const rest = st || !qSrv.srv ? queueRemaining(q, st) : qSrv.srv.remaining_s || 0;
   $('queueT').textContent = t('Warteschlange · {name}', { name: q.name.replace(/\.(stl|3mf|zip)$/i, '') });
   $('queueSum').textContent = t('{done} von {total} fertig', { done, total: q.items.length }) + (rest > 0 ? ' · ' + t('noch ≈ {time} Druckzeit (ohne Pausen zum Abräumen)', { time: duration(rest) }) : '');
   const ace = st && st.ace && st.ace[0] ? st.ace[0].slots : null;
@@ -102,10 +171,23 @@ $('queueCard').addEventListener('click', e => {
   const p = e.target.closest('[data-q-print]'), s = e.target.closest('[data-q-skip]'), a = e.target.closest('[data-q-again]');
   if (p) { queuePrint(+p.dataset.qPrint); return; }
   const plate = s ? +s.dataset.qSkip : a ? +a.dataset.qAgain : 0, it = q.items.find(i => i.plate === plate);
-  if (s && it) { it.state = 'skipped'; saveQueue(q); renderQueue(); }
-  if (a && it) { it.state = 'wait'; saveQueue(q); renderQueue(); }
+  if (!it || !(s || a)) return;
+  if (qSrv.mode === 'server') { queueApi({ action: s ? 'skip' : 'again', plate }).then(queueSync, err => toast(t(err.message))); return; }
+  it.state = s ? 'skipped' : 'wait';
+  saveQueue(q); renderQueue();
 });
-$('queueEnd').addEventListener('click', () => { saveQueue(null); clearTimeout(queueTimer); renderQueue(); toast(t('Warteschlange beendet – ein laufender Druck läuft weiter')); });
+$('queueEnd').addEventListener('click', async () => {
+  if (qSrv.mode === 'server') {
+    try { await queueApi({ action: 'end' }); } catch (e) { toast(t(e.message)); return; }
+    queueSync();
+  } else { saveQueue(null); clearTimeout(queueTimer); }
+  renderQueue(); toast(t('Warteschlange beendet – ein laufender Druck läuft weiter'));
+});
 $('queueStart').addEventListener('click', startQueue);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && qSrv.mode === 'server') queueSync(); });
 renderQueue();
-queuePoll();
+queueServerDetect().then(async mode => {
+  qSrv.mode = mode;
+  if (mode === 'server') { await queueMigrate(); queueServerData(qSrv.srv); queueSync(); }
+  else { renderQueue(); queuePoll(); }
+});

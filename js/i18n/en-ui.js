@@ -87,3 +87,15 @@ I18N.add({
   'Slot {n} für alle {count} Teile': 'Slot {n} for all {count} parts',
   'Slot {n} für alle Teile übernehmen': 'Apply slot {n} to all parts'
 });
+I18N.add({ 'Filament wird knapp:': 'Filament is running low:' });
+I18N.add({ 'Einstellungen von „{preset}“ werden ersetzt; Farben bleiben, Platten wie in ① angeordnet': 'Settings of “{preset}” are replaced; colors stay, plates as arranged in ①' });
+// 3D-Fortschritt im Tab Drucker (js/live-ui.js)
+I18N.add({
+  '3D-Fortschritt': '3D progress',
+  'Ansicht': 'View',
+  'Lade 3D-Ansicht …': 'Loading 3D view …',
+  'Kein Druck aktiv.': 'No print running.',
+  'Für diesen Druck gibt es keine 3D-Ansicht – sie steht nur für Drucke bereit, die aus dem Tool gestartet wurden.': 'There is no 3D view for this print – it is only available for prints started from the tool.',
+  'Schicht {l} von {n} · Z {z} mm': 'Layer {l} of {n} · Z {z} mm',
+  'Keine Vorschau für diesen Druck (nur für Drucke aus dem Tool)': 'No preview for this print (only for prints started from the tool)'
+});

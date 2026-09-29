@@ -110,7 +110,7 @@ Steht auf einer Plattenkarte „Slot 1: braucht ABS, eingelegt ist ASA“, passt
 
 ### Mehrere Modelle kombinieren
 
-**Datei → Modell hinzufügen …** (oder **+ Hinzufügen** in der Modell-Karte) lädt weitere Dateien ins bestehende Projekt, statt es zu ersetzen – so druckst du verschiedene Modelle zusammen. Wie oft ein Teil gedruckt wird, stellst du unter **Platten → Anzahl** ein. Kommt eine Makerworld-/Orca-3MF dazu, baut das Tool die 3MF neu auf: Platten und Körper-Slots bleiben, Farb-Modifikatoren (z. B. Schriftzüge) und Bemalung des Designers gehen dabei verloren.
+**Datei → Modell hinzufügen …** (oder **+ Hinzufügen** in der Modell-Karte) lädt weitere Dateien ins bestehende Projekt, statt es zu ersetzen – so druckst du verschiedene Modelle zusammen. Wie oft ein Teil gedruckt wird, stellst du unter **Platten → Anzahl** ein. Ist das Projekt eine Makerworld-/Orca-3MF, bleibt sie erhalten – mit Platten, Farb-Modifikatoren (z. B. Schriftzügen) und Bemalung des Designers; hinzugefügte Teile kommen als eigene Objekte dazu. Nur wenn du eine *zweite* Makerworld-3MF hinzufügst, gehen **deren** Modifikatoren und Bemalung verloren (Hinweis im Modell).
 
 ### Platten
 
@@ -119,7 +119,7 @@ Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Be
 - Zuerst verteilt das Tool alle Teile **automatisch** auf möglichst wenige Platten: Es füllt freie Flächen und dreht Teile um 90°, wenn dadurch eine Platte wegfällt.
 - Über die Auswahl neben einem Teil schiebst du es auf eine andere oder eine **neue Platte**. Ab dann gilt deine Zuordnung; passt eine Platte nicht mehr, kommt der Rest auf eine weitere. **Platzsparend anordnen** verwirft die Zuordnung.
 - **Anzahl** (− / +) legt Kopien des gewählten Teils an. Kopien teilen Einstellungen, Slot und Farben; weniger stellen entfernt die letzten Kopien.
-- Makerworld-3MF behalten zunächst die Platten des Designers. Ginge es mit weniger, steht es da („3 statt 4 Platten“), und **Platzsparend anordnen** verteilt neu – dafür wird die 3MF neu aufgebaut, Farb-Modifikatoren und Bemalung des Designers entfallen.
+- Makerworld-3MF behalten zunächst die Platten des Designers. Ginge es mit weniger, steht es da („3 statt 4 Platten“), und **Platzsparend anordnen** verteilt neu – Farb-Modifikatoren und Bemalung des Designers bleiben dabei erhalten. Auch **Anzahl** und **Verschieben** gehen bei Makerworld-Teilen.
 - Passt ein Teil nicht in den **Bauraum** (Breite, Tiefe oder Höhe), steht es hier und in der 3D-Ansicht rot.
 
 In **③ Slicen & Kosten** stehen dann **Zeit, Filament und Kosten je Platte** und eine empfohlene **Reihenfolge**: erst alles, was mit dem eingelegten Filament druckt, danach gruppiert nach Spulentausch. Änderst du nur eine Platte, slict der Server nur diese neu („neu geslict: 1 von 4“), der Rest bleibt.
@@ -206,7 +206,8 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 Die Werte im Datenblatt sind ein **Vorschlag**. Willst du für diesen Druck etwas anders – z. B. mehr Wände, eine andere Füllung oder Stützen erzwingen –, klick über dem Datenblatt auf **✎ Werte für diesen Auftrag anpassen**:
 
 - Links steht je Wert der **Vorschlag**, rechts trägst du deinen Wert ein. **Leer = Vorschlag.** Das **×** nimmt einen einzelnen Wert zurück, **Alle leeren** alle.
-- Anpassen lassen sich: Düse und Heizbett (°C), Schichthöhe, Wandlinien, obere/untere Schichten, Fülldichte, Füllmuster (Gyroid, Kubisch, Gitter, Waben, Linien, Dreiecke, Kreuzschraffur, Blitz), Geschwindigkeit von Außenwand, Innenwand und Füllung, Lüfter, Stützen (an/aus) und Brim.
+- Anpassen lassen sich: Düse und Heizbett (°C), Schichthöhe, Wandlinien, obere/untere Schichten, Fülldichte, Füllmuster (Gyroid, Kubisch, Gitter, Waben, Linien, Dreiecke, Kreuzschraffur, Blitz), Geschwindigkeit von Außenwand, Innenwand und Füllung, Lüfter, Stützen (an/aus), **Nur kritische Bereiche** (an/aus) und Brim.
+- **Nur kritische Bereiche** ist als Vorschlag an: OrcaSlicer stützt dann nur Spitzen und Auskragungen, normale Überhänge nicht. Fehlen in der Vorschau Stützen unter Überhängen, schalte es hier aus.
 - Die angepassten Werte gelten **überall**: im Datenblatt (orange markiert, mit dem Vorschlag daneben), in der 3MF, beim Slicen, in den Kosten und beim Drucken.
 - Sie gelten **je Teil** – bei mehreren Teilen für das gewählte Teil (und alle Platzierungen desselben Objekts); **Für alle Teile des Projekts übernehmen** setzt sie für alle.
 - Anders als **Werte anpassen** beim Filament (das ändert dein Filamentprofil dauerhaft) gilt die Anpassung nur für das geladene Projekt.
@@ -272,6 +273,8 @@ Die Slots bestimmen Filamenttyp und Farbe in der 3MF, die Vorauswahl im Export-D
 
 ### Kostenkalkulation
 
+![Slicen & Kosten mit Vorschau](docs/img/slicen.png)
+
 Im Schritt **③ Slicen & Kosten** unter **Kosten** steht der Preis des geladenen Projekts. Mit **automatisch neu berechnen** (Standard) rechnet das Tool nach jeder Änderung an Einstellungen oder Modell von selbst neu – kurz verzögert, damit mehrere Klicks nur einmal geslict werden; **Kosten berechnen** löst es von Hand aus. Das Tool baut dafür dieselbe 3MF wie beim Speichern und lässt sie auf dem Server **exakt mit OrcaSlicer slicen** – Verbrauch je Slot und Druckzeit kommen also aus Orca, nicht aus einer Schätzung. Das dauert je nach Modell Sekunden bis Minuten. Voraussetzung: das Tool läuft im Container (Orca ist dort enthalten) oder lokal mit installiertem OrcaSlicer.
 
 | Posten | Rechnung |
@@ -295,11 +298,13 @@ Im Schritt **③ Slicen & Kosten** steht rechts die **Vorschau**: der geslicte G
 - Einträge der Legende anklicken blendet sie aus und wieder ein.
 - **G-Code herunterladen** speichert den G-Code der Platte – derselbe, den OrcaSlicer mit dieser 3MF erzeugt.
 
-Die Vorschau zeigt nur Druckbahnen (keine Fahrwege). Das Tool hebt die letzten fünf Slice-Aufträge auf; ältere muss man neu berechnen.
+Die Vorschau zeigt nur Druckbahnen (keine Fahrwege). Das Tool hebt die letzten acht Slice-Aufträge auf; ältere muss man neu berechnen.
 
 ---
 
 ### Spulen & Restmengen (Filamentverwaltung)
+
+![Spulen & Restmengen](docs/img/spulen.png)
 
 **⚙ Einstellungen → Spulen & Restmengen …** (oder der Link auf der ACE-Karte im Tab **Drucker**). Der Server erkennt die Spulen in der ACE selbst: an der RFID-Artikelnummer, am Typ und an der Farbe. Eine neue Spule legt er mit 1000 g an. Nimmst du eine heraus, wandert sie **ins Regal**; legst du sie wieder ein, erkennt er sie und rechnet weiter.
 
@@ -309,23 +314,28 @@ Die ACE meldet keine Restmenge. Die **Restmenge errechnet** das Tool: Füllgewic
 - **Korrigieren:** Unter **Bearbeiten** trägst du die gewogene Restmenge ein (Gewicht mit Spule minus leere Spule). Dort stellst du auch das Füllgewicht (z. B. 750 g), Name, Marke und den **Preis je kg** ein. Der Preis geht in die Kosten ein.
 - **Warnung:** Braucht der Druck mehr, als auf einer Spule ist, steht es in **③ Slicen & Kosten** und im Senden-Dialog.
 - Spulen ohne RFID legst du mit **Spule ohne RFID hinzufügen** an. Leere Spulen kannst du **archivieren**.
+- **Neue Spule erkannt:** Auf der ACE-Karte (④) und im Dialog erscheint „Neue Spule in Slot N erkannt – wie viel ist drauf?“ mit **Voll (1000 g)** oder **Restmenge eingeben …** – so beginnt die Rechnung mit dem richtigen Gewicht.
+- **Warnen unter … g** (Standard 100 g): darunter wird die Anzeige rot, und vor dem Drucken warnt das Tool, wenn eine Spule nicht reicht („Zu wenig Filament“) oder danach unter die Schwelle fiele („Filament wird knapp“).
+- **Exportieren / Importieren** überträgt die Spulen zwischen zwei Servern (z. B. vom Mac ins Home-Assistant-Add-on): **Zusammenführen** gleicht Spulen ab (neuerer Stand gewinnt) und fügt unbekannte hinzu, **Ersetzen** übernimmt alles.
 
-Die Daten liegen auf dem Server in `~/.druck-konfigurator/spools.json`, im Container im Volume `/data`.
+Die Daten liegen auf dem Server in `~/.druck-konfigurator/spools.json`, im Container und im Home-Assistant-Add-on in `/data`.
 
 ### Drucker-Werkbank (Tab „Drucker“)
+
+![Drucker-Werkbank mit 3D-Fortschritt](docs/img/drucker.png)
 
 Mit der Werksfirmware im LAN-Modus steuerst du den Kobra S1 im Tab **Drucker** – das Tool muss über den Server laufen (Container oder `Konfigurator starten.cmd`). Ist noch keine Verbindung eingerichtet, fragt der Tab nach der IP-Adresse.
 
 | Bereich | Was geht |
 |---|---|
 | **Druckauftrag** | Name, Fortschritt, Schicht, gedruckte und verbleibende Zeit; **Pausieren**, **Fortsetzen**, **Abbrechen** (mit Rückfrage). Der Reiter „Drucker“ zeigt den Fortschritt in Prozent. |
-| **Kamera** | Live-Bild der Druckerkamera (**Kamera starten**). Braucht einen Browser mit MSE (Chrome, Edge, Firefox, Safari am Mac). |
+| **3D-Fortschritt / Kamera** | Umschalter in der Karte: **3D-Fortschritt** zeigt den geslicten Druck bis zur aktuellen Schicht – fertige Schichten in Filamentfarbe, die aktuelle orange, die kommenden grau; drehen und zoomen mit der Maus. Nur für Drucke, die aus dem Tool gestartet wurden (der G-Code von Drucken aus anderen Programmen ist dem Tool nicht bekannt). **Kamera** zeigt das Live-Bild (**Kamera starten**; braucht einen Browser mit MSE – Chrome, Edge, Firefox, Safari am Mac). |
 | **Druckeinstellungen** | Zieltemperatur Düse und Bett (bis 300 / 110 °C), Vorheizen für PLA, PETG, ASA/ABS oder **Aus**, Bauteil-, Zusatz- und Gehäuselüfter, Licht. Die Druckgeschwindigkeit (Leise/Standard/Sport) wird angezeigt; ändern geht nur am Drucker. |
 | **Achsen** | X/Y/Z um 1, 10 oder 50 mm fahren, **⌂ XY** und **⌂ Z** referenzieren, Motoren aus. **Während eines Drucks gesperrt.** Nicht referenzierte Achsen fährt der Drucker nicht. |
 | **ACE-Verwaltung** | Slots mit Material, Farbe und RFID; **Laden**/**Zurück** je Slot (während eines Drucks gesperrt), **Automatisch nachfüllen**, **Trocknen** mit Temperatur und Dauer. |
 | **Drucker** | Modell, Firmware, IP, Zustand, Verbindung; **Rohdaten** zum Nachsehen. |
 
-Das Tool fragt den Stand alle paar Sekunden ab, solange der Tab offen ist; der Server hält dafür eine Verbindung zum Drucker und beendet sie nach 10 Minuten ohne Zugriff. Jeder Befehl wird auf dem Server geprüft (erlaubte Befehle, Wertebereiche, Sperren während des Drucks).
+Das Tool fragt den Stand alle paar Sekunden ab, solange der Tab offen ist. Der Server hält eine Verbindung zum Drucker dauerhaft – für die Filamentzählung und die Warteschlange, auch wenn keine Seite offen ist. Jeder Befehl wird auf dem Server geprüft (erlaubte Befehle, Wertebereiche, Sperren während des Drucks).
 
 **Nicht dabei**, weil nicht belegt: Druckgeschwindigkeit ändern, Dateien auf dem Drucker verwalten.
 
@@ -340,9 +350,27 @@ Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder 
 3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
 4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
 
-**Mehrere Platten nacheinander:** **Alle Platten nacheinander …** legt im Tab **Drucker** eine **Warteschlange** in der empfohlenen Reihenfolge an. Du startest jede Platte selbst (**Drucken …**, mit derselben Slot-Prüfung). Ist sie fertig, meldet das Tool **„Platte 2 fertig – Bett abräumen“** – als Hinweis, mit ● im Fenstertitel und, wenn du es erlaubst, als Browser-Benachrichtigung (nur über `localhost` oder HTTPS). Danach mit einem Klick die nächste. Das Tool startet nie von selbst: Das Bett muss vorher leer sein. Oben steht die Restzeit aller Platten; **Überspringen**, **Nochmal** und **Beenden** (ein laufender Druck läuft weiter). Die Warteschlange bleibt beim Neuladen der Seite erhalten.
+**Mehrere Platten nacheinander:** **Alle Platten nacheinander …** legt im Tab **Drucker** eine **Warteschlange** in der empfohlenen Reihenfolge an. Du startest jede Platte selbst (**Drucken …**, mit derselben Slot-Prüfung). Ist sie fertig, meldet das Tool **„Platte 2 fertig – Bett abräumen“** – als Hinweis, mit ● im Fenstertitel und, wenn du es erlaubst, als Browser-Benachrichtigung (nur über `localhost` oder HTTPS). Danach mit einem Klick die nächste. Das Tool startet nie von selbst: Das Bett muss vorher leer sein. Oben steht die Restzeit aller Platten; **Überspringen**, **Nochmal** und **Beenden** (ein laufender Druck läuft weiter).
+
+Die Warteschlange liegt **auf dem Server**: Er erkennt „Platte fertig“ auch, wenn keine Seite offen ist, und jede geöffnete Seite zeigt denselben Stand. Mit dem Home-Assistant-Add-on kommt die Meldung auch aufs Handy (siehe [Home Assistant](#home-assistant)).
 
 Gedruckt wird genau der Stand der letzten Kostenberechnung. Hast du danach etwas geändert, erscheint **Drucken …** erst nach einer neuen Berechnung. Der Server prüft vor dem Start noch einmal, dass der Drucker frei ist und der G-Code für dieses Modell geslict wurde. Vor dem ersten Druck: Bett frei, richtige Druckplatte?
+
+### Home Assistant
+
+Als **Home-Assistant-Add-on** (Repository `https://github.com/TMA84/ha-addons`) läuft das Tool in der Seitenleiste von Home Assistant. In den Add-on-Einstellungen trägst du die **Drucker-IP** ein; die Seite verbindet sich damit von selbst.
+
+Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensoren an Home Assistant (Gerät „Druck-Konfigurator Anycubic Kobra S1“):
+
+| Sensor | Inhalt |
+|---|---|
+| Druckerzustand, Fortschritt, Restzeit, Fertig um, Auftrag, Schicht | laufender Druck |
+| Düse, Heizbett | Temperaturen |
+| Warteschlange, Restzeit Warteschlange, Platten fertig/gesamt | Warteschlange |
+| **Bett abräumen** (an/aus) | an, sobald eine Platte der Warteschlange fertig ist – bis die nächste startet |
+| Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
+
+Damit lassen sich Automationen bauen, z. B. eine Handy-Benachrichtigung bei **Bett abräumen** oder bei wenig Filament; ein Beispiel steht in der README des Add-ons. Ohne Home Assistant geht dasselbe mit einem eigenen MQTT-Broker (Umgebungsvariablen `MQTT_HOST`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASSWORD`).
 
 ## 9. 3MF für OrcaSlicer speichern
 

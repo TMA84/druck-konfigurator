@@ -252,6 +252,8 @@
     </section>
     <section class="wb-card wb-cam" aria-labelledby="wbCamT">
       <h3 id="wbCamT" class="visually-hidden">Kamera</h3>
+      <span class="seg wb-view" role="group" aria-label="Ansicht"><button type="button" data-wb-view="live" aria-pressed="false">3D-Fortschritt</button><button type="button" data-wb-view="cam" aria-pressed="false">Kamera</button></span>
+      <div id="wbLiveStage" class="wb-live hidden"><p id="wbLiveNote" class="wb-video-note">Kein Druck aktiv.</p><span id="wbLiveInfo" class="wb-live-info"></span></div>
       <div class="wb-video"><video id="wbVideo" muted playsinline></video>
         <p id="wbCamNote" class="wb-video-note">Kamera aus</p>
         <button class="btn wb-cam-btn" type="button" id="wbCamBtn">Kamera starten</button></div>
@@ -276,6 +278,7 @@
 
     <section class="wb-card wb-acecard" aria-labelledby="wbAceT">
       <div class="wb-head"><h3 id="wbAceT" class="wb-eyebrow">ACE</h3><span id="wbAceTemp" class="muted small"></span><button class="linkbtn" type="button" data-action="spools">Spulen &amp; Restmengen …</button></div>
+      <div id="spoolCheck" class="spool-check hidden"></div>
       <ul id="wbAceSlots" class="wb-ace"></ul>
       <div id="wbDryBox" class="wb-drybox">
         <div class="wb-dry-state"><b>Trocknen</b><span id="wbDryState" class="muted small">aus</span><i class="wb-heatbar"><i id="wbDryBar"></i></i></div>
@@ -466,7 +469,7 @@
 
 <dialog id="spoolDlg" class="spool-dlg" aria-labelledby="spoolDlgTitle"><div class="ed-head"><h2 id="spoolDlgTitle">Spulen &amp; Restmengen</h2><div class="muted">Der Server erkennt die Spulen in der ACE (RFID, Typ, Farbe) und zieht den Verbrauch jedes Drucks ab – auch bei Drucken aus anderen Programmen. Restmenge = Füllgewicht − Verbrauch − Spülabfall.</div></div>
   <div class="ed-body" id="spoolBody"></div>
-  <div class="ed-foot"><button class="btn sec" type="button" id="spoolAdd">Spule ohne RFID hinzufügen</button><button class="btn" type="button" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
+  <div class="ed-foot"><button class="btn sec" type="button" id="spoolAdd">Spule ohne RFID hinzufügen</button><button class="btn sec" type="button" id="spoolExport" title="Alle Spulen und letzten Drucke als Datei sichern, z. B. für den Umzug auf einen anderen Server">Exportieren</button><button class="btn sec" type="button" id="spoolImportBtn">Importieren …</button><input type="file" id="spoolImportFile" accept=".json,application/json" hidden><button class="btn" type="button" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
 <dialog id="costDlg" aria-labelledby="costDlgTitle"><div class="ed-head"><h2 id="costDlgTitle">Kosten: Preise &amp; Sätze</h2><div class="muted">Grundlage der Kostenkalkulation. Verbrauch und Druckzeit kommen aus dem exakten Slicen mit OrcaSlicer, der Spülabfall aus „Farbwechsel &amp; Spülmenge“.</div></div>
   <div class="ed-body">
     <div class="ed-group"><h4>Preis je Filamenttyp (€/kg)</h4>
@@ -550,6 +553,8 @@
 <script src="js/i18n/en-app.js"></script>
 <script src="js/i18n/en-server.js"></script>
 <script src="js/i18n/en-spools.js"></script>
+<script src="js/i18n/en-mw.js"></script>
+<script src="js/i18n/en-queue.js"></script>
 <script src="js/i18n/en-ui.js"></script>
 <script src="js/i18n/dom.js"></script>
 <script src="js/data.js"></script>
@@ -585,6 +590,7 @@
 <script src="js/preview-ui.js"></script>
 <script src="vendor/flv.min.js"></script>
 <script src="js/workbench-ui.js"></script>
+<script src="js/live-ui.js"></script>
 <script src="js/send-ui.js"></script>
 <script src="js/queue-ui.js"></script>
 <script src="js/spools-ui.js"></script>

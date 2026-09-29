@@ -28,7 +28,8 @@ async function wbPoll() {
   try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); wb.err = ''; }
   catch (e) { wb.err = t(e.message); }
   wbRender();
-  if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);   // Warteschlange (js/queue-ui.js)
+  if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
+  if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)   // Warteschlange (js/queue-ui.js)
   wb.timer = setTimeout(wbPoll, WB_POLL_MS);
 }
 

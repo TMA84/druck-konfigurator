@@ -132,7 +132,7 @@ function renderCostPanel() {
     ((costState.notes || []).length ? '<br>' + costState.notes.map(esc).join('<br>') : '');
   // Reicht das Filament auf den Spulen (Filamentverwaltung)?
   const short = typeof spoolShortage === 'function' ? spoolShortage(tot.grams) : [];
-  if (short.length) info.innerHTML += '<span class="note bad small spool-short">' + esc(t('Zu wenig Filament:') + ' ' + spoolShortageText(short)) + '</span>';
+  if (short.length) info.innerHTML += '<span class="note bad small spool-short">' + esc(spoolShortagePrefix(short) + ' ' + spoolShortageText(short)) + '</span>';
 }
 
 /* Kosten auch im Slicer: filament_cost (€/kg je Slot) und time_cost (€/h = Strom + Verschleiß) in die 3MF –

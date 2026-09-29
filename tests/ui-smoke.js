@@ -36,7 +36,7 @@ async function runSmoke(opts={}){
   /* 0) Haftungsausschluss beim ersten Start (Test lädt mit leerem Speicher) */
   ok($('disclaimerDlg').open,'Haftungsausschluss beim ersten Start sichtbar');
   $('disclaimerOk').click();
-  ok(!$('disclaimerDlg').open&&localStorage.getItem('druckKonfigurator.disclaimer')==='1','„Verstanden“ schließt und merkt es sich');
+  ok(!$('disclaimerDlg').open&&localStorage.getItem('druckKonfigurator.disclaimer')===DISCLAIMER_VERSION,'„Verstanden“ schließt und merkt es sich');
   document.querySelector('.footnote [data-action="disclaimer"]').click();
   ok($('disclaimerDlg').open,'Haftungsausschluss über die Fußzeile erreichbar');$('disclaimerDlg').close();
 
@@ -337,6 +337,42 @@ async function runSmoke(opts={}){
     menuClick('export3mf');for(let i=0;i<180&&!document.querySelector('.slot-source.fallback');i++)await wait(100);
     ok(document.querySelector('.slot-source.fallback')&&/antwortet nicht|nicht erreichbar/.test($('slotSource').textContent),'Drucker nicht erreichbar → Vorlage mit Hinweis ('+$('slotSource').textContent+')');
     $('exportDlg').close();store.settings.printerHosts=opts.hosts;persist();
+  }
+
+  /* 13b) Seit 8.3/9.x: Platten, Kopien, Modell hinzufügen, Slot-Wahl, Werte je Auftrag, Spulen, Sprache/Darstellung */
+  {
+    const mk=(n,x,y,z)=>stlFile(n,[[0,0,0,x,y,z]]);
+    await dropFile(mk('gross.stl',150,120,20),mk('klein.stl',60,60,30));await wait(300);
+    ok(project.parts.length===2&&!$('plateBox').classList.contains('hidden'),'Platten-Übersicht bei zwei Teilen');
+    ok(projectLayout(plTpl()).count===1&&document.querySelectorAll('#plateList .plate-svg rect[data-pick]').length===2,'beide Teile auf einer Platte mit Draufsicht');
+    selectPart(1);$('plateCopyPlus').click();await wait(100);
+    ok(project.parts.length===3&&samePlacements(project.parts[1]).length===2,'Anzahl + legt eine Kopie an (gleiche Einstellungen)');
+    const mv=document.querySelector('#plateList [data-move="0"]');mv.value=String(projectLayout(plTpl()).count+1);mv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+    ok(projectLayout(plTpl()).count===2&&!$('plateAuto').classList.contains('hidden'),'Teil auf neue Platte verschoben, „Platzsparend anordnen“ erscheint');
+    $('plateAuto').click();await wait(100);
+    ok(projectLayout(plTpl()).count===1,'Platzsparend anordnen: wieder eine Platte');
+    // Modell hinzufügen statt ersetzen
+    addMode=true;await dropFile(mk('deckel.stl',50,30,4));await wait(300);
+    ok(project.parts.length===4&&/ \+ /.test(project.name),'Modell hinzufügen erweitert das Projekt ('+project.name+')');
+    // Slot für alle Teile
+    setTab('settings');await wait(50);
+    ok(!$('partScope').classList.contains('hidden')&&!$('partSlotAll').classList.contains('hidden'),'Slot-Auswahl mit „Für alle Teile übernehmen“');
+    sel('partSlot','2');$('partSlotAll').click();await wait(100);
+    ok(project.parts.every(p=>p.slot===2),'Slot 3 für alle Teile übernommen');
+    setTab('slice');await wait(100);
+    const li=document.querySelector('#slotPanelList [data-slot-pick="1"]');ok(!!li,'Filament-Slots anklickbar');
+    // Werte je Auftrag: nur kritische Bereiche
+    setTab('settings');$('ovOpen').click();await wait(50);
+    const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
+    crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
+    ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');
+    // Spulen-Dialog (braucht den Server; ohne Server nur der Hinweis)
+    ACTIONS.spools();await wait(400);ok($('spoolDlg').open&&$('spoolBody').textContent.length>20,'Dialog Spulen & Restmengen');$('spoolDlg').close();
+    // Darstellung: dunkel/hell (Sprache nicht umschalten – das lädt die Seite neu)
+    const th=document.documentElement.dataset.theme;document.querySelector('[data-theme-set="dark"]').click();await wait(30);
+    ok(document.documentElement.dataset.theme==='dark','Dunkelmodus schaltet um');
+    document.querySelector('[data-theme-set="auto"]').click();await wait(30);ok(!!document.documentElement.dataset.theme,'zurück auf automatisch ('+th+')');
+    ok(typeof t==='function'&&I18N.dict['Datei']==='File','englisches Wörterbuch geladen');
   }
 
   /* 14) Modell entfernen */

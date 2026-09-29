@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.0.0] – 2026-09-29
+
+### Neu
+- **Home Assistant über MQTT** (`tools/ha_mqtt.py`): Gerät „Druck-Konfigurator <Drucker>“ mit Sensoren für Druckerzustand, Fortschritt, Restzeit, Fertig um, Auftrag, Schicht, Düse/Bett, Warteschlange, Platten fertig/gesamt, **Bett abräumen** (binär, für Handy-Benachrichtigungen) und Restmenge je ACE-Slot – mit MQTT-Discovery. Das Add-on holt die Broker-Zugangsdaten selbst vom Mosquitto-Add-on (`services: mqtt:want`, Option `mqtt_enabled`); sonst `MQTT_HOST`/`MQTT_PORT`/`MQTT_USER`/`MQTT_PASSWORD`.
+- **Warteschlange auf dem Server** (`tools/printqueue.py`, `api/queue`): erkennt „Platte fertig“ auch ohne offene Seite; alle Seiten zeigen denselben Stand; Benachrichtigung im Browser wie bisher, dazu der HA-Sensor. Druckstart bleibt ein Klick.
+- **3D-Fortschritt in ④ Drucker** (`js/live-ui.js`): der geslicte Druck bis zur aktuellen Schicht – fertige Schichten in Filamentfarbe, aktuelle orange, kommende grau; Umschalter Kamera | 3D-Fortschritt. Die Vorschau speichert der Server beim Druckstart dauerhaft (`api/printing/preview`), sie übersteht Neuladen und Neustart. Nur für Drucke aus dem Tool.
+- **Filamentverwaltung:** Export/Import der Spulen (Zusammenführen oder Ersetzen – z. B. vom Mac ins HA-Add-on); **neue Spule erkannt → Gewicht abfragen** (Banner auf der ACE-Karte); **Warnschwelle** „Warnen unter … g“ mit Hinweis vor dem Drucken („Zu wenig Filament“ / „Filament wird knapp“).
+- **Makerworld-Projekte bleiben erhalten** beim Kombinieren (Modell hinzufügen), platzsparenden Anordnen und bei Kopien: Farb-Modifikatoren, Bemalung, SVG- und Negativteile des Designers bleiben; Kopien sind zusätzliche Instanzen desselben Objekts, hinzugefügte Teile eigene Objekte. Mit Orca geprüft (porta utensili auf 3 Platten, Schriftzug weiter aus Slot 2).
+- Werkzeuge: `tools/headless.js` (Chrome ohne Fenster: Bedientest, Screenshots, Prüfungen), `tools/build-screenshots.js` (alle Bilder in docs/img neu).
+
+### Geändert
+- Handbuch: neue Bilder (Slicen & Kosten, Drucker mit 3D-Fortschritt, Spulen), Abschnitte Home Assistant, Warteschlange auf dem Server, Spulen-Export und Warnschwelle; überholte Aussagen korrigiert. PDF neu (`tools/build-handbuch.js` jetzt über das DevTools-Protokoll, auch am Mac zuverlässig).
+- Bedientest `tests/ui-smoke.js` deckt Platten, Kopien, Modell hinzufügen, Slot für alle, Werte je Auftrag, Spulen-Dialog und Darstellung ab (127 Prüfungen).
+
+### Behoben
+- 3MF-Dialog warnte nach dem Anordnen einer Makerworld-3MF fälschlich vor zu großen Platten.
+- Slot, der nur von einem Farb-Modifikator des Designers genutzt wird, bekam die Filamentwerte der Vorlage – Orca lehnte dann ab („nozzle temperatures are incompatible“).
+
+### Geprüft
+- Node: import 25, orient 15, export-project 11, holes 9, purge 11, costs 8, overrides 15, plates 37, export-project-arrange 56 (mit Orca). Python: lan 49, spools 65, printqueue 65, ha_mqtt 46, printed 7, preview 9, slice 21 (mit Orca). verify-3mf gegen Orca ok. Bedientest 127/127 (headless).
+
 ## [9.5.1] – 2026-09-29
 
 ### Neu

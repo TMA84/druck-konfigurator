@@ -141,5 +141,113 @@ with tempfile.TemporaryDirectory() as d:
     got = spools.load(p)
     check("Tracker erkennt Spule und zählt", len(got["spools"]) == 1 and abs(got["spools"][0]["used_g"] - spools.mm_to_g(1500, "ASA")) < 1e-3, got["spools"])
 
+
+def fails(name, fn, part=""):
+    try:
+        fn()
+        check(name, False, "kein Fehler")
+    except ValueError as e:
+        check(name, part in str(e), e)
+
+
+# Neue Spule: nach dem Füllgewicht fragen (needs_check)
+st = spools.empty_state()
+spools.sync_slots(st, ace(ASA, PLA_G), now=100)
+a0, g0 = st["spools"]
+check("neue Spulen: needs_check", a0["needs_check"] and g0["needs_check"])
+spools.update(st, {"action": "update", "id": a0["id"], "name": "x"})
+check("nur Name geändert: bleibt offen", a0["needs_check"])
+spools.update(st, {"action": "update", "id": a0["id"], "needs_check": False})
+check("„Voll“ bestätigt", a0["needs_check"] is False and a0["net_g"] == 1000)
+spools.update(st, {"action": "update", "id": g0["id"], "remaining_g": 400})
+check("Restmenge eingetragen: erledigt", g0["needs_check"] is False and spools.remaining(g0) == 400)
+spools.sync_slots(st, ace(ASA, EMPTY), now=110)
+spools.sync_slots(st, ace(ASA, PLA_G), now=120)
+check("wieder eingelegt: nicht erneut fragen", g0["needs_check"] is False and len(st["spools"]) == 2)
+spools.update(st, {"action": "add", "type": "PLA", "colour": "#123456"})
+check("von Hand angelegt: keine Nachfrage", st["spools"][-1]["needs_check"] is False)
+old = spools.empty_state()
+old["spools"].append({k: v for k, v in a0.items() if k != "needs_check"})
+check("alte Daten ohne Feld: keine Nachfrage", not spools.view(old)["spools"][0].get("needs_check"))
+
+# Warnschwelle
+check("Warnschwelle Standard 100 g", spools.empty_state()["low_g"] == 100 and spools.view(spools.empty_state())["low_g"] == 100)
+spools.update(st, {"action": "config", "low_g": 250})
+check("Warnschwelle 250 g gespeichert", st["low_g"] == 250 and spools.view(st)["low_g"] == 250)
+fails("Warnschwelle −5 abgelehnt", lambda: spools.update(st, {"action": "config", "low_g": -5}), "Warnschwelle")
+fails("Warnschwelle Text abgelehnt", lambda: spools.update(st, {"action": "config", "low_g": "viel"}), "Warnschwelle")
+spools.update(st, {"action": "config", "flush": 1.2})
+check("andere Einstellung lässt Warnschwelle", st["low_g"] == 250)
+
+# Export / Import
+import json  # noqa: E402
+st["host"] = "192.168.1.50"
+st["history"] = [{"job": "a.gcode", "start": 10, "end": 20, "used": {a0["id"]: 5.0}, "changes": 0}]
+name, body = spools.export_state(st, now=1790000000)
+exp = json.loads(body)
+check("Export: Dateiname mit Datum", name.startswith("spools-2026-") and name.endswith(".json"), name)
+check("Export: Format und Spulen", exp["format"] == spools.EXPORT_FORMAT and len(exp["spools"]) == 3 and exp["low_g"] == 250)
+
+# replace: alles außer host (und dem laufenden Zähler)
+tgt = spools.empty_state()
+tgt["host"], tgt["track"] = "10.0.0.9", {"job": "läuft.gcode"}
+r = spools.import_state(tgt, exp, "replace")
+check("replace: Spulen, Verlauf, Einstellungen übernommen", len(tgt["spools"]) == 3 and len(tgt["history"]) == 1 and tgt["low_g"] == 250 and tgt["flush"] == 1.2 and r["imported"]["total"] == 3, r)
+check("replace: host und track bleiben", tgt["host"] == "10.0.0.9" and tgt["track"] == {"job": "läuft.gcode"})
+
+# merge: zweiter Server hat dieselben Spulen mit anderen ids
+other = spools.empty_state()
+other["host"], other["flush"], other["low_g"] = "10.0.0.9", 2.0, 80
+spools.sync_slots(other, ace(ASA, PLA_G, PLA_W), now=50)       # früher gesehen als im Export
+oa, og, ow = other["spools"]
+ow["last_seen"] = 9e9                                          # Weiß hier neuer
+ow["name"] = "hier"
+r = spools.import_state(other, exp, "merge")
+check("merge: gleiche Spule über sku/Typ/Farbe im Slot", len(other["spools"]) == 4 and r["imported"]["added"] == 1, (r, len(other["spools"])))
+check("merge: neuere Angaben gewinnen, id und Slot bleiben", spools.remaining(og) == 400 and og["id"] != g0["id"] and og["slot"] == 1 and og["needs_check"] is False, og)
+check("merge: eigene neuere Spule bleibt", ow["name"] == "hier")
+check("merge: unbekannte Spule ins Regal", other["spools"][-1]["slot"] is None and other["spools"][-1]["colour"] == "#123456")
+check("merge: host/flush/low_g bleiben", other["host"] == "10.0.0.9" and other["flush"] == 2.0 and other["low_g"] == 80)
+check("merge: Verlauf übernommen, ids umgeschrieben", other["history"][0]["used"] == {oa["id"]: 5.0}, other["history"])
+n = len(other["spools"])
+spools.import_state(other, exp, "merge")
+check("merge zweimal: nichts doppelt", len(other["spools"]) == n and len(other["history"]) == 1)
+same = spools.empty_state()
+spools.import_state(same, exp, "replace")
+exp2 = dict(exp, spools=[dict(sp, net_g=750, last_seen=sp["last_seen"] + 1) for sp in exp["spools"]])
+spools.import_state(same, exp2, "merge")
+check("merge über id: neuere Datei gewinnt", all(sp["net_g"] == 750 for sp in same["spools"]) and len(same["spools"]) == 3)
+
+# Prüfung der Importdatei
+fails("Import: keine Art", lambda: spools.import_state(spools.empty_state(), exp, "egal"), "merge")
+fails("Import: kein Objekt", lambda: spools.import_state(spools.empty_state(), [1, 2], "merge"), "JSON-Objekt")
+fails("Import: fremdes Format", lambda: spools.import_state(spools.empty_state(), {"format": "x", "spools": []}, "merge"), "Spulendatei")
+fails("Import: spools fehlt", lambda: spools.import_state(spools.empty_state(), {"foo": 1}, "merge"), "Spulendatei")
+bad = lambda **kw: dict(exp, spools=[dict(exp["spools"][0], **kw)])
+fails("Import: Gewicht als Text", lambda: spools.import_state(spools.empty_state(), bad(net_g="1000"), "replace"), "net_g")
+fails("Import: Gewicht unendlich", lambda: spools.import_state(spools.empty_state(), bad(net_g=float("inf")), "replace"), "net_g")
+fails("Import: Slot ungültig", lambda: spools.import_state(spools.empty_state(), bad(slot=-1), "replace"), "Slot")
+fails("Import: id ungültig", lambda: spools.import_state(spools.empty_state(), bad(id="../x"), "replace"), "id")
+fails("Import: Name zu lang", lambda: spools.import_state(spools.empty_state(), bad(name="x" * 5000), "replace"), "name")
+fails("Import: archived kein bool", lambda: spools.import_state(spools.empty_state(), bad(archived="ja"), "replace"), "archived")
+fails("Import: doppelte id", lambda: spools.import_state(spools.empty_state(), dict(exp, spools=[exp["spools"][0]] * 2), "replace"), "doppelt")
+fails("Import: zu viele Spulen", lambda: spools.import_state(spools.empty_state(), dict(exp, spools=[{}] * 501), "replace"), "Zu viele")
+fails("Import: Verlauf kaputt", lambda: spools.import_state(spools.empty_state(), dict(exp, history=[{"used": {"a": "x"}}]), "replace"), "Verbrauch")
+keep = spools.empty_state()
+keep["spools"].append(dict(a0))
+try:
+    spools.import_state(keep, bad(net_g=-1), "replace")
+except ValueError:
+    pass
+check("abgelehnter Import ändert nichts", len(keep["spools"]) == 1 and keep["spools"][0]["id"] == a0["id"])
+
+# über api_post (Datei)
+with tempfile.TemporaryDirectory() as d:
+    p = os.path.join(d, "spools.json")
+    res = spools.api_post({"action": "import", "mode": "replace", "data": exp}, p)
+    check("api_post import: Meldung und Zahlen", res["note"] == "Spulen ersetzt" and res["imported"]["total"] == 3 and len(spools.load(p)["spools"]) == 3, res.get("note"))
+    nm, bd = spools.api_export(p)
+    check("api_export liefert JSON", json.loads(bd)["format"] == spools.EXPORT_FORMAT)
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

@@ -819,3 +819,23 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .slot-panel-list li .pick-tag { font-size: 11px; font-weight: 700; color: var(--accent); margin-left: 4px; }
 #partSlotAll { grid-column: 1 / -1; justify-self: start; padding: 0; }
 #slotPanelAll { justify-self: start; padding: 2px 0; }
+/* Filamentverwaltung: neue Spule prüfen, Warnschwelle, Import (js/spools-ui.js) */
+.spool-check { display: grid; gap: 4px; margin: 6px 0 8px; padding: 6px 10px; border-radius: var(--r-s); background: var(--accent-soft); font-size: 12.5px; }
+.spool-check-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.spool-check-row .spool-sw { width: 14px; height: 14px; flex: none; }
+.spool-check-row > span:not(.spool-sw) { flex: 1 1 200px; }
+.spool-low { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.spool-low input { width: 80px; padding: 4px 6px; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: var(--field, #fff); color: var(--ink); font: inherit; font-weight: 400; }
+.spool-low small { flex-basis: 100%; font-weight: 400; }
+.spool-import { display: grid; gap: 6px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: var(--paper-2); }
+
+/* ④ 3D-Fortschritt (js/live-ui.js) in der Kamera-Karte */
+.wb-cam { position: relative; }
+.wb-cam .wb-view { position: absolute; left: 12px; top: 12px; z-index: 3; background: rgba(0,0,0,.45); }
+.wb-cam .wb-view button { color: #cfd3da; }
+.wb-cam .wb-view button[aria-pressed="true"] { background: rgba(255,255,255,.16); color: #fff; box-shadow: none; }
+.wb-live { position: relative; background: #14161a; height: 100%; min-height: 280px; max-height: 400px; }
+.wb-live.hidden, .wb-video.hidden { display: none; }
+.wb-live canvas { display: block; width: 100%; height: 100%; }
+.wb-live-info { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.wb-live-info:empty { display: none; }

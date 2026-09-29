@@ -41,41 +41,43 @@ function partsFromImport(imp){
 }
 
 /* Modell hinzufügen: weitere Dateien ins bestehende Projekt (verschiedene Modelle kombiniert drucken; mehrfach
-   über „Anzahl“ in den Platten). Ist das Projekt eine Makerworld-/Orca-3MF, wird es dabei zu einfachen Teilen:
-   Platten bleiben (als eigene Zuordnung), Körper behalten ihren Slot – Farb-Modifikatoren und Bemalung des Designers
-   sowie seine übrigen Einstellungen entfallen, weil die 3MF dann neu aufgebaut wird. */
+   über „Anzahl“ in den Platten). Ist das Projekt eine Makerworld-/Orca-3MF, bleibt sie erhalten (Modifikatoren,
+   Bemalung, Einstellungen des Designers): die neuen Teile kommen als einfache Teile dazu (part.extra, objectId null),
+   build3mfFromProject hängt sie als eigene Objekte an und platziert sie selbst – ohne Anordnen auf eigenen Platten
+   hinter denen des Designers. Aus einer weiteren 3MF wird dabei nur die Geometrie übernommen. */
 let addMode=false;
-// Makerworld-/Orca-3MF zu einfachen Teilen machen (für Kombinieren und platzsparendes Anordnen): die 3MF wird neu
-// aufgebaut; Platten (als eigene Zuordnung) und Körper-Slots bleiben, übrige Designer-Einstellungen entfallen
-function projectToPlain(extra){
-  if(!project||!project.threemf)return false;
-  const lost=project.parts.concat(extra||[]).some(p=>p.painted||(p.modSlots&&p.modSlots.length)||(p.modifiers&&p.modifiers.length));
-  project.notes=[...(project.notes||[]),t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):'')];
-  project.threemf=null;project.platesFixed=true;
-  const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.remove('hidden');
-  return true;
-}
 function addParts(imp){
-  if(project.threemf)projectToPlain(imp.parts);
-  else if(imp.threemf){const lost=imp.parts.some(p=>p.painted||(p.modifiers&&p.modifiers.length));
-    project.notes=[...(project.notes||[]),t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):'')]}
+  const tm=project.threemf,lost=!!imp.threemf&&imp.parts.some(p=>p.painted||(p.modifiers&&p.modifiers.length));
   const notes=[...(project.notes||[])];
-  const add=partsFromImport(imp);
-  // bisher automatisch verteilte Teile behalten ihre Platte, wenn ab jetzt eine feste Zuordnung gilt
-  if(imp.threemf&&!project.platesFixed&&typeof fixPlates==='function'&&plTpl())fixPlates(plTpl());
-  if(imp.threemf)project.platesFixed=true;
+  if(tm)notes.push(t('Hinzugefügt: {name} – die 3MF des Designers bleibt mit Farben, Modifikatoren und Bemalung erhalten, die neuen Teile kommen als eigene Objekte dazu.',{name:imp.name})+
+    (lost?' '+t('Farb-Modifikatoren und Bemalung von {name} gehen dabei verloren.',{name:imp.name}):''));
+  else if(imp.threemf)notes.push(t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):''));
+  const add=partsFromImport(imp),tpl=typeof plTpl==='function'?plTpl():null;
   initPartInputs(add);
-  if(project.platesFixed){
-    // neue Teile hinter die bisherigen Platten (bzw. auf die Platten ihrer eigenen 3MF)
-    const last=Math.max(1,...project.parts.map(p=>p.plate||1));
-    add.forEach(p=>{p.plate=imp.threemf?last+(p.plate||1):last});
+  if(tm){
+    // einfache Teile: kein Objekt der 3MF, Farben/Bemalung der Quelldatei gelten nicht
+    add.forEach(p=>{Object.assign(p,{extra:true,objectId:null,instance:0,painted:false,paintTris:false,modSlots:[],dSlot:null});(p.bodies||[]).forEach(b=>{b.dSlot=null;b.partId=null})});
+    if(tm.layout!=='auto'){
+      if(tpl)normalizePlates(tpl);   // Plattennummern wie in der Übersicht
+      const last=Math.max(1,...project.parts.map(p=>p.plate||1)),next=tm.layout==='plates'?last:last+1;
+      add.forEach(p=>{p.plate=imp.threemf?next+(p.plate||1)-1:next});
+    }
+  }else{
+    // bisher automatisch verteilte Teile behalten ihre Platte, wenn ab jetzt eine feste Zuordnung gilt
+    if(imp.threemf&&!project.platesFixed&&tpl)fixPlates(tpl);
+    if(imp.threemf)project.platesFixed=true;
+    if(project.platesFixed){
+      // neue Teile hinter die bisherigen Platten (bzw. auf die Platten ihrer eigenen 3MF)
+      const last=Math.max(1,...project.parts.map(p=>p.plate||1));
+      add.forEach(p=>{p.plate=imp.threemf?last+(p.plate||1):last});
+    }
   }
   const first=project.parts.length;
   project.parts.push(...add);
   project.parts.forEach((p,i)=>{p.id=i});
   project.name=/ \+ /.test(project.name)?project.name:project.name.replace(/\.(stl|3mf|zip)$/i,'')+' + '+imp.name.replace(/\.(stl|3mf|zip)$/i,'');
   project.notes=notes.concat(imp.notes||[]);
-  if(typeof normalizePlates==='function'&&typeof plTpl==='function'&&plTpl())normalizePlates(plTpl());
+  if(typeof normalizePlates==='function'&&tpl)normalizePlates(tpl);
   const n=project.parts.reduce((s,x)=>s+x.geom.n,0);
   $('fileinfo').innerHTML='<b>'+esc(project.name)+'</b><br>'+t('{n} Teile · {tri} Dreiecke',{n:project.parts.length,tri:n.toLocaleString(LOCALE())});
   const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.toggle('hidden',!project.notes.length);
@@ -113,7 +115,7 @@ function renderPartList(){
     const g=p.geom,lv=analyze(g,th).level,sel=i===project.selected;
     const sc=p.slot!=null&&slots[p.slot],col=sc&&/^#[0-9a-f]{6}$/i.test(sc.colour)?sc.colour:'#999999';
     const slot=p.slot!=null?'<span class="pslot" style="background:'+col+'"></span>Slot '+(p.slot+1)+' · ':'';
-    const plate=project.threemf&&project.threemf.plates.length>1?t('Platte {n}',{n:p.plate})+' · ':'';
+    const plate=project.threemf&&(project.threemf.plates.length>1||project.parts.some(x=>(x.plate||1)>1))?t('Platte {n}',{n:p.plate})+' · ':'';
     return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
       '<span class="pmeta">'+slot+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+(p.painted?t('Farben vom Designer')+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
   }).join('');

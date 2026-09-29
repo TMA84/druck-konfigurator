@@ -227,10 +227,11 @@ function openExportDialog(){
   const [bw,bd]=bedSize(tpl);
   let tooBig=[];
   if(project.threemf){
-    // Makerworld-3MF: Platten bleiben, geprüft wird je Platte
-    const {oversize}=plateShifts(project.parts.map(p=>({geom:p.geom,plate:p.plate})),tpl);
-    tooBig=oversize.map(id=>t('Platte {n}',{n:id}));
-    $('exportSub').textContent+=' · '+t('Einstellungen von „{preset}“ werden ersetzt, Platten und Farben bleiben',{preset:(project.threemf.settings||{}).printer_settings_id||'?'});
+    // Makerworld-3MF: geprüft wird nach derselben Aufteilung wie beim Export (Designer-Platten oder vom Tool angeordnet)
+    const lay=projectLayout(tpl),rearranged=lay&&!!lay.places;
+    tooBig=lay?[...(lay.oversizePlates||[]).map(id=>t('Platte {n}',{n:id})),...(lay.oversize||[]).map(i=>project.parts[i].name)]:[];
+    $('exportSub').textContent+=' · '+(rearranged?t('Einstellungen von „{preset}“ werden ersetzt; Farben bleiben, Platten wie in ① angeordnet',{preset:(project.threemf.settings||{}).printer_settings_id||'?'})
+      :t('Einstellungen von „{preset}“ werden ersetzt, Platten und Farben bleiben',{preset:(project.threemf.settings||{}).printer_settings_id||'?'}));
   }else tooBig=projectLayout(tpl).oversize.map(i=>project.parts[i].name+' ('+volumeExcess(project.parts[i].geom,buildVolume(tpl)).join(', ')+')');
   const bh=buildVolume(tpl)[2];
   $('sizeWarn').textContent=tooBig.length?t('Größer als der Bauraum ({size} mm): {parts}. Bitte drehen oder in OrcaSlicer skalieren/teilen.',{size:de(bw,0)+' × '+de(bd,0)+(isFinite(bh)?' × '+de(bh,0):''),parts:tooBig.join(', ')}):'';

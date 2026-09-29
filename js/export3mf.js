@@ -396,6 +396,55 @@ function arrangeByPlate(items, tpl) {
   return packPlates(items.map(p => p.geom), nums.map(n => items.map((p, i) => i).filter(i => (items[i].plate || 1) === n)), tpl);
 }
 
+/* ---------- Makerworld-/Orca-3MF neu anordnen (2026-09-29) ----------
+   Teile, die das Tool selbst platziert: part.extra = hinzugefügtes einfaches Teil (STL oder Geometrie einer weiteren
+   Datei, objectId null), part.copy = Kopie eines 3MF-Objekts (weitere Instanz desselben Objekts), part.moved = auf
+   eine andere Platte verschoben. threemf.layout: 'auto' = alles platzsparend (Knopf „Platzsparend anordnen“),
+   'plates' = danach eigene Plattenzuordnung, sonst Platten des Designers. */
+const ownPlaced = p => !!p && !!(p.extra || p.copy || p.moved);
+// Muss die 3MF neu angeordnet werden (Build-Items, Platten)? Sonst bleibt die Lage des Designers (nur auf die Bettmitte gerückt).
+const needsRelayout = (threemf, parts) => !!(threemf && threemf.layout) || parts.some(ownPlaced);
+/* items: [{geom, plate (1-basiert), own}]. Platten ohne eigene Teile (und nicht angeordnet) behalten die Lage des Designers,
+   auf die Bettmitte gerückt; die übrigen packt das Tool (packPlates, läuft eine über, folgt eine weitere Platte).
+   Platten werden ohne Lücken durchnummeriert. Ergebnis wie arrangeParts, dazu plateOf (1-basiert), designer (Set
+   der Plattennummern mit Designer-Lage) und oversizePlates. places[i].x/y = Mitte des Hüllrechtecks in Orca-Welt-
+   koordinaten, auch für Teile in Designer-Lage (dort rot = false). */
+function layout3mf(items, tpl, mode) {
+  const geoms = items.map(p => p.geom), [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, vol = buildVolume(tpl);
+  const designer = new Set(), oversizePlates = [];
+  if (mode === 'auto') {
+    const r = arrangeParts(geoms, tpl);
+    return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, overflow: false, oversize: r.oversize, oversizePlates, designer };
+  }
+  const plateNo = p => p.plate || 1, all = items.map((p, i) => i);
+  const nums = [...new Set(items.map(plateNo))].sort((a, b) => a - b);
+  const packNums = nums.filter(k => mode === 'plates' || items.some(p => plateNo(p) === k && p.own));
+  const pk = packNums.length ? packPlates(geoms, packNums.map(k => all.filter(i => plateNo(items[i]) === k)), tpl) : null;
+  const local = [];
+  let f = 0, overflow = false;
+  for (const k of nums) {
+    const idx = all.filter(i => plateNo(items[i]) === k);
+    if (!packNums.includes(k)) {
+      f++; designer.add(f);
+      const mnx = Math.min(...idx.map(i => geoms[i].mn[0])), mxx = Math.max(...idx.map(i => geoms[i].mx[0]));
+      const mny = Math.min(...idx.map(i => geoms[i].mn[1])), mxy = Math.max(...idx.map(i => geoms[i].mx[1]));
+      const cx = (mnx + mxx) / 2, cy = (mny + mxy) / 2;
+      for (const i of idx) local[i] = { f, lx: (geoms[i].mn[0] + geoms[i].mx[0]) / 2 - cx + bx, ly: (geoms[i].mn[1] + geoms[i].mx[1]) / 2 - cy + by, rot: false };
+      if (mxx - mnx > bw || mxy - mny > bd || Math.max(...idx.map(i => geoms[i].z)) > vol[2] + 0.01) oversizePlates.push(f);
+    } else {
+      const bins = [...new Set(idx.map(i => pk.places[i].plate))].sort((a, b) => a - b), base = f;
+      if (bins.length > 1) overflow = true;
+      f += bins.length;
+      for (const i of idx) { const pl = pk.places[i]; local[i] = { f: base + 1 + bins.indexOf(pl.plate), lx: pl.lx, ly: pl.ly, rot: pl.rot }; }
+    }
+  }
+  const cols = Math.ceil(Math.sqrt(f || 1));
+  const places = local.map(L => { const pi = L.f - 1; return { plate: pi, x: (pi % cols) * bw * PLATE_STRIDE + L.lx, y: -Math.floor(pi / cols) * bd * PLATE_STRIDE + L.ly, lx: L.lx, ly: L.ly, rot: L.rot }; });
+  // zu groß: in Designer-Lage so, wie es liegt; beim Packen auch gedreht nicht
+  const oversize = all.filter(i => volumeExcess(geoms[i], vol).length && (designer.has(local[i].f) || volumeExcess({ x: geoms[i].y, y: geoms[i].x, z: geoms[i].z }, vol).length));
+  return { count: f, plateOf: local.map(L => L.f), places, overflow, oversize, oversizePlates, designer };
+}
+
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
 /* Dateiversion im Bambu-Format, wie sie die Orca-Vorlagen tragen. Neuere Angaben (z. B. Bambu Studio 2.7.1 bei
    Makerworld-Projekten) lehnt die Orca-Kommandozeile ab: „File Version 2.7.1.62 not supported by current cli
@@ -404,14 +453,18 @@ const BBL_FILE_VERSION = '02.06.00.51';
 const MODEL_OPEN = '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n';
 const REL_TYPE = 'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel';
 
-function modelSettingsXML(objs, plateCount) {
-  const object = o => '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + o.extruder + '"/>\n' +
+// Objekt-Eintrag in model_settings.config: Name, Slot, eigene Werte, Bauteile (Körper) und Modifikatoren (name bereits XML-escaped)
+function objectConfigXML(o) {
+  return '  <object id="' + o.id + '">\n    <metadata key="name" value="' + o.name + '"/>\n    <metadata key="extruder" value="' + o.extruder + '"/>\n' +
     o.overrides.map(c => '    <metadata key="' + c.key + '" value="' + xmlEsc(c.value) + '"/>\n').join('') +
     o.vols.map((v, j) => '    <part id="' + v.id + '" subtype="normal_part">\n      <metadata key="name" value="' + xmlEsc(v.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
       (v.slot !== null ? '      <metadata key="extruder" value="' + (v.slot + 1) + '"/>\n' : '') + '      <metadata key="source_file" value="' + o.name + '"/>\n' +
       '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="' + j + '"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n').join('') +
     (o.mods || []).map(m => '    <part id="' + m.id + '" subtype="modifier_part">\n      <metadata key="name" value="' + xmlEsc(m.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
       HOLE_MOD_SETTINGS.map(([k, v]) => '      <metadata key="' + k + '" value="' + v + '"/>\n').join('') + '    </part>\n').join('') + '  </object>\n';
+}
+function modelSettingsXML(objs, plateCount) {
+  const object = objectConfigXML;
   const instance = o => '    <model_instance>\n      <metadata key="object_id" value="' + o.id + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + o.k + '"/>\n    </model_instance>\n';
   const plate = pi => '  <plate>\n    <metadata key="plater_id" value="' + (pi + 1) + '"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' +
     objs.filter(o => o.place.plate === pi).map(instance).join('') + '  </plate>\n';
@@ -610,17 +663,137 @@ function patchModifierExtruders(ms, objectId, map, nFil) {
     }) + close));
 }
 
-/* jobs: [{geom, r, slot, bodies?, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip. */
+/* Lage eines Build-Items neu: erst die Transformation des Designers (Zeilenvektor · m), dann um die Mitte c des
+   Hüllrechtecks (Weltkoordinaten) optional +90° um Z drehen und diese Mitte auf (pl.x, pl.y) setzen. Höhe bleibt. */
+const ROT_Z90 = [0, 1, 0, -1, 0, 0, 0, 0, 1], ROT_ID = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+function relocateTransform(m, c, pl) {
+  const R = pl.rot ? ROT_Z90 : ROT_ID, out = [];
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) out.push(m[r * 3] * R[k] + m[r * 3 + 1] * R[3 + k] + m[r * 3 + 2] * R[6 + k]);
+  const tx = m[9] - c[0], ty = m[10] - c[1], tz = m[11];
+  out.push(tx * R[0] + ty * R[3] + tz * R[6] + pl.x, tx * R[1] + ty * R[4] + tz * R[7] + pl.y, tx * R[2] + ty * R[5] + tz * R[8]);
+  return out;
+}
+const fmtTransform = m => m.map(v => { const s = String(Math.round(v * 1e6) / 1e6); return s === '-0' ? '0' : s; }).join(' ');
+const PLATE_FILE_KEYS = /[ \t]*<metadata key="(thumbnail_file|thumbnail_no_light_file|top_file|pick_file|pattern_file|pattern_bbox_file)" value="[^"]*"\/>\n?/g;
+
+/* Build-Items, Platten (model_instance) und assemble der 3MF neu schreiben; hinzugefügte einfache Teile als neue
+   Objekte (Netz direkt im Hauptmodell, ein Bauteil je Körper, dazu Loch-Modifikatoren) anhängen.
+   Kopien eines 3MF-Objekts werden weitere Instanzen desselben Objekts (Orca: gleiche Bauteile, Modifikatoren, Bemalung
+   und Objekt-Einstellungen, eigene Lage) – so bleibt die Datei klein und jede Änderung am Objekt gilt für alle Kopien.
+   zipFiles: alle Dateien der 3MF (für freie Ids). Ergebnis {model, ms, objectChanges}. */
+function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, zipLib) {
+  // freie Ids oberhalb aller vorhandenen (Objekte und Bauteile, auch in 3D/Objects/*)
+  let maxId = 0;
+  for (const [name, data] of Object.entries(zipFiles)) if (/\.model$/i.test(name)) {
+    const text = name === '3D/3dmodel.model' ? model : zipLib.strFromU8(data);
+    for (const m of text.matchAll(/<(?:\w+:)?object\b[^>]*?\bid="(\d+)"/g)) maxId = Math.max(maxId, +m[1]);
+  }
+  for (const m of ms.matchAll(/<(?:object|part) id="(\d+)"/g)) maxId = Math.max(maxId, +m[1]);
+  let nextId = maxId + 1;
+  const hasP = /<(?:\w+:)?model\b[^>]*xmlns:p=/.test(model);
+  const uuidAttr = (n, tail) => hasP ? ' p:UUID="' + uuid(n, tail) + '"' : '';
+  // Build-Items des Designers je Objekt (Reihenfolge = Instanz) und seine Montage-Lage
+  const orig = new Map();
+  for (const m of model.matchAll(/<(?:\w+:)?item\b([^>]*?)\/?>/g)) {
+    const id = (/objectid="([^"]+)"/.exec(m[1]) || [])[1], tr = (/transform="([^"]+)"/.exec(m[1]) || [])[1];
+    const t = tr ? tr.trim().split(/\s+/).map(Number) : ROT_ID.concat([0, 0, 0]);
+    if (!orig.has(id)) orig.set(id, []);
+    orig.get(id).push({ attrs: m[1].replace(/\s*\/?\s*$/, ''), m: t.length === 12 && t.every(Number.isFinite) ? t : ROT_ID.concat([0, 0, 0]) });
+  }
+  const assembleOf = new Map();
+  for (const m of ms.matchAll(/<assemble_item\b([^>]*?)\/?>/g)) {
+    const a = attrsOfTag(m[1]);
+    assembleOf.set(a.object_id + '#' + (a.instance_id || 0), a.transform);
+  }
+  const buildXml = [], instances = [], extraObjs = [], resources = [], objectChanges = [], used = new Map();
+  items.forEach((j, i) => {
+    const pl = lay.places[i], g = j.geom, c = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2];
+    const src = j.part && j.part.objectId != null && !j.part.extra && orig.get(String(j.part.objectId));
+    if (src && src.length) {
+      const id = String(j.part.objectId), base = src[Math.min(j.part.instance || 0, src.length - 1)], inst = used.get(id) || 0;
+      used.set(id, inst + 1);
+      const tr = fmtTransform(relocateTransform(base.m, c, pl));
+      let attrs = base.attrs.replace(/\s*transform="[^"]*"/, '') + ' transform="' + tr + '"';
+      if (inst >= src.length || j.part.copy) attrs = attrs.replace(/p:UUID="[^"]*"/, 'p:UUID="' + uuid(0x8000 + i, 'c0de-4553-aec9-835e5b724bb4') + '"');
+      buildXml.push('  <item' + (attrs.startsWith(' ') ? '' : ' ') + attrs + ' />');
+      instances.push({ id, inst, plate: pl.plate, assemble: assembleOf.get(id + '#' + (j.part.instance || 0)) || tr });
+      return;
+    }
+    // Hinzugefügtes Teil: Körper und Loch-Modifikatoren als Netze, lokal um die Mitte (wie build3mfFiles)
+    const vols = bodyVolumes(g, j.bodies, 1).map(v => ({ ...v, id: nextId++ })), mods = holeMods(1, j.holes).map(m => ({ ...m, id: nextId++ }));
+    const oid = nextId++, center = [c[0], c[1], (g.mn[2] + g.mx[2]) / 2];
+    const mesh = (pos, id) => { const x = meshObjectXML(pos, center, id); return hasP ? x : x.replace(/ p:UUID="[^"]*"/, ''); };
+    resources.push(...vols.map(v => mesh(v.pos, v.id)), ...mods.map(m => mesh(m.pos, m.id)),
+      '  <object id="' + oid + '"' + uuidAttr(oid, '61cb-4c03-9d28-80fed5dfa1dc') + ' type="model">\n   <components>\n' +
+      vols.concat(mods).map(v => '    <component objectid="' + v.id + '"' + uuidAttr(v.id, 'b206-40ff-9872-83e8017abed1') + ' transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') + '   </components>\n  </object>\n');
+    const tr = placeTransform(pl, coord(g.z / 2));
+    buildXml.push('  <item objectid="' + oid + '"' + uuidAttr(oid, 'b1ec-4553-aec9-835e5b724bb4') + ' transform="' + tr + '" printable="1" />');
+    const own = j.r ? objectOverrides(settings, j.r) : [];
+    if (own.length) objectChanges.push({ name: g.name, changes: own });
+    extraObjs.push({ id: oid, name: xmlEsc(g.name), extruder: Math.min(partSlot(j), nFil - 1) + 1, overrides: own, mods,
+      vols: vols.map(v => ({ ...v, slot: v.slot == null ? null : Math.min(v.slot, nFil - 1) })) });
+    instances.push({ id: String(oid), inst: 0, plate: pl.plate, assemble: tr });
+  });
+  if (resources.length) model = model.replace(/(\n?[ \t]*<\/(?:\w+:)?resources>)/, '\n' + resources.join('').replace(/\n$/, '') + '$1');
+  model = model.replace(/(<(?:\w+:)?build\b[^>]*?)(?:\/>|>[\s\S]*?<\/((?:\w+:)?build)>)/, (all, open, close) => (open.endsWith(' ') ? open.slice(0, -1) : open) + '>\n' + buildXml.join('\n') + '\n </' + (close || 'build') + '>');
+
+  // Platten: Kopf der gleichnamigen Platte des Designers (ohne Vorschaubilder, die nicht mehr passen), Instanzen neu
+  const origPlates = [...ms.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map(m => m[1]);
+  const plateXml = k => {
+    const src = origPlates.find(b => new RegExp('key="plater_id" value="' + k + '"').test(b));
+    const head = src ? src.replace(/\s*<model_instance>[\s\S]*?<\/model_instance>/g, '').replace(PLATE_FILE_KEYS, '').replace(/\s+$/, '')
+      : '\n    <metadata key="plater_id" value="' + k + '"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>';
+    return '  <plate>' + head + '\n' + instances.map((x, n) => [x, n]).filter(([x]) => x.plate === k - 1).map(([x, n]) => '    <model_instance>\n      <metadata key="object_id" value="' + x.id + '"/>\n      <metadata key="instance_id" value="' + x.inst + '"/>\n      <metadata key="identify_id" value="' + (2000 + n) + '"/>\n    </model_instance>\n').join('') + '  </plate>\n';
+  };
+  ms = ms.replace(/[ \t]*<plate>[\s\S]*?<\/plate>\n?/g, '').replace(/[ \t]*<assemble>[\s\S]*?<\/assemble>\n?/g, '');
+  const tail = extraObjs.map(objectConfigXML).join('') + Array.from({ length: lay.count }, (_, k) => plateXml(k + 1)).join('') +
+    '  <assemble>\n' + instances.map(x => '   <assemble_item object_id="' + x.id + '" instance_id="' + x.inst + '" transform="' + x.assemble + '" offset="0 0 0" />\n').join('') + '  </assemble>\n';
+  ms = /<\/config>/.test(ms) ? ms.replace(/<\/config>\s*$/, tail + '</config>\n') : ms + tail;
+  return { model, ms, objectChanges };
+}
+const attrsOfTag = tag => { const o = {}; tag.replace(/([\w:]+)="([^"]*)"/g, (_, k, v) => { o[k] = v; }); return o; };
+
+/* jobs: [{geom, r, slot, bodies?, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip.
+   Ist die 3MF neu angeordnet oder kommen eigene Teile/Kopien dazu (needsRelayout), schreibt relayout3mf Build-Items,
+   Platten und die neuen Objekte; sonst bleiben Lage und Platten des Designers (je Platte auf die Bettmitte gerückt). */
 function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, machine) {
   const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate }));
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
   const nFil = tpl.settings.filament_settings_id.length;
+  // Slots, die nur Farb-Modifikatoren des Designers nutzen (z. B. ein Schriftzug), bekommen die Filamentwerte ihres Teils –
+  // sonst blieben dort die Vorlagenwerte, und Orca lehnt die Mischung ab („nozzle temperatures are incompatible“)
+  const dmap = threemf.designMap || {};
+  items.forEach(j => ((j.part && j.part.modSlots) || []).forEach(d => { const s = dmap[d] ?? d;
+    if (s !== slot && s < nFil && !extra.some(e => e.slot === s)) extra.push({ slot: s, r: j.r || r }); }));
   items.forEach(j => { if (partSlot(j) >= nFil) notes.push(t('{part}: Slot {n} gibt es an deinem Drucker nicht – bitte in Orca zuweisen.', { part: j.geom.name, n: partSlot(j) + 1 })); });
   items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(t('{part} · {body}: Slot {n} gibt es an deinem Drucker nicht – Slot {last} wird verwendet.', { part: j.geom.name, body: b.name, n: b.slot + 1, last: nFil })); }));
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra.filter(e => e.slot < nFil), machine);
-  const { shifts, oversize } = plateShifts(items, tpl);
-  oversize.forEach(id => notes.push(t('Platte {n} ist größer als dein Druckbett – in Orca prüfen.', { n: id })));
-  {
+  const relayout = needsRelayout(threemf, items.map(j => j.part));
+  let shifts = new Map(), lay = null;
+  if (relayout) {
+    lay = layout3mf(items.map(j => ({ geom: j.geom, plate: j.plate, own: ownPlaced(j.part) })), tpl, threemf.layout || null);
+    lay.oversizePlates.forEach(id => notes.push(t('Platte {n} ist größer als dein Druckbett – in Orca prüfen.', { n: id })));
+    if (lay.oversize.length) notes.push(t('Passt nicht aufs Bett: {parts} – in Orca prüfen.', { parts: lay.oversize.map(i => items[i].geom.name).join(', ') }));
+    if (lay.overflow) notes.push(t('Nicht alle Teile einer Platte passen aufs Bett – sie stehen auf einer zusätzlichen Platte.'));
+    // Reinigungsturm je Platte: Hüllrechtecke in Bettkoordinaten der Platte
+    const [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(lay.count));
+    const origin = pi => [(pi % cols) * bw * PLATE_STRIDE, -Math.floor(pi / cols) * bd * PLATE_STRIDE];
+    const plates = Array.from({ length: lay.count }, () => ({ rects: [], slots: new Set(), idx: [] }));
+    items.forEach((j, i) => {
+      const pl = lay.places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(j.geom, pl);
+      q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
+      q.slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(Math.min(b.slot, nFil - 1)); });
+      if (j.part && (j.part.painted || (j.part.modSlots || []).length)) q.slots.add('bemalt');
+      q.idx.push(i);
+    });
+    const tp = planTowers(settings, tpl, plates);
+    plates.forEach((q, pi) => { const [dx, dy] = tp.shifts[pi]; if (dx || dy) q.idx.forEach(i => { lay.places[i] = { ...lay.places[i], x: lay.places[i].x + dx, y: lay.places[i].y + dy }; }); });
+    applyTowers(settings, changes, tp);
+    notes.push(...tp.notes);
+  } else {
+    const ps = plateShifts(items, tpl);
+    shifts = ps.shifts;
+    ps.oversize.forEach(id => notes.push(t('Platte {n} ist größer als dein Druckbett – in Orca prüfen.', { n: id })));
     // Reinigungsturm je Platte (Platten-Ids 1..n); Teile nach der Verschiebung auf die Bettmitte
     const count = Math.max(1, ...items.map(j => j.plate || 1)), [bw, bd] = bedSize(tpl), cols = Math.ceil(Math.sqrt(count));
     const plates = Array.from({ length: count }, () => ({ rects: [], slots: new Set() }));
@@ -651,20 +824,22 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
 
   // Build-Items verschieben (Translation = letzte drei Werte der Matrix)
   const rootPath = Object.keys(out).find(k => /^3D\/3dmodel\.model$/i.test(k));
-  // Je Build-Item die Platte seiner Instanz – dasselbe Objekt kann auf mehreren Platten stehen
-  const plateOfItem = new Map(items.map(j => [j.part.objectId + '#' + (j.part.instance || 0), j.plate || 1]));
-  const itemCount = new Map();
-  out[rootPath] = zipLib.strToU8(zipLib.strFromU8(out[rootPath]).replace(/<((?:\w+:)?item\b)([^>]*?)(\/?)>/g, (all, tag, attrs, close) => {
-    const id = (/objectid="([^"]+)"/.exec(attrs) || [])[1], inst = itemCount.get(id) || 0;
-    itemCount.set(id, inst + 1);
-    const shift = shifts.get(plateOfItem.get(id + '#' + inst));
-    if (!shift) return all;
-    const t = (/transform="([^"]+)"/.exec(attrs) || [])[1];
-    const m = t ? t.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
-    m[9] += shift[0]; m[10] += shift[1];
-    const tr = 'transform="' + m.map(v => String(Math.round(v * 1e4) / 1e4)).join(' ') + '"';
-    return '<' + tag + (t ? attrs.replace(/transform="[^"]+"/, tr) : attrs + ' ' + tr) + close + '>';
-  }));
+  if (!relayout) {
+    // Je Build-Item die Platte seiner Instanz – dasselbe Objekt kann auf mehreren Platten stehen
+    const plateOfItem = new Map(items.map(j => [j.part.objectId + '#' + (j.part.instance || 0), j.plate || 1]));
+    const itemCount = new Map();
+    out[rootPath] = zipLib.strToU8(zipLib.strFromU8(out[rootPath]).replace(/<((?:\w+:)?item\b)([^>]*?)(\/?)>/g, (all, tag, attrs, close) => {
+      const id = (/objectid="([^"]+)"/.exec(attrs) || [])[1], inst = itemCount.get(id) || 0;
+      itemCount.set(id, inst + 1);
+      const shift = shifts.get(plateOfItem.get(id + '#' + inst));
+      if (!shift) return all;
+      const t = (/transform="([^"]+)"/.exec(attrs) || [])[1];
+      const m = t ? t.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+      m[9] += shift[0]; m[10] += shift[1];
+      const tr = 'transform="' + m.map(v => String(Math.round(v * 1e4) / 1e4)).join(' ') + '"';
+      return '<' + tag + (t ? attrs.replace(/transform="[^"]+"/, tr) : attrs + ' ' + tr) + close + '>';
+    }));
+  }
 
   // Slot und eigene Werte je Objekt
   const computedKeys = [...new Set(plannedChanges(r, 0, null).filter(c => !c.perSlot && isObjectKey(c.key)).map(c => c.key).concat([...OBJECT_KEYS], supportChanges(r).map(x => x[1])))];
@@ -672,7 +847,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   let ms = zipLib.strFromU8(out['Metadata/model_settings.config'] || zipLib.strToU8('<?xml version="1.0" encoding="UTF-8"?>\n<config>\n</config>\n'));
   const done = new Set(); // Objekt mit mehreren Instanzen nur einmal anpassen
   for (const j of items) {
-    if (done.has(j.part.objectId)) continue;
+    if (j.part.objectId == null || j.part.extra || done.has(j.part.objectId)) continue;   // hinzugefügte Teile: relayout3mf
     done.add(j.part.objectId);
     const own = objectOverrides(settings, j.r);
     if (own.length) objectChanges.push({ name: j.geom.name, changes: own });
@@ -682,8 +857,13 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     for (const b of j.bodies || []) if (b.partId != null) ms = patchPartExtruder(ms, esc, b.partId, b.slot == null ? null : Math.min(b.slot, nFil - 1) + 1);
     if (threemf.designMap && Object.keys(threemf.designMap).length) ms = patchModifierExtruders(ms, esc, threemf.designMap, nFil);
   }
+  if (relayout) {
+    const rl = relayout3mf(zipLib.strFromU8(out[rootPath]), ms, items, lay, settings, partSlot, nFil, out, zipLib);
+    out[rootPath] = zipLib.strToU8(rl.model); ms = rl.ms; objectChanges.push(...rl.objectChanges);
+    if (out['Metadata/filament_sequence.json']) out['Metadata/filament_sequence.json'] = zipLib.strToU8(JSON.stringify(Object.fromEntries(Array.from({ length: lay.count }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }]))));
+  }
   out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
-  return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: shifts.size };
+  return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: relayout ? lay.count : shifts.size };
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
