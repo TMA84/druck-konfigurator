@@ -809,3 +809,11 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .spool-arch summary { cursor: pointer; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
 .spool-short { display: block; margin-top: 8px; padding: 6px 8px; }
 @media (max-width: 700px) { .spool-row { grid-template-columns: 22px minmax(0, 1fr) auto; } .spool-rest { grid-column: 2 / -1; } .spool-form { grid-template-columns: 1fr; margin-left: 0; } }
+
+/* Einzelnes Teil: nur die Slot-Auswahl */
+.part-scope.single #partScopeName, .part-scope.single label[for="partPick"], .part-scope.single #partPick { display: none; }
+/* ③ Filament-Slots: anklicken = damit drucken */
+.slot-panel-list li[data-slot-pick] { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
+.slot-panel-list li[data-slot-pick]:hover { background: var(--paper-2); }
+.slot-panel-list li.pick { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.slot-panel-list li .pick-tag { font-size: 11px; font-weight: 700; color: var(--accent); margin-left: 4px; }

@@ -57,3 +57,22 @@ I18N.add({
   '<i>nur kritische Bereiche</i> einschalten – stützt nur Spitzen und Auskragungen. Fehlen in der Vorschau Stützen unter normalen Überhängen, unter <b>Werte für diesen Auftrag anpassen</b> ausschalten.': 'turn on <i>critical regions only</i> – supports only sharp tails and cantilevers. If the preview lacks supports under normal overhangs, turn it off under <b>Adjust values for this job</b>.',
   '<i>nur kritische Bereiche</i> ausgeschaltet lassen – so stützt der Slicer auch normale Überhänge.': 'leave <i>critical regions only</i> off – then the slicer also supports normal overhangs.'
 });
+// Slot wählen (③ Filament-Slots, js/export-ui.js)
+I18N.add({
+  'Anklicken: mit diesem Slot drucken': 'Click: print with this slot',
+  'druckt damit': 'printing with it',
+  'Druckt mit Slot {n}': 'Printing with slot {n}',
+  'Standard-Slot {n} für Teile ohne eigenen Slot': 'Default slot {n} for parts without their own slot',
+  'Filament auf {type} umgestellt': 'filament switched to {type}'
+});
+// Modell hinzufügen (js/app.js addParts, index.html)
+I18N.add({
+  'Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.': 'Combined: the 3MF is rebuilt – plates and body slots stay, the designer’s other settings are dropped.',
+  'Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.': 'The designer’s color modifiers and painting are lost.',
+  '{n} Teile · {tri} Dreiecke': '{n} parts · {tri} triangles',
+  '{n} Teil(e) hinzugefügt – jetzt {total} Teile': '{n} part(s) added – now {total} parts',
+  'Modell hinzufügen … weiteres Modell ins Projekt – kombiniert drucken': 'Add model … <small>another model into the project – print combined</small>',
+  'weiteres Modell ins Projekt – kombiniert drucken': 'another model into the project – print combined',
+  'Modell hinzufügen …': 'Add model …',
+  '+ Hinzufügen': '+ Add'
+});

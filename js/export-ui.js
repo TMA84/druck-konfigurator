@@ -363,14 +363,37 @@ $('slotDlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.curren
 ACTIONS.slots=openSlotDialog;
 
 /* Einstellungen-Tab (linke Spalte): Slots und Spülmenge direkt sichtbar, aufgerufen aus update() */
+// Welche Slots das Projekt nutzt (Teile und Körper; ohne eigenen Slot der Standard-Slot)
+function slotsInUse(){
+  const out=new Set();if(!project||!lastResult)return out;
+  const def=+(store.last[slotKey(lastResult.printer.id)]||0);
+  for(const p of project.parts){out.add(p.slot??def);for(const b of p.bodies||[])if(b.slot!=null)out.add(b.slot)}
+  return out;
+}
+/* ③ Slot anklicken = damit drucken. Ein Teil (bzw. alle Platzierungen/Kopien desselben Teils): dessen Slot;
+   mehrere Teile: Standard-Slot für die Teile ohne eigenen Slot. Passt das Filament nicht zum Slot, wird es umgestellt. */
+function pickPrintSlot(i){
+  if(!project||!lastResult)return;
+  const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),s=tpl&&slotSource(tpl).slots[i];
+  const single=project.parts.every(p=>samePlacements(project.parts[0]).includes(p));
+  const targets=single?project.parts:project.parts.filter(p=>p.slot==null);
+  if(single)project.parts.forEach(p=>{p.slot=i});
+  else{store.last[slotKey(r.printer.id)]=i;persist()}
+  let changed=0;
+  if(s&&s.present&&s.type)for(const p of targets){const m=materialForSlotType(s.type,p.input&&p.input.material);if(p.input&&m!==p.input.material){p.input.material=m;changed++}}
+  loadPartIntoForm(project.parts[project.selected]);update();
+  toast((single?t('Druckt mit Slot {n}',{n:i+1}):t('Standard-Slot {n} für Teile ohne eigenen Slot',{n:i+1}))+(changed?' · '+t('Filament auf {type} umgestellt',{type:s.type}):''));
+}
+$('slotPanelList').addEventListener('click',e=>{const li=e.target.closest('[data-slot-pick]');if(li)pickPrintSlot(+li.dataset.slotPick)});
 function renderSidePanels(){
   const r=lastResult,tpl=r&&exportTemplate(r.printer.id,r.dSel);
   $('slotPanel').classList.toggle('hidden',!tpl);
   if(tpl){
     const src=slotSource(tpl);
+    const used=slotsInUse();
     $('slotPanelList').innerHTML=src.slots.map((s,i)=>{
       const how=s.own?(src.kind==='live'?t('überschrieben'):t('eigene Angabe')):src.kind==='live'?(s.present?t('vom Drucker'):t('leer')):t('unbekannt');
-      return '<li class="'+(s.own&&src.kind==='live'?'ovr':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small></span></li>';
+      return '<li data-slot-pick="'+i+'" title="'+esc(t('Anklicken: mit diesem Slot drucken'))+'" class="'+(s.own&&src.kind==='live'?'ovr':'')+(used.has(i)?' pick':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small>'+(used.has(i)?'<span class="pick-tag">'+t('druckt damit')+'</span>':'')+'</span></li>';
     }).join('');
     const live=slotState.live&&slotState.printer===r.printer.id?slotState.live:null;
     $('slotPanelSource').textContent=live?t('Gelesen {time} ({via})',{time:live.time.toLocaleTimeString(LOCALE(),{hour:'2-digit',minute:'2-digit'}),via:live.via==='lan'?t('Werksfirmware'):'Moonraker'})

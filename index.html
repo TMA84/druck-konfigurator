@@ -36,6 +36,7 @@
       <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuDatei">Datei</button>
       <div class="menu-list" role="menu" id="menuDatei">
         <button type="button" role="menuitem" data-action="open">Modell öffnen … <small>STL, 3MF, ZIP</small></button>
+        <button type="button" role="menuitem" data-action="add">Modell hinzufügen … <small>weiteres Modell ins Projekt – kombiniert drucken</small></button>
         <button type="button" role="menuitem" id="clear">Modell entfernen</button>
         <hr>
         <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst ein Modell laden</small></button>
@@ -304,7 +305,7 @@
 <section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view view-model" hidden>
   <aside class="model-col noprint" aria-label="Modell">
     <div class="model-card noprint" id="modelCard">
-        <div class="model-head"><span class="eyebrow">Modell</span><button class="linkbtn" type="button" data-action="open">Modell öffnen</button></div>
+        <div class="model-head"><span class="eyebrow">Modell</span><span><button class="linkbtn" type="button" data-action="add" id="addModelBtn">+ Hinzufügen</button> · <button class="linkbtn" type="button" data-action="open">Modell öffnen</button></span></div>
         <div id="fileinfo">Noch keine Datei geladen.</div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
         <p id="importNotes" class="muted hidden"></p>

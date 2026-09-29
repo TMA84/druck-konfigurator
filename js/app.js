@@ -22,16 +22,59 @@ async function loadFiles(files){
   try{
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
     const imp=importModels(entries,fflate);
-    // slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers
+    if(addMode&&project){addMode=false;return addParts(imp)}
+    addMode=false;
+    showProject({name:imp.name,parts:partsFromImport(imp),threemf:imp.threemf,notes:imp.notes});
+  }catch(e){
+    addMode=false;
+    $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg:t(e.message)});
+  }
+}
+// slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers
+function partsFromImport(imp){
     const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
       // Farben des Designers (0-basiert): Slot des Objekts, der Körper und der Farb-Modifikatoren – für „Farben des Designers → Slot“ (js/design-ui.js)
       dSlot:p.extruder?p.extruder-1:null,modSlots:(p.modifiers||[]).map(e=>e-1),paintTris:!!p.paintTris}));
     parts.forEach((q,i)=>{if(q.bodies)q.bodies.forEach((b,j)=>{const e=imp.parts[i].bodies[j].extruder;b.dSlot=e?e-1:q.dSlot})});
     if(imp.threemf)imp.threemf.designMap={};
-    showProject({name:imp.name,parts,threemf:imp.threemf,notes:imp.notes});
-  }catch(e){
-    $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg:t(e.message)});
+    return parts;
+}
+
+/* Modell hinzufügen: weitere Dateien ins bestehende Projekt (verschiedene Modelle kombiniert drucken; mehrfach
+   über „Anzahl“ in den Platten). Ist das Projekt eine Makerworld-/Orca-3MF, wird es dabei zu einfachen Teilen:
+   Platten bleiben (als eigene Zuordnung), Körper behalten ihren Slot – Farb-Modifikatoren und Bemalung des Designers
+   sowie seine übrigen Einstellungen entfallen, weil die 3MF dann neu aufgebaut wird. */
+let addMode=false;
+function addParts(imp){
+  const notes=[...(project.notes||[])];
+  if(project.threemf||imp.threemf){
+    const lost=[...project.parts,...imp.parts].some(p=>p.painted||(p.modSlots&&p.modSlots.length)||(p.modifiers&&p.modifiers.length));
+    if(project.threemf){project.platesFixed=true}
+    notes.push(t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):''));
+    project.threemf=null;
   }
+  const add=partsFromImport(imp);
+  // bisher automatisch verteilte Teile behalten ihre Platte, wenn ab jetzt eine feste Zuordnung gilt
+  if(imp.threemf&&!project.platesFixed&&typeof fixPlates==='function'&&plTpl())fixPlates(plTpl());
+  if(imp.threemf)project.platesFixed=true;
+  initPartInputs(add);
+  if(project.platesFixed){
+    // neue Teile hinter die bisherigen Platten (bzw. auf die Platten ihrer eigenen 3MF)
+    const last=Math.max(1,...project.parts.map(p=>p.plate||1));
+    add.forEach(p=>{p.plate=imp.threemf?last+(p.plate||1):last});
+  }
+  const first=project.parts.length;
+  project.parts.push(...add);
+  project.parts.forEach((p,i)=>{p.id=i});
+  project.name=/ \+ /.test(project.name)?project.name:project.name.replace(/\.(stl|3mf|zip)$/i,'')+' + '+imp.name.replace(/\.(stl|3mf|zip)$/i,'');
+  project.notes=notes.concat(imp.notes||[]);
+  if(typeof normalizePlates==='function'&&typeof plTpl==='function'&&plTpl())normalizePlates(plTpl());
+  const n=project.parts.reduce((s,x)=>s+x.geom.n,0);
+  $('fileinfo').innerHTML='<b>'+esc(project.name)+'</b><br>'+t('{n} Teile · {tri} Dreiecke',{n:project.parts.length,tri:n.toLocaleString(LOCALE())});
+  const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.toggle('hidden',!project.notes.length);
+  $('partList').classList.toggle('hidden',project.parts.length<2);
+  toast(t('{n} Teil(e) hinzugefügt – jetzt {total} Teile',{n:add.length,total:project.parts.length}));
+  selectPart(first);
 }
 
 function showProject(p){
@@ -155,7 +198,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus()});
 
 /* data-action: gemeinsame Aktionen für Menü, Modellkarte und leere 3D-Ansicht */
 const ACTIONS={
-  open:()=>input.click(),
+  open:()=>{addMode=false;input.click()},
+  add:()=>{addMode=!!project;input.click()},
   profiles:()=>{renderMyList();$('profilesDlg').showModal()},
   help:()=>$('helpDlg').showModal(),
   disclaimer:()=>{if($('helpDlg').open)$('helpDlg').close();$('disclaimerDlg').showModal()}

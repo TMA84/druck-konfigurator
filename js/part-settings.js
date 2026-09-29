@@ -41,10 +41,12 @@ function slotChoices() {
   return tpl ? dialogSlots(tpl) : [];
 }
 
+// Auch bei einem einzelnen Teil: Slot wählbar (dann ohne Teile-Auswahl)
 function renderPartScope() {
   const multi = !!project && project.parts.length > 1;
-  $('partScope').classList.toggle('hidden', !multi);
-  if (!multi) return;
+  $('partScope').classList.toggle('hidden', !project);
+  if (!project) return;
+  $('partScope').classList.toggle('single', !multi);
   const p = project.parts[project.selected], sel = $('partSlot'), slots = slotChoices();
   $('partScopeName').textContent = p.name;
   // Teil hier wählen, ohne in den Tab „Modell“ zu wechseln

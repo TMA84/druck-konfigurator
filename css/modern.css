@@ -186,3 +186,7 @@ dialog::backdrop { background: rgba(10, 12, 16, .45); backdrop-filter: blur(2px)
 /* 3D-Ansicht */
 .hud button { border-radius: var(--r-s); backdrop-filter: blur(6px); }
 #viewerEmpty { font-family: var(--f-display); font-weight: 600; }
+
+/* Draufsicht der Platten im Dunkelmodus: dunkle Teile (z. B. schwarzes Filament) auf dunklem Bett sichtbar halten */
+:root[data-theme="dark"] .plate-svg rect[data-pick] { stroke: rgba(255, 255, 255, .6); }
+:root[data-theme="dark"] .plate-svg .bed { fill: var(--paper-2); }

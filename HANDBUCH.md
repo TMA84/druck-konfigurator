@@ -108,6 +108,10 @@ Bei Makerworld-/Orca-3MF mit mehreren Farben zeigt **① Modell** den Kasten **F
 
 Steht auf einer Plattenkarte „Slot 1: braucht ABS, eingelegt ist ASA“, passt das Filament der Teile (② Druckwerte → Filament) nicht zur ACE. **Filament aus dem ACE übernehmen** stellt es um.
 
+### Mehrere Modelle kombinieren
+
+**Datei → Modell hinzufügen …** (oder **+ Hinzufügen** in der Modell-Karte) lädt weitere Dateien ins bestehende Projekt, statt es zu ersetzen – so druckst du verschiedene Modelle zusammen. Wie oft ein Teil gedruckt wird, stellst du unter **Platten → Anzahl** ein. Kommt eine Makerworld-/Orca-3MF dazu, baut das Tool die 3MF neu auf: Platten und Körper-Slots bleiben, Farb-Modifikatoren (z. B. Schriftzüge) und Bemalung des Designers gehen dabei verloren.
+
 ### Platten
 
 Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Bett (Teile in Slot-Farbe, das gewählte umrandet), die Teile darauf, die genutzten Slots und – rot – wenn ein Slot anderes Filament braucht als eingelegt ist.
@@ -249,6 +253,8 @@ Weiteres:
 ### Filament-Slots
 
 Im Schritt **③ Slicen & Kosten** zeigt der Abschnitt **Filament-Slots** jeden Slot mit Farbe, Material und Herkunft (vom Drucker, überschrieben, eigene Angabe) – ist eine Verbindung eingerichtet, liest das Tool die ACE beim Öffnen einmal aus. Darunter stellst du unter **Farbwechsel & Spülmenge** die Spülmenge ein und siehst die Schätzung für das geladene Projekt.
+
+**Mit welchem Slot gedruckt wird:** Slot in der Liste anklicken – er ist dann mit „druckt damit“ markiert. Bei einem Teil (auch einem einfarbigen) gilt das für dieses Teil, bei mehreren Teilen als Standard für alle Teile ohne eigenen Slot. Passt das Filament des Teils nicht zum Slot (z. B. PLA-Profil, im Slot liegt ASA), stellt das Tool es passend um. Denselben Slot wählst du auch in **② Druckwerte** unter **Einstellungen für Teil → Slot**.
 
 Bearbeiten über **✎ Bearbeiten / überschreiben**, **⚙ Einstellungen → Filament-Slots …** oder **Slots bearbeiten** im Export-Dialog stellst du je Slot **Material und Farbe** ein.
 

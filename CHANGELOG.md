@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.4.0] – 2026-09-29
+
+### Neu
+- **Modell hinzufügen** (Datei-Menü und „+ Hinzufügen“ in ① Modell): weitere Modelle ins bestehende Projekt laden und zusammen drucken, statt das Projekt zu ersetzen. Mit **Anzahl** (Platten) jedes Teil mehrfach. Kommt eine Makerworld-/Orca-3MF dazu, wird die 3MF neu aufgebaut: Platten und Körper-Slots bleiben, übrige Designer-Einstellungen, Farb-Modifikatoren und Bemalung entfallen (Hinweis im Modell). Geprüft: ACE-Guide + 3 × Deckel geslict (32,9 g).
+- **Slot wählen auch bei einem einfarbigen Teil:** ② „Einstellungen für Teil“ zeigt die Slot-Auswahl jetzt auch bei nur einem Teil; in ③ **Filament-Slots** den Slot anklicken = damit drucken (markiert „druckt damit“). Bei mehreren Teilen setzt der Klick den Standard-Slot für Teile ohne eigenen Slot. Passt das Filament nicht zum Slot, wird es passend umgestellt.
+
+### Geändert
+- Draufsicht der Platten im Dunkelmodus: heller Rand, damit dunkle Teile auf dem Bett sichtbar sind.
+
 ## [9.3.3] – 2026-09-29
 
 ### Neu
