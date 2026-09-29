@@ -66,9 +66,9 @@ jobs:
         run: |
           set -euo pipefail
           img="${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}-${{ matrix.arch }}"
-          docker run -d --name t -p 8765:8765 "$img"
+          docker run -d --name druck-test -p 8765:8765 "$img"
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/api/health && break; sleep 2; done
-          curl -fsS http://127.0.0.1:8765/api/health | grep -q '"slicer": "2' || { docker logs t; exit 1; }
+          curl -fsS http://127.0.0.1:8765/api/health | grep -q '"slicer": "2' || { docker logs druck-test; exit 1; }
           curl -fsS http://127.0.0.1:8765/ | grep -q 'Druck-Konfigurator'
 
     outputs:
