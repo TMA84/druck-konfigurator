@@ -290,47 +290,104 @@ function volumeExcess(g, vol) {
   return out;
 }
 
-/* Teile zeilenweise aufs Bett legen; passt keine Zeile mehr, beginnt eine neue Platte.
+/* Teile platzsparend aufs Bett legen (Grundfläche = Hüllrechteck, Abstand PART_GAP_MM). Verfahren „freie Rechtecke“
+   (MaxRects, beste kurze Seite): jedes Teil kommt in die freie Lücke, in die es am knappsten passt, auf die erste
+   Platte mit Platz; wenn es hilft, um 90° um die Hochachse gedreht. Mehrere Sortierungen werden durchprobiert, die
+   mit den wenigsten Platten gewinnt (bei Gleichstand die dichteste erste Platte). Je Platte wird die belegte Fläche
+   auf die Bettmitte gerückt. (2026-09-29, ersetzt das Zeilenverfahren: Mischungen mit 78–84 % Fläche brauchten 2 Platten.)
    groups: Listen von Teil-Indizes, jede Gruppe beginnt auf einer eigenen Platte (Plattenzuordnung je Teil);
    läuft eine Gruppe über, geht es auf einer zusätzlichen Platte weiter.
-   Ergebnis je Teil: {plate (0-basiert), x, y} = Mitte in Orca-Weltkoordinaten, lx/ly = Mitte auf der Platte. */
+   Ergebnis je Teil: {plate (0-basiert), x, y, lx, ly, rot} – Mitte in Orca-Weltkoordinaten bzw. auf der Platte,
+   rot = um 90° gedreht (Grundfläche dann y × x). */
+const PACK_ORDERS = [
+  (a, b) => b.x * b.y - a.x * a.y,
+  (a, b) => Math.max(b.x, b.y) - Math.max(a.x, a.y),
+  (a, b) => b.y - a.y || b.x - a.x,
+  (a, b) => b.x - a.x || b.y - a.y,
+  (a, b) => (b.x + b.y) - (a.x + a.y)
+];
+// a < b lexikografisch (erste abweichende Stelle entscheidet)
+function lexLess(a, b) { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] < b[k]; return false; }
+function maxRectsBin(W, H) {
+  let free = [{ x: 0, y: 0, w: W, h: H }];
+  const fits = (f, w, h) => w <= f.w + 1e-6 && h <= f.h + 1e-6;
+  return {
+    used: [],
+    // beste Lücke für w × h (optional gedreht) → {x, y, w, h, rot, score} oder null
+    find(w, h, allowRot) {
+      let best = null;
+      for (const f of free) for (const [ww, hh, rot] of allowRot && Math.abs(w - h) > 1e-6 ? [[w, h, false], [h, w, true]] : [[w, h, false]]) {
+        if (!fits(f, ww, hh)) continue;
+        const score = [Math.min(f.w - ww, f.h - hh), Math.max(f.w - ww, f.h - hh), f.y, f.x];
+        if (!best || lexLess(score, best.score)) best = { x: f.x, y: f.y, w: ww, h: hh, rot, score };
+      }
+      return best;
+    },
+    place(r) {
+      const next = [];
+      for (const f of free) {
+        if (r.x >= f.x + f.w || r.x + r.w <= f.x || r.y >= f.y + f.h || r.y + r.h <= f.y) { next.push(f); continue; }
+        if (r.x > f.x) next.push({ x: f.x, y: f.y, w: r.x - f.x, h: f.h });
+        if (r.x + r.w < f.x + f.w) next.push({ x: r.x + r.w, y: f.y, w: f.x + f.w - r.x - r.w, h: f.h });
+        if (r.y > f.y) next.push({ x: f.x, y: f.y, w: f.w, h: r.y - f.y });
+        if (r.y + r.h < f.y + f.h) next.push({ x: f.x, y: r.y + r.h, w: f.w, h: f.y + f.h - r.y - r.h });
+      }
+      // in anderen enthaltene Lücken streichen
+      free = next.filter((a, k) => !next.some((b, m) => m !== k && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h && (m < k || a.w !== b.w || a.h !== b.h || a.x !== b.x || a.y !== b.y)));
+      this.used.push(r);
+    }
+  };
+}
+// Beste Lösung: wenigste Platten, dann möglichst wenige gedrehte Teile (Drehen nur, wenn es Platten spart), dann dichteste erste Platte
+function packGroup(geoms, idx, W, H, gap) {
+  let best = null;
+  for (const allowRot of [false, true]) for (const order of PACK_ORDERS) {
+    const seq = idx.slice().sort((a, b) => order(geoms[a], geoms[b]) || a - b), bins = [];
+    for (const i of seq) {
+      const w = geoms[i].x + gap, h = geoms[i].y + gap;
+      let spot = null, bin = null;
+      for (const b of bins) { const f = b.find(w, h, allowRot); if (f) { spot = f; bin = b; break; } }
+      if (!spot) {
+        bin = maxRectsBin(W + gap, H + gap); bins.push(bin);
+        spot = bin.find(w, h, allowRot) || bin.find(w, h, true) || { x: 0, y: 0, w, h, rot: false };   // größer als das Bett: allein auf eine Platte
+      }
+      bin.place({ ...spot, i });
+    }
+    const fill = bins.length ? bins[0].used.reduce((s, r) => s + r.w * r.h, 0) : 0, rots = bins.reduce((s, b) => s + b.used.filter(r => r.rot).length, 0);
+    if (!best || lexLess([bins.length, rots, -fill], [best.bins.length, best.rots, -best.fill])) best = { bins, fill, rots };
+  }
+  return best ? best.bins : [];
+}
 function packPlates(geoms, groups, tpl) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = PART_GAP_MM;
-  const plates = [];   // je Platte Zeilen: {y0, depth, width, items:[{i, x0}]}
+  const plates = [];   // je Platte die belegten Rechtecke {i, x, y, w, h, rot} (inkl. Abstand)
   const sources = [];  // je Platte: aus welcher Gruppe (Plattennummer) sie stammt
   for (const [gi, idx] of groups.entries()) {
-    const order = idx.slice().sort((a, b) => geoms[b].y - geoms[a].y || geoms[b].x - geoms[a].x);
-    let rows = []; plates.push(rows); sources.push(gi);
-    const nextY = () => rows.length ? rows[rows.length - 1].y0 + rows[rows.length - 1].depth + gap : 0;
-    for (const i of order) {
-      const g = geoms[i];
-      let row = rows.find(r => r.width + gap + g.x <= bw && g.y <= r.depth);
-      if (!row) {
-        if (rows.length && nextY() + g.y > bd) { rows = []; plates.push(rows); sources.push(gi); }
-        row = { y0: nextY(), depth: g.y, width: -gap, items: [] };
-        rows.push(row);
-      }
-      row.items.push({ i, x0: row.width + gap });
-      row.width += gap + g.x;
-    }
+    const bins = packGroup(geoms, idx, bw, bd, gap);
+    if (!bins.length) { plates.push([]); sources.push(gi); }
+    bins.forEach(b => { plates.push(b.used); sources.push(gi); });
   }
   // leere Gruppen (Platte ohne Teile) weglassen
   const used = plates.map((p, k) => [p, sources[k]]).filter(([p]) => p.length);
   const cols = Math.ceil(Math.sqrt(used.length || 1)), places = [];
-  used.forEach(([prow, src], pi) => {
-    const usedW = Math.max(...prow.map(r => r.width)), last = prow[prow.length - 1], usedD = last.y0 + last.depth;
+  used.forEach(([rects, src], pi) => {
+    const usedW = Math.max(...rects.map(r => r.x + r.w)) - gap, usedD = Math.max(...rects.map(r => r.y + r.h)) - gap;
     const lx0 = bx - usedW / 2, ly0 = by - usedD / 2;
     const ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
-    prow.forEach(r => r.items.forEach(it => {
-      const lx = lx0 + it.x0 + geoms[it.i].x / 2, ly = ly0 + r.y0 + r.depth / 2;
-      places[it.i] = { plate: pi, x: ox + lx, y: oy + ly, lx, ly, group: src };
-    }));
+    for (const r of rects) {
+      const lx = lx0 + r.x + (r.w - gap) / 2, ly = ly0 + r.y + (r.h - gap) / 2;
+      places[r.i] = { plate: pi, x: ox + lx, y: oy + ly, lx, ly, group: src, rot: !!r.rot };
+    }
   });
   // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
-  const vol = buildVolume(tpl), oversize = geoms.map((g, i) => i).filter(i => volumeExcess(geoms[i], vol).length);
+  const vol = buildVolume(tpl), oversize = geoms.map((g, i) => i).filter(i => volumeExcess(geoms[i], vol).length && volumeExcess({ x: geoms[i].y, y: geoms[i].x, z: geoms[i].z }, vol).length);
   const overflow = used.length > new Set(used.map(([, s]) => s)).size;
   return { places, plateCount: used.length, oversize, overflow };
 }
+// Grundfläche eines platzierten Teils (gedreht: Breite und Tiefe getauscht)
+const footprint = (g, pl) => pl && pl.rot ? [g.y, g.x] : [g.x, g.y];
+// 3MF-Transformation (Zeilenvektor · Matrix): gedreht = +90° um Z, sonst nur verschoben
+const placeTransform = (pl, hz) => (pl.rot ? '0 1 0 -1 0 0 0 0 1 ' : '1 0 0 0 1 0 0 0 1 ') + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
 // Alle Teile automatisch auf möglichst wenige Platten (ohne feste Zuordnung)
 function arrangeParts(geoms, tpl) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl); }
 // Nach Plattenzuordnung je Teil (1-basiert); Platten in aufsteigender Reihenfolge, Lücken fallen weg
@@ -359,7 +416,7 @@ function modelSettingsXML(objs, plateCount) {
   const plate = pi => '  <plate>\n    <metadata key="plater_id" value="' + (pi + 1) + '"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' +
     objs.filter(o => o.place.plate === pi).map(instance).join('') + '  </plate>\n';
   return XML_HEAD + '<config>\n' + objs.map(object).join('') + Array.from({ length: plateCount }, (_, pi) => plate(pi)).join('') +
-    '  <assemble>\n' + objs.map(o => '   <assemble_item object_id="' + o.id + '" instance_id="0" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" offset="0 0 0" />\n').join('') + '  </assemble>\n</config>\n';
+    '  <assemble>\n' + objs.map(o => '   <assemble_item object_id="' + o.id + '" instance_id="0" transform="' + placeTransform(o.place, o.hz) + '" offset="0 0 0" />\n').join('') + '  </assemble>\n</config>\n';
 }
 
 // parts: ein geom (Einzelteil) oder [{geom}] – alle Teile bekommen dieselben Werte und den gewählten Slot.
@@ -457,8 +514,8 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
     const origin = pi => [(pi % cols) * bw * PLATE_STRIDE, -Math.floor(pi / cols) * bd * PLATE_STRIDE];
     const plates = Array.from({ length: plateCount }, () => ({ rects: [], slots: new Set(), idx: [] }));
     items.forEach((p, i) => {
-      const pl = places[i], [ox, oy] = origin(pl.plate), g = p.geom, q = plates[pl.plate];
-      q.rects.push([pl.x - ox - g.x / 2, pl.y - oy - g.y / 2, pl.x - ox + g.x / 2, pl.y - oy + g.y / 2]);
+      const pl = places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(p.geom, pl);
+      q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
       q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); });
       q.idx.push(i);
     });
@@ -484,7 +541,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
         o.mods.map(m => '    <component p:path="' + objectPath(o.k) + '" objectid="' + m.id + '" p:UUID="' + uuid(m.id, 'b206-40ff-9872-83e8017abed1') + '" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') +
         '   </components>\n  </object>\n').join('') +
       ' </resources>\n <build p:UUID="2c7c17d8-22b5-4d84-8835-1976022ea369">\n' +
-      objs.map(o => '  <item objectid="' + o.id + '" p:UUID="' + uuid(o.id, 'b1ec-4553-aec9-835e5b724bb4') + '" transform="1 0 0 0 1 0 0 0 1 ' + coord(o.place.x) + ' ' + coord(o.place.y) + ' ' + o.hz + '" printable="1"/>\n').join('') +
+      objs.map(o => '  <item objectid="' + o.id + '" p:UUID="' + uuid(o.id, 'b1ec-4553-aec9-835e5b724bb4') + '" transform="' + placeTransform(o.place, o.hz) + '" printable="1"/>\n').join('') +
       ' </build>\n</model>\n',
     'Metadata/model_settings.config': modelSettingsXML(objs, plateCount),
     'Metadata/project_settings.config': JSON.stringify(settings, null, 4),

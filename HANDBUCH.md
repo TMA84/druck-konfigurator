@@ -116,10 +116,10 @@ Steht auf einer Plattenkarte „Slot 1: braucht ABS, eingelegt ist ASA“, passt
 
 Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Bett (Teile in Slot-Farbe, das gewählte umrandet), die Teile darauf, die genutzten Slots und – rot – wenn ein Slot anderes Filament braucht als eingelegt ist.
 
-- Zuerst verteilt das Tool alle Teile **automatisch** auf möglichst wenige Platten.
+- Zuerst verteilt das Tool alle Teile **automatisch** auf möglichst wenige Platten: Es füllt freie Flächen und dreht Teile um 90°, wenn dadurch eine Platte wegfällt.
 - Über die Auswahl neben einem Teil schiebst du es auf eine andere oder eine **neue Platte**. Ab dann gilt deine Zuordnung; passt eine Platte nicht mehr, kommt der Rest auf eine weitere. **Platzsparend anordnen** verwirft die Zuordnung.
 - **Anzahl** (− / +) legt Kopien des gewählten Teils an. Kopien teilen Einstellungen, Slot und Farben; weniger stellen entfernt die letzten Kopien.
-- Makerworld-3MF behalten die Platten des Designers; hier nur Anzeige – verschieben in OrcaSlicer.
+- Makerworld-3MF behalten zunächst die Platten des Designers. Ginge es mit weniger, steht es da („3 statt 4 Platten“), und **Platzsparend anordnen** verteilt neu – dafür wird die 3MF neu aufgebaut, Farb-Modifikatoren und Bemalung des Designers entfallen.
 - Passt ein Teil nicht in den **Bauraum** (Breite, Tiefe oder Höhe), steht es hier und in der 3D-Ansicht rot.
 
 In **③ Slicen & Kosten** stehen dann **Zeit, Filament und Kosten je Platte** und eine empfohlene **Reihenfolge**: erst alles, was mit dem eingelegten Filament druckt, danach gruppiert nach Spulentausch. Änderst du nur eine Platte, slict der Server nur diese neu („neu geslict: 1 von 4“), der Rest bleibt.

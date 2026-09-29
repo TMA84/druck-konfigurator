@@ -83,7 +83,7 @@ function plateSlotUse(plan, idx) {
 function plateSvg(tpl, lay, idx, slots, def) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, x0 = bx - bw / 2, y0 = by - bd / 2;
   const rects = idx.map(i => {
-    const p = project.parts[i], g = p.geom, pl = lay.places[i], s = slots[p.slot ?? def];
+    const p = project.parts[i], pl = lay.places[i], s = slots[p.slot ?? def], [fw, fd] = footprint(p.geom, pl), g = { x: fw, y: fd };
     const col = s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : '#9aa8bc';
     return '<rect data-pick="' + i + '" x="' + (pl.lx - g.x / 2 - x0).toFixed(1) + '" y="' + (bd - (pl.ly - y0) - g.y / 2).toFixed(1) + '" width="' + g.x.toFixed(1) + '" height="' + g.y.toFixed(1) +
       '" rx="2" fill="' + col + '"' + (i === project.selected ? ' class="sel"' : '') + '><title>' + esc(p.name) + '</title></rect>';
@@ -101,7 +101,13 @@ function renderPlates() {
   const plN = t(lay.count > 1 ? '{n} Platten' : '{n} Platte', { n: lay.count });
   $('plateInfo').textContent = fixed ? t('{plates} aus der 3MF des Designers – Teile verschiebst du in OrcaSlicer.', { plates: plN })
     : plN + ' · ' + (project.platesFixed ? t('eigene Zuordnung') : t('automatisch platzsparend verteilt'));
-  $('plateAuto').classList.toggle('hidden', fixed || !project.platesFixed);
+  // Platzsparend anordnen: bei eigener Zuordnung und bei Makerworld-3MF (wenn es Platten spart; baut die 3MF neu auf)
+  const packed = project.parts.length > 1 ? arrangeParts(project.parts.map(p => p.geom), tpl).plateCount : lay.count;
+  $('plateAuto').classList.toggle('hidden', fixed ? packed >= lay.count : !project.platesFixed);
+  $('plateAuto').title = fixed ? t('Platzsparend: {n} statt {m} Platten. Die 3MF wird dafür neu aufgebaut – Farb-Modifikatoren und Bemalung des Designers gehen verloren.', { n: packed, m: lay.count })
+    : t('Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen');
+  $('plateSave').textContent = packed < lay.count ? t('Platzsparend angeordnet wären es {n} statt {m} Platten.', { n: packed, m: lay.count }) : '';
+  $('plateSave').classList.toggle('hidden', !(packed < lay.count));
   $('plateCopies').classList.toggle('hidden', fixed);
   if (!fixed && sel) { $('plateCopyName').textContent = sel.name.replace(/ \(\d+\)$/, ''); $('plateCopyN').value = copyGroupOf(sel).length; }
   const warn = [];
@@ -139,7 +145,11 @@ $('plateList').addEventListener('click', e => {
   const i = +b.dataset.pick; if (i !== project.selected) selectPart(i);
 });
 $('plateList').addEventListener('change', e => { const s = e.target.closest('[data-move]'); if (s) movePart(+s.dataset.move, +s.value); });
-$('plateAuto').addEventListener('click', () => { project.platesFixed = false; update(); toast(t('Teile automatisch platzsparend verteilt')); });
+$('plateAuto').addEventListener('click', () => {
+  if (project.threemf) projectToPlain();
+  project.platesFixed = false;
+  update(); toast(t('Teile automatisch platzsparend verteilt'));
+});
 $('plateCopyN').addEventListener('change', () => setCopies(project.parts[project.selected], num($('plateCopyN').value) || 1));
 $('plateCopyMinus').addEventListener('click', () => setCopies(project.parts[project.selected], copyGroupOf(project.parts[project.selected]).length - 1));
 $('plateCopyPlus').addEventListener('click', () => setCopies(project.parts[project.selected], copyGroupOf(project.parts[project.selected]).length + 1));

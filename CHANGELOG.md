@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.5.0] – 2026-09-29
+
+### Geändert
+- **Teile platzsparend anordnen:** Statt zeilenweise („Regal“) packt das Tool jetzt in freie Rechtecke, probiert mehrere Reihenfolgen und dreht Teile um 90° um die Hochachse, wenn das eine Platte spart (sonst nicht). Beispiele: hohes Teil 100×230 + 6 × 60×60 und 2 × 200×100 + 4 × 40×40 jetzt 1 statt 2 Platten; nie mehr Platten als vorher. Gedrehte Teile stehen richtig in der 3MF, der Draufsicht und bei der Turm-Platzierung (mit Orca geprüft).
+- **Platzsparend anordnen auch für Makerworld-Projekte:** Passen die Teile auf weniger Platten als vom Designer angelegt, zeigt ① Modell „Platzsparend angeordnet wären es 3 statt 4 Platten“ und bietet **Platzsparend anordnen** an (baut die 3MF neu auf; Farb-Modifikatoren und Bemalung des Designers entfallen). Beispiel porta utensili: 3 statt 4 Platten, 18 h 20 statt 18 h 42 min.
+
+### Geprüft
+- `tests/plates.js` 37/37 (Packen, Drehen nur bei Bedarf, im Bett und ohne Überlappung).
+
 ## [9.4.0] – 2026-09-29
 
 ### Neu

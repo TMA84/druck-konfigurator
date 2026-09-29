@@ -45,14 +45,21 @@ function partsFromImport(imp){
    Platten bleiben (als eigene Zuordnung), Körper behalten ihren Slot – Farb-Modifikatoren und Bemalung des Designers
    sowie seine übrigen Einstellungen entfallen, weil die 3MF dann neu aufgebaut wird. */
 let addMode=false;
+// Makerworld-/Orca-3MF zu einfachen Teilen machen (für Kombinieren und platzsparendes Anordnen): die 3MF wird neu
+// aufgebaut; Platten (als eigene Zuordnung) und Körper-Slots bleiben, übrige Designer-Einstellungen entfallen
+function projectToPlain(extra){
+  if(!project||!project.threemf)return false;
+  const lost=project.parts.concat(extra||[]).some(p=>p.painted||(p.modSlots&&p.modSlots.length)||(p.modifiers&&p.modifiers.length));
+  project.notes=[...(project.notes||[]),t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):'')];
+  project.threemf=null;project.platesFixed=true;
+  const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.remove('hidden');
+  return true;
+}
 function addParts(imp){
+  if(project.threemf)projectToPlain(imp.parts);
+  else if(imp.threemf){const lost=imp.parts.some(p=>p.painted||(p.modifiers&&p.modifiers.length));
+    project.notes=[...(project.notes||[]),t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):'')]}
   const notes=[...(project.notes||[])];
-  if(project.threemf||imp.threemf){
-    const lost=[...project.parts,...imp.parts].some(p=>p.painted||(p.modSlots&&p.modSlots.length)||(p.modifiers&&p.modifiers.length));
-    if(project.threemf){project.platesFixed=true}
-    notes.push(t('Kombiniert: Die 3MF wird neu aufgebaut – Platten und Körper-Slots bleiben, die übrigen Einstellungen des Designers entfallen.')+(lost?' '+t('Farb-Modifikatoren und Bemalung des Designers gehen dabei verloren.'):''));
-    project.threemf=null;
-  }
   const add=partsFromImport(imp);
   // bisher automatisch verteilte Teile behalten ihre Platte, wenn ab jetzt eine feste Zuordnung gilt
   if(imp.threemf&&!project.platesFixed&&typeof fixPlates==='function'&&plTpl())fixPlates(plTpl());

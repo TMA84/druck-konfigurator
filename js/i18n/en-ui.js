@@ -76,3 +76,8 @@ I18N.add({
   'Modell hinzufügen …': 'Add model …',
   '+ Hinzufügen': '+ Add'
 });
+// Platzsparend anordnen (js/plates-ui.js)
+I18N.add({
+  'Platzsparend: {n} statt {m} Platten. Die 3MF wird dafür neu aufgebaut – Farb-Modifikatoren und Bemalung des Designers gehen verloren.': 'Compact: {n} instead of {m} plates. The 3MF is rebuilt for this – the designer’s color modifiers and painting are lost.',
+  'Platzsparend angeordnet wären es {n} statt {m} Platten.': 'Arranged compactly it would be {n} instead of {m} plates.'
+});
