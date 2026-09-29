@@ -55,9 +55,9 @@ const BUILTIN=[
    accel:800,retrLen:0.8,retrSpeed:20,fan:35,zhop:0.2,dry:'Vor dem Druck trocknen: ca. 50–55 °C für 4–6 Stunden.',
    src:'Am Kobra S1 getestetes Startprofil (0,4-mm-Werksdüse). Bewusst langsam.'})
 ];
-const KIND_LABEL={pla:'PLA',petg:'PETG',abs:'ABS',asa:'ASA',tpu:'TPU / flexibel'};
+const KIND_LABEL={pla:'PLA',petg:'PETG',abs:'ABS',asa:'ASA',tpu:t('TPU / flexibel')};
 const KIND_TEMPLATE={pla:'pla',petg:'petg',abs:'abs',asa:'asa',tpu:'tpu'};
-const STATUS={tested:['tested','Getestet'],generic:['generic','Allgemeiner Startwert'],user:['user','Eigene Werte']};
+const STATUS={tested:['tested',t('Getestet')],generic:['generic',t('Allgemeiner Startwert')],user:['user',t('Eigene Werte')]};
 
 // Düsen: v = Volumenstrom-Faktor ggü. 0,4 mm, lh = Schichthöhe [Q,A,S], fl = erste Schicht, lw/lwo/lwf = Linienbreiten
 const NOZ={
@@ -72,9 +72,9 @@ const NOZ={
 // Stahl sind sich thermisch sehr ähnlich). hardened bestimmt die Warnung bei
 // faserverstärktem Filament, unabhängig von thermalFamily.
 const NOZZLE_MATERIALS={
-  steel_hardened:{label:'Gehärteter Stahl',thermalFamily:'steel',hardened:true},
-  steel_stainless:{label:'Edelstahl (Standard)',thermalFamily:'steel',hardened:false},
-  brass:{label:'Messing',thermalFamily:'brass',hardened:false}
+  steel_hardened:{label:t('Gehärteter Stahl'),thermalFamily:'steel',hardened:true},
+  steel_stainless:{label:t('Edelstahl (Standard)'),thermalFamily:'steel',hardened:false},
+  brass:{label:t('Messing'),thermalFamily:'brass',hardened:false}
 };
 NOZZLE_MATERIALS.steel=NOZZLE_MATERIALS.steel_hardened; // Altwert aus gespeicherten Profilen
 
@@ -109,6 +109,7 @@ const ORCA_PROCESS_BASE={
   snapmaker_u1:{'0.4':'0.20 Standard @Snapmaker U1 (0.4 nozzle)','0.6':'0.20 Standard @Snapmaker U1 (0.6 nozzle)','0.8':'0.24 Standard @Snapmaker U1 (0.8 nozzle)'}
 };
 
+// label bleibt deutsch: steht im Namen des Orca-Prozess-Presets (engine.js); angezeigt wird t(label)
 const OBJ={
   general:{label:'Funktionsteil',pla:{w:2,t:4,b:4,i:15},tpu:{w:2,t:3,b:3,i:10}},
   holder:{label:'Halterung',pla:{w:3,t:4,b:4,i:20},tpu:{w:3,t:3,b:3,i:15}},
@@ -123,46 +124,46 @@ const OBJ={
   dumpling:{label:'Quetschbares Spielzeug',soft:true,tpuOnly:true,pla:{w:2,t:4,b:4,i:10},tpu:{w:2,t:3,b:3,i:5}},
   case:{label:'Flexible Hülle',soft:true,tpuOnly:true,pla:{w:2,t:4,b:4,i:15},tpu:{w:2,t:3,b:3,i:5}}
 };
-const GOAL_LABEL={balanced:'Ausgewogen',quality:'Qualität',fast:'Schnell',strong:'Stabilität'};
+const GOAL_LABEL={balanced:t('Ausgewogen'),quality:t('Qualität'),fast:t('Schnell'),strong:t('Stabilität')};
 
 /* ================= HELP TEXTS ================= */
 const explanations={
- 'Düsendurchmesser':'Größere Düse = mehr Durchsatz, dickere Schichten, gröbere Details. 0,25 mm nur für sehr feine Details. Schichthöhe, Linienbreite und Volumenstrom werden automatisch angepasst.',
- 'Linienbreite':'Breite einer gedruckten Bahn, typischerweise 105–115 % des Düsendurchmessers. Wird aus der gewählten Düse abgeleitet.',
- 'Düse':'Temperatur der Düse. Zu niedrig: schlechte Schichtverbindung und Risse. Zu hoch: Fäden, durchhängende Überhänge, Verfärbung.',
- 'Heizbett':'Temperatur der Bauplatte. Höher verbessert die Haftung, kann aber die Unterseite verformen (Elefantenfuß).',
- 'Schichthöhe':'Höhe jeder Schicht. Dünner = feinere Oberfläche, aber länger; dicker = schneller, aber gröbere Details. Bei Mehrfarbdruck bedeuten weniger Schichten auch weniger Farbwechsel.',
- 'Höhe der ersten Schicht':'Höhe der ersten Lage. Beeinflusst Haftung und Toleranzen; zu hoch haftet schlecht, zu niedrig quetscht.',
- 'Elefantenfuß':'Zieht die erste Schicht minimal nach innen, damit die Unterkante nicht breiter wird als das Modell.',
- 'Glätten':'Fährt die oberste Fläche ein zweites Mal mit der heißen Düse ab. Nur bei großen, flachen Oberseiten sinnvoll; kostet deutlich Zeit.',
- 'Nahtposition':'Position des Start-/Endpunkts jeder Außenwand. Beeinflusst die sichtbare Naht, nicht die Stabilität.',
- 'Wandlinien':'Anzahl der Außen-/Innenwände. Mehr = stabiler und härter; weniger = weicher und schneller.',
- 'Obere / untere Schichten':'Geschlossene Lagen oben und unten. Zu wenige oben: Löcher und durchscheinende Füllung. Ziel sind oben mindestens ca. 0,8 mm.',
- 'Max. Volumenstrom':'Obergrenze für das Materialvolumen pro Sekunde. Sie bremst alle Geschwindigkeiten automatisch, wenn zu viel Material verlangt wird.',
- 'Obere Schichten':'Geschlossene Lagen oben. Zu wenige: Löcher und durchscheinende Füllung. Ziel sind mindestens ca. 0,8 mm.',
- 'Untere Schichten':'Geschlossene Lagen unten. Stabilisieren den Boden und die Haftung.',
- 'Fülldichte':'Anteil der inneren Füllung. Mehr = stabiler und schwerer; weniger = weicher, aber die Oberseite kann Löcher bekommen.',
- 'Füllmuster':'Gyroid ist ein guter Kompromiss aus Stabilität in alle Richtungen, Druckzeit und Flexibilität.',
- 'Lückenfüllung':'Füllt sehr schmale Zwischenräume zwischen Konturen. Niedrige Geschwindigkeit hält dünne Stellen sauber.',
- 'Füllung erste Schicht':'Geschwindigkeit der Füllung in der ersten Lage. Langsamer reduziert Ablösen.',
- 'Erste Schicht':'Geschwindigkeit der ersten Lage. Langsamer = bessere Haftung.',
- 'Außenwand':'Geschwindigkeit der sichtbaren Außenwand. Langsamer = glattere, maßhaltigere Oberfläche.',
- 'Innere Wand':'Geschwindigkeit der Innenwände. Darf schneller sein als die Außenwand.',
- 'Obere Fläche':'Geschwindigkeit der obersten sichtbaren Fläche. Langsamer = weniger Riefen und Löcher.',
- 'Füllung':'Geschwindigkeit der inneren Füllbahnen. Wird automatisch durch die maximale Volumengeschwindigkeit begrenzt.',
- 'Travel':'Bewegung ohne Extrusion. Höher spart Zeit, kann bei TPU aber Fäden und Zug am Teil erhöhen.',
- 'Maximale Volumengeschwindigkeit':'Obergrenze für das Materialvolumen pro Sekunde. Sie bremst alle Geschwindigkeiten automatisch, wenn Schichthöhe × Linienbreite × Geschwindigkeit zu viel Material verlangt.',
- 'Durchflussverhältnis':'Korrekturfaktor für die extrudierte Menge. 1,00 = keine Korrektur. In 0,02-Schritten anpassen, wenn Wände zu dick oder zu dünn sind.',
- 'Pressure Advance':'Gleicht den Druckaufbau in der Düse aus. Sorgt für saubere Ecken ohne Beulen oder Lücken.',
- 'Beschleunigung':'Wie schnell die Geschwindigkeit erreicht wird. Niedriger = weniger Ringing, aber langsamer. Bei TPU niedrig halten.',
- 'Rückzug':'Filament wird vor Leerfahrten zurückgezogen. Zu wenig erzeugt Fäden; bei TPU kann zu viel das Filament knicken.',
- 'Lüfter':'Kühlt die gerade gedruckte Schicht. Mehr stabilisiert Überhänge, kann aber die Schichtverbindung verschlechtern.',
- 'Stützstrukturen':'Stützmaterial unter Überhängen. Die Empfehlung kommt aus der Überhanganalyse der STL; Flächen, die auf dem Bett liegen, zählen nicht.',
- 'Support':'Stützmaterial unter Überhängen. Die Empfehlung kommt aus der Überhanganalyse der STL; Flächen, die auf dem Bett liegen, zählen nicht.',
- 'Schwellenwinkel':'Ab diesem Überhangwinkel (von der Senkrechten) erzeugt der Slicer Stützen. Höher = weniger Stützen, aber unsauberere Überhänge.',
- 'Brim':'Zusätzliche Randlinien am Boden. Verbessert die Haftung bei kleiner Aufstandsfläche oder abhebenden Ecken, erhöht aber die Nacharbeit.',
- 'Z-Hop':'Düse hebt bei Leerfahrten an. Reduziert Kollisionen, kann bei TPU aber zusätzliche Fäden verursachen.',
- 'Reinigungsvolumen':'Menge, die bei jedem Farbwechsel ausgespült wird. Wechsel zu dunklen Farben brauchen wenig, Wechsel zu Weiß viel.',
- 'Reinigungsturm':'Turm, an dem nach dem Farbwechsel vorgedruckt wird. Stabilisiert den Düsendruck; beim Kobra S1 geht der Großteil der Spülung ohnehin in die Abfallrutsche.',
- 'In Füllung spülen':'Nutzt einen Teil des Spülmaterials als Füllung im Inneren des Objekts und spart so Abfall.'
+ 'Düsendurchmesser':t('Größere Düse = mehr Durchsatz, dickere Schichten, gröbere Details. 0,25 mm nur für sehr feine Details. Schichthöhe, Linienbreite und Volumenstrom werden automatisch angepasst.'),
+ 'Linienbreite':t('Breite einer gedruckten Bahn, typischerweise 105–115 % des Düsendurchmessers. Wird aus der gewählten Düse abgeleitet.'),
+ 'Düse':t('Temperatur der Düse. Zu niedrig: schlechte Schichtverbindung und Risse. Zu hoch: Fäden, durchhängende Überhänge, Verfärbung.'),
+ 'Heizbett':t('Temperatur der Bauplatte. Höher verbessert die Haftung, kann aber die Unterseite verformen (Elefantenfuß).'),
+ 'Schichthöhe':t('Höhe jeder Schicht. Dünner = feinere Oberfläche, aber länger; dicker = schneller, aber gröbere Details. Bei Mehrfarbdruck bedeuten weniger Schichten auch weniger Farbwechsel.'),
+ 'Höhe der ersten Schicht':t('Höhe der ersten Lage. Beeinflusst Haftung und Toleranzen; zu hoch haftet schlecht, zu niedrig quetscht.'),
+ 'Elefantenfuß':t('Zieht die erste Schicht minimal nach innen, damit die Unterkante nicht breiter wird als das Modell.'),
+ 'Glätten':t('Fährt die oberste Fläche ein zweites Mal mit der heißen Düse ab. Nur bei großen, flachen Oberseiten sinnvoll; kostet deutlich Zeit.'),
+ 'Nahtposition':t('Position des Start-/Endpunkts jeder Außenwand. Beeinflusst die sichtbare Naht, nicht die Stabilität.'),
+ 'Wandlinien':t('Anzahl der Außen-/Innenwände. Mehr = stabiler und härter; weniger = weicher und schneller.'),
+ 'Obere / untere Schichten':t('Geschlossene Lagen oben und unten. Zu wenige oben: Löcher und durchscheinende Füllung. Ziel sind oben mindestens ca. 0,8 mm.'),
+ 'Max. Volumenstrom':t('Obergrenze für das Materialvolumen pro Sekunde. Sie bremst alle Geschwindigkeiten automatisch, wenn zu viel Material verlangt wird.'),
+ 'Obere Schichten':t('Geschlossene Lagen oben. Zu wenige: Löcher und durchscheinende Füllung. Ziel sind mindestens ca. 0,8 mm.'),
+ 'Untere Schichten':t('Geschlossene Lagen unten. Stabilisieren den Boden und die Haftung.'),
+ 'Fülldichte':t('Anteil der inneren Füllung. Mehr = stabiler und schwerer; weniger = weicher, aber die Oberseite kann Löcher bekommen.'),
+ 'Füllmuster':t('Gyroid ist ein guter Kompromiss aus Stabilität in alle Richtungen, Druckzeit und Flexibilität.'),
+ 'Lückenfüllung':t('Füllt sehr schmale Zwischenräume zwischen Konturen. Niedrige Geschwindigkeit hält dünne Stellen sauber.'),
+ 'Füllung erste Schicht':t('Geschwindigkeit der Füllung in der ersten Lage. Langsamer reduziert Ablösen.'),
+ 'Erste Schicht':t('Geschwindigkeit der ersten Lage. Langsamer = bessere Haftung.'),
+ 'Außenwand':t('Geschwindigkeit der sichtbaren Außenwand. Langsamer = glattere, maßhaltigere Oberfläche.'),
+ 'Innere Wand':t('Geschwindigkeit der Innenwände. Darf schneller sein als die Außenwand.'),
+ 'Obere Fläche':t('Geschwindigkeit der obersten sichtbaren Fläche. Langsamer = weniger Riefen und Löcher.'),
+ 'Füllung':t('Geschwindigkeit der inneren Füllbahnen. Wird automatisch durch die maximale Volumengeschwindigkeit begrenzt.'),
+ 'Travel':t('Bewegung ohne Extrusion. Höher spart Zeit, kann bei TPU aber Fäden und Zug am Teil erhöhen.'),
+ 'Maximale Volumengeschwindigkeit':t('Obergrenze für das Materialvolumen pro Sekunde. Sie bremst alle Geschwindigkeiten automatisch, wenn Schichthöhe × Linienbreite × Geschwindigkeit zu viel Material verlangt.'),
+ 'Durchflussverhältnis':t('Korrekturfaktor für die extrudierte Menge. 1,00 = keine Korrektur. In 0,02-Schritten anpassen, wenn Wände zu dick oder zu dünn sind.'),
+ 'Pressure Advance':t('Gleicht den Druckaufbau in der Düse aus. Sorgt für saubere Ecken ohne Beulen oder Lücken.'),
+ 'Beschleunigung':t('Wie schnell die Geschwindigkeit erreicht wird. Niedriger = weniger Ringing, aber langsamer. Bei TPU niedrig halten.'),
+ 'Rückzug':t('Filament wird vor Leerfahrten zurückgezogen. Zu wenig erzeugt Fäden; bei TPU kann zu viel das Filament knicken.'),
+ 'Lüfter':t('Kühlt die gerade gedruckte Schicht. Mehr stabilisiert Überhänge, kann aber die Schichtverbindung verschlechtern.'),
+ 'Stützstrukturen':t('Stützmaterial unter Überhängen. Die Empfehlung kommt aus der Überhanganalyse der STL; Flächen, die auf dem Bett liegen, zählen nicht.'),
+ 'Support':t('Stützmaterial unter Überhängen. Die Empfehlung kommt aus der Überhanganalyse der STL; Flächen, die auf dem Bett liegen, zählen nicht.'),
+ 'Schwellenwinkel':t('Ab diesem Überhangwinkel (von der Senkrechten) erzeugt der Slicer Stützen. Höher = weniger Stützen, aber unsauberere Überhänge.'),
+ 'Brim':t('Zusätzliche Randlinien am Boden. Verbessert die Haftung bei kleiner Aufstandsfläche oder abhebenden Ecken, erhöht aber die Nacharbeit.'),
+ 'Z-Hop':t('Düse hebt bei Leerfahrten an. Reduziert Kollisionen, kann bei TPU aber zusätzliche Fäden verursachen.'),
+ 'Reinigungsvolumen':t('Menge, die bei jedem Farbwechsel ausgespült wird. Wechsel zu dunklen Farben brauchen wenig, Wechsel zu Weiß viel.'),
+ 'Reinigungsturm':t('Turm, an dem nach dem Farbwechsel vorgedruckt wird. Stabilisiert den Düsendruck; beim Kobra S1 geht der Großteil der Spülung ohnehin in die Abfallrutsche.'),
+ 'In Füllung spülen':t('Nutzt einen Teil des Spülmaterials als Füllung im Inneren des Objekts und spart so Abfall.')
 };

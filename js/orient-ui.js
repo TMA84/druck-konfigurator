@@ -27,8 +27,8 @@ function orientResult(part, th) {
 
 function supportText(s) {
   const total = s.onBed + s.onPart;
-  if (total < 1) return 'keine Stützen';
-  return mm2(total) + ' Stützen' + (s.onPart >= 1 ? ' (davon ' + mm2(s.onPart) + ' auf dem Teil)' : ' (alle vom Bett)');
+  if (total < 1) return t('keine Stützen');
+  return t('{area} Stützen', { area: mm2(total) }) + (s.onPart >= 1 ? t(' (davon {area} auf dem Teil)', { area: mm2(s.onPart) }) : t(' (alle vom Bett)'));
 }
 
 // Aufgerufen aus update(): Anzeige sofort, Berechnung kurz danach (kann bei großen Netzen dauern)
@@ -41,13 +41,13 @@ function renderOrient() {
   $('orientPart').textContent = project.parts.length > 1 ? part.name : '';
   $('orientAll').classList.toggle('hidden', !orientable() || project.parts.length < 2);
   if (!orientable()) {
-    $('orientInfo').textContent = 'Lage aus der 3MF bleibt erhalten – die Designer legen ihre Teile in der Regel schon richtig hin.';
+    $('orientInfo').textContent = t('Lage aus der 3MF bleibt erhalten – die Designer legen ihre Teile in der Regel schon richtig hin.');
     $('orientSuggest').classList.add('hidden');
     return;
   }
   const th = +$('thresh').value, cached = orientCache.get(part), job = ++orientJob;
   if (!cached || cached.th !== th) {
-    $('orientInfo').textContent = 'Prüfe mögliche Auflageflächen …';
+    $('orientInfo').textContent = t('Prüfe mögliche Auflageflächen …');
     $('orientSuggest').classList.add('hidden');
   }
   setTimeout(() => {
@@ -58,16 +58,16 @@ function renderOrient() {
 
 function showOrientResult(part, res) {
   const c = res.current;
-  $('orientInfo').textContent = 'Aktuelle Lage: ' + supportText(c) + ' · Auflage ' + mm2(c.contact) + (c.contact < MIN_CONTACT_MM2 ? ' – sehr wenig, Kippgefahr' : '') + '.';
+  $('orientInfo').textContent = t('Aktuelle Lage: {supports} · Auflage {contact}{warn}.', { supports: supportText(c), contact: mm2(c.contact), warn: c.contact < MIN_CONTACT_MM2 ? t(' – sehr wenig, Kippgefahr') : '' });
   const s = res.suggestion;
   $('orientSuggest').classList.toggle('hidden', !s);
-  if (s) $('orientSuggestText').textContent = 'Besser: andere Seite aufs Bett – ' + supportText(s) + ', Auflage ' + mm2(s.contact) + ', Höhe ' + de(s.height, 1) + ' mm.';
+  if (s) $('orientSuggestText').textContent = t('Besser: andere Seite aufs Bett – {supports}, Auflage {contact}, Höhe {h} mm.', { supports: supportText(s), contact: mm2(s.contact), h: de(s.height, 1) });
 }
 
 function pickFace(part) {
   setTab('3d');
   $('btnPick').classList.add('active');
-  toast('Fläche anklicken, die aufs Bett soll (Esc bricht ab)');
+  toast(t('Fläche anklicken, die aufs Bett soll (Esc bricht ab)'));
   Viewer.setPick(true, fi => {
     $('btnPick').classList.remove('active');
     const p = part.geom.pos, o = fi * 9;
@@ -75,7 +75,7 @@ function pickFace(part) {
     const n = [uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx];
     if (!Math.hypot(...n)) return;
     setPartRotation(part, mulMat3(rotationToDown(n), part.R));
-    toast('Fläche liegt jetzt auf dem Bett');
+    toast(t('Fläche liegt jetzt auf dem Bett'));
   });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('btnPick').classList.contains('active')) { Viewer.setPick(false); $('btnPick').classList.remove('active'); } });
@@ -84,13 +84,13 @@ async function orientAll() {
   const th = +$('thresh').value;
   let changed = 0;
   for (const [i, part] of project.parts.entries()) {
-    $('orientInfo').textContent = 'Prüfe Teil ' + (i + 1) + ' von ' + project.parts.length + ' …';
+    $('orientInfo').textContent = t('Prüfe Teil {i} von {n} …', { i: i + 1, n: project.parts.length });
     await new Promise(r => setTimeout(r, 0));   // Anzeige zwischendurch aktualisieren
     const res = orientResult(part, th);
     if (res.suggestion) { part.R = res.suggestion.R; part.geom = makeGeom(part.name, rotatePositions(part.origPos, part.R)); orientCache.delete(part); changed++; }
   }
   showModel(selectedPart().geom);
-  toast(changed ? changed + ' von ' + project.parts.length + ' Teilen neu ausgerichtet' : 'Alle Teile liegen bereits gut');
+  toast(changed ? t('{c} von {n} Teilen neu ausgerichtet', { c: changed, n: project.parts.length }) : t('Alle Teile liegen bereits gut'));
 }
 
 document.addEventListener('click', e => {

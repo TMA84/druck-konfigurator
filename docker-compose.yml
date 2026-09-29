@@ -1,0 +1,19 @@
+# Start: docker compose up -d --build   →   http://<NAS-IP>:8765/
+services:
+  druck-konfigurator:
+    build: .
+    image: druck-konfigurator:latest
+    container_name: druck-konfigurator
+    ports:
+      - "8765:8765"
+    restart: unless-stopped
+    # Filamentverwaltung: Spulen und Verbrauch (spools.json) bleiben beim Neubau erhalten
+    volumes:
+      - konfigurator-daten:/data
+    # Der Container baut die Verbindungen zum Drucker selbst auf (ausgehend) – dafür reicht das normale
+    # Docker-Netz. Nur falls der Drucker trotzdem nicht erreichbar ist: stattdessen
+    #   network_mode: host
+    # (dann entfällt "ports", die Seite liegt direkt auf Port 8765 des NAS).
+
+volumes:
+  konfigurator-daten:

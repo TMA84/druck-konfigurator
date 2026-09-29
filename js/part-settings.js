@@ -21,10 +21,18 @@ function loadPartIntoForm(part) {
     sel.value = [...sel.options].some(o => o.value === v) ? v : (sel.options[0] || {}).value;
   }
 }
-// Aus update(): aktuelle Auswahl gehört zum gewählten Teil
+/* Dasselbe 3MF-Objekt kann mehrfach auf mehreren Platten stehen. Orca speichert Slot, Werte und Körper-Slots
+   je Objekt, nicht je Platzierung – deshalb gilt jede Änderung für alle Platzierungen (Platten). */
+// Platzierungen desselben 3MF-Objekts bzw. Kopien eines Teils (js/plates-ui.js) teilen Einstellungen und Slots
+function samePlacements(part) {
+  if (project && project.threemf && part.objectId != null) return project.parts.filter(p => p.objectId === part.objectId);
+  return project && part.copyGroup ? project.parts.filter(p => p.copyGroup === part.copyGroup) : [part];
+}
+
+// Aus update(): aktuelle Auswahl gehört zum gewählten Teil (und allen Platzierungen desselben Objekts)
 function savePartFromForm() {
   const p = project && project.parts[project.selected];
-  if (p) p.input = formSnapshot();
+  if (p) { const input = formSnapshot(); samePlacements(p).forEach(x => { x.input = { ...input }; }); }
 }
 
 // Slots des aktuellen Druckers: live vom Drucker, sonst aus der Orca-Vorlage
@@ -39,20 +47,25 @@ function renderPartScope() {
   if (!multi) return;
   const p = project.parts[project.selected], sel = $('partSlot'), slots = slotChoices();
   $('partScopeName').textContent = p.name;
-  sel.innerHTML = '<option value="">wie beim Export gewählt</option>' +
-    slots.map(s => '<option value="' + s.idx + '">Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) : '') + '</option>').join('');
+  // Teil hier wählen, ohne in den Tab „Modell“ zu wechseln
+  $('partPick').innerHTML = project.parts.map((x, i) => '<option value="' + i + '"' + (i === project.selected ? ' selected' : '') + '>' + esc(x.name) + (project.threemf && project.threemf.plates.length > 1 ? ' · ' + t('Platte {n}', { n: x.plate }) : '') + '</option>').join('');
+  sel.innerHTML = '<option value="">' + t('wie beim Export gewählt') + '</option>' +
+    slots.map(s => '<option value="' + s.idx + '">Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) + (typeof slotOriginNote === 'function' ? slotOriginNote() : '') : '') + '</option>').join('');
   sel.value = p.slot === null || p.slot === undefined || p.slot >= slots.length ? '' : String(p.slot);
 }
+$('partPick').addEventListener('change', () => { const i = +$('partPick').value; if (i !== project.selected) selectPart(i); });
 $('partSlot').addEventListener('change', () => {
   const p = project.parts[project.selected], v = $('partSlot').value;
-  p.slot = v === '' ? null : +v;
+  samePlacements(p).forEach(x => { x.slot = v === '' ? null : +v; });
   update();
 });
 
 // Je Teil ein eigenes Ergebnis; Drucker, Düse und Überhangwinkel gelten für alle
 function partJobs() {
   const base = currentInput(), ctx = { getMat, settings: store.settings };
-  return project.parts.map(p => ({ geom: p.geom, slot: p.slot ?? null, part: p, holes: p.holeGeom === p.geom ? p.holes || [] : [], r: compute({ ...base, ...(p.input || {}) }, p.geom, ctx) }));
+  // Plattenzuordnung nur, wenn sie jemand festgelegt hat (sonst verteilt build3mfFiles automatisch)
+  const plateOf = p => project.platesFixed && !project.threemf ? p.plate : undefined;
+  return project.parts.map(p => ({ geom: p.geom, plate: plateOf(p), slot: p.slot ?? null, bodies: p.bodies, part: p, holes: p.holeGeom === p.geom ? p.holes || [] : [], r: compute({ ...base, ...(p.input || {}), overrides: p.overrides || null }, p.geom, ctx) }));
 }
 
 /* Globale Werte = erstes Teil ohne eigenen Slot (dessen Slot wählt der Dialog); haben alle Teile einen

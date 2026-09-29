@@ -2,3 +2,4 @@
 *.log
 docs/handbuch.html
 node_modules/
+__pycache__/

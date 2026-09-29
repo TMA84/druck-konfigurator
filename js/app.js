@@ -12,21 +12,25 @@ document.addEventListener('drop',e=>{
   const files=e.dataTransfer&&e.dataTransfer.files;if(files&&files.length)loadFiles([...files]);
 });
 input.addEventListener('change',()=>{if(input.files.length)loadFiles([...input.files])});
-$('clear').addEventListener('click',()=>{input.value='';project=null;geom=null;$('fileinfo').textContent='Noch keine Datei geladen.';clearModel();update()});
+$('clear').addEventListener('click',()=>{input.value='';project=null;geom=null;$('fileinfo').textContent=t('Noch keine Datei geladen.');clearModel();update()});
 
-const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error('Lesefehler'));r.readAsArrayBuffer(file)});
+const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error(t('Lesefehler')));r.readAsArrayBuffer(file)});
 
 // Eine oder mehrere Dateien (STL, 3MF, ZIP) → Projekt mit Teileliste
 async function loadFiles(files){
-  $('fileinfo').textContent='Lese '+(files.length===1?files[0].name:files.length+' Dateien')+' …';
+  $('fileinfo').textContent=files.length===1?t('Lese {name} …',{name:files[0].name}):t('Lese {n} Dateien …',{n:files.length});
   try{
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
     const imp=importModels(entries,fflate);
     // slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers
-    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null}));
+    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
+      // Farben des Designers (0-basiert): Slot des Objekts, der Körper und der Farb-Modifikatoren – für „Farben des Designers → Slot“ (js/design-ui.js)
+      dSlot:p.extruder?p.extruder-1:null,modSlots:(p.modifiers||[]).map(e=>e-1),paintTris:!!p.paintTris}));
+    parts.forEach((q,i)=>{if(q.bodies)q.bodies.forEach((b,j)=>{const e=imp.parts[i].bodies[j].extruder;b.dSlot=e?e-1:q.dSlot})});
+    if(imp.threemf)imp.threemf.designMap={};
     showProject({name:imp.name,parts,threemf:imp.threemf,notes:imp.notes});
   }catch(e){
-    $('fileinfo').textContent='Modell konnte nicht gelesen werden: '+e.message+'. Bitte die Datei prüfen oder erneut exportieren.';
+    $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg:t(e.message)});
   }
 }
 
@@ -34,9 +38,9 @@ function showProject(p){
   project=p;
   initPartInputs(p.parts);
   const n=p.parts.reduce((s,x)=>s+x.geom.n,0);
-  $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+(p.parts.length>1?p.parts.length+' Teile · ':'')+n.toLocaleString('de-DE')+' Dreiecke'+
-    (p.threemf&&p.threemf.plates.length>1?' · '+p.threemf.plates.length+' Platten':'')+
-    (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>Ursprünglich für: '+esc(p.threemf.settings.printer_settings_id)+'</small>':'');
+  $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+(p.parts.length>1?t('{n} Teile',{n:p.parts.length})+' · ':'')+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())})+
+    (p.threemf&&p.threemf.plates.length>1?' · '+t('{n} Platten',{n:p.threemf.plates.length}):'')+
+    (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>'+t('Ursprünglich für: {name}',{name:esc(p.threemf.settings.printer_settings_id)})+'</small>':'');
   const notes=$('importNotes');notes.textContent=p.notes.join(' ');notes.classList.toggle('hidden',!p.notes.length);
   $('partList').classList.toggle('hidden',p.parts.length<2);
   $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');
@@ -53,15 +57,15 @@ function selectPart(i){
 function renderPartList(){
   const list=$('partList');
   if(!project||project.parts.length<2){list.innerHTML='';return}
-  const th=+$('thresh').value,label={none:'ohne Stützen',few:'wenig Stützen',needed:'Stützen'};
+  const th=+$('thresh').value,label={none:t('ohne Stützen'),few:t('wenig Stützen'),needed:t('Stützen')};
   const slots=typeof slotChoices==='function'?slotChoices():[];
   list.innerHTML=project.parts.map((p,i)=>{
     const g=p.geom,lv=analyze(g,th).level,sel=i===project.selected;
     const sc=p.slot!=null&&slots[p.slot],col=sc&&/^#[0-9a-f]{6}$/i.test(sc.colour)?sc.colour:'#999999';
     const slot=p.slot!=null?'<span class="pslot" style="background:'+col+'"></span>Slot '+(p.slot+1)+' · ':'';
-    const plate=project.threemf&&project.threemf.plates.length>1?'Platte '+p.plate+' · ':'';
+    const plate=project.threemf&&project.threemf.plates.length>1?t('Platte {n}',{n:p.plate})+' · ':'';
     return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
-      '<span class="pmeta">'+slot+plate+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
+      '<span class="pmeta">'+slot+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+(p.painted?t('Farben vom Designer')+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
   }).join('');
 }
 $('partList').addEventListener('click',e=>{const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
@@ -70,16 +74,26 @@ function showModel(g){
   geom=g;
   const n=g.n;
   $('sx').textContent=de(g.x,1)+' mm';$('sy').textContent=de(g.y,1)+' mm';$('sz').textContent=de(g.z,1)+' mm';$('sv').textContent=de(g.vol/1000,1)+' cm³';
-  $('info').textContent=g.name+'  —  '+de(g.x,1)+' × '+de(g.y,1)+' × '+de(g.z,1)+' mm  —  '+n.toLocaleString('de-DE')+' Dreiecke';
+  $('info').textContent=g.name+'  —  '+de(g.x,1)+' × '+de(g.y,1)+' × '+de(g.z,1)+' mm  —  '+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())});
   $('ohBar').classList.remove('hidden');
   // Ohne Renderer bleibt der Hinweis „3D-Ansicht nicht verfügbar“ sichtbar (wie in v4).
   if(Viewer.show(g))$('viewerEmpty').classList.add('hidden');
   Viewer.colorize(+$('thresh').value);
+  showVolume();
   if(miniReady){$('miniView').classList.remove('hidden');MiniView.show(g);MiniView.colorize(+$('thresh').value)}
   update();
 }
+// Bauraum des gewählten Druckers in der 3D-Ansicht; Warnung, wenn das gewählte Teil nicht hineinpasst
+function showVolume(){
+  const tpl=lastResult&&exportTemplate(lastResult.printer.id,lastResult.dSel),g=geom;
+  const vol=tpl?buildVolume(tpl):null,ex=vol&&g?volumeExcess(g,vol):[];
+  Viewer.setVolume(vol,ex.length>0);
+  const w=$('volWarn');
+  w.textContent=ex.length?t('Passt nicht in den Bauraum ({size} mm): {over}. Teil drehen (Lage auf dem Bett) oder in OrcaSlicer skalieren/teilen.',{size:de(vol[0],0)+' × '+de(vol[1],0)+(isFinite(vol[2])?' × '+de(vol[2],0):''),over:ex.join(', ')}):'';
+  w.classList.toggle('hidden',!ex.length);
+}
 function clearModel(){
-  Viewer.clear();
+  Viewer.clear();Viewer.setVolume(null);$('volWarn').classList.add('hidden');
   if(miniReady){MiniView.clear();$('miniView').classList.add('hidden')}
   $('ohBar').classList.add('hidden');$('info').textContent='';
   document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=''});
@@ -132,7 +146,7 @@ menus.forEach(m=>{
   list.addEventListener('click',e=>{
     const item=e.target.closest('button');if(!item||item.disabled)return;
     closeMenus();btn.focus({preventScroll:true});
-    if(item.dataset.toast)toast(item.dataset.toast);
+    if(item.dataset.toast)toast(t(item.dataset.toast));
     else if(item.id==='copyBtn')setTimeout(()=>toast(item.textContent),120);
   });
 });
@@ -158,7 +172,7 @@ document.addEventListener('click',e=>{
 function enhanceHelp(){
   document.querySelectorAll('.help[title]').forEach(el=>{
     el.dataset.tip=el.title;el.removeAttribute('title');
-    el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label','Erklärung: '+el.dataset.tip);
+    el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label',t('Erklärung: {tip}',{tip:el.dataset.tip}));
   });
 }
 let tipOwner=null;
@@ -183,8 +197,8 @@ document.addEventListener('scroll',hideTip,true);
 
 let toastTimer=0;
 function toast(text){
-  const t=$('toast');t.textContent=text;t.classList.add('show');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+  const el=$('toast');el.textContent=text;el.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
 }
 
 /* Drucken: alle Aufklappbereiche öffnen, danach Zustand wiederherstellen */
@@ -197,15 +211,18 @@ window.addEventListener('afterprint',()=>{document.querySelectorAll('details.fol
 
 /* ================= TABS ================= */
 const TAB_KEY='druckKonfigurator.tab';
-const tabs={settings:[$('tabSettings'),$('viewSettings')],'3d':[$('tab3d'),$('view3d')]};
+// Reihenfolge = Arbeitsschritte (Pfeiltasten gehen sie der Reihe nach durch)
+const tabs={'3d':[$('tab3d'),$('view3d')],settings:[$('tabSettings'),$('viewSettings')],slice:[$('tabSlice'),$('viewSlice')],printer:[$('tabPrinter'),$('viewPrinter')]};
 function setTab(name){
   Object.entries(tabs).forEach(([k,[btn,view]])=>{const on=k===name;btn.setAttribute('aria-selected',String(on));view.hidden=!on});
   document.body.dataset.tab=name;
   try{localStorage.setItem(TAB_KEY,name)}catch(e){/* nur Komfort */}
+  if(typeof onWorkbenchTab==='function')onWorkbenchTab(name==='printer');
+  if(name==='slice'&&typeof refreshSlicePreview==='function')refreshSlicePreview();
 }
 Object.entries(tabs).forEach(([k,[btn]])=>btn.addEventListener('click',()=>setTab(k)));
 document.querySelector('.tabs').addEventListener('keydown',e=>{
-  if(['ArrowLeft','ArrowRight'].includes(e.key)){const next=document.body.dataset.tab==='3d'?'settings':'3d';setTab(next);tabs[next][0].focus()}
+  if(['ArrowLeft','ArrowRight'].includes(e.key)){const order=Object.keys(tabs),i=order.indexOf(document.body.dataset.tab),next=order[(i+(e.key==='ArrowRight'?1:order.length-1))%order.length];setTab(next);tabs[next][0].focus()}
 });
 
 /* ================= VIEWER-BEDIENUNG (aus 3dView) ================= */
@@ -230,8 +247,8 @@ $('clipSlider').addEventListener('input',()=>Viewer.setClipFraction(Number($('cl
 let miniReady=false;
 if(MiniView.available()){try{MiniView.init($('miniView'));miniReady=true}catch(e){/* ohne Vorschau weiter */}}
 if(Viewer.available()){
-  try{Viewer.init($('stage'))}catch(e){$('viewerEmpty').textContent='3D-Ansicht konnte nicht gestartet werden. Die Analyse funktioniert trotzdem.'}
-}else $('viewerEmpty').textContent='3D-Ansicht nicht verfügbar (three.js fehlt im Ordner vendor/). Die Analyse und alle Empfehlungen funktionieren trotzdem.';
+  try{Viewer.init($('stage'))}catch(e){$('viewerEmpty').textContent=t('3D-Ansicht konnte nicht gestartet werden. Die Analyse funktioniert trotzdem.')}
+}else $('viewerEmpty').textContent=t('3D-Ansicht nicht verfügbar (three.js fehlt im Ordner vendor/). Die Analyse und alle Empfehlungen funktionieren trotzdem.');
 loadStore();
 if(store.last.printer&&PRINTERS[store.last.printer])$('printer').value=store.last.printer;
 fillNozzleMaterialSelect();
@@ -240,7 +257,8 @@ if(store.last.nozD&&NOZ[nkey(store.last.nozD)])$('nozD').value=store.last.nozD;
 if(store.last.nozM&&NOZZLE_MATERIALS[store.last.nozM]&&currentPrinter().nozzleOptions.includes(store.last.nozM))$('nozM').value=store.last.nozM;
 if(!storageOK)persist();
 syncPrinterSwitch();
-try{if(localStorage.getItem(TAB_KEY)==='3d')setTab('3d')}catch(e){/* nur Komfort */}
+// Start: zuletzt genutzter Schritt, beim ersten Mal „Modell“
+try{const t=localStorage.getItem(TAB_KEY);setTab(tabs[t]?t:'3d')}catch(e){setTab('3d')}
 
 /* Haftungsausschluss: beim ersten Start (und nach inhaltlicher Änderung, neue Versionsnummer) einmal bestätigen.
    Ist kein Speichern möglich, erscheint er bei jedem Start – lieber einmal zu oft als gar nicht. */

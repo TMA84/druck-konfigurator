@@ -47,6 +47,17 @@ check('Stiel + Hut (berühren sich) = 1 Teil', r.parts.length === 1, r.parts.len
 r = imp([{ name: 'ueberlapp.stl', bytes: stlBytes([...boxTris(0, 0, 0, 20, 20, 10), ...boxTris(15, 5, 0, 40, 15, 10), ...boxTris(60, 0, 0, 70, 10, 10)]) }]);
 check('Überlappende Körper verschmelzen, entfernter bleibt eigenes Teil', r.parts.length === 2 && dims(r.parts[0].pos) === '40x20x10', r.parts.map(p => dims(p.pos)).join(' '));
 
+// 3b) Körper eines Teils (Mehrfarbdruck): berührende Körper werden Körper, ein Hohlraum nicht
+r = imp([{ name: 'pilz.stl', bytes: stlBytes([...boxTris(0, 0, 20, 40, 40, 25), ...boxTris(15, 15, 0, 25, 25, 20)]) }]);
+{ const b = r.parts[0].bodies || [];
+  check('Stiel + Hut = 2 Körper', b.length === 2 && b[0].count === 12 && b[1].count === 12 && b.reduce((s, x) => s + x.count, 0) * 9 === r.parts[0].pos.length, JSON.stringify(b));
+  // Körper liegen hintereinander in pos: der erste Bereich ist der Hut (vorne links zuerst)
+  check('Körper-Bereiche passen', b.length === 2 && dims(r.parts[0].pos.subarray(0, b[0].count * 9)) === '40x40x5', dims(r.parts[0].pos.subarray(0, 108))); }
+r = imp([{ name: 'hohl.stl', bytes: stlBytes([...boxTris(0, 0, 0, 30, 30, 30), ...boxTris(2, 2, 2, 28, 28, 28, true)]) }]);
+check('Hohlkörper = 1 Körper', !r.parts[0].bodies, JSON.stringify(r.parts[0].bodies));
+r = imp([{ name: 'wuerfel.stl', bytes: stlBytes(boxTris(0, 0, 0, 10, 10, 10)) }]);
+check('Einzelkörper ohne Körperliste', !r.parts[0].bodies);
+
 // 4) Mehrere Dateien + ZIP
 const zipped = fflate.zipSync({ 'modell/a.stl': stlBytes(boxTris(0, 0, 0, 5, 5, 5)), 'modell/b.stl': stlBytes(boxTris(0, 0, 0, 6, 6, 6)), '__MACOSX/modell/._a.stl': new Uint8Array([1, 2]), 'liesmich.txt': new Uint8Array([65]) });
 r = imp([{ name: 'paket.zip', bytes: zipped }, { name: 'c.stl', bytes: stlBytes(boxTris(0, 0, 0, 7, 7, 7)) }]);
@@ -85,6 +96,17 @@ check('3MF Lage (Mitte 100/50, unten 0)', hg && Math.abs((hg.mn[0] + hg.mx[0]) /
 check('3MF Slot/Platte', halter && halter.extruder === 2 && halter.plate === 1 && knopf.extruder === 4 && knopf.plate === 2);
 check('3MF Modifier-Hinweis', r.notes.some(n => /Modifier/.test(n)), r.notes.join('|'));
 check('3MF threemf', r.threemf && r.threemf.plates.length === 2 && r.threemf.settings.printer_settings_id.indexOf('Bambu') === 0);
+
+// 5b) 3MF-Objekt mit zwei Bauteilen und eigenem Slot je Bauteil → ein Teil mit zwei Körpern
+{ const root2 = '<?xml version="1.0"?><model unit="millimeter" xmlns:p="x"><resources>' +
+    '<object id="3" type="model"><components><component p:path="/3D/Objects/object_1.model" objectid="1" transform="1 0 0 0 1 0 0 0 1 0 0 0"/><component p:path="/3D/Objects/object_1.model" objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 3"/></components></object>' +
+    '</resources><build><item objectid="3" transform="1 0 0 0 1 0 0 0 1 50 50 2"/></build></model>';
+  const set2 = '<?xml version="1.0"?><config><object id="3"><metadata key="name" value="Schild"/><metadata key="extruder" value="1"/>' +
+    '<part id="1" subtype="normal_part"><metadata key="name" value="Platte"/></part><part id="2" subtype="normal_part"><metadata key="name" value="Schrift"/><metadata key="extruder" value="3"/></part></object></config>';
+  r = imp([{ name: 'schild.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(root2), '3D/Objects/object_1.model': u8(objFile), 'Metadata/model_settings.config': u8(set2) }) }]);
+  const b = (r.parts[0] || {}).bodies || [];
+  check('3MF Bauteile = Körper', r.parts.length === 1 && b.length === 2 && b.map(x => x.name).join() === 'Platte,Schrift' && b[0].extruder === null && b[1].extruder === 3 && b[1].partId === '2', JSON.stringify(b));
+}
 
 // 6) ZIP mit einer 3MF und STLs → 3MF hat Vorrang
 r = imp([{ name: 'mw.zip', bytes: fflate.zipSync({ 'projekt.3mf': tmf, 'teil.stl': stlBytes(boxTris(0, 0, 0, 5, 5, 5)) }) }]);

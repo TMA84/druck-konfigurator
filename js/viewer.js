@@ -8,7 +8,7 @@ const Viewer = (() => {
   const CLICK_TOLERANCE_PX = 5;
 
   let renderer = null, scene, camera, controls, stage;
-  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100;
+  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100, volBox = null, volume = null;
   let wireframeOn = false;
   const clip = { on: false, axis: 'x', fraction: 0, plane: null, helper: null };
   const measure = { on: false, points: [], markers: [], line: null, onChange: () => {} };
@@ -66,6 +66,21 @@ const Viewer = (() => {
     axes.scale.setScalar(size * 0.75);
   }
 
+  /* Bauraum des Druckers als Drahtbox um das Teil (Mitte wie das Teil, Boden z = 0); rot, wenn das Teil
+     nicht hineinpasst. vol = [Breite, Tiefe, Höhe] oder null. */
+  function setVolume(vol, over) {
+    volume = vol;
+    if (!renderer) return;
+    if (volBox) { scene.remove(volBox); volBox.geometry.dispose(); volBox.material.dispose(); volBox = null; }
+    if (!vol) return;
+    const h = isFinite(vol[2]) ? vol[2] : Math.max(vol[0], vol[1]);
+    const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol[0], vol[1], h));
+    volBox = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: over ? 0xe5514f : 0x5f7d9c, transparent: true, opacity: over ? 0.9 : 0.55 }));
+    volBox.position.set(0, 0, h / 2);
+    scene.add(volBox);
+    if (camera) { camera.far = Math.max(camera.far, Math.max(vol[0], vol[1], h) * 20); camera.updateProjectionMatrix(); }
+  }
+
   function disposeMesh() {
     if (!mesh) return;
     scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null;
@@ -108,7 +123,9 @@ const Viewer = (() => {
   }
 
   // Überhang-Einfärbung, unverändert aus v4.
+  let paint = null, lastTh = 45;
   function colorize(th) {
+    lastTh = th;
     if (!mesh || !geomRef) return;
     const geom = geomRef, c = mesh.geometry.attributes.color.array;
     for (let i = 0; i < geom.n; i++) {
@@ -117,8 +134,12 @@ const Viewer = (() => {
       const col = geom.bed[i] ? COLORS.bed : inner ? COLORS.ok : a > th ? COLORS.over : (a > th * .6 && a > 0) ? COLORS.near : COLORS.ok;
       for (let v = 0; v < 3; v++) { const k = (i * 3 + v) * 3; c[k] = col[0]; c[k + 1] = col[1]; c[k + 2] = col[2]; }
     }
+    // Körperfarben (Mehrfarbdruck) überdecken die Überhangfarben: [{start, count, rgb:[r,g,b]}]
+    if (paint) for (const b of paint) for (let i = b.start; i < b.start + b.count && i < geom.n; i++)
+      for (let v = 0; v < 3; v++) { const k = (i * 3 + v) * 3; c[k] = b.rgb[0]; c[k + 1] = b.rgb[1]; c[k + 2] = b.rgb[2]; }
     mesh.geometry.attributes.color.needsUpdate = true;
   }
+  function setPaint(p) { paint = p && p.length ? p : null; colorize(lastTh); }
 
   function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; }
   function setAxes(on) { if (axes) axes.visible = on; }
@@ -152,7 +173,7 @@ const Viewer = (() => {
     measure.markers = [];
     if (measure.line) { scene.remove(measure.line); measure.line.geometry.dispose(); measure.line.material.dispose(); measure.line = null; }
     measure.points = [];
-    measure.onChange(measure.on ? 'Ersten Punkt anklicken …' : '');
+    measure.onChange(measure.on ? t('Ersten Punkt anklicken …') : '');
   }
   function addMeasurePoint(point) {
     if (measure.points.length >= 2) clearMeasurement();
@@ -164,9 +185,9 @@ const Viewer = (() => {
     if (measure.points.length === 2) {
       measure.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(measure.points), new THREE.LineBasicMaterial({ color: MARKER_COLOR }));
       scene.add(measure.line);
-      measure.onChange(`Abstand: ${measure.points[0].distanceTo(measure.points[1]).toFixed(2)} mm`);
+      measure.onChange(t('Abstand: {d} mm', { d: measure.points[0].distanceTo(measure.points[1]).toFixed(2) }));
     } else {
-      measure.onChange('Zweiten Punkt anklicken …');
+      measure.onChange(t('Zweiten Punkt anklicken …'));
     }
   }
   function setMeasure(on, onChange) {
@@ -198,5 +219,5 @@ const Viewer = (() => {
     });
   }
 
-  return { available, init, show, clear, colorize, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
+  return { available, init, show, clear, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
 })();

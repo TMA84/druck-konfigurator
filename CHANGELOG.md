@@ -2,6 +2,183 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.1.2] – 2026-09-29
+
+### Neu
+- **Favicon:** Druckbett mit Schichten in Orange (`img/favicon.svg`, PNG 32 px und Apple-Touch-Icon 180 px), dazu Theme-Farbe für Browserleisten.
+
+## [9.1.1] – 2026-09-29
+
+### Behoben
+- **Licht und Trocknen meldeten „Drucker hat den Befehl nicht bestätigt“**, obwohl der Drucker die Einstellung übernahm. Die Werksfirmware 2.7.2.7 bestätigt diese Befehle ohne die Nachrichten-Nummer der Anfrage; jetzt gilt auch die nächste Antwort derselben Art und Aktion als Bestätigung. Der Nachbau in `tests/lan.py` antwortet dafür wie die echte Firmware (49/49).
+
+## [9.1.0] – 2026-09-29
+
+### Neu
+- **Filamentverwaltung „Spulen & Restmengen“** (⚙ Einstellungen und ACE-Karte im Tab Drucker). Der Server erkennt die Spulen in der ACE automatisch (RFID-Artikelnummer, Typ, Farbe) – neu eingelegt, herausgenommen, wieder eingelegt – und **errechnet die Restmenge**: Füllgewicht − Verbrauch − Spülabfall. Den Verbrauch zählt er beim Drucken selbst mit (vom Drucker gemeldete Millimeter, zugeordnet dem Slot im Druckkopf, Dichte je Typ; Spülabfall je Farbwechsel wie in ③), auch bei Drucken aus anderen Programmen und ohne offene Seite (`tools/spools.py`, Daten in `~/.druck-konfigurator/spools.json`, im Container im Volume `/data`).
+- Restmenge auf den ACE-Kacheln und in der Slot-Liste; Warnung in ③ und im Senden-Dialog, wenn eine Platte mehr braucht, als auf der Spule ist. Korrektur durch Wiegen, eigene Spulen ohne RFID, Archiv, Verbrauch der letzten Drucke. Spulenpreis (€/kg) fließt in die Kosten.
+- Die ACE meldet keine Restmenge (`consumables_percent` ist bei Firmware 2.7.2.7 immer 0) – deshalb die Rechnung.
+
+### Geprüft
+- `tests/spools.py` 25/25 (Erkennen, Umstecken, Wiedereinlegen, Verbrauch, Farbwechsel, Neustart mitten im Druck, Wiegen, Tracker). Am echten Kobra S1 (nur lesend): vier Spulen erkannt, laufender Druck zählt auf die ASA-Spule.
+
+## [9.0.0] – 2026-09-29
+
+### Neu
+- **Englische Oberfläche.** Umschalter **DE / EN** oben rechts; ohne Auswahl nach Browsersprache. Alle Texte der Seite, Dialoge, Datenblatt, Kosten, Vorschau, Warteschlange, Werkbank und die Meldungen des Servers. Technik: `t('Deutscher Text {x}', {x})` (js/util.js), Wörterbücher `js/i18n/en-*.js`, feste Seitentexte übersetzt `js/i18n/dom.js` beim Laden. Werte, die in die 3MF oder zum Drucker gehen, bleiben unverändert; Zahlen im Format der Sprache.
+- **Modernes Erscheinungsbild** (`css/modern.css`): ruhige Flächen und Karten, Systemschrift, schlanke Kopfzeile, Tabs mit Unterstrich, weichere Felder und Knöpfe.
+- **Dunkelmodus:** ☀ / A / ☾ oben rechts – hell, automatisch (wie das System) oder dunkel (`js/theme.js`).
+
+### Geprüft
+- Englisch im Browser: alle vier Tabs und alle Dialoge ohne deutsche Reste (automatische Suche), Slicen mit Kosten je Platte. Deutsch: Bedientest 112/112, alle Node-Tests, 3MF-Regression gegen OrcaSlicer ok; Datenblatt-Ausgaben byte-gleich zu vorher (≈ 13.500 Vergleiche).
+
+## [8.5.0] – 2026-09-29
+
+### Neu
+- **Kosten auch im Slicer:** Die 3MF enthält die Preise aus „Preise & Sätze“ – `filament_cost` je Slot (Filament- bzw. Typpreis) und `time_cost` (Strom + Verschleiß je Stunde). OrcaSlicer und AnycubicSlicerNext rechnen damit selbst (ohne Spülabfall, Aufschlag, MwSt.).
+
+### Geprüft
+- **AnycubicSlicerNext 1.4.1.1** (Orca 2.3.1) öffnet und slict die 3MF des Tools: eine und zwei Platten, alle geprüften Werte gleich wie in OrcaSlicer 2.4.2 (Temperaturen, Schichthöhe, Wände, Füllung, Stützen, Slot-Farben, Wechselzeit, Turm); Gramm/Zeit leicht anders (8,09 statt 7,88 g, 51 statt 55 min). Mit Kostenwerten: Filamentkosten 0,35 € aus den eigenen Preisen.
+- `tests/slice.py` prüft die Kostenwerte im G-Code (18/18), `tests/verify-3mf.js` unverändert ok.
+
+## [8.4.0] – 2026-09-28
+
+### Neu
+- **Farben des Designers → Slot** (① Modell, Makerworld-/Orca-3MF): jede Farbe des Designers – Objekt, Körper oder Farb-Modifikator wie ein Schriftzug – auf einen beliebigen ACE-Slot legen. Modifikatoren werden in der 3MF umgeschrieben; Bemalung mit dem Farbpinsel bleibt beim Slot des Designers (Hinweis).
+- **Prüfung vor dem Slicen:** Mischt eine Platte PLA/TPU mit PETG/ABS/ASA, meldet das Tool das gleich verständlich („Slot 2 PLA zusammen mit Slot 1 ABS …“) mit Lösungsweg, statt Orca erst scheitern zu lassen. Auch auf der Plattenkarte.
+- **Filament aus dem ACE übernehmen:** Knopf bei „Slot 1: braucht ABS, eingelegt ist ASA“ stellt die Teile auf das Filament im Slot um (nur sichtbar, wenn er etwas ändert).
+
+### Behoben
+- Orcas Meldung zu unverträglichen Düsentemperaturen kam teils als „unbekannter Fehler“ an.
+- **Slice-Vorschau zeigte nach dem Laden eines neuen Modells noch das alte.** Jetzt verwirft ein neues Modell das letzte Slice-Ergebnis sofort (auch ein noch laufendes), die Vorschau ist leer bis zum neuen Slicen; schlägt das Slicen fehl, bleibt sie leer. Zeigt die Vorschau einen älteren Stand desselben Projekts, steht „älterer Stand“ daneben.
+
+## [8.3.0] – 2026-09-28
+
+### Neu
+- **Platten-Übersicht** (① Modell): je Platte eine Karte mit Draufsicht aufs Bett, Teilen, genutzten Slots und Hinweis, wenn ein Slot anderes Filament braucht als eingelegt. Teile per Auswahl auf eine andere oder **neue Platte** verschieben; **Platzsparend anordnen** verteilt wieder automatisch. **Anzahl** je Teil (Kopien teilen Einstellungen, Slot und Farben). Makerworld-3MF: Platten des Designers, nur Anzeige.
+- **Kosten und Zeit je Platte** (③): Tabelle mit Zeit, Farbwechseln, Filament und Kosten je Platte; Klick zeigt die Platte in der Vorschau.
+- **Nur geänderte Platten neu slicen:** Ändert sich nur eine Platte, slict OrcaSlicer nur diese (`--slice N`), die übrigen G-Codes übernimmt der Server aus dem letzten Stand (`/api/slice?plates=…&count=…&reuse=…`). Fehlt der alte Stand, wird alles geslict.
+- **Reihenfolge nach Filament:** Empfehlung, erst alle Platten mit dem eingelegten Filament zu drucken und dann gruppiert nach nötigem Spulentausch.
+- **Druck-Warteschlange** (④ Drucker): „Alle Platten nacheinander …“ legt die Platten in dieser Reihenfolge an. Ist eine Platte fertig, meldet das Tool **„Bett abräumen“** (auch als Browser-Benachrichtigung und ● im Fenstertitel); die nächste startet erst nach Klick über den Senden-Dialog mit Slot-Prüfung. Restzeit aller Platten, Überspringen, Nochmal; abgebrochene Platten kommen zurück in die Warteschlange. Überwacht auch, wenn ein anderer Tab offen ist.
+- **Bauraum beachten:** 3D-Ansicht zeigt den Bauraum des Druckers (Kobra S1: 250 × 250 × 250 mm) als Drahtbox, rot mit Hinweis, wenn das Teil nicht hineinpasst – jetzt auch in der **Höhe**. Plattenübersicht, 3MF-Dialog und Makerworld-Platten prüfen ebenfalls die Höhe. Die Slice-Vorschau zeigt das Druckbett mit Rand.
+
+### Geprüft
+- `tests/plates.js` (22 Prüfungen: geänderte Platten, Filamentbedarf, Reihenfolge, Warteschlange, Plattenzuordnung, Überlauf). `tests/slice.py` mit echtem OrcaSlicer: nur Platte 2 neu geslict, Platte 1 übernommen, Summe gleich (16/16). `tests/verify-3mf.js` unverändert ok. Im Browser: Kopien, Verschieben, Bauraum-Warnung (280 mm hoch), Teil-Neuslicen „1 von 2“, Warteschlange mit simuliertem Druckerstand (kein Befehl an den echten Drucker).
+
+## [8.2.0] – 2026-09-28
+
+### Neu
+- **Werte für diesen Auftrag anpassen** (② Druckwerte): Düse, Bett, Schichthöhe, Wände, Deck-/Bodenschichten, Fülldichte, Füllmuster, Geschwindigkeiten, Lüfter, Stützen, Brim – je Teil, Vorschlag daneben, leer = Vorschlag. Die Anpassung wirkt in `compute()` selbst, dadurch gleich in Datenblatt (markiert, mit Vorschlag), 3MF, Slicen, Kosten und Drucken. Auf Wunsch für alle Teile.
+- 3MF: weitere Füllmuster (kubisch, Gitter, Waben, Linien, Dreiecke, Kreuzschraffur, Blitz).
+
+### Geprüft
+- `tests/overrides.js` (13 Prüfungen: 3MF-Werte, Markierung, Vorschlag bleibt, gleicher Wert ≠ Abweichung, Stützen aus). Im Browser: Anpassung → Datenblatt markiert, 3MF mit 5 Wänden/50 %/kubisch/225 °C, Kosten automatisch neu (4,26 → 6,81 g).
+
+## [8.1.0] – 2026-09-28
+
+### Geändert
+- **Drucker-Seite neu gestaltet:** Statusleiste (Drucker, Firmware, Zustand, Verbindung, Licht) · Druckauftrag groß mit lesbarem Namen (aus „0928-1842-Name_plate(01)_ASA_0.16_…“ wird „Name“ + „Platte 1 · ASA · 0,16 mm“), Fortschritt, Schicht, **fertig um**, Filament bisher · Kamera groß · Temperaturen mit Heizbalken · ACE als Slot-Kacheln in Filamentfarbe mit Trocknen-Fortschritt · Achsen während eines Drucks nur als Hinweis. Knöpfe ohne Auftrag ausgeblendet.
+
+### Behoben
+- **Slots aus der ACE nach einem Fehlversuch:** Scheiterte das Lesen (z. B. Container ohne Heimnetz), blieb die Seite still bei den eigenen Angaben. Jetzt neuer Versuch alle 30 s und beim Zurückkehren ins Fenster; Auswahllisten zeigen „(eigene Angabe)“, solange die Werte nicht vom Drucker stammen.
+
+## [8.0.0] – 2026-09-28
+
+### Geändert
+- **Neue Aufteilung in Arbeitsschritte:** ① Modell (große 3D-Ansicht mit Teileliste, Lage, Mehrfarbig, Bohrlöchern daneben) · ② Druckwerte (Werte je Teil mit Teileauswahl, Datenblatt; Orca-Reihenfolge eingeklappt) · ③ Slicen & Kosten (Kosten, Ausgabe mit „Drucken …“ und 3MF, Slots, Spülmenge; Slice-Vorschau eingebettet statt als Fenster) · ④ Drucker. Registerkarten zeigen „geladen“, Gesamtpreis und Druckfortschritt.
+- **Menüs zusammengefasst:** „Datei“ (Modell, 3MF, weitere Exporte) und „⚙ Einstellungen“ in Gruppen Filamente / Drucker / Farben & Kosten; das Menü „Export“ entfällt.
+- Beim ersten Start öffnet der Schritt „Modell“.
+
+### Geprüft
+- Bedientest `tests/ui-smoke.js`: 112 von 112 (mit frischem Browserspeicher).
+
+## [7.5.0] – 2026-09-28
+
+### Neu
+- **Filamentpreis je Typ** (PLA, PETG, ABS, ASA, TPU; „Preise & Sätze“). Reihenfolge: Einzelpreis des Filaments → Typpreis → Preis für andere. Slots ohne Filamentprofil (Farben des Designers) nach dem Typ, den die ACE meldet („PLA-CF“ → PLA). Bestehende Preise der Standardfilamente werden einmalig zu Typpreisen.
+- **Kosten automatisch neu berechnen** nach jeder Änderung an Einstellungen oder Modell (Schalter im Abschnitt Kosten, Standard an): 1,5 s Verzögerung, nie zwei Slice-Aufträge gleichzeitig, fehlgeschlagene Stände werden nicht endlos wiederholt.
+
+## [7.4.0] – 2026-09-28
+
+### Neu
+- **Direkt drucken:** „Drucken …“ (Kosten) bzw. „An Drucker senden …“ (Slice-Vorschau) lädt den G-Code einer geslicten Platte auf den Kobra S1 und startet ihn. Dialog mit Zustand des Druckers, Zuordnung Werkzeug → ACE-Slot (Warnung bei leerem Slot oder anderem Material) und Optionen (Bett vermessen, Flusskalibrierung, Zeitraffer). Server: Upload als multipart an die signierte Adresse aus `/info`, Start `print`/`start` im Kanal „slicer“ mit Datei, Größe, MD5 und Slotzuordnung (`/api/anycubic/print`); nur wenn der Drucker frei ist und der G-Code für das verbundene Modell geslict wurde. Protokollfakten aus anycubic-orca-plugin und kobra-connect, eigene Umsetzung.
+
+### Geändert
+- Auftragsnummer −1 ist bei LAN-Drucken der Normalfall (auch bei Anycubics Slicer) – der Hinweis dazu entfällt.
+
+### Geprüft
+- `tests/lan.py` (47 Prüfungen, Nachbau): Upload mit Token/multipart/Länge, Start im Kanal slicer mit Datei, Größe, MD5, taskid −1, Slotzuordnung und Optionen, zweiter Druck abgelehnt, G-Code für anderes Modell abgelehnt. Im Browser gegen den Nachbau: Slicen, Dialog mit Warnung, Senden, Werkbank zeigt „heizt vor“. **Am echten Drucker noch nicht gedruckt.**
+
+## [7.3.0] – 2026-09-28
+
+### Neu
+- **Drucker-Werkbank** (Tab „Drucker“, Kobra S1 mit Werksfirmware im LAN-Modus): Druckauftrag (Fortschritt, Schicht, Zeiten; Pausieren, Fortsetzen, Abbrechen mit Rückfrage), Kamera (HTTP-FLV über den Server, Wiedergabe mit flv.js), Temperaturen mit Vorheiz-Voreinstellungen, drei Lüfter, Licht, Achsen (Fahren, Referenzieren, Motoren aus), ACE (Laden/Zurückziehen je Slot, Nachfüllen, Trocknen), Druckerdaten und Rohdaten.
+- **Stehende Verbindung je Drucker** im Server (`PrinterLink`): eine Anmeldung, Abfrage alle 5 s, Befehle mit Bestätigung, neue Anmeldung bei Abbruch, Ende nach 10 min ohne Zugriff. Belegung und Werkbank nutzen sie gemeinsam.
+- Befehle werden auf dem Server geprüft und die Nutzdaten dort gebaut: nur freigegebene Befehle, Grenzen (Düse ≤ 300 °C, Bett ≤ 110 °C, Achsweg ≤ 50 mm, Trocknen ≤ 70 °C/24 h), Achsen und Laden während eines Drucks gesperrt, Pause/Abbruch nur mit der Auftragsnummer des laufenden Drucks.
+
+### Geprüft
+- `tests/lan.py` (39 Prüfungen, Nachbau): Temperaturen, Lüfter, Licht, Achsen, Grenzen, Sperre während des Drucks, Pause mit Auftragsnummer. Bedientest im Browser gegen den Nachbau. Am echten Kobra S1 (Firmware 2.7.2.7) während eines laufenden Drucks nur gelesen: Auftrag, Temperaturen, Lüfter, Licht, ACE (trocknet) – Befehle nicht am echten Drucker ausgelöst.
+
+
+## [7.2.0] – 2026-09-28
+
+### Neu
+- **Slice-Vorschau** (Kosten → „Slice-Vorschau“): der von OrcaSlicer erzeugte G-Code als Schichtansicht im Tool – je Platte, Schichtregler, „nur diese Schicht“, Farben nach Linienart oder nach Filament (Slotfarben der ACE), Legende zum Ausblenden, G-Code-Download. Der Server hebt die letzten fünf Aufträge auf und liefert je Platte eine kompakte Vorschau (`tools/gcode_preview.py`: nur Druckbahnen, gerade Bahnen zusammengefasst, 16-bit-Koordinaten – z. B. 27,5 MB G-Code → 9,5 MB).
+
+### Geprüft
+- `tests/preview.py` (relative/absolute Extrusion, Bögen, Schichten, Werkzeuge). Im Browser mit einem Makerworld-Projekt (4 Platten, 680 000 Bahnen je Platte): Schichten, Filamentfarben, Schrift des Designers in Slot 2 sichtbar.
+
+## [7.1.0] – 2026-09-28
+
+### Neu
+- **Kostenkalkulation** (Tab „Einstellungen“ → Kosten): Die 3MF wird auf dem Server exakt mit der OrcaSlicer-Kommandozeile geslict (`/api/slice`, `tools/slicer.py`); daraus Filament je Slot, Spülabfall der ACE, Strom, Verschleiß, optional Aufschlag und MwSt. Preise je Filament und Sätze unter „Preise & Sätze …“; Änderungen rechnen sofort neu, Projektänderungen markieren das Ergebnis als veraltet.
+- **Container mit OrcaSlicer 2.4.2** (Ubuntu 24.04, x86_64 und aarch64, ohne Bildschirm) – rund 1,5 GB.
+
+### Behoben
+- **Makerworld-Projekte ließen sich nicht slicen** (Kostenkalkulation, Orca-Kommandozeile): „File Version 2.7.1.62 not supported by current cli version 2.4.2“. Die Umstellung setzt jetzt die Dateiversion der eigenen Vorlage und die OrcaSlicer-Angabe; Geometrie, Platten und Farben bleiben.
+- **Reinigungsturm auf dem Teil** („gcode path conflicts found between WipeTower and …“): Die Turmposition wird je Platte mit mehreren Farben frei gesucht; notfalls werden die Teile nach vorne links gerückt, sonst ohne Turm (Hinweis). Gilt für neue Exporte und Makerworld-Umstellungen.
+- **Farben des Designers erkannt:** Modifikatoren mit eigenem Slot (z. B. Text/Logo) und bemalte Flächen zählen als mehrfarbig (Teileliste: „Farben vom Designer“).
+- Fehlermeldungen beim Slicen enthalten Orcas eigentliche Fehlerzeilen; der letzte fehlgeschlagene Auftrag wird zur Fehlersuche aufgehoben (`SLICE_DEBUG_DIR`).
+- **3MF: Temperaturbereich je Filament** (`nozzle_temperature_range_low/high`) wird jetzt aus dem Datenblatt geschrieben. Bisher blieb der PLA-Bereich der Vorlage stehen, und Orca verweigerte Mehrfarbdrucke mit ASA/ABS/PETG („nozzle temperatures are incompatible“).
+- Export-Dialog markiert auch **Körper**, deren Slot ein anderes Material enthält.
+- Orcas Meldung zu unverträglichen Temperaturen (z. B. PLA + ASA) erscheint verständlich auf Deutsch.
+
+### Geprüft
+- `tests/slice.py` (Mac-Orca und im Container: 13,18 g, 1 Wechsel, 55 min – gleiche Werte), `tests/costs.js`, `tests/verify-3mf.js` (Temperaturbereich im G-Code). PLA + ASA wird von Orca abgelehnt, ASA + ABS geslict.
+
+## [7.0.0] – 2026-09-28
+
+### Geändert
+- **Nur noch Anycubic-Drucker** in der Auswahl (Kobra S1 und die Anycubic-Modelle aus den Orca-Profilen). Snapmaker U1 und die übrigen Hersteller bleiben im Code, sind aber ausgeblendet (`js/config.js`; `index.html?alle-drucker` zeigt alles).
+
+### Neu
+- **Kobra S1 mit Werksfirmware (LAN-Modus):** Der Server meldet sich wie Anycubics Slicer am Drucker an (HTTP 18910, MQTT über TLS 9883) und liest die ACE-Belegung. Schreiben lassen sich Einstellungen: Slot-Filament/-Farbe („Auch am Drucker speichern“ in „Belegung eintragen“) und „Automatisch nachfüllen“. Keine Druck-, Bewegungs- oder Heizbefehle; nur Drucker mit privater IP-Adresse. Verbindung wählbar: Automatisch / Werksfirmware / Rinkhals (Moonraker).
+- **Container:** `Dockerfile` und `docker-compose.yml` für NAS/Heimserver (`KONFIGURATOR_HOST=0.0.0.0`). Neue Server-API `/api/health`, `/api/anycubic/status`, `/api/anycubic/command`.
+
+### Neu (Einstellungen)
+- **Im Tab „Einstellungen“** (linke Spalte): Filament-Slots mit Herkunft (vom Drucker / überschrieben / eigene Angabe) und Farbwechsel & Spülmenge mit Schätzung für das geladene Projekt. Mit eingerichteter Verbindung wird die ACE beim Start einmal gelesen.
+- **Profile → Filament-Slots …:** Material und Farbe je Slot. Mit Verbindung aus der ACE gelesen, je Slot **überschreibbar** (bleibt auch nach erneutem Auslesen); ohne Verbindung eigene Angabe. Überschriebene Slots lassen sich bei Werksfirmware in die ACE schreiben. Ersetzt „Belegung eintragen“ im Export-Dialog („Slots bearbeiten“ öffnet denselben Dialog).
+- **Profile → Farbwechsel & Spülmenge …:** Spülmenge am Drucker und optional eigene Messwerte (Abfall und Zeit je Wechsel) für Schätzung und Wechselzeit in der 3MF.
+
+### Behoben
+- **Drucker-Verbindung ging ohne „Speichern“ verloren:** Ein erfolgreicher Test übernimmt die Verbindung jetzt automatisch. Ohne Verbindung zeigt der Abschnitt „Filament-Slots“ im Tab Einstellungen ein IP-Feld mit „Verbinden“.
+- **Am echten Kobra S1 (Firmware 2.7.2.7) geprüft:** ACE mit 4 RFID-Slots wird gelesen. „Geladen“ nur noch laut `loaded_slot` – status 5 bedeutet dort bei allen belegten Slots nur „bereit“. Verbindungsfehler nennen den Grund (abgelehnt / keine Antwort) und werden einmal wiederholt.
+- **Mehrfarbig über alle Platten:** Steht dasselbe 3MF-Objekt auf mehreren Platten, gelten Körper-Slots, Slot und Werte jetzt für alle Platzierungen. Bisher übernahm der Export nur die erste Platzierung – Farben, die auf Platte 2 gewählt wurden, gingen verloren.
+
+### Geprüft
+- `tests/lan.py`: Handshake, Entschlüsselung, MQTT über TLS mit selbst signiertem Zertifikat, Belegung, Slot schreiben, Nachfüllen, abgelehnte Befehle – gegen einen nachgebauten Kobra S1 (26 Prüfungen), auch im Container. Bedientest im Browser gegen den Nachbau (`python tests/lan.py --serve`). **Noch nicht am echten Drucker geprüft.**
+
+## [6.3.0] – 2026-09-28
+
+### Neu
+- **Mehrfarbig – mehrere Farben in einem Teil:** Körper eines Teils (berührende Körper einer STL, Bauteile eines 3MF-Objekts) bekommen je einen eigenen Slot. Kasten „Mehrfarbig“ in der Modellkarte mit Auswahl je Körper, Hervorheben in der Vorschau und „Farben zeigen“. In der 3MF wird jeder Körper ein eigenes Orca-Bauteil mit eigenem Slot; bei Makerworld-3MF wird der Slot je Bauteil in der Originaldatei gesetzt.
+- **Dateien zu einem Teil vereinen** (z. B. eine STL je Farbe) und wieder **trennen**.
+- Hohlräume (nach innen gerichtete Hüllen) werden ihrem Körper zugeordnet und nicht als eigener Körper gezählt.
+- **Farbwechsel und Abfall (Kobra S1):** Der Export-Dialog schätzt Farbwechsel (gleiche Zahl wie OrcaSlicer), Abfall im Schacht und Wechselzeit. Auswahl „Spülmenge am Drucker“ (Empfehlung 1,0 statt Werk 1,5 – rund 30 % weniger Abfall); die 3MF bekommt die passende Wechselzeit (`machine_load_filament_time`) für eine richtige Zeitschätzung in Orca. Die Spülmenge selbst stellt man am Touchscreen ein – die Firmware spült selbst, der Slicer kann die Menge nicht setzen.
+
+### Geprüft
+- Mit der OrcaSlicer-CLI: Teil mit zwei Körpern in Slot 1 und 3 – beide Slots im Einsatz, Stiel mit T0, Hut mit T2, geschätzte Farbwechsel = Orca, Wechselzeit im G-Code (`tests/verify-3mf.js`). Wechselzahl zusätzlich an vier Anordnungen mit Orca verglichen (`tests/purge.js`).
+
 ## [6.2.0] – 2026-09-27
 
 ### Geändert
