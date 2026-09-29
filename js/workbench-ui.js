@@ -204,10 +204,11 @@ $('wbCamBtn').addEventListener('click', () => {
   if (wb.player) { wbCamOff(); return; }
   if (typeof flvjs === 'undefined' || !flvjs.isSupported()) { $('wbCamNote').textContent = t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); return; }
   $('wbCamNote').textContent = t('Starte Kamera …');
-  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: location.origin + 'api/anycubic/camera?host=' + encodeURIComponent(wbHost()) },
+  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: new URL('api/anycubic/camera?host=' + encodeURIComponent(wbHost()), location.href).href },
     { enableStashBuffer: false, lazyLoad: false, liveBufferLatencyChasing: true });
   player.attachMediaElement($('wbVideo'));
-  player.on(flvjs.Events.ERROR, (type, detail) => { $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail }); $('wbCamNote').classList.remove('hidden'); });
+  // Fehlerart, Detail und Meldung von flv.js (z. B. NetworkError · HttpStatusCodeInvalid · 502)
+  player.on(flvjs.Events.ERROR, (type, detail, info) => { $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail: [detail, info && (info.msg || info.code)].filter(Boolean).join(' · ') }); $('wbCamNote').classList.remove('hidden'); });
   $('wbVideo').onplaying = () => $('wbCamNote').classList.add('hidden');
   player.load(); player.play().catch(() => { /* Autoplay: startet nach Klick */ });
   wb.player = player; $('wbCamBtn').textContent = t('Kamera stoppen');

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.3.2] – 2026-09-29
+
+### Behoben
+- **Kamera: „Kamera nicht verfügbar (Exception)“.** Beim Umstellen auf relative Pfade (9.2.0) wurde die Kamera-Adresse zu `http://…:8765api/…` zusammengesetzt. Jetzt relativ zur Seite aufgelöst – auch hinter dem Home-Assistant-Ingress. Fehlermeldungen der Kamera nennen zusätzlich den Grund. Geprüft: Der Server liefert den Strom (FLV, H.264 mit Codec-Daten am Anfang, ≈ 50–60 KB/s).
+
 ## [9.3.1] – 2026-09-29
 
 ### Geändert
