@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.3.3] – 2026-09-29
+
+### Behoben
+- **Stützen erschienen beim Slicen nicht.** Das Tool setzte immer „Nur kritische Bereiche“ (`support_critical_regions_only`). Damit stützt OrcaSlicer nur Spitzen und Auskragungen, normale Überhänge gar nicht – auch wenn das Tool Stützen empfahl oder du sie über „Werte anpassen“ eingeschaltet hattest. Jetzt bleibt die Option aus. Geprüft mit Orca: ACE-Guide (Makerworld) 0 → 110 Stützbahnen, Trichterform 0 → 98. Empfehlung bei wenigen Überhängen heißt jetzt „Ja – wenige Baumstützen“; Datenblatt und Anleitung („nur kritische Bereiche ausgeschaltet lassen“) angepasst. Neuer Test in `tests/slice.py` zählt die Stützbahnen im G-Code.
+
 ## [9.3.2] – 2026-09-29
 
 ### Behoben

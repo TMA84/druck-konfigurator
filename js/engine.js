@@ -176,13 +176,13 @@ function compute(I,geom,ctx){
   }else if(a.level==='none'){
     sup='Nicht nötig';supNeed=t('Keine relevanten Überhänge über {th}°. Flächen, die auf dem Druckbett liegen, werden nicht mitgezählt. Kleine Fasen und Bohrungen druckt der Slicer ohne Stütze.',{th:a.th});
   }else if(a.level==='few'){
-    if(s==='allow'){supOn=true;sup='Nur kritische Bereiche';}
+    if(s==='allow'){supOn=true;sup='Ja – wenige Baumstützen';}
     else{sup='Meist nicht nötig – Vorschau prüfen';}
     supNeed=t('Einzelne Überhänge (ca. {area} mm², {pct} % der Oberfläche). Meist druckbar; nur stützen, wenn die Vorschau frei hängende Bahnen zeigt.',{area:de(a.flagged,0),pct:de(a.ratio*100,1)});
   }else{
-    if(s==='avoid'){sup='Vermeiden: zuerst Modell drehen';supNeed=t('Deutliche Überhänge (ca. {area} mm²). Vor dem Aktivieren von Stützen das Modell im Slicer drehen oder um 10–20° kippen – das reduziert Stützen oft mehr als jede Einstellung. Nur wenn das nicht reicht, Baumstützen „nur kritische Bereiche“.',{area:de(a.flagged,0)})}
-    else{supOn=true;sup='Ja – Baumstützen';supNeed=a.ceiling>50?t('Deutliche Überhänge erkannt (ca. {area} mm², {pct} % der Oberfläche, davon ca. {flat} mm² fast waagerecht). Baumstützen ab Druckbett, nur kritische Bereiche.',{area:de(a.flagged,0),pct:de(a.ratio*100,1),flat:de(a.ceiling,0)})
-      :t('Deutliche Überhänge erkannt (ca. {area} mm², {pct} % der Oberfläche). Baumstützen ab Druckbett, nur kritische Bereiche.',{area:de(a.flagged,0),pct:de(a.ratio*100,1)})}
+    if(s==='avoid'){sup='Vermeiden: zuerst Modell drehen';supNeed=t('Deutliche Überhänge (ca. {area} mm²). Vor dem Aktivieren von Stützen das Modell im Slicer drehen oder um 10–20° kippen – das reduziert Stützen oft mehr als jede Einstellung. Nur wenn das nicht reicht, Baumstützen aktivieren.',{area:de(a.flagged,0)})}
+    else{supOn=true;sup='Ja – Baumstützen';supNeed=a.ceiling>50?t('Deutliche Überhänge erkannt (ca. {area} mm², {pct} % der Oberfläche, davon ca. {flat} mm² fast waagerecht). Baumstützen ab Druckbett.',{area:de(a.flagged,0),pct:de(a.ratio*100,1),flat:de(a.ceiling,0)})
+      :t('Deutliche Überhänge erkannt (ca. {area} mm², {pct} % der Oberfläche). Baumstützen ab Druckbett.',{area:de(a.flagged,0),pct:de(a.ratio*100,1)})}
   }
 
   sugg.support=supOn?'on':'off';
@@ -233,7 +233,7 @@ function compute(I,geom,ctx){
       ['Füllung',sp_fill+' mm/s',nFill],['Obere Fläche',top+' mm/s'],['Lückenfüllung',m.gap+' mm/s'],['Travel',m.travel+' mm/s'],
       ['Beschleunigung',accelTxt,accelNote]].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
     ['Stützen',supOn?[
-      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],['Nur kritische Bereiche',t('Ein')],
+      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],['Nur kritische Bereiche',t('Aus')],
       ['Nur auf Druckplatte',t('Ein, zuerst testen')],['Kleine Überhänge entfernen',t(sp.small)],['Raft',t('0 Schichten')],
       ['Oberer Z-Abstand',de(supZ.top,2)+' mm'],['Unterer Z-Abstand',de(supZ.bottom,2)+' mm'],['Stützen/Objekt XY-Abstand',sp.xy],
       ['Obere Schnittstellenschichten',sp.iface],['Schnittstellenabstand',sp.gap]

@@ -64,6 +64,12 @@ if slicer.find_orca():
             tail = f.read().decode("utf-8", "replace")
         check("time_cost 0,35 €/h in der 3MF", "; time_cost = 0.35" in tail)
         check("filament_cost je Slot", "; filament_cost = 25,30,27.5,40" in tail)
+        # Stützen: empfiehlt das Tool Stützen, muss Orca auch welche erzeugen (2026-09-29: mit „nur kritische
+        # Bereiche“ waren es bei normalen Überhängen 0 Stützbahnen)
+        sup = slicer.slice_3mf(subprocess.run(["node", os.path.join(ROOT, "tests", "make-test-3mf.js"), "stuetzen"], capture_output=True, check=True).stdout)
+        with open(slicer.job_file(sup["job"], 1, "gcode"), encoding="utf-8", errors="replace") as f:
+            n_sup = sum(1 for ln in f if ln.startswith(";TYPE:Support"))
+        check("Stützen im G-Code (Trichterform)", n_sup > 20, n_sup)
         gone = slicer.slice_3mf(two, plates=[2], count=2, reuse="0" * 16)
         check("fehlender Auftrag: alles geslict", gone["sliced"] == 2, gone["plates"])
     else:
