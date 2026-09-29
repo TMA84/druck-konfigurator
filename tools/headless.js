@@ -46,7 +46,7 @@ async function open() {
     }
     await sleep(800);
   };
-  const close = () => { try { ws.close(); } catch (e) { /* zu */ } proc.kill(); setTimeout(() => fs.rmSync(dir, { recursive: true, force: true }), 500); };
+  const close = () => { try { ws.close(); } catch (e) { /* zu */ } proc.kill(); setTimeout(() => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { /* Chrome schreibt noch – Temp-Ordner bleibt */ } }, 500); };
   return { send, evaluate, go, close, events };
 }
 
