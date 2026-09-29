@@ -592,9 +592,9 @@ class Tracker:
         with _lock:
             state = load(self.path)
             changed = False
-            if boxes:
-                changed = bool(sync_slots(state, boxes[0]["slots"])) or changed
-            loaded = boxes[0]["loaded_slot"] if boxes else -1
+            if boxes:   # alle ACE-Einheiten, Slots durchgehend nummeriert (ACE 2 = Slot 5–8)
+                changed = bool(sync_slots(state, self.lan.all_slots(boxes))) or changed
+            loaded = self.lan.loaded_slot(boxes) if boxes else -1
             changed = track(state, info.get("project") if info else None, loaded) or changed
             if changed or time.time() - self.saved > 60:     # „zuletzt gesehen“ höchstens minütlich schreiben
                 save(state, self.path)

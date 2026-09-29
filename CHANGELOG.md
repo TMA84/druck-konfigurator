@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.2.0] – 2026-09-29
+
+### Neu
+- **Mehrere ACE-Einheiten:** Kobra S1 bis 2 ACE (8 Slots), andere Anycubic-Drucker bis 4 (16 Slots). Slots zählen durch (ACE 2 = Slot 5–8); Anzahl vom Drucker erkannt oder im Dialog Filament-Slots einstellbar. 3MF mit bis zu 16 Filamenten (Werte je Filament, Spülmatrix; mit Orca-CLI geprüft), Filamentverwaltung, HA-Sensoren und Druckstart über alle Einheiten; Tab ④ mit Reitern je ACE.
+- **Einzelne Teile entfernen:** ✕ in der Teileliste (oder Entf), mit „Rückgängig“; bei 3MF-Projekten fehlt das Teil im Export, die übrigen bleiben an ihrer Stelle (mit Orca-CLI geprüft).
+
+### Behoben
+- **Licht/Trocknen „nicht bestätigt“**, obwohl der Drucker den Befehl ausführt: Kommt keine erkennbare Antwort, prüft der Server den gemeldeten Zustand (Licht, Trocknen, Nachfüllen, Lüfter). Bleibt der Fehler, nennt die Meldung, was der Drucker geantwortet hat.
+
 ## [10.1.0] – 2026-09-29
 
 ### Neu

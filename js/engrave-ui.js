@@ -20,7 +20,7 @@ const txPartSlot = p => p.slot ?? (typeof defaultSlot === 'function' ? defaultSl
 const txHex = h => parseInt(String(h).slice(1), 16);
 const txNum = (id, lo, hi, def) => { const v = num($(id).value); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def; };
 
-// Slot-Auswahl: Slots des Druckers (sonst 1–4); Vorschlag = ein anderer Slot als der des Teils
+// Slot-Auswahl: Slots des Druckers (alle ACE-Einheiten, sonst 1–4); Vorschlag = ein anderer Slot als der des Teils
 function txSlotOptions(part, chosen) {
   const slots = slotChoices(), list = slots.length ? slots : [0, 1, 2, 3].map(idx => ({ idx }));
   const own = txPartSlot(part), def = chosen ?? (list.find(s => s.idx !== own) || list[0]).idx;

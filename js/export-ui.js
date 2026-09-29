@@ -29,6 +29,21 @@ let slotState={printer:null,live:null,note:''};
 let slotPicked=false; // Slot im offenen Dialog von Hand gewählt
 const manualSlots=printerId=>((store.settings.manualSlots||{})[printerId])||null;
 const ownSlot=s=>({type:s.type,colour:s.colour,present:!!s.type,name:s.type?t('eigene Angabe'):t('leer'),own:true});
+/* Mehrere ACE-Einheiten (je 4 Slots, Slot 5–8 = ACE 2 …): Kobra S1 höchstens 2, andere Anycubic-Drucker mit ACE Pro 2
+   bis 4 (ACE_MAX; ohne Eintrag 4). Meldet der Drucker mehr Slots, merkt sich das Tool die Anzahl
+   (store.settings.aceCount[drucker]) – ohne Verbindung gilt sie weiter; von Hand im Dialog Filament-Slots. */
+// als Funktionen: exportTemplate fragt schon beim Laden der Skripte nach, bevor Konstanten hier stehen
+function aceMax(printerId){return ({kobra_s1:2})[printerId]||4}
+var ACE_SLOTS=4;
+function printerSlotCount(printerId,tpl){
+  if(typeof LAN_PRINTERS==='undefined'||!LAN_PRINTERS.includes(printerId))return 0;
+  const st=slotState,counts=store.settings.aceCount||{},max=aceMax(printerId),live=st&&st.live&&st.printer===printerId?st.live.slots.length:0;
+  const boxes=Math.min(max,Math.ceil(live/4));
+  if(live&&boxes!==(+counts[printerId]||1)){store.settings.aceCount={...counts,[printerId]:boxes};persist()}
+  return Math.min(max,live?boxes:(+counts[printerId]||1))*4;
+}
+// „Slot 5“ – bei zwei ACE mit Einheit („Slot 5 · ACE 2“)
+function slotLabel(i,n){return 'Slot '+(i+1)+(n>4?' · ACE '+(Math.floor(i/4)+1):'')}
 function slotSource(tpl){
   const n=tpl.slots.length,m=(lastResult&&manualSlots(lastResult.printer.id))||[];
   if(slotState.live&&slotState.printer===(lastResult&&lastResult.printer.id)){
@@ -48,7 +63,7 @@ function renderSlotList(tpl,preselect){
   $('slotList').innerHTML=slots.map(s=>
     '<label class="slot'+(s.present?'':' absent')+'" title="'+esc(s.name)+'"><input type="radio" name="slot" value="'+s.idx+'"'+(s.idx===preselect?' checked':'')+'>'+
     '<span class="swatch" style="background:'+esc(/^#[0-9a-f]{6}$/i.test(s.colour)?s.colour:'#888888')+'"></span>'+
-    '<span class="slot-text"><b>Slot '+(s.idx+1)+'</b>'+(s.type?' · '+esc(s.type):s.present?'':' · '+t('leer'))+'<small>'+esc(!s.present?t('kein Filament'):s.name||t('unbekannt'))+'</small></span></label>').join('');
+    '<span class="slot-text"><b>'+slotLabel(s.idx,slots.length)+'</b>'+(s.type?' · '+esc(s.type):s.present?'':' · '+t('leer'))+'<small>'+esc(!s.present?t('kein Filament'):s.name||t('unbekannt'))+'</small></span></label>').join('');
   const src=document.querySelector('.slot-source'),kind=slotSource(tpl).kind;
   src.classList.toggle('live',kind!=='template');src.classList.toggle('fallback',kind==='template'&&!!slotState.note);
   $('slotSource').textContent=kind==='live'
@@ -290,18 +305,31 @@ function renderSlotDialog(){
   const types=[...new Set(SLOT_TYPES.concat(Object.keys(tpl.filamentPresets||{})))];
   $('slotDlgSource').textContent=live?t('Vom Drucker gelesen ({via}, {time})',{via:live.via==='lan'?t('Werksfirmware'):'Moonraker',time:live.time.toLocaleTimeString(LOCALE(),{hour:'2-digit',minute:'2-digit'})})
     :slotState.note&&slotState.printer===id?slotState.note:printerHost(id)?t('Noch nicht vom Drucker gelesen'):t('Keine Drucker-Verbindung eingerichtet – deine Angaben gelten');
+  const aceRow=typeof LAN_PRINTERS!=='undefined'&&LAN_PRINTERS.includes(id);
+  $('slotAceRow').classList.toggle('hidden',!aceRow);
+  $('slotAceCount').innerHTML=Array.from({length:aceMax(id)},(_,k)=>'<option value="'+(k+1)+'">'+t('{n} (Slot 1–{last})',{n:k+1,last:(k+1)*ACE_SLOTS})+'</option>').join('');
+  $('slotAceCount').value=String(Math.max(1,Math.round(n/ACE_SLOTS)));
+  $('slotAceCount').disabled=!!live;
+  $('slotAceCount').title=live?t('Meldet der Drucker'):'';
   $('slotEditRows').innerHTML=Array.from({length:n},(_,i)=>{
     const l=live&&live.slots[i],own=m[i],ovr=!!(live&&own&&own.override);
     const cur=live&&!ovr?(l||{}):(own||{}),ty=String(cur.present===false?'':cur.type||'').toUpperCase(),col=validHex(cur.colour)?cur.colour:'#888888';
     const liveTxt=live?'<span class="slot-live" title="'+t('Meldet der Drucker')+'">'+(l&&l.present?'<i style="background:'+esc(validHex(l.colour)?l.colour:'#888888')+'"></i>'+esc(l.type||'?'):t('leer'))+'</span>'+
       '<label class="slot-ovr"><input type="checkbox" data-slot-ovr="'+i+'"'+(ovr?' checked':'')+'> '+t('Überschreiben')+'</label>':'<span></span><span></span>';
-    return '<div class="slot-edit-row'+(live&&!ovr?' inherit':'')+'" data-slot-row="'+i+'"><b>Slot '+(i+1)+'</b>'+liveTxt+
+    return '<div class="slot-edit-row'+(live&&!ovr?' inherit':'')+'" data-slot-row="'+i+'"><b>'+slotLabel(i,n)+'</b>'+liveTxt+
       '<select data-slot-type="'+i+'" aria-label="'+t('Material in Slot {n}',{n:i+1})+'"><option value="">'+t('leer')+'</option>'+types.map(x=>'<option'+(x===ty?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+
       '<input type="color" data-slot-colour="'+i+'" value="'+col+'" aria-label="'+t('Farbe Slot {n}',{n:i+1})+'"></div>';
   }).join('');
   $('slotEditPrinterRow').classList.toggle('hidden',!(live&&live.via==='lan'));
   $('slotEditPrinter').checked=false;
 }
+$('slotAceCount').addEventListener('change',()=>{
+  const id=lastResult.printer.id;
+  store.settings.aceCount={...(store.settings.aceCount||{}),[id]:Math.min(aceMax(id),Math.max(1,+$('slotAceCount').value||1))};persist();
+  renderSlotDialog();
+  if($('exportDlg').open){const tpl=slotDialogTemplate();renderSlotList(tpl,chosenSlot());renderExportDialog()}
+  update();
+});
 // Ändern von Material oder Farbe bei einer Live-Zeile heißt: überschreiben
 $('slotEditRows').addEventListener('input',e=>{
   const row=e.target.closest('[data-slot-row]');if(!row)return;
@@ -413,7 +441,7 @@ function renderSidePanels(){
     if(mixed)$('slotPanelAll').textContent=t('Slot {n} für alle Teile übernehmen',{n:def+1});
     $('slotPanelList').innerHTML=src.slots.map((s,i)=>{
       const how=s.own?(src.kind==='live'?t('überschrieben'):t('eigene Angabe')):src.kind==='live'?(s.present?t('vom Drucker'):t('leer')):t('unbekannt');
-      return '<li data-slot-pick="'+i+'" title="'+esc(t('Anklicken: mit diesem Slot drucken'))+'" class="'+(s.own&&src.kind==='live'?'ovr':'')+(used.has(i)?' pick':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small>'+(used.has(i)?'<span class="pick-tag">'+t('druckt damit')+'</span>':'')+'</span></li>';
+      return '<li data-slot-pick="'+i+'" title="'+esc(t('Anklicken: mit diesem Slot drucken'))+'" class="'+(s.own&&src.kind==='live'?'ovr':'')+(used.has(i)?' pick':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>'+slotLabel(i,src.slots.length)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small>'+(used.has(i)?'<span class="pick-tag">'+t('druckt damit')+'</span>':'')+'</span></li>';
     }).join('');
     const live=slotState.live&&slotState.printer===r.printer.id?slotState.live:null;
     $('slotPanelSource').textContent=live?t('Gelesen {time} ({via})',{time:live.time.toLocaleTimeString(LOCALE(),{hour:'2-digit',minute:'2-digit'}),via:live.via==='lan'?t('Werksfirmware'):'Moonraker'})

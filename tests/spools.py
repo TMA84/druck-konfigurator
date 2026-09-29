@@ -126,6 +126,8 @@ class FakeLan:
 
     import anycubic_lan as _real
     ace_boxes = staticmethod(_real.ace_boxes)
+    all_slots = staticmethod(_real.all_slots)
+    loaded_slot = staticmethod(_real.loaded_slot)
 
 
 with tempfile.TemporaryDirectory() as d:
@@ -141,6 +143,19 @@ with tempfile.TemporaryDirectory() as d:
     tr.step()
     got = spools.load(p)
     check("Tracker erkennt Spule und zählt", len(got["spools"]) == 1 and abs(got["spools"][0]["used_g"] - spools.mm_to_g(1500, "ASA")) < 1e-3, got["spools"])
+
+    # zweite ACE: deren Slots zählen als 5–8; der geladene Slot kommt aus der Einheit, die ihn meldet
+    lan.link.reports["multiColorBox"]["data"]["multi_color_box"][0]["loaded_slot"] = -1
+    lan.link.reports["multiColorBox"]["data"]["multi_color_box"].append({"id": 1, "loaded_slot": 1, "slots": [
+        {"index": 0, "type": "PLA", "color": [255, 0, 0], "edit_status": 1, "status": 5},
+        {"index": 1, "type": "PETG", "color": [0, 0, 255], "edit_status": 1, "status": 5}]})
+    lan.link.info["project"] = {"filename": "zwei.gcode", "progress": 0, "supplies_usage": 0}
+    tr.step()
+    lan.link.info["project"]["supplies_usage"] = 1000
+    tr.step()
+    got = {sp["slot"]: sp for sp in spools.load(p)["spools"]}
+    check("zweite ACE: Spulen in Slot 5 und 6 (durchgehend nummeriert)", got.get(4, {}).get("type") == "PLA" and got.get(5, {}).get("type") == "PETG", sorted(got))
+    check("zweite ACE: Verbrauch auf Slot 6 (ACE 2, Slot 2)", abs((got[5].get("used_g") or 0) - spools.mm_to_g(1000, "PETG")) < 1e-3 and not got[4].get("used_g"), got.get(5))
 
 
 def fails(name, fn, part=""):

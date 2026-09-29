@@ -101,6 +101,7 @@ Körper, die sich berühren oder überlappen, bleiben ein Teil – z. B. Hohlkö
 Bei mehreren Teilen erscheint im Schritt **① Modell** eine **Teileliste**. Jede Zeile zeigt Name, Maße, Slot und ob das Teil Stützen braucht.
 
 - **Anklicken wählt ein Teil.** Die Druckwerte, das Datenblatt und die 3D-Ansicht gelten dann für dieses Teil. In **② Druckwerte** steht oben **„Einstellungen für Teil“** – dort wählst du das Teil auch direkt über **Teil**, ohne zurück zum Modell zu wechseln.
+- **✕ am Zeilenende entfernt ein Teil** aus dem Projekt (auch mit der Taste Entf, wenn das Teil in der Liste gewählt ist). **Rückgängig** in der Meldung holt es zurück. Bei Makerworld-Projekten fehlt das Teil dann im Export; die übrigen Teile behalten die Lage des Designers. Ein Teil bleibt immer – für ein anderes Modell einfach neu laden.
 - Jedes Teil merkt sich **eigenes Filament, Objektart, Priorität, Belastung, Support und Stützreduzierung**.
 - Über **Slot** kannst du jedem Teil einen eigenen Filament-Slot geben. „Wie beim Export gewählt“ bedeutet: Das Teil bekommt den Standard-Slot aus dem Export-Dialog.
 
@@ -283,6 +284,8 @@ Bearbeiten über **✎ Bearbeiten / überschreiben**, **⚙ Einstellungen → Fi
 - Mit der Werksfirmware kannst du überschriebene Slots zusätzlich **in die ACE schreiben**; danach meldet der Drucker sie selbst und die Überschreibung entfällt.
 
 Die Slots bestimmen Filamenttyp und Farbe in der 3MF, die Vorauswahl im Export-Dialog und die Farben in der Vorschau („Farben zeigen“).
+
+**Mehrere ACE-Einheiten:** Am Kobra S1 gehen bis zu **2 ACE** (8 Slots), andere Anycubic-Drucker mit ACE Pro 2 bis zu 4 (16 Slots). Die Slots zählen durch: ACE 2 hat die Slots 5–8 (in den Listen „Slot 5 · ACE 2“). Mit Verbindung erkennt das Tool die Anzahl selbst und merkt sie sich; ohne Verbindung stellst du sie im Dialog **Filament-Slots** unter **ACE-Einheiten** ein. 3MF, Slicen, Kosten, Filamentverwaltung und Home-Assistant-Sensoren nutzen dann alle Slots. Im Tab **④ Drucker** wählst du die Einheit über die Reiter **ACE 1 / ACE 2 …**; Laden, Trocknen und Temperatur gelten für die gewählte Einheit, „Automatisch nachfüllen“ für alle. *Hinweis:* Direkt drucken aus Slot 5–8 ist nur mit einer ACE am Drucker getestet – die Zuordnung (Slot 5 = ACE 2, Slot 1) folgt der Zählung des Druckers.
 
 ### Farbwechsel & Spülmenge einstellen
 

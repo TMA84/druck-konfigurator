@@ -281,6 +281,7 @@
 
     <section class="wb-card wb-acecard" aria-labelledby="wbAceT">
       <div class="wb-head"><h3 id="wbAceT" class="wb-eyebrow">ACE</h3><span id="wbAceTemp" class="muted small"></span><button class="linkbtn" type="button" data-action="spools">Spulen &amp; Restmengen …</button></div>
+      <div id="wbAceTabs" class="wb-acetabs hidden" role="group" aria-label="ACE-Einheit"></div>
       <div id="spoolCheck" class="spool-check hidden"></div>
       <ul id="wbAceSlots" class="wb-ace"></ul>
       <div id="wbDryBox" class="wb-drybox">
@@ -466,6 +467,7 @@
 <dialog id="slotDlg" aria-labelledby="slotDlgTitle"><div class="ed-head"><h2 id="slotDlgTitle">Filament-Slots</h2><div class="muted" id="slotDlgSub">Material und Farbe je Slot. Mit Drucker-Verbindung liest das Tool die ACE aus; <b>Überschreiben</b> setzt deine eigene Angabe an die Stelle des Druckers. Ohne Verbindung gilt, was du hier einträgst.</div></div>
   <div class="ed-body">
     <div class="slot-dlg-source"><span id="slotDlgSource" class="muted"></span><button class="linkbtn" type="button" id="slotDlgReload">Vom Drucker laden</button></div>
+    <label class="slot-ace hidden" id="slotAceRow">ACE-Einheiten <select id="slotAceCount"></select></label>
     <div id="slotEditRows" class="slot-edit"></div>
     <label class="slot-edit-printer hidden" id="slotEditPrinterRow"><input type="checkbox" id="slotEditPrinter"> Überschriebene Slots auch in die ACE schreiben (Werksfirmware) – dann gilt wieder, was der Drucker meldet</label>
   </div>

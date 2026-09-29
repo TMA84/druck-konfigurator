@@ -114,6 +114,7 @@ class FakeBroker(threading.Thread):
         self.temps = {"curr_nozzle_temp": 26, "target_nozzle_temp": 0, "curr_hotbed_temp": 24, "target_hotbed_temp": 0}
         self.fans = {"fan_speed_pct": 0, "aux_fan_speed_pct": 0, "box_fan_level": 0}
         self.light, self.pos, self.moves, self.starts = {"type": 2, "status": 0, "brightness": 0}, {"x": 10, "y": 20, "z": 5}, [], []
+        self.silent, self.ignore = set(), set()   # (Art, Aktion): ausführen ohne Antwort / gar nicht ausführen
 
     def run(self):
         while True:
@@ -176,6 +177,10 @@ class FakeBroker(threading.Thread):
                     self.reply(conn, kind, {"type": kind, "action": "setSpeed", "state": "done", "code": 200, "msgid": msg["msgid"], "data": None})
                 elif (kind, action) == ("light", "query"):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"lights": [dict(self.light)]}})
+                elif (kind, action) in self.ignore:
+                    pass
+                elif (kind, action) == ("light", "control") and (kind, action) in self.silent:
+                    self.light.update(msg["data"])   # führt aus, bestätigt aber nicht (andere Firmware)
                 elif (kind, action) == ("light", "control"):
                     self.light.update(msg["data"])
                     # wie die Werksfirmware 2.7.2.7: Bestätigung ohne die msgid der Anfrage
@@ -327,6 +332,18 @@ res = lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "bri
 check("Licht bestätigt, obwohl die Antwort keine msgid trägt", res["ok"], res)
 res = lan.command("127.0.0.1", "multiColorBox", "setDry", {"multi_color_box": [{"id": 0, "drying_status": {"status": 1, "target_temp": 45, "duration": 240}}]})
 check("Trocknen bestätigt, obwohl die Antwort keine msgid trägt", res["ok"] and broker.ace["drying_status"]["target_temp"] == 45, res)
+broker.silent.add(("light", "control"))
+res = lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 0})
+check("Licht aus ohne jede Antwort: am gemeldeten Zustand bestätigt", res["ok"] and res["state"] == "verified" and broker.light["status"] == 0, res)
+broker.silent.clear()
+broker.ignore.add(("light", "control"))
+try:
+    lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
+    check("Licht, das der Drucker nicht schaltet, gilt als nicht bestätigt", False)
+except lan.LanError as e:
+    check("Licht, das der Drucker nicht schaltet, gilt als nicht bestätigt", e.kind == "timeout" and "nicht bestätigt" in str(e), str(e))
+broker.ignore.clear()
+lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
 st = lan.status("127.0.0.1")
 check("Lüfter 40 % und Licht an", st["fans"]["fan_speed_pct"] == 40 and st["lights"] and st["lights"][0]["status"] == 1, (st["fans"], st["lights"]))
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})
@@ -366,6 +383,15 @@ gtmp = tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False)
 gtmp.write("; HEADER\nG1 X1 Y1 E1\n; filament used [g] = 3.10, 0.00, 1.20, 0.00\n; filament_colour = #FF0000;#00FF00;#0000FF;#FFFFFF\n"
            "; filament_type = PLA;PLA;PETG;PLA\n; printer_model = Anycubic Kobra S1\n")
 gtmp.close()
+g5 = tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False)
+g5.write("; filament used [g] = 0, 0, 0, 0, 2.0\n; filament_type = PLA;PLA;PLA;PLA;PLA\n; printer_model = Anycubic Kobra S1\n")
+g5.close()
+n_up = len(uploads)
+try:
+    lan.print_gcode("127.0.0.1", g5.name, "slot5.gcode"); check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", False)
+except lan.LanError as e:
+    check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", e.kind == "forbidden" and "Slot 5" in str(e) and len(uploads) == n_up, str(e))
+os.unlink(g5.name)
 res = lan.print_gcode("127.0.0.1", gtmp.name, "Schild_Platte1.gcode", {"auto_leveling": 1, "timelapse": 0})
 up = uploads[-1] if uploads else {}
 check("Hochgeladen mit Token, multipart, Länge", up.get("token") == "SECRET" and up.get("ctype", "").startswith("multipart/form-data") and up.get("length") == str(os.path.getsize(gtmp.name)) and b"G1 X1 Y1 E1" in up.get("body", b""), {k: v for k, v in up.items() if k != "body"})
@@ -423,6 +449,12 @@ try:
     check("Nicht erreichbar erkannt", False)
 except lan.LanError as e:
     check("Nicht erreichbar erkannt", e.kind == "unreachable", e)
+
+# Mehrere ACE-Einheiten: Slots durchgehend (ACE 2, Slot 1 = Slot 5), auch wenn eine Einheit weniger als 4 Slots meldet
+two = lan.ace_boxes({"multiColorBox": [{"data": {"multi_color_box": [dict(ACE, loaded_slot=-1), dict(ACE, id=1, loaded_slot=1)]}}]})
+flat = lan.all_slots(two)
+check("zwei ACE: Slots 1–3 und 5–7, Box und Slot darin", [(s["index"], s["box"], s["local"]) for s in flat] == [(0, 0, 0), (1, 0, 1), (2, 0, 2), (4, 1, 0), (5, 1, 1), (6, 1, 2)], flat)
+check("zwei ACE: geladener Slot = ACE 2, Slot 2 → 5 (0-basiert)", lan.loaded_slot(two) == 5, lan.loaded_slot(two))
 
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

@@ -10,7 +10,7 @@ const WB_POLL_MS = 3000;
 const WB_PRINTER = 'kobra_s1';
 const WB_PRESETS = { pla: [215, 60], petg: [240, 75], asa: [250, 95], off: [0, 0] };
 const WB_SPEED = { 1: 'Leise', 2: 'Standard', 3: 'Sport' };
-const wb = { timer: 0, st: null, err: '', player: null };
+const wb = { timer: 0, st: null, err: '', player: null, box: 0 };
 const wbHost = () => printerHost(WB_PRINTER);
 const wbMin = m => m == null ? '–' : m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
 const wbDeg = v => v == null ? '–' : Math.round(v) + ' °C';
@@ -121,13 +121,17 @@ function wbRender() {
   $('wbAxNote').classList.toggle('hidden', !printing); $('wbAxBody').classList.toggle('hidden', printing);
   document.querySelectorAll('[data-wb-jog],[data-wb-home],#wbMotorsOff').forEach(b => { b.disabled = printing || !!wb.err; });
 
-  // ACE: Kacheln in Filamentfarbe
-  const box = (st.ace || [])[0];
-  $('wbAceSlots').innerHTML = box ? box.slots.map(s => '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
-      '<div class="wb-swatch" style="' + (s.present ? 'background:' + esc(s.colour || '#dddddd') : '') + '"><span>' + (s.index + 1) + '</span></div>' +
+  // ACE: Kacheln in Filamentfarbe. Mehrere Einheiten (bis 4): Reiter je ACE; Slot-Nummern laufen über alle Einheiten
+  // (ACE 2 = Slot 5–8), Laden/Trocknen/Temperatur gelten für die gewählte Einheit
+  const boxes = st.ace || [], bi = Math.min(wb.box || 0, Math.max(0, boxes.length - 1)), box = boxes[bi], base = wbSlotBase(boxes, bi);
+  $('wbAceTabs').classList.toggle('hidden', boxes.length < 2);
+  $('wbAceTabs').innerHTML = boxes.length < 2 ? '' : boxes.map((x, i) => '<button type="button" data-wb-box="' + i + '" aria-pressed="' + (i === bi) + '">ACE ' + (i + 1) +
+    (x.drying && x.drying.status ? ' <small>' + t('trocknet') + '</small>' : '') + '</button>').join('');
+  $('wbAceSlots').innerHTML = box ? box.slots.map(s => { const g = base + s.index; return '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
+      '<div class="wb-swatch" style="' + (s.present ? 'background:' + esc(s.colour || '#dddddd') : '') + '"><span>' + (g + 1) + '</span></div>' +
       '<div class="wb-slotinfo"><b>' + (s.present ? esc(s.type) : t('leer')) + '</b><small>' + (s.present ? (s.loaded ? t('im Drucker') : s.rfid ? 'RFID' : t('von Hand')) : '–') + '</small>' +
-        (s.present && typeof spoolTileHTML === 'function' ? spoolTileHTML(s.index) : '') + '</div>' +
-      (s.present ? '<div class="wb-feed"><button type="button" data-wb-feed="' + s.index + ',1"' + (printing ? ' disabled' : '') + ' title="' + t('Filament bis zur Düse laden') + '">' + t('Laden') + '</button><button type="button" data-wb-feed="' + s.index + ',2"' + (printing ? ' disabled' : '') + ' title="' + t('Filament zurückziehen') + '">' + t('Zurück') + '</button></div>' : '') + '</li>').join('')
+        (s.present && typeof spoolTileHTML === 'function' ? spoolTileHTML(g) : '') + '</div>' +
+      (s.present ? '<div class="wb-feed"><button type="button" data-wb-feed="' + s.index + ',1"' + (printing ? ' disabled' : '') + ' title="' + t('Filament bis zur Düse laden') + '">' + t('Laden') + '</button><button type="button" data-wb-feed="' + s.index + ',2"' + (printing ? ' disabled' : '') + ' title="' + t('Filament zurückziehen') + '">' + t('Zurück') + '</button></div>' : '') + '</li>'; }).join('')
     : '<li class="empty" style="grid-column:1/-1;padding:10px">' + (st.has_ace === 0 ? t('Keine ACE angeschlossen.') : t('Keine ACE-Daten.')) + '</li>';
   $('wbAutoFeed').disabled = !box; if (box && document.activeElement !== $('wbAutoFeed')) $('wbAutoFeed').checked = box.auto_feed === 1;
   const dry = box && box.drying || {};
@@ -180,17 +184,25 @@ document.querySelectorAll('[data-wb-jog]').forEach(b => b.addEventListener('clic
 }));
 document.querySelectorAll('[data-wb-home]').forEach(b => b.addEventListener('click', () => wbCmd(b, 'axis', 'move', { axis: +b.dataset.wbHome, move_type: 2 }, t('Fahre nach Hause'))));
 $('wbMotorsOff').addEventListener('click', e => wbCmd(e.currentTarget, 'axis', 'turnOff', null, t('Motoren aus – Achsen müssen danach neu referenziert werden')));
+// Erster Slot einer Einheit in der Zählung über alle Einheiten (wie js/printer-link.js aceSlots)
+const wbSlotBase = (boxes, bi) => boxes.slice(0, bi).reduce((n, b) => n + b.slots.length, 0);
+const wbBox = () => { const boxes = (wb.st && wb.st.ace) || []; return boxes[Math.min(wb.box || 0, boxes.length - 1)]; };
+$('wbAceTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-wb-box]'); if (!b) return;
+  wb.box = +b.dataset.wbBox; if (wb.st) wbRender();
+});
 $('wbAceSlots').addEventListener('click', e => {
   const b = e.target.closest('[data-wb-feed]'); if (!b) return;
-  const [slot, type] = b.dataset.wbFeed.split(',').map(Number), box = wb.st.ace[0];
-  wbCmd(b, 'multiColorBox', 'feedFilament', { multi_color_box: [{ id: box.id, feed_status: { slot_index: slot, type } }] }, type === 1 ? t('Lade Slot {n}', { n: slot + 1 }) : t('Ziehe Slot {n} zurück', { n: slot + 1 }));
+  const [slot, type] = b.dataset.wbFeed.split(',').map(Number), box = wbBox(), n = wbSlotBase(wb.st.ace, wb.st.ace.indexOf(box)) + slot + 1;
+  wbCmd(b, 'multiColorBox', 'feedFilament', { multi_color_box: [{ id: box.id, feed_status: { slot_index: slot, type } }] }, type === 1 ? t('Lade Slot {n}', { n }) : t('Ziehe Slot {n} zurück', { n }));
 });
+// Nachfüllen gilt für den ganzen Drucker: an alle Einheiten
 $('wbAutoFeed').addEventListener('change', e => {
-  const box = wb.st.ace[0];
-  wbCmd(e.currentTarget, 'multiColorBox', 'setAutoFeed', { multi_color_box: [{ id: box.id, auto_feed: e.currentTarget.checked ? 1 : 0 }] });
+  const on = e.currentTarget.checked ? 1 : 0;
+  wbCmd(e.currentTarget, 'multiColorBox', 'setAutoFeed', { multi_color_box: wb.st.ace.map(box => ({ id: box.id, auto_feed: on })) });
 });
 $('wbDry').addEventListener('click', e => {
-  const box = wb.st.ace[0], on = !(box.drying && box.drying.status);
+  const box = wbBox(), on = !(box.drying && box.drying.status);
   wbCmd(e.currentTarget, 'multiColorBox', 'setDry', { multi_color_box: [{ id: box.id, drying_status: { status: on ? 1 : 0, target_temp: Math.round(num($('wbDryTemp').value)), duration: Math.round(num($('wbDryMin').value)) } }] }, on ? t('Trocknen gestartet') : t('Trocknen beendet'));
 });
 $('wbRaw').addEventListener('click', () => { $('wbRawOut').classList.toggle('hidden'); if (wb.st) $('wbRawOut').textContent = JSON.stringify(wb.st.raw, null, 1); });

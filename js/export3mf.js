@@ -16,7 +16,41 @@ const objectPath = k => '/3D/Objects/object_' + k + '.model';
 
 function exportTemplate(printerId, nozD) {
   if (printerId === 'orca') return typeof orcaActiveTemplate === 'function' ? orcaActiveTemplate(nozD) : null;
-  return (ORCA_TEMPLATES[printerId] || {})[nozD] || null;
+  const tpl = (ORCA_TEMPLATES[printerId] || {})[nozD] || null;
+  // Zweite ACE am Drucker: Vorlage auf 8 Slots erweitern (Anzahl aus js/export-ui.js printerSlotCount)
+  const n = tpl && typeof printerSlotCount === 'function' ? printerSlotCount(printerId, tpl) : 0;
+  return tpl && n > tpl.slots.length ? widenTemplate(tpl, n) : tpl;
+}
+
+/* Vorlage mit n statt 4 Filament-Slots (zweite ACE-Einheit: Slot 5–8). Die Vorlage ist mit einer ACE gespeichert;
+   alle Werte je Filament (Listen mit einem Eintrag je Slot) bekommen für die neuen Slots die Werte von Slot 1,
+   filament_self_index zählt weiter, die Spülmatrix wächst auf n × n (neue Paare mit der größten Spülmenge der
+   Vorlage – lieber etwas mehr spülen als verschmieren). Ergebnis je (Vorlage, n) zwischengespeichert. */
+const NOT_PER_FILAMENT = new Set(['printable_area', 'bed_exclude_area', 'wrapping_exclude_area', 'thumbnails', 'head_wrap_detect_zone']);
+const widened = new WeakMap();
+function widenTemplate(tpl, n) {
+  const cache = widened.get(tpl) || widened.set(tpl, {}).get(tpl);
+  if (cache[n]) return cache[n];
+  const src = tpl.settings, k0 = src.filament_settings_id.length, settings = JSON.parse(JSON.stringify(src));
+  for (const [k, v] of Object.entries(settings)) {
+    if (!Array.isArray(v) || v.length !== k0 || NOT_PER_FILAMENT.has(k)) continue;
+    for (let i = k0; i < n; i++) v.push(k === 'filament_self_index' ? String(i + 1) : v[0]);
+  }
+  const m = (src.flush_volumes_matrix || []).map(Number);
+  if (m.length === k0 * k0) {
+    const most = String(Math.max(0, ...m));
+    settings.flush_volumes_matrix = Array.from({ length: n * n }, (_, x) => { const i = Math.floor(x / n), j = x % n;
+      return i === j ? '0' : i < k0 && j < k0 ? String(m[i * k0 + j]) : most; });
+  }
+  const vec = src.flush_volumes_vector || [];
+  if (vec.length === 2 * k0) settings.flush_volumes_vector = Array.from({ length: 2 * n }, (_, i) => vec[i % vec.length]);
+  // [Prozess, Filament 1..n, Drucker]: leere Gruppen für die neuen Slots vor dem Drucker einfügen
+  for (const key of ['different_settings_to_system', 'inherits_group']) {
+    const g = src[key];
+    if (Array.isArray(g) && g.length === k0 + 2) settings[key] = [...g.slice(0, k0 + 1), ...Array(n - k0).fill(''), g[k0 + 1]];
+  }
+  const slots = [...tpl.slots, ...Array.from({ length: n - k0 }, () => ({ ...tpl.slots[0] }))];
+  return (cache[n] = { ...tpl, slots, settings });
 }
 
 // Gleiche Zuordnung wie buildOrcaProcessJSON: Gyroid ist in beiden Mustervorschlägen die Primärempfehlung.
@@ -418,8 +452,8 @@ function arrangeByPlate(items, tpl) {
    eine andere Platte verschoben. threemf.layout: 'auto' = alles platzsparend (Knopf „Platzsparend anordnen“),
    'plates' = danach eigene Plattenzuordnung, sonst Platten des Designers. */
 const ownPlaced = p => !!p && !!(p.extra || p.copy || p.moved);
-// Muss die 3MF neu angeordnet werden (Build-Items, Platten)? Sonst bleibt die Lage des Designers (nur auf die Bettmitte gerückt).
-const needsRelayout = (threemf, parts) => !!(threemf && threemf.layout) || parts.some(ownPlaced);
+// Muss die 3MF neu angeordnet werden (Build-Items, Platten; auch wenn Teile entfernt wurden)? Sonst bleibt die Lage des Designers (nur auf die Bettmitte gerückt).
+const needsRelayout = (threemf, parts) => !!(threemf && (threemf.layout || threemf.removed)) || parts.some(ownPlaced);
 /* items: [{geom, plate (1-basiert), own}]. Platten ohne eigene Teile (und nicht angeordnet) behalten die Lage des Designers,
    auf die Bettmitte gerückt; die übrigen packt das Tool (packPlates, läuft eine über, folgt eine weitere Platte).
    Platten werden ohne Lücken durchnummeriert. Ergebnis wie arrangeParts, dazu plateOf (1-basiert), designer (Set

@@ -113,9 +113,10 @@ def payload(st, queue, now=None, spool_view=None):
 
 
 def slot_payloads(st, spool_view):
-    """Je ACE-Slot (1 …) die Spule mit Restmenge. Anzahl Slots laut Drucker, sonst laut Filamentverwaltung."""
+    """Je ACE-Slot (1 …, über alle Einheiten: ACE 2 = Slot 5–8) die Spule mit Restmenge. Anzahl Slots laut Drucker,
+    sonst laut Filamentverwaltung."""
     boxes = (st or {}).get("ace") or []
-    n = len(boxes[0].get("slots") or []) if boxes else 0
+    n = sum(max(4, len(b.get("slots") or [])) for b in boxes[:-1]) + len(boxes[-1].get("slots") or []) if boxes else 0
     spools = [sp for sp in (spool_view or {}).get("spools") or [] if isinstance(sp.get("slot"), int) and not sp.get("archived")]
     n = max([n] + [sp["slot"] + 1 for sp in spools])
     out = {}

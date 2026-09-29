@@ -65,7 +65,8 @@ async function lanApi(path, opts) {
   if (!res.ok) { const err = Error(data.error ? t(data.error) : t('Server antwortet mit HTTP {status}', { status: res.status })); err.kind = data.kind; throw err; }
   return data;
 }
-// Slots aller ACE-Einheiten hintereinander (Slot 5 = Box 2, Slot 1)
+// Slots aller ACE-Einheiten hintereinander (Slot 5 = Box 2, Slot 1) aus dem Stand von api/anycubic/status
+const aceSlots = st => ((st && st.ace) || []).flatMap(box => box.slots.map(s => ({ ...s, box: box.id })));
 async function fetchLanStatus(host) {
   const st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host));
   const slots = [];

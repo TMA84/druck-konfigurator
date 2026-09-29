@@ -34,7 +34,7 @@ function renderSendDialog() {
   $('sendState').textContent = !st ? '' : free ? t('Drucker bereit ({model}, Firmware {fw}).', { model: st.model || 'Kobra S1', fw: st.firmware || '?' })
     : t('Drucker ist nicht frei ({what}) – erst den laufenden Vorgang beenden.', { what: st.job ? t('druckt „{name}“', { name: st.job.name }) : t(st.state) });
   $('sendState').className = 'note' + (free ? '' : ' bad');
-  const slots = (st && st.ace && st.ace[0] && st.ace[0].slots) || [];
+  const slots = aceSlots(st);
   let warn = 0;
   const rows = (p ? p.grams : []).map((g, tool) => {
     if (!(g > 0)) return '';

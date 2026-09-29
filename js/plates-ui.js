@@ -120,7 +120,7 @@ function setCopies(part, n) {
 // (auch Farb-Modifikatoren des Designers, js/design-ui.js usedSlots)
 function plateSlotUse(plan, idx) {
   const g = [0, 0, 0, 0];
-  usedSlots(plan, idx).forEach(s => { g[s] = 1; });
+  usedSlots(plan, idx).forEach(s => { while (g.length <= s) g.push(0); g[s] = 1; });
   return g;
 }
 

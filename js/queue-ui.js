@@ -149,7 +149,7 @@ function renderQueue() {
   const rest = st || !qSrv.srv ? queueRemaining(q, st) : qSrv.srv.remaining_s || 0;
   $('queueT').textContent = t('Warteschlange · {name}', { name: q.name.replace(/\.(stl|3mf|zip)$/i, '') });
   $('queueSum').textContent = t('{done} von {total} fertig', { done, total: q.items.length }) + (rest > 0 ? ' · ' + t('noch ≈ {time} Druckzeit (ohne Pausen zum Abräumen)', { time: duration(rest) }) : '');
-  const ace = st && st.ace && st.ace[0] ? st.ace[0].slots : null;
+  const ace = st && st.ace && st.ace.length ? aceSlots(st) : null;
   const banner = $('queueBanner');
   const last = q.lastDone && q.items.find(i => i.plate === q.lastDone);
   banner.classList.toggle('hidden', !(last || (!cur && !next)));

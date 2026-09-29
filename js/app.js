@@ -117,10 +117,43 @@ function renderPartList(){
     const slot=p.slot!=null?'<span class="pslot" style="background:'+col+'"></span>Slot '+(p.slot+1)+' · ':'';
     const plate=project.threemf&&(project.threemf.plates.length>1||project.parts.some(x=>(x.plate||1)>1))?t('Platte {n}',{n:p.plate})+' · ':'';
     return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
-      '<span class="pmeta">'+slot+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+(p.painted?t('Farben vom Designer')+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button></li>';
+      '<span class="pmeta">'+slot+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+(p.painted?t('Farben vom Designer')+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button>'+
+      '<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button></li>';
   }).join('');
 }
-$('partList').addEventListener('click',e=>{const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
+$('partList').addEventListener('click',e=>{
+  const d=e.target.closest('[data-del-part]');if(d){removePart(+d.dataset.delPart);return}
+  const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
+// Entf im Teileliste: gewähltes Teil entfernen
+$('partList').addEventListener('keydown',e=>{const b=e.target.closest('[data-part]');if(b&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();removePart(+b.dataset.part)}});
+
+/* Einzelnes Teil aus dem Projekt entfernen (mindestens eins bleibt). Teile aus einer 3MF fehlen danach im Export:
+   threemf.removed erzwingt neu geschriebene Build-Items; Platten ohne eigene Teile behalten die Lage des Designers.
+   „Rückgängig“ in der Meldung stellt den Stand davor wieder her. */
+function removePart(i){
+  if(!project||project.parts.length<2||!project.parts[i])return;
+  const before={parts:project.parts.slice(),selected:project.selected,removed:project.threemf&&project.threemf.removed,groups:project.parts.map(p=>p.copyGroup)};
+  const p=project.parts[i],tpl=lastResult&&exportTemplate(lastResult.printer.id,lastResult.dSel);
+  if(project.threemf&&p.objectId!=null&&!p.extra)project.threemf.removed=true;
+  project.parts.splice(i,1);
+  if(p.copyGroup){const rest=project.parts.filter(x=>x.copyGroup===p.copyGroup);if(rest.length===1)rest[0].copyGroup=null}
+  project.parts.forEach((x,k)=>{x.id=k});
+  if(tpl&&typeof normalizePlates==='function')normalizePlates(tpl);
+  const sel=i<project.selected?project.selected-1:Math.min(project.selected===i?i:project.selected,project.parts.length-1);
+  afterPartsChanged(sel);
+  toast(t('„{name}“ entfernt',{name:p.name}),{label:t('Rückgängig'),fn:()=>{
+    project.parts=before.parts;project.parts.forEach((x,k)=>{x.id=k;x.copyGroup=before.groups[k]});
+    if(project.threemf)project.threemf.removed=before.removed;
+    afterPartsChanged(before.selected);
+  }});
+}
+function afterPartsChanged(sel){
+  const n=project.parts.reduce((s,x)=>s+x.geom.n,0);
+  $('fileinfo').innerHTML='<b>'+esc(project.name)+'</b><br>'+(project.parts.length>1?t('{n} Teile',{n:project.parts.length})+' · ':'')+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())});
+  $('partList').classList.toggle('hidden',project.parts.length<2);
+  selectPart(Math.max(0,Math.min(sel,project.parts.length-1)));
+  const f=$('partList').querySelector('[data-part="'+project.selected+'"]');if(f&&$('partList').contains(document.activeElement))f.focus();
+}
 
 function showModel(g){
   geom=g;
@@ -249,9 +282,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('scroll',hideTip,true);
 
 let toastTimer=0;
-function toast(text){
-  const el=$('toast');el.textContent=text;el.classList.add('show');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+// action: {label, fn} – Knopf in der Meldung (z. B. „Rückgängig“), dann bleibt sie länger stehen
+function toast(text,action){
+  const el=$('toast');el.textContent=text;el.classList.add('show');el.classList.toggle('has-action',!!action);
+  if(action){const b=document.createElement('button');b.type='button';b.textContent=action.label;
+    b.addEventListener('click',()=>{el.classList.remove('show');clearTimeout(toastTimer);action.fn()});el.appendChild(b)}
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),action?6000:2200);
 }
 
 /* Drucken: alle Aufklappbereiche öffnen, danach Zustand wiederherstellen */

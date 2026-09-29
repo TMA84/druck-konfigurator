@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import ipaddress
+import collections
 import json
 import secrets
 import socket
@@ -191,6 +192,7 @@ class PrinterLink:
         self.reports = {}          # Art → letzter Bericht (ohne Geheimnisse)
         self.waiters = {}          # msgid → [Event, Antwort]
         self.waiters_ka = {}       # (Art, Aktion) → [[Event, Antwort], …] – Antworten ohne unsere msgid
+        self.recent = collections.deque(maxlen=40)   # (Zeit, Art, Aktion, msgid?, state, code) – zur Fehlersuche
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -301,6 +303,7 @@ class PrinterLink:
             return  # leere Berichte (Kobra X) tragen nichts
         doc = redact(doc)
         with self.lock:
+            self.recent.append((time.time(), kind, doc.get("action"), bool(doc.get("msgid")), doc.get("state"), doc.get("code")))
             # Die Box-Liste nur aus Berichten, die sie vollständig enthalten (getInfo …); Bestätigungen und
             # Teilmeldungen (setInfo ohne Daten, autoUpdateInfo …) unter eigenem Schlüssel
             boxes = (doc.get("data") or {}).get("multi_color_box") if isinstance(doc.get("data"), dict) else None
@@ -433,6 +436,22 @@ def ace_boxes(reports):
     return out
 
 
+def all_slots(boxes):
+    """Slots aller ACE-Einheiten hintereinander mit durchgehender Nummer (index; Box 2, Slot 1 = 4) – wie im Browser
+    (js/printer-link.js aceSlots). box/local: Einheit und Slot darin, für Befehle an die ACE."""
+    out, base = [], 0
+    for b in boxes:
+        for s in b["slots"]:
+            out.append(dict(s, index=base + (s.get("index") or 0), box=b["id"], local=s.get("index")))
+        base += max(4, len(b["slots"]))
+    return out
+
+
+def loaded_slot(boxes):
+    """Durchgehende Nummer des Slots, der gerade im Drucker ist (−1 = keiner)."""
+    return next((s["index"] for s in all_slots(boxes) if s.get("loaded")), -1)
+
+
 PRINT_STATUS = {1: "druckt", 2: "fertig", 3: "abgebrochen", 4: "lädt herunter", 5: "prüft", 6: "heizt vor", 7: "slict", 9: "nivelliert"}
 
 
@@ -477,6 +496,7 @@ MAX_NOZZLE_C, MAX_BED_C, MAX_JOG_MM, MAX_DRY_C, MAX_DRY_MIN = 300, 110, 50, 70, 
 WRITABLE = {("multiColorBox", "setInfo"), ("multiColorBox", "setAutoFeed"), ("multiColorBox", "setDry"), ("multiColorBox", "feedFilament"),
             ("print", "pause"), ("print", "resume"), ("print", "stop"), ("light", "control"), ("tempature", "set"),
             ("fan", "setSpeed"), ("axis", "move"), ("axis", "turnOff"), ("video", "startCapture")}
+VERIFIABLE = {("light", "control"), ("multiColorBox", "setDry"), ("multiColorBox", "setAutoFeed"), ("fan", "setSpeed")}
 NOT_WHILE_PRINTING = {("axis", "move"), ("axis", "turnOff"), ("multiColorBox", "feedFilament")}
 REFRESH_AFTER = {"multiColorBox": ("multiColorBox", "getInfo"), "light": ("light", "query"), "fan": ("fan", "query"),
                  "tempature": ("tempature", "query"), "axis": ("axis", "query"), "print": ("info", "query")}
@@ -556,8 +576,14 @@ def command(host, kind, action, data):
         raise LanError("Dieser Befehl ist nicht freigegeben: " + str(kind) + "/" + str(action), "forbidden")
     link = _ready(host)
     payload = _payload(kind, action, data, link)
-    rep = link.request(kind, action, payload)
-    ok = rep.get("code", 200) == 200 and rep.get("state") not in ("failed",)
+    sent = time.time()
+    try:
+        rep = link.request(kind, action, payload, timeout=5 if (kind, action) in VERIFIABLE else 10)
+    except LanError as e:
+        if e.kind != "timeout":
+            raise
+        rep = None
+    ok = rep is not None and rep.get("code", 200) == 200 and rep.get("state") not in ("failed",)
     # Stand des betroffenen Bereichs gleich neu holen, damit die Anzeige nicht bis zur nächsten Abfrage hinterherhinkt
     kind_q, action_q = REFRESH_AFTER.get(kind, (None, None))
     if kind_q:
@@ -565,7 +591,34 @@ def command(host, kind, action, data):
             link.request(kind_q, action_q, None, timeout=4)
         except LanError:
             pass
+    if rep is None:
+        # Keine erkennbare Quittung: Die Werksfirmware führt Licht/Trocknen aus, antwortet aber je nach Version
+        # anders (ohne msgid, andere Aktion …). Dann zählt, ob der Drucker den neuen Zustand meldet.
+        if _took_effect(link, kind, action, payload):
+            return {"ok": True, "state": "verified", "code": None, "msg": "Zustand am Drucker bestätigt", "reply": None}
+        with link.lock:
+            seen = sorted({"%s/%s%s" % (k, a, "" if m else " ohne msgid") for (ts, k, a, m, _s, _c) in link.recent
+                           if ts >= sent and (k, a) not in POLL_QUERIES})
+        raise LanError("Drucker hat den Befehl nicht bestätigt" + (" (empfangen: " + ", ".join(seen) + ")" if seen else ""), "timeout")
     return {"ok": ok, "state": rep.get("state"), "code": rep.get("code"), "msg": rep.get("msg"), "reply": rep.get("data")}
+
+
+def _took_effect(link, kind, action, payload):
+    """Meldet der Drucker nach dem Befehl den gewünschten Zustand? (nur für Befehle mit ablesbarem Zustand)"""
+    if (kind, action) == ("light", "control"):
+        light = link.data("light")
+        lights = light.get("lights") if isinstance(light.get("lights"), list) else [light]
+        return any(isinstance(l, dict) and l.get("type") == payload["type"] and l.get("status") == payload["status"] for l in lights)
+    boxes = {b.get("id"): b for b in (link.data("multiColorBox").get("multi_color_box") or []) if isinstance(b, dict)}
+    want = (payload or {}).get("multi_color_box") or []
+    if (kind, action) == ("multiColorBox", "setDry") and want:
+        return all(((boxes.get(w["id"]) or {}).get("drying_status") or {}).get("status") == w["drying_status"]["status"] for w in want)
+    if (kind, action) == ("multiColorBox", "setAutoFeed") and want:
+        return all((boxes.get(w["id"]) or {}).get("auto_feed") == w["auto_feed"] for w in want)
+    if (kind, action) == ("fan", "setSpeed"):
+        fan = link.data("fan")
+        return all(fan.get(k) == v for k, v in payload.items())
+    return False
 
 
 def camera_url(host):
@@ -677,10 +730,14 @@ def print_gcode(host, path, filename, options=None):
         raise LanError("Der G-Code ist für „%s“ geslict, verbunden ist „%s“" % (facts["printer"], model), "forbidden")
     if not link._upload_url:          # nach einem 401 neu anmelden, dann gibt /info eine frische Adresse
         link._upload_url = discovery(link.host).get("fileUploadurl")
-    stored = _upload(link, path, filename)
-    # Werkzeug n im G-Code druckt aus ACE-Slot n (so exportiert das Tool); Farben und Typ zur Kontrolle am Drucker
+    # Werkzeug n im G-Code druckt aus ACE-Slot n (so exportiert das Tool), über alle Einheiten durchgezählt
+    # (ACE 2 = Slot 5–8, ams_index 4–7; mit zwei Einheiten noch nicht am echten Drucker geprüft). Farben und Typ zur Kontrolle.
     ace = ace_boxes({"multiColorBox": [link.reports["multiColorBox"]]} if "multiColorBox" in link.reports else {})
-    slots = [s for b in ace for s in b["slots"]]
+    slots = all_slots(ace)
+    missing = [t + 1 for t in facts["tools"] if slots and t >= len(slots)]
+    if missing:
+        raise LanError("Der G-Code nutzt Slot %s – am Drucker gibt es nur %d Slots" % (", ".join(map(str, missing)), len(slots)), "forbidden")
+    stored = _upload(link, path, filename)
     rgb = lambda h: [int(h[i:i + 2], 16) for i in (1, 3, 5)] if re.fullmatch(r"#[0-9a-fA-F]{6}", h or "") else [255, 255, 255]
     mapping = [{"paint_index": t, "ams_index": t, "paint_color": rgb(facts["colours"][t] if t < len(facts["colours"]) else "") + [255],
                 "ams_color": rgb(slots[t]["colour"] if t < len(slots) else "") + [255],

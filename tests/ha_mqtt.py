@@ -181,6 +181,8 @@ sl = ha_mqtt.slot_payloads(ST, SPOOLS)
 check("Slots: 4 laut ACE", sorted(sl) == [1, 2, 3, 4], sl)
 check("Slot 1 mit Spule", sl[1]["remaining_g"] == 812.5 and sl[1]["name"] == "Weiß" and sl[1]["type"] == "PLA" and sl[1]["net_g"] == 1000)
 check("Slot 3 archivierte Spule zählt nicht", sl[3]["remaining_g"] is None)
+two = {"ace": [{"id": 0, "slots": [{"index": i} for i in range(4)]}, {"id": 1, "slots": [{"index": i} for i in range(4)]}]}
+check("zwei ACE: Sensoren für Slot 1–8", sorted(ha_mqtt.slot_payloads(two, {"spools": []})) == list(range(1, 9)))
 check("Slots ohne Drucker laut Filamentverwaltung", sorted(ha_mqtt.slot_payloads(None, SPOOLS)) == [1])
 
 # ---------- gegen den Broker ----------

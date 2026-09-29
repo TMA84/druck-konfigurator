@@ -225,7 +225,11 @@ body.dragging .model-card { border-color: var(--accent); background: var(--accen
 
 /* Teileliste: ein Eintrag je Teil, das gewählte bestimmt Datenblatt und 3D-Ansicht */
 .part-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(260px, 40vh); overflow-y: auto; border-top: 1px solid var(--rule); }
-.part-list li { border-bottom: 1px solid var(--rule); }
+.part-list li { border-bottom: 1px solid var(--rule); display: flex; align-items: stretch; }
+.part-list li > button[data-part] { flex: 1; min-width: 0; }
+.part-list button.pdel { display: block; flex: none; width: 30px; padding: 0; border-left: 0; border: 0; background: none; color: var(--ink-3); font-size: 13px; cursor: pointer; opacity: .55; }
+.part-list li:hover .pdel, .part-list .pdel:focus-visible { opacity: 1; }
+.part-list button.pdel:hover { color: var(--bad, #c0392b); background: var(--paper); }
 .part-list button { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; background: none; border: 0; border-left: 3px solid transparent; padding: 6px 6px 6px 8px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
 .part-list button:hover { background: var(--paper); }
 .part-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -361,6 +365,8 @@ dialog::backdrop { background: rgba(27, 31, 36, .45); }
   border-left: 4px solid var(--accent); transition: opacity var(--t-fast), transform var(--t-norm) var(--ease);
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show.has-action { pointer-events: auto; }
+.toast button { margin-left: 12px; font: inherit; font-weight: 600; background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 2px 10px; cursor: pointer; }
 
 /* ================= ① Modell: Spalte mit Teilen/Lage/Mehrfarbig/Bohrlöchern | 3D-Ansicht ================= */
 #view3d { overflow: hidden; background: var(--stage-bg); }
@@ -524,6 +530,9 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .slot-edit-row .slot-ovr { font-size: 12px; display: inline-flex; gap: 3px; align-items: center; cursor: pointer; }
 .slot-edit-row.inherit select, .slot-edit-row.inherit input[type=color] { opacity: .55; }
 .slot-edit-printer.hidden { display: none; }
+.slot-ace { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 8px 0 0; }
+.slot-ace.hidden { display: none; }
+.slot-ace select { padding: 4px 8px; }
 .ace-box.hidden { display: none; }
 .ace-auto { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .ace-box pre { max-height: 220px; overflow: auto; font-size: 11px; background: var(--accent-soft); padding: 8px; border-radius: var(--r-s); white-space: pre-wrap; word-break: break-all; }
@@ -840,3 +849,8 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-live canvas { display: block; width: 100%; height: 100%; }
 .wb-live-info { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
 .wb-live-info:empty { display: none; }
+.wb-acetabs { display: flex; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+.wb-acetabs.hidden { display: none; }
+.wb-acetabs button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--ink); cursor: pointer; }
+.wb-acetabs button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.wb-acetabs small { opacity: .75; margin-left: 4px; }

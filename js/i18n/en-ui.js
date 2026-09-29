@@ -195,5 +195,13 @@ I18N.add({
  "{n} Platten": "{n} plates",
  "{n} Teil auf das Filament im Slot umgestellt": "{n} part switched to the filament in its slot",
  "{n} Teile": "{n} parts",
- "{n} Teile auf das Filament im Slot umgestellt": "{n} parts switched to the filament in their slot"
+ "{n} Teile auf das Filament im Slot umgestellt": "{n} parts switched to the filament in their slot",
+ "trocknet": "drying",
+ "ACE-Einheit": "ACE unit",
+ "ACE-Einheiten": "ACE units",
+ "{n} (Slot 1–{last})": "{n} (slots 1–{last})",
+ "Teil entfernen": "Remove part",
+ "„{name}“ entfernen": "Remove “{name}”",
+ "„{name}“ entfernt": "“{name}” removed",
+ "Rückgängig": "Undo"
 });

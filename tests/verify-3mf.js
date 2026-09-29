@@ -16,7 +16,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verify3mf-'));
 const ctx = vm.createContext({ console, TextDecoder });
 for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf', 'purge'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
-const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,build3mf,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
+const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,widenTemplate,build3mf,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
 
 /* ---------- Testmodelle ---------- */
 function boxTris(x0, y0, z0, x1, y1, z1) {
@@ -246,6 +246,32 @@ if (!ONLY_MW) {
     const est = K.estimateColourChanges([{ geom, slot: null, bodies, plate: 1 }], 0, r.layer, r.firstLayer), orcaChanges = +(text.match(/^; total filament change = (\d+)/m) || [])[1];
     check(est === orcaChanges, `Farbwechsel geschätzt ${est} = Orca ${orcaChanges}`);
     check(g.cfg.machine_load_filament_time === loadTime, `Wechselzeit für Spülmenge 1,0 im G-Code: ${g.cfg.machine_load_filament_time} = ${loadTime}`);
+  } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
+}
+
+/* ---------- Zwei ACE (8 Slots): Stiel aus Slot 1, Hut aus Slot 6 (ACE 2, Slot 2) ---------- */
+if (!ONLY_MW) {
+  const inp = { printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'multicolor', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const geom = MODELS.mushroom, r = K.compute(inp, geom, { getMat: K.getMat, settings: K.store.settings });
+  const tpl = K.widenTemplate(K.exportTemplate('kobra_s1', '0.4'), 8);
+  const live = Array.from({ length: 8 }, (_, i) => ({ type: 'PLA', colour: ['#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#000000'][i] }));
+  const bodies = [{ name: 'Stiel', start: 0, count: 12, slot: null }, { name: 'Hut', start: 12, count: 12, slot: 5 }];
+  const { bytes, notes } = K.build3mf(tpl, r, [{ geom, r, bodies }], 0, fflate, live);
+  const ps = JSON.parse(fflate.strFromU8(fflate.unzipSync(bytes)['Metadata/project_settings.config']));
+  console.log('\nZwei ACE: pilz.stl, Stiel Slot 1, Hut Slot 6 (ACE 2)');
+  check(ps.filament_settings_id.length === 8 && ps.nozzle_temperature.length === 8 && ps.flush_volumes_matrix.length === 64 && ps.filament_self_index[7] === '8', `8 Filamente in der Datei (Spülmatrix ${ps.flush_volumes_matrix.length} Werte)`);
+  check(!notes.some(n => /gibt es an deinem Drucker nicht/.test(n)), 'kein Hinweis „Slot gibt es nicht“: ' + notes.join(' | '));
+  check(ps.filament_type[5] === 'PLA' && ps.filament_colour[5] === '#FF00FF' && ps.nozzle_temperature[5] === String(r.nozzle), `Slot 6 laut Drucker mit den Werten des Teils (${ps.nozzle_temperature[5]} °C): ${ps.filament_type[5]} ${ps.filament_colour[5]}`);
+  const dir = path.join(OUT, 'zwei_ace'); fs.mkdirSync(dir);
+  const file = path.join(dir, 'export.3mf'); fs.writeFileSync(file, bytes);
+  try {
+    execFileSync(ORCA, ['--slice', '0', '--outputdir', dir, file], { stdio: 'pipe', timeout: 240000 });
+    const text = fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.gcode'))), 'utf8');
+    check(/^; filament: (1,6|6,1)$/m.test(text), 'Slots 1 und 6 im Einsatz: ' + (text.match(/^; filament: .*$/m) || ['?'])[0]);
+    const tools = new Set([...text.matchAll(/^T(\d+)\b/gm)].map(m => +m[1]));
+    check(tools.has(5) && !tools.has(1), 'Werkzeugwechsel auf T5 (Slot 6): ' + [...tools].join(','));
+    const cfg = parseGcode(text).cfg;
+    check((cfg.filament_type || '').split(/[,;]/).length === 8, 'G-Code kennt 8 Filamente: ' + cfg.filament_type);
   } catch (e) { check(false, 'Orca-CLI fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 300)); }
 }
 

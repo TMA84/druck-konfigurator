@@ -111,6 +111,17 @@ const cases = [];
   delete threemf.layout;
   const d = build(parts, threemf);
   check('porta nicht angeordnet: 4 Platten wie beim Designer', d.res.plateCount === 4 && (d.ms.match(/<plate>/g) || []).length === 4);
+
+  // Ein Teil entfernt (js/app.js removePart): fehlt im Export, die übrigen behalten die Lage des Designers
+  const drop = parts.find(p => p !== lid), rest = parts.filter(p => p !== drop);
+  threemf.removed = true;
+  const r = build(rest, threemf), re2 = reimport(r.res.bytes), plates = new Set(rest.map(p => p.plate)).size;
+  check('porta ohne „' + drop.name + '“: 4 Build-Items, 4 Instanzen', (r.root.match(/<item\b/g) || []).length === 4 && (r.ms.match(/<model_instance>/g) || []).length === 4);
+  check('porta ohne Teil: erneut importiert 4 Teile, ' + plates + ' Platten', re2.imp.parts.length === 4 && re2.count === plates && !re2.imp.parts.some(p => p.name === drop.name), re2.imp.parts.map(p => p.name + '@' + p.plate).join(', '));
+  const keep = rest.find(p => p.plate === lid.plate) || lid, before = reimport(d.res.bytes).boxes.find(b => b.name === keep.name), after = re2.boxes.find(b => b.name === keep.name);
+  check('porta ohne Teil: „' + keep.name + '“ bleibt an seiner Stelle', before && after && Math.abs(before.x0 - after.x0) < 0.01 && Math.abs(before.y0 - after.y0) < 0.01, before && after && fmtBox(before) + ' → ' + fmtBox(after));
+  delete threemf.removed;
+  cases.push({ name: 'porta_ohne_teil', bytes: r.res.bytes, count: plates, instances: null });
 }
 
 /* 2) ACE-Guide + erzeugte STL-Box (Modell hinzufügen) */

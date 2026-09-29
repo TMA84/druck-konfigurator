@@ -76,6 +76,8 @@ I18N.addRx([
   [/^Drucker lehnt die MQTT-Anmeldung ab \((.*)\)$/s, 'The printer rejects the MQTT login ($1)'],
   [/^MQTT-Verbindung zum Drucker fehlgeschlagen: (.*)$/s, 'MQTT connection to the printer failed: $1'],
   [/^(.*) muss eine ganze Zahl von (-?\d+) bis (-?\d+) sein$/s, (m, n, lo, hi) => t(n) + ' must be a whole number from ' + lo + ' to ' + hi],
+  [/^Drucker hat den Befehl nicht bestätigt \(empfangen: (.*)\)$/s, (m, a) => "The printer didn't confirm the command (received: " + a.replace(/ ohne msgid/g, ' without msgid') + ')'],
+  [/^Der G-Code nutzt Slot (.*) – am Drucker gibt es nur (\d+) Slots$/s, 'The G-code uses slot $1 – the printer only has $2 slots'],
   [/^Dieser Befehl ist nicht freigegeben: (.*)$/s, 'This command isn’t allowed: $1'],
   [/^Hochladen fehlgeschlagen: (.*)$/s, (m, a) => 'Upload failed: ' + t(a)],
   [/^Drucker lehnt die Datei ab: (.*)$/s, 'The printer rejects the file: $1'],

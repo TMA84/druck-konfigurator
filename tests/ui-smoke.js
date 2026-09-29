@@ -292,7 +292,37 @@ async function runSmoke(opts={}){
     loadStore();ok(store.settings.manualSlots&&store.settings.manualSlots[$('printer').value][1].type==='PETG','Eintragen: bleibt gespeichert');
     menuClick('export3mf');await wait(50);$('slotEditBtn').click();$('slotEditReset').click();await wait(50);
     ok(/unbekannt/.test($('slotSource').textContent)&&!(store.settings.manualSlots||{})[$('printer').value]&&!/PLA|PETG/.test($('slotList').textContent),'Eingabe löschen: Belegung wieder unbekannt, keine Typen aus der Vorlage');
-    $('exportDlg').close();}
+    /* Zweite ACE von Hand (Kobra S1): 8 Slots, Slot 6 = PETG → 3MF mit 8 Filamenten; der S1 bietet höchstens 2 Einheiten an */
+    const prevPrinter=document.body.dataset.printer;
+    $('exportDlg').close();document.querySelector('.printer-switch [data-printer="kobra_s1"]').click();await wait(120);
+    menuClick('export3mf');await wait(50);
+    $('slotEditBtn').click();
+    ok(!$('slotAceRow').classList.contains('hidden')&&$('slotAceCount').options.length===2,'Zwei ACE: Auswahl 1–2 Einheiten beim S1');
+    $('slotAceCount').value='2';$('slotAceCount').dispatchEvent(new Event('change'));await wait(50);
+    ok(document.querySelectorAll('[data-slot-type]').length===8&&/Slot 5 · ACE 2/.test($('slotEditRows').textContent),'Zwei ACE: 8 Slots, Slot 5 = ACE 2');
+    if(document.querySelectorAll('[data-slot-type]').length===8){
+    document.querySelector('[data-slot-type="5"]').value='PETG';document.querySelector('[data-slot-colour="5"]').value='#00aa00';
+    $('slotEditSave').click();await wait(50);
+    ok(document.querySelectorAll('#slotList input[name="slot"]').length===8&&/Slot 6 · ACE 2 · PETG/.test($('slotList').textContent),'Zwei ACE: Export-Dialog zeigt 8 Slots');
+    document.querySelector('input[name="slot"][value="5"]').click();await wait(30);
+    $('export3mfSave').click();await wait(100);
+    { const z2=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop()));
+      const p2=JSON.parse(fflate.strFromU8(z2['Metadata/project_settings.config'])),m2=fflate.strFromU8(z2['Metadata/model_settings.config']);
+      ok(p2.filament_settings_id.length===8&&p2.filament_colour[5]==='#00AA00'&&/key="extruder" value="6"/.test(m2),'Zwei ACE: 3MF mit 8 Filamenten, Teil druckt aus Slot 6 (Farbe aus der Belegung)'); }
+    menuClick('export3mf');await wait(50);$('slotEditBtn').click();
+    $('slotAceCount').value='1';$('slotAceCount').dispatchEvent(new Event('change'));await wait(30);
+    ok(document.querySelectorAll('[data-slot-type]').length===4,'Zurück auf eine ACE: 4 Slots');
+    $('slotEditReset').click();await wait(50);}
+    /* Werkstatt mit zwei Einheiten: Reiter je ACE, Slot-Nummern laufen weiter */
+    { const saved=wb.st,box=(id,t)=>({id,auto_feed:0,loaded_slot:-1,temp:24,drying:{status:id,target_temp:45,duration:240,remain_time:100},slots:[0,1,2,3].map(i=>({index:i,type:t,colour:'#336699',present:true,loaded:false,rfid:false}))});
+      try{ wb.st={connected:true,state:'free',printing:false,temps:{},fans:{},lights:[],ace:[box(0,'PLA'),box(1,'PETG')],has_ace:1};wb.box=0;wbRender();
+        ok($('wbAceTabs').querySelectorAll('button').length===2&&/trocknet/.test($('wbAceTabs').textContent),'Werkstatt: Reiter ACE 1/ACE 2, ACE 2 trocknet');
+        $('wbAceTabs').querySelectorAll('button')[1].click();
+        ok([...$('wbAceSlots').querySelectorAll('.wb-swatch span')].map(x=>x.textContent).join()==='5,6,7,8'&&/PETG/.test($('wbAceSlots').textContent),'Werkstatt: ACE 2 zeigt Slot 5–8');
+      }catch(e){ok(false,'Werkstatt mit zwei ACE: '+e.message)}
+      finally{wb.st=saved;wb.box=0;if(saved)wbRender()} }
+    $('exportDlg').close();
+    if(prevPrinter!=='kobra_s1'){document.querySelector('.printer-switch [data-printer="'+prevPrinter+'"]').click();await wait(120);}}
 
   /* Anderer Drucker aus den Orca-Profilen: Auswahl, Datenblatt, Export mit dessen Profil, zurück zum S1 */
   { document.querySelector('.printer-switch [data-printer="orca"]').click();
@@ -354,6 +384,13 @@ async function runSmoke(opts={}){
     // Modell hinzufügen statt ersetzen
     addMode=true;await dropFile(mk('deckel.stl',50,30,4));await wait(300);
     ok(project.parts.length===4&&/ \+ /.test(project.name),'Modell hinzufügen erweitert das Projekt ('+project.name+')');
+    // Einzelnes Teil entfernen (✕ in der Teileliste) und rückgängig machen
+    setTab('model');await wait(50);
+    { const name=project.parts[3].name;
+      $('partList').querySelector('[data-del-part="3"]').click();await wait(80);
+      ok(project.parts.length===3&&!project.parts.some(p=>p.name===name)&&$('partList').querySelectorAll('[data-part]').length===3&&/entfernt/.test($('toast').textContent),'✕ entfernt „'+name+'“');
+      $('toast').querySelector('button').click();await wait(80);
+      ok(project.parts.length===4&&project.parts[3].name===name&&project.parts.every((p,i)=>p.id===i),'Rückgängig stellt das Teil wieder her'); }
     // Slot für alle Teile
     setTab('settings');await wait(50);
     ok(!$('partScope').classList.contains('hidden')&&!$('partSlotAll').classList.contains('hidden'),'Slot-Auswahl mit „Für alle Teile übernehmen“');
