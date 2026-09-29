@@ -4,9 +4,13 @@ Nur Extrusionsbahnen (keine Fahrwege), je Bahn Linienart (;TYPE:) und Werkzeug (
 fast gerade Bahnen gleicher Art werden zusammengefasst – so schrumpft ein 50-MB-G-Code auf wenige MB.
 G2/G3 (Bögen) werden in kurze Stücke zerlegt. Relative (M83) und absolute (M82) Extrusion, G92.
 
-Format (little endian):  b"GCPV2" · uint32 Länge des JSON-Kopfs · JSON · Auffüllung auf 4 Byte
+Format (little endian):  b"GCPV3" · uint32 Länge des JSON-Kopfs · JSON · Auffüllung auf 4 Byte
                          · uint16[4·n] (x0, y0, x1, y1 – auf bbox skaliert, ~0,004 mm bei 250 mm) · uint8[2·n] (Art, Werkzeug)
-JSON: {"count": n, "types": [...], "layers": [[z, erste Bahn], ...], "bbox": [x0, y0, z0, x1, y1, z1], "tools": [...]}
+                         · uint8[n] Vorschub je Bahn in speed_unit mm/s (aus F im G-Code – Einstellungen samt Abbremsen
+                           für die Mindest-Schichtzeit; 0 = unbekannt)
+JSON: {"count": n, "types": [...], "layers": [[z, erste Bahn], ...], "bbox": [x0, y0, z0, x1, y1, z1], "tools": [...],
+       "speed_unit": 2, "travel": Fahrgeschwindigkeit mm/s (schnellste Fahrt ohne Extrusion)}
+Bis 10.4 hieß das Format GCPV2 (ohne Vorschub) – js/preview-ui.js parsePreview liest beide.
 """
 import json
 import math
@@ -18,18 +22,20 @@ TYPES = ["Outer wall", "Inner wall", "Overhang wall", "Sparse infill", "Internal
          "Top surface", "Bottom surface", "Bridge", "Internal Bridge", "Gap infill", "Support", "Support interface",
          "Support transition", "Prime tower", "Brim", "Skirt", "Ironing", "Custom", "Other"]
 TYPE_INDEX = {t.lower(): i for i, t in enumerate(TYPES)}
-WORD = re.compile(r"([XYZEIJ])(-?\d*\.?\d+)")
+WORD = re.compile(r"([XYZEIJF])(-?\d*\.?\d+)")
+SPEED_UNIT = 2            # mm/s je Stufe im uint8 (bis 510 mm/s)
 MERGE_COS = 0.9995        # fast gerade: Winkel < ~1,8°
 ARC_STEP_MM = 1.0
 
 
 def build_preview(path):
-    segs, attrs, layers = array("f"), array("B"), []
+    segs, attrs, speeds, layers = array("f"), array("B"), array("B"), []
+    feed, travel = 0.0, 0.0   # aktueller Vorschub (mm/min), schnellste Fahrt
     x = y = z = 0.0
     e_abs, relative, tool, kind, layer_z = 0.0, True, 0, TYPE_INDEX["other"], None
     tools = set()
     bb = [math.inf, math.inf, math.inf, -math.inf, -math.inf, -math.inf]
-    last = None  # (ende_x, ende_y, dx, dy, art, werkzeug) der letzten Bahn – zum Zusammenfassen
+    last = None  # (ende_x, ende_y, dx, dy, art, werkzeug, vorschub) der letzten Bahn – zum Zusammenfassen
 
     def add(x0, y0, x1, y1):
         nonlocal last
@@ -37,15 +43,17 @@ def build_preview(path):
         ln = math.hypot(dx, dy)
         if ln < 1e-6:
             return
-        if last and last[4] == kind and last[5] == tool and abs(last[0] - x0) < 1e-4 and abs(last[1] - y0) < 1e-4:
+        spd = max(0, min(255, int(round(feed / 60 / SPEED_UNIT))))
+        if last and last[4] == kind and last[5] == tool and last[6] == spd and abs(last[0] - x0) < 1e-4 and abs(last[1] - y0) < 1e-4:
             lx, ly = last[2], last[3]
             if (lx * dx + ly * dy) / (math.hypot(lx, ly) * ln) > MERGE_COS:
                 segs[-2], segs[-1] = x1, y1
-                last = (x1, y1, segs[-2] - segs[-4], segs[-1] - segs[-3], kind, tool)
+                last = (x1, y1, segs[-2] - segs[-4], segs[-1] - segs[-3], kind, tool, spd)
                 return
         segs.extend((x0, y0, x1, y1))
         attrs.extend((kind, tool))
-        last = (x1, y1, dx, dy, kind, tool)
+        speeds.append(spd)
+        last = (x1, y1, dx, dy, kind, tool, spd)
         bb[0], bb[1], bb[3], bb[4] = min(bb[0], x0, x1), min(bb[1], y0, y1), max(bb[3], x0, x1), max(bb[4], y0, y1)
         bb[2], bb[5] = min(bb[2], z), max(bb[5], z)
 
@@ -85,6 +93,8 @@ def build_preview(path):
                     e_abs = float(m.group(1))
             elif cmd in ("G0", "G1", "G2", "G3"):
                 w = {k: float(v) for k, v in WORD.findall(line)}
+                if "F" in w:
+                    feed = w["F"]
                 nx, ny, nz = w.get("X", x), w.get("Y", y), w.get("Z", z)
                 de = 0.0
                 if "E" in w:
@@ -112,7 +122,9 @@ def build_preview(path):
                     else:
                         add(x, y, nx, ny)
                 else:
-                    last = None if (nx != x or ny != y) else last
+                    if nx != x or ny != y:
+                        last = None
+                        travel = max(travel, feed / 60)
                 x, y = nx, ny
     n = len(attrs) // 2
     if not n:
@@ -121,6 +133,6 @@ def build_preview(path):
     sx, sy = max(bb[3] - bb[0], 1e-6), max(bb[4] - bb[1], 1e-6)
     q = array("H", (int(round((v - (bb[0] if i % 2 == 0 else bb[1])) / (sx if i % 2 == 0 else sy) * 65535)) for i, v in enumerate(segs)))
     head = json.dumps({"count": n, "types": TYPES, "layers": layers, "bbox": [round(v, 3) for v in bb],
-                       "tools": sorted(tools)}).encode()
+                       "tools": sorted(tools), "speed_unit": SPEED_UNIT, "travel": round(travel, 1)}).encode()
     pad = (-(5 + 4 + len(head))) % 4
-    return b"GCPV2" + struct.pack("<I", len(head)) + head + b" " * pad + q.tobytes() + attrs.tobytes()
+    return b"GCPV3" + struct.pack("<I", len(head)) + head + b" " * pad + q.tobytes() + attrs.tobytes() + speeds.tobytes()

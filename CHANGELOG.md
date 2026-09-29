@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.5.0] – 2026-09-29
+
+### Neu
+- **Druckkopf mit echten Geschwindigkeiten:** Die Vorschau speichert den Vorschub je Bahn aus dem G-Code (Format GCPV3); der Kopf fährt damit weiter – mit einem vereinfachten Bewegungsplaner wie Klipper (Kurvengeschwindigkeit aus dem Winkel, Rampen, Beschleunigung je Linienart, Rückzug/Z-Hop bei Fahrten; am echten Druck auf ±5 % genau) – bei älteren Vorschauen mit den Geschwindigkeiten aus den Druckereinstellungen je Linienart. Leerfahrten zwischen Teilen werden abgefahren statt übersprungen; Meldungsalter wird eingerechnet, ein Filter glättet Restsprünge.
+- **Mechanik im 3D-Fortschritt:** Druckbett, X-Traverse und Y-Schienen, die mit dem Kopf mitfahren; Kopf in etwa echter Größe.
+- **Farben:** Auf der aktuellen Schicht ist noch nicht Gedrucktes blass und färbt sich orange, sobald der Kopf darüber war; sehr dunkle Filamente werden aufgehellt.
+
+### Behoben
+- Bahnen blieben zunächst schwarz (zwei Farb-Aktualisierungen im selben Bild – die erste ging verloren).
+
 ## [10.4.0] – 2026-09-29
 
 ### Neu

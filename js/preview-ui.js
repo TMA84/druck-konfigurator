@@ -20,12 +20,14 @@ const PV_TYPE_LABELS = {
 
 const pv = { job: null, plates: [], data: null, hidden: new Set(), renderer: null, scene: null, camera: null, controls: null, mesh: null, grid: null, idx: null, layerEnd: [], layerStart: [], raf: 0 };
 
+// GCPV3: dazu Vorschub je Bahn (v, in speed_unit mm/s); GCPV2 (bis 10.4, z. B. ältere gespeicherte Drucke) ohne
 function parsePreview(buf) {
-  const u8 = new Uint8Array(buf);
-  if (String.fromCharCode(...u8.subarray(0, 5)) !== 'GCPV2') throw Error(t('unbekanntes Vorschauformat'));
+  const u8 = new Uint8Array(buf), magic = String.fromCharCode(...u8.subarray(0, 5));
+  if (magic !== 'GCPV2' && magic !== 'GCPV3') throw Error(t('unbekanntes Vorschauformat'));
   const len = new DataView(buf).getUint32(5, true), head = JSON.parse(new TextDecoder().decode(u8.subarray(9, 9 + len)));
   const off = 9 + len + ((4 - (9 + len) % 4) % 4), n = head.count;
-  return { ...head, q: new Uint16Array(buf, off, 4 * n), a: new Uint8Array(buf, off + 8 * n, 2 * n) };
+  return { ...head, q: new Uint16Array(buf, off, 4 * n), a: new Uint8Array(buf, off + 8 * n, 2 * n),
+    v: magic === 'GCPV3' ? new Uint8Array(buf, off + 10 * n, n) : null };
 }
 
 // Sehr dunkle Filamente (schwarzes ASA …) wären auf dem dunklen Hintergrund unsichtbar – auf Dunkelgrau anheben

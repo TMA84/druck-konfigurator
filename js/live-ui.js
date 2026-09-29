@@ -10,7 +10,7 @@
 
 const lv = { name: null, data: null, missing: false, renderer: null, scene: null, camera: null, controls: null, mesh: null, grid: null,
   layerOf: null, shown: -2, shownDone: null, track: null, raf: 0, mode: null, loading: false, pos: null, cx: 0, cy: 0, head: null, layerAt: -1, layerSince: 0,
-  hs: null, anim: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
+  hs: null, anim: 0, dirty: null, disp: null, lastTick: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
 const LV_POS_FRESH_S = 10;
 const livePosWanted = () => store.settings.livePos !== false && lv.mode === 'live';
 const LV_NOW = [0.95, 0.48, 0.2];
@@ -36,9 +36,21 @@ function lvResize() {
   if (!w || !h) return;
   lv.renderer.setSize(w, h, false); lv.camera.aspect = w / h; lv.camera.updateProjectionMatrix(); lvRender();
 }
+/* Geänderte Farben (Bahn-Bereich lo…hi) bis zum nächsten Zeichnen sammeln: three.js überträgt nur einen Bereich je Bild –
+   setzt man ihn zweimal, bevor gezeichnet wird, geht der erste verloren (die Bahnen blieben schwarz). */
+function lvColourDirty(lo, hi) {
+  const d = lv.dirty = lv.dirty ? [Math.min(lv.dirty[0], lo), Math.max(lv.dirty[1], hi)] : [lo, hi];
+  const attr = lv.mesh.geometry.attributes.color;
+  attr.updateRange.offset = d[0] * 6; attr.updateRange.count = (d[1] - d[0]) * 6; attr.needsUpdate = true;
+}
+function lvDraw() {
+  if (!lv.renderer) return;
+  lv.renderer.render(lv.scene, lv.camera);
+  lv.dirty = null;
+}
 function lvRender() {
   if (lv.raf || !lv.renderer) return;
-  lv.raf = requestAnimationFrame(() => { lv.raf = 0; if (lv.renderer) lv.renderer.render(lv.scene, lv.camera); });
+  lv.raf = requestAnimationFrame(() => { lv.raf = 0; lvDraw(); });
 }
 
 function lvBuild() {
@@ -69,61 +81,191 @@ function lvBuild() {
   const size = Math.max(bx1 - bx0, by1 - by0, 20), span = Math.ceil(size * 1.4 / 10) * 10;
   lv.grid = new THREE.GridHelper(span, span / 10, 0x444444, 0x2c2c2c); lv.grid.rotation.x = Math.PI / 2; lv.scene.add(lv.grid);
   const top = d.bbox[5] || 1;
-  lv.camera.position.set(size * 0.9, -size * 1.1, size * 0.8 + top);
+  // Bett und Mechanik möglichst im Bild – bei kleinen Teilen höchstens 2,2 × Modellgröße, sonst wäre das Teil winzig
+  const bed = lvBed(), frame = Math.max(size, Math.min(Math.max(bed.x1 - bed.x0, bed.y1 - bed.y0), size * 2.2));
+  lv.camera.position.set(frame * 0.9, -frame * 1.1, frame * 0.8 + top);
   lv.controls.target.set(0, 0, top / 3); lv.controls.update();
-  lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null;
+  lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null;
   lvHeadInit();
-  lv.head.scale.setScalar(Math.max(0.3, Math.min(1, size / 150)));   // bei kleinen Teilen kleiner, sonst verdeckt er alles
 }
 
-// Druckkopf: Düse (Kegel, Spitze = Position) und Heizblock darüber, halbdurchsichtig
-function lvHeadInit() {
-  if (lv.head) return;
-  // etwa in Originalgröße (Kobra S1: Kopf ≈ 45 × 45 mm), damit er auf dem ganzen Bett auffällt
-  const mat = new THREE.MeshBasicMaterial({ color: 0xe6e8ec, transparent: true, opacity: 0.18, depthWrite: false });
-  const edge = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, 8, 20), new THREE.MeshBasicMaterial({ color: 0xf27a33 }));
-  tip.rotation.x = -Math.PI / 2; tip.position.z = 4;
-  const boxG = new THREE.BoxGeometry(44, 44, 30), block = new THREE.Mesh(boxG, mat); block.position.z = 8 + 15;
-  const lines = new THREE.LineSegments(new THREE.EdgesGeometry(boxG), edge); lines.position.copy(block.position);
-  lv.head = new THREE.Group(); lv.head.add(tip, block, lines); lv.head.visible = false;
-  lv.scene.add(lv.head);
+/* Drucker-Mechanik ungefähr wie beim Kobra S1 (CoreXY, das Bett fährt nach unten): Kopf ≈ 56 × 48 × 70 mm (geschätzt, keine
+   offiziellen Maße), darüber die X-Traverse über die ganze Breite und links/rechts die Y-Schienen – beide auf Höhe des
+   Kopfes, sie fahren mit der Düse mit. Dazu der Umriss des Druckbetts. Maße in mm, Koordinaten wie die Bahnen. */
+const LV_HEAD = { w: 56, d: 48, h: 70, tip: 8 }, LV_GANTRY_Z = 52, LV_RAIL = 10;
+function lvBed() {
+  const tpl = typeof exportTemplate === 'function' ? exportTemplate(typeof WB_PRINTER !== 'undefined' ? WB_PRINTER : 'kobra_s1', '0.4') : null;
+  const pts = tpl ? (tpl.settings.printable_area || []).map(p => p.split('x').map(Number)) : [];
+  if (!pts.length) return { x0: 0, y0: 0, x1: 250, y1: 250 };
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
+function lvHeadInit() {
+  for (const k of ['head', 'gantry', 'bed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
+  const H = LV_HEAD, glass = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, depthWrite: false });
+  const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
+  // Kopf: Düse (Spitze = Position) und Gehäuse darüber
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, H.tip, 20), new THREE.MeshBasicMaterial({ color: 0xf27a33 }));
+  tip.rotation.x = -Math.PI / 2; tip.position.z = H.tip / 2;
+  const boxG = new THREE.BoxGeometry(H.w, H.d, H.h), block = new THREE.Mesh(boxG, glass(0xe6e8ec)); block.position.z = H.tip + H.h / 2;
+  const blockE = edges(boxG, 0.75); blockE.position.copy(block.position);
+  lv.head = new THREE.Group(); lv.head.add(tip, block, blockE); lv.head.visible = false;
+  // Mechanik: X-Traverse (fährt in Y und Z mit), Y-Schienen (fahren in Z mit)
+  const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22;
+  const beamG = new THREE.BoxGeometry(bx1 - bx0 + 2 * m, LV_RAIL, LV_RAIL), beam = new THREE.Group();
+  beam.add(new THREE.Mesh(beamG, glass(0xb8bec8)), edges(beamG, 0.35)); beam.position.x = (bx0 + bx1) / 2;
+  const railG = new THREE.BoxGeometry(LV_RAIL, by1 - by0 + 2 * m, LV_RAIL), rails = [bx0 - m, bx1 + m].map(x => {
+    const r = new THREE.Group(); r.add(new THREE.Mesh(railG, glass(0xb8bec8)), edges(railG, 0.3)); r.position.set(x, (by0 + by1) / 2, 0); return r; });
+  lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
+  // Bett: Umriss auf Höhe 0
+  const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));
+  lv.bed = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(bedPts), new THREE.LineBasicMaterial({ color: 0x6b7280 }));
+  lv.scene.add(lv.head, lv.gantry, lv.bed);
+}
+// Kopf und Mechanik an die Stelle p (Düsenspitze)
+function lvPlaceHead(p) {
+  lv.head.position.set(p.x, p.y, p.z);
+  lv.gantry.visible = lv.head.visible;
+  lv.gantry.position.z = p.z + LV_GANTRY_Z;
+  lv.gantry.userData.beam.position.y = p.y;
+}
+// Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
+function lvVisible(rgb) {
+  const l = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2], min = 0.28;
+  if (l >= min) return rgb;
+  const k = (min - l) / (1 - l);
+  return rgb.map(c => c + (1 - c) * k);
+}
+
 /* ---------- Druckkopf ----------
-   Der Kopf fährt die Bahnen der Schicht entlang (Weg s in mm ab Schichtbeginn, Fahrten zwischen Bahnen zählen nicht).
-   - Echte Position (Schalter an, Meldung < 10 s alt): Schicht aus der gemeldeten Höhe, Stelle = nächste Bahn (≤ 8 mm);
-     zwischen zwei Meldungen fährt er mit der gemessenen Geschwindigkeit weiter, Abweichungen gleichen sich weich aus.
-     Weit weg von jeder Bahn (Fahrt, Parken, Reinigen): gleitet er gerade zur gemeldeten Stelle.
-   - Geschätzt: Anteil der erwarteten Schichtzeit (Restzeit / restliche Schichten) → Weg in der Schicht.
+   Der Kopf fährt die Bahnen der Schicht entlang, gemessen in Druckzeit t (s ab Schichtbeginn): je Bahn Länge durch
+   Vorschub – aus dem G-Code (Vorschau GCPV3) oder, bei älteren Vorschauen, aus den Druckereinstellungen je Linienart
+   (lvSpeeds) – plus Beschleunigen/Bremsen (Trapez mit der Druckbeschleunigung). Leerfahrten zählen mit der
+   Fahrgeschwindigkeit und werden sichtbar abgefahren – kein Sprung zwischen Teilen.
+   - Echte Position (Schalter an, Meldung < 10 s alt): Schicht aus der gemeldeten Höhe, Stelle = nächste Bahn (≤ 8 mm,
+     zuerst in der Nähe der erwarteten Stelle); die Meldung ist position_age_s alt – so weit wird vorgerechnet. Zwischen
+     zwei Meldungen läuft die Druckzeit mit dem gemessenen Verhältnis zur Uhr (rate, ≈ 1) weiter, Abweichungen gleichen
+     sich über LV_BLEND_MS aus. Weit weg von jeder Bahn (Parken, Reinigen): gleitet er gerade zur gemeldeten Stelle.
+   - Geschätzt: Anteil der erwarteten Schichtzeit (Restzeit / restliche Schichten) → Stelle in der Schicht.
+   Zuletzt glättet ein Filter die gezeigte Stelle (Zeitkonstante LV_SMOOTH_S) – Restsprünge werden zu kurzem Gleiten.
    Ansichtskoordinaten: G-Code minus Mitte (lv.cx/cy). Die Schleife läuft nur, solange der Kopf sichtbar ist. */
-const LV_SNAP_MM = 8, LV_BLEND_MS = 700;
+const LV_SNAP_MM = 8, LV_BLEND_MS = 1500, LV_SMOOTH_S = 0.2, LV_MAX_CORR_S = 4, LV_NEAR_S = 6;
 const livePosOn = () => store.settings.livePos !== false;     // Standard: an (am Kobra S1 geprüft)
 
-// Weg-Tabelle einer Schicht (zwischengespeichert): cum[k] = Weg bis zum Anfang von Bahn start+k
+/* Geschwindigkeiten (mm/s) und Beschleunigungen (mm/s²) je Linienart aus den Druckereinstellungen (Orca-Vorlage des
+   Druckers) – Geschwindigkeit nur für Vorschauen ohne Vorschub je Bahn, Beschleunigung immer (steht nicht in der Vorschau).
+   Prozent bei Geschwindigkeiten: von der Innenwand; bei Beschleunigungen: von der Standardbeschleunigung (Brücke: von der
+   Außenwand, wie Orca). */
+const LV_TYPE_SPEED = { 'Outer wall': 'outer_wall_speed', 'Inner wall': 'inner_wall_speed', 'Overhang wall': 'overhang_2_4_speed',
+  'Sparse infill': 'sparse_infill_speed', 'Internal solid infill': 'internal_solid_infill_speed', 'Solid infill': 'internal_solid_infill_speed',
+  'Top surface': 'top_surface_speed', 'Bottom surface': 'initial_layer_speed', 'Bridge': 'bridge_speed', 'Internal Bridge': 'bridge_speed',
+  'Gap infill': 'gap_infill_speed', 'Support': 'support_speed', 'Support interface': 'support_interface_speed',
+  'Support transition': 'support_speed', 'Prime tower': 'inner_wall_speed', 'Brim': 'skirt_speed', 'Skirt': 'skirt_speed',
+  'Ironing': 'ironing_speed' };
+const LV_TYPE_ACCEL = { 'Outer wall': 'outer_wall_acceleration', 'Inner wall': 'inner_wall_acceleration', 'Overhang wall': 'outer_wall_acceleration',
+  'Sparse infill': 'sparse_infill_acceleration', 'Internal solid infill': 'internal_solid_infill_acceleration',
+  'Solid infill': 'internal_solid_infill_acceleration', 'Top surface': 'top_surface_acceleration', 'Bridge': 'bridge_acceleration',
+  'Internal Bridge': 'bridge_acceleration' };
+function lvSpeeds() {
+  if (lv.speeds) return lv.speeds;
+  const tpl = typeof exportTemplate === 'function' ? exportTemplate(WB_PRINTER, '0.4') : null, st = (tpl && tpl.settings) || {};
+  const raw = k => { const v = st[k]; return Array.isArray(v) ? v[0] : v; };
+  const num = (k, def, base) => { const v = String(raw(k) ?? ''), f = parseFloat(v); return !(f > 0) ? def : /%$/.test(v) ? base * f / 100 : f; };
+  const inner = num('inner_wall_speed', 150), acc = num('default_acceleration', 5000), outerAcc = num('outer_wall_acceleration', acc, acc);
+  const types = {}, accels = {};
+  for (const [ty, key] of Object.entries(LV_TYPE_SPEED)) types[ty] = num(key, inner, inner);
+  for (const [ty, key] of Object.entries(LV_TYPE_ACCEL)) accels[ty] = num(key, acc, /Bridge/.test(ty) ? outerAcc : acc);
+  const travelAcc = num('travel_acceleration', acc, acc);
+  // Rückzug + Z-Hop je Leerfahrt (hin und zurück), nur ab der Mindeststrecke
+  const retr = num('retraction_length', 0.8, 1), rs = num('retraction_speed', 40, 1), hop = num('z_hop', 0.4, 1), zs = num('machine_max_speed_z', 15, 1);
+  return (lv.speeds = { types, accels, other: inner, accel: acc, first: num('initial_layer_speed', 50, inner),
+    firstAccel: num('initial_layer_acceleration', 500, acc), travel: num('travel_speed', 300, inner), travelAcc,
+    scv: num('machine_max_jerk_x', 5, 1), travelExtra: 2 * retr / rs + 2 * hop / zs, minTravel: num('retraction_minimum_travel', 1, 1) });
+}
+// Zeit für eine Strecke L mit Anfangs-/Endgeschwindigkeit v0/v1, Höchstgeschwindigkeit vm und Beschleunigung acc (Trapez)
+function lvMoveTime(L, v0, v1, vm, acc) {
+  if (!(L > 0)) return 0;
+  const da = (vm * vm - v0 * v0) / (2 * acc), dd = (vm * vm - v1 * v1) / (2 * acc);
+  if (da + dd <= L) return (vm - v0) / acc + (vm - v1) / acc + (L - da - dd) / vm;
+  const vp = Math.sqrt(Math.max(v0 * v0, v1 * v1, (2 * acc * L + v0 * v0 + v1 * v1) / 2));
+  return Math.max(0, (vp - v0) / acc) + Math.max(0, (vp - v1) / acc);
+}
+/* Zeit-Tabelle einer Schicht (zwischengespeichert): a[k]/b[k] = Druckzeit bei Anfang/Ende von Bahn start+k, dazwischen die
+   Leerfahrt. Vereinfachter Bewegungsplaner wie Klipper: Kurvengeschwindigkeit aus dem Winkel (square_corner_velocity ≈
+   Ruck-Einstellung), Vor- und Rückschau für die Rampen, Beschleunigung je Linienart. */
 function lvTrack(li) {
   if (lv.track && lv.track.li === li) return lv.track;
-  const d = lv.data, start = d.layers[li][1], end = li + 1 < d.layers.length ? d.layers[li + 1][1] : d.count, P = lv.pos;
-  const cum = new Float64Array(end - start + 1);
-  for (let i = start; i < end; i++) { const o = i * 6; cum[i - start + 1] = cum[i - start] + Math.hypot(P[o + 3] - P[o], P[o + 4] - P[o + 1]); }
-  return (lv.track = { li, start, end, cum, len: cum[end - start] });
+  const d = lv.data, start = d.layers[li][1], end = li + 1 < d.layers.length ? d.layers[li + 1][1] : d.count, P = lv.pos, n = end - start;
+  const sp = lvSpeeds(), unit = d.speed_unit || 2, first = li === 0, travel = d.travel > 0 ? d.travel : sp.travel;
+  // Bewegungen: [Länge, Höchstgeschw., Beschl., dx, dy, Bahn k oder −1 = Fahrt]
+  const M = [];
+  for (let k = 0; k < n; k++) {
+    const i = start + k, o = i * 6;
+    if (k) { const q = o - 6, dx = P[o] - P[q + 3], dy = P[o + 1] - P[q + 4], L = Math.hypot(dx, dy);
+      if (L > 1e-3) M.push([L, travel, first ? Math.min(sp.firstAccel * 2, sp.travelAcc) : sp.travelAcc, dx / L, dy / L, -1]); }
+    const dx = P[o + 3] - P[o], dy = P[o + 4] - P[o + 1], L = Math.hypot(dx, dy), ty = d.types[d.a[2 * i]];
+    const v = d.v && d.v[i] ? d.v[i] * unit : first ? sp.first : (sp.types[ty] || sp.other);
+    M.push([L, v, first ? sp.firstAccel : (sp.accels[ty] || sp.accel), L ? dx / L : 1, L ? dy / L : 0, k]);
+  }
+  // Kurvengeschwindigkeit zwischen zwei Bewegungen (Klipper: junction deviation aus square_corner_velocity)
+  const m = M.length, vj = new Float64Array(m + 1);   // vj[i] = Geschwindigkeit am Anfang von Bewegung i
+  for (let i = 1; i < m; i++) {
+    const A = M[i - 1], B = M[i], acc = Math.min(A[2], B[2]), jd = sp.scv * sp.scv * (Math.SQRT2 - 1) / acc;
+    const cos = -(A[3] * B[3] + A[4] * B[4]);
+    let v;
+    if (cos > 0.999999) v = 0; else if (cos < -0.999999) v = Infinity;
+    else { const sh = Math.sqrt(0.5 * (1 - cos)); v = Math.sqrt(acc * jd * sh / (1 - sh)); }
+    // Rückzug/Z-Hop vor und nach einer längeren Fahrt: dort steht der Kopf kurz
+    if ((A[5] < 0 && A[0] >= sp.minTravel) || (B[5] < 0 && B[0] >= sp.minTravel)) v = 0;
+    vj[i] = Math.min(v, A[1], B[1]);
+  }
+  // Rückschau: rechtzeitig bremsen; Vorschau: nur so schnell, wie beschleunigt werden kann
+  for (let i = m - 1; i >= 1; i--) vj[i] = Math.min(vj[i], Math.sqrt(vj[i + 1] * vj[i + 1] + 2 * M[i][2] * M[i][0]));
+  for (let i = 1; i <= m; i++) vj[i] = Math.min(vj[i], Math.sqrt(vj[i - 1] * vj[i - 1] + 2 * M[i - 1][2] * M[i - 1][0]));
+  const a = new Float64Array(n), b = new Float64Array(n);
+  let t = 0;
+  for (let i = 0; i < m; i++) {
+    const [L, vm, acc, , , k] = M[i];
+    if (k < 0 && L >= sp.minTravel) t += sp.travelExtra;
+    if (k >= 0) a[k] = t;
+    t += lvMoveTime(L, vj[i], vj[i + 1], vm, acc);
+    if (k >= 0) b[k] = t;
+  }
+  return (lv.track = { li, start, end, a, b, len: t });
 }
 function lvPointAt(tr, s) {
-  const c = tr.cum, n = tr.end - tr.start;
+  const n = tr.end - tr.start, P = lv.pos;
   if (!n) return null;
   s = Math.max(0, Math.min(tr.len, s));
   let lo = 0, hi = n - 1;
-  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (c[m] <= s) lo = m; else hi = m - 1; }
-  const o = (tr.start + lo) * 6, seg = c[lo + 1] - c[lo], k = seg > 0 ? (s - c[lo]) / seg : 0, P = lv.pos;
-  return { x: P[o] + (P[o + 3] - P[o]) * k, y: P[o + 1] + (P[o + 4] - P[o + 1]) * k, z: P[o + 5], seg: tr.start + lo };
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (tr.a[m] <= s) lo = m; else hi = m - 1; }
+  const o = (tr.start + lo) * 6;
+  if (s <= tr.b[lo]) {                      // auf der Bahn
+    const seg = tr.b[lo] - tr.a[lo], k = seg > 0 ? (s - tr.a[lo]) / seg : 0;
+    return { x: P[o] + (P[o + 3] - P[o]) * k, y: P[o + 1] + (P[o + 4] - P[o + 1]) * k, z: P[o + 5], seg: tr.start + lo };
+  }
+  // Leerfahrt zur nächsten Bahn
+  const q = o + 6, gap = lo + 1 < n ? tr.a[lo + 1] - tr.b[lo] : 0, k = gap > 0 ? (s - tr.b[lo]) / gap : 1;
+  if (lo + 1 >= n) return { x: P[o + 3], y: P[o + 4], z: P[o + 5], seg: tr.start + lo + 1 };
+  return { x: P[o + 3] + (P[q] - P[o + 3]) * k, y: P[o + 4] + (P[q + 1] - P[o + 4]) * k, z: P[o + 5], seg: tr.start + lo + 1 };
 }
-// nächste Stelle auf einer Bahn der Schicht → {s, dist}
-function lvSnap(tr, x, y) {
+// nächste Stelle auf einer Bahn der Schicht → {s (Druckzeit), dist}. near = erwartete Druckzeit: dann zuerst ±LV_NEAR_S davon
+// suchen – bei dichter Füllung liegen Nachbarlinien 0,4 mm auseinander, da wäre die nächste Linie oft die falsche
+function lvSegAt(tr, s) { let lo = 0, hi = tr.end - tr.start - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (tr.a[m] <= s) lo = m; else hi = m - 1; } return lo; }
+function lvSnap(tr, x, y, near) {
+  if (near != null) {
+    const r = lvSnapRange(tr, x, y, tr.start + lvSegAt(tr, near - LV_NEAR_S), tr.start + lvSegAt(tr, near + LV_NEAR_S) + 1);
+    if (r.dist <= LV_SNAP_MM) return r;
+  }
+  return lvSnapRange(tr, x, y, tr.start, tr.end);
+}
+function lvSnapRange(tr, x, y, from, to) {
   const P = lv.pos; let best = Infinity, bs = 0;
-  for (let i = tr.start; i < tr.end; i++) {
+  for (let i = from; i < to; i++) {
     const o = i * 6, ax = P[o], ay = P[o + 1], dx = P[o + 3] - ax, dy = P[o + 4] - ay, l2 = dx * dx + dy * dy;
     const k = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2)) : 0;
     const qx = ax + dx * k - x, qy = ay + dy * k - y, d2 = qx * qx + qy * qy;
-    if (d2 < best) { best = d2; bs = tr.cum[i - tr.start] + k * Math.sqrt(l2); }
+    if (d2 < best) { best = d2; bs = tr.a[i - tr.start] + k * (tr.b[i - tr.start] - tr.a[i - tr.start]); }
   }
   return { s: bs, dist: Math.sqrt(best) };
 }
@@ -142,23 +284,27 @@ function lvHeadSet(st, cur, L, T) {
   if (real) {
     const x = +p.x - lv.cx, y = +p.y - lv.cy, z = +p.z, key = x + ',' + y + ',' + z, li = lvLayerByZ(z);
     if (h && h.real && h.key === key) return h.info;              // nichts Neues – weiterfahren wie bisher
-    const shown = h ? lvHeadPos(h, now) : null;
-    const tr = li >= 0 ? lvTrack(li) : null, sn = tr && tr.len > 0 ? lvSnap(tr, x, y) : null;
+    const t0 = now - Math.min(8, Math.max(0, +age || 0)) * 1000;   // Zeitpunkt der Messung
+    const tr = li >= 0 ? lvTrack(li) : null, same = h && h.snapped && h.li === li;
+    const sn = tr && tr.len > 0 ? lvSnap(tr, x, y, same ? h.s0 + h.v * Math.min(10, (t0 - h.t0) / 1000) : null) : null;
     let hs;
     if (sn && sn.dist <= LV_SNAP_MM) {
-      // Geschwindigkeit aus zwei Meldungen auf derselben Schicht (geglättet); sonst die bisherige
-      let v = h && h.v || 0;
-      if (h && h.snapped && h.li === li && sn.s > h.s0) { const vm = (sn.s - h.s0) / Math.max(0.5, (now - h.t0) / 1000); v = v ? 0.5 * v + 0.5 * vm : vm; }
-      const corr = h && h.snapped && h.li === li && shown ? Math.max(-30, Math.min(30, lvHeadS(h, now) - sn.s)) : 0;
-      hs = { real: true, snapped: true, li, s0: sn.s, t0: now, v: Math.min(v, 400), corr, key };
-      hs.info = { real: true, snapped: true, li, frac: tr.len ? sn.s / tr.len : 0, seg: lvPointAt(tr, sn.s).seg };
+      // Verhältnis Druckzeit zu Uhrzeit aus zwei Meldungen auf derselben Schicht (geglättet; ≈ 1, wenn die Zeiten passen)
+      let v = h && h.v || 1;
+      if (same && sn.s > h.s0 && t0 - h.t0 > 1500) { const vm = (sn.s - h.s0) / ((t0 - h.t0) / 1000); v = Math.max(0.3, Math.min(2.5, 0.7 * v + 0.3 * vm)); }
+      // wo der Kopf gerade gezeigt wird → Abweichung weich ausgleichen statt springen
+      let corr = 0;
+      const shownS = same ? lvHeadS(h, now) : lv.disp && h && h.li === li ? (at => at.dist <= LV_SNAP_MM ? at.s : null)(lvSnap(tr, lv.disp.x, lv.disp.y, sn.s)) : null;
+      if (shownS != null) corr = shownS - (sn.s + v * (now - t0) / 1000);
+      hs = { real: true, snapped: true, li, s0: sn.s, t0, tc: now, v, corr: Math.max(-LV_MAX_CORR_S, Math.min(LV_MAX_CORR_S, corr)), key };
+      hs.info = { real: true, snapped: true, li, frac: tr.len ? sn.s / tr.len : 0 };
     } else {
-      hs = { real: true, snapped: false, from: shown || { x, y, z }, to: { x, y, z }, t0: now, dur: h && h.real ? Math.min(6000, Math.max(800, now - h.t0)) : 1, key, v: h && h.v, li };
+      hs = { real: true, snapped: false, from: lv.disp || { x, y, z }, to: { x, y, z }, t0: now, dur: h && h.real ? Math.min(6000, Math.max(800, now - (h.tc || h.t0))) : 1, tc: now, key, v: h && h.v, li };
       hs.info = { real: true, snapped: false, li };
     }
     lv.hs = hs;
   } else {
-    if (!(L > 0)) { lv.hs = null; if (lv.head) lv.head.visible = false; lvRender(); return null; }
+    if (!(L > 0)) { lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; } lvRender(); return null; }
     if (cur !== lv.layerAt) { lv.layerAt = cur; lv.layerSince = Date.now(); }
     const rest = +(st.job && st.job.remaining_min) || 0, left = Math.max(1, (T || lv.data.layers.length) - L + 1);
     lv.hs = { real: false, li: cur, dur: rest > 0 ? rest * 60 / left : 60, info: { real: false, li: cur } };
@@ -167,10 +313,10 @@ function lvHeadSet(st, cur, L, T) {
   if (!lv.anim) lv.anim = requestAnimationFrame(lvHeadTick);
   return lv.hs.info;
 }
-// Weg in der Schicht jetzt (echt, auf der Bahn): letzte Meldung + Geschwindigkeit × Zeit, Abweichung blendet aus
+// Druckzeit in der Schicht jetzt (echt, auf der Bahn): Messung + rate × Zeit seit der Messung, Abweichung blendet aus
 function lvHeadS(h, now) {
-  const dt = (now - h.t0) / 1000, k = Math.min(1, (now - h.t0) / LV_BLEND_MS), e = k * k * (3 - 2 * k);
-  return h.s0 + h.v * Math.min(dt, 8) + h.corr * (1 - e);
+  const dt = Math.min(10, (now - h.t0) / 1000), k = Math.min(1, (now - h.tc) / LV_BLEND_MS), e = k * k * (3 - 2 * k);
+  return h.s0 + h.v * dt + h.corr * (1 - e);
 }
 function lvHeadPos(h, now) {
   if (!h.real) {
@@ -184,50 +330,57 @@ function lvHeadPos(h, now) {
 function lvHeadTick(now) {
   lv.anim = 0;
   const h = lv.hs;
-  if (!h || !lv.head || !lv.head.visible || lv.mode !== 'live' || document.hidden) return;
+  if (!h || !lv.head || !lv.head.visible || lv.mode !== 'live' || document.hidden) { lv.lastTick = 0; return; }
   const p = lvHeadPos(h, now);
   if (p) {
-    lv.head.position.set(p.x, p.y, p.z);
-    if (p.seg != null && h.li === lv.shown) lvColourTo(p.seg);   // abgefahrene Bahnen einfärben (die aktuelle erst danach)
-    if (lv.renderer) lv.renderer.render(lv.scene, lv.camera);
+    // Glätten: gezeigte Stelle folgt dem Ziel mit kurzer Verzögerung; sehr weite Wege (Schichtwechsel, Start) direkt
+    const dt = lv.lastTick ? Math.min(0.1, (now - lv.lastTick) / 1000) : 1, d = lv.disp;
+    if (!d || Math.hypot(p.x - d.x, p.y - d.y) > 120) lv.disp = { x: p.x, y: p.y, z: p.z };
+    else { const a = 1 - Math.exp(-dt / LV_SMOOTH_S); d.x += (p.x - d.x) * a; d.y += (p.y - d.y) * a; d.z += (p.z - d.z) * a; }
+    lvPlaceHead(lv.disp);
+    if (p.seg != null && h.li === lv.shown) lvColourTo(p.seg);   // abgefahrene Bahnen orange (die aktuelle erst danach)
+    lvDraw();
   }
-  if (h.snapped || !h.real || now - h.t0 < h.dur) lv.anim = requestAnimationFrame(lvHeadTick);
+  lv.lastTick = now;
+  if (h.snapped || !h.real || now - h.t0 < h.dur + 1000) lv.anim = requestAnimationFrame(lvHeadTick);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && lv.hs && !lv.anim) lv.anim = requestAnimationFrame(lvHeadTick); });
 
 // Bis Schicht cur (0-basiert): fertig = Filamentfarbe, aktuell = orange; danach die kommenden Schichten je nach Wahl
-// done: erste Bahn der aktuellen Schicht, die noch nicht gedruckt ist (echte Kopfposition) – davor schon in Filamentfarbe
+/* Farben bis Schicht cur: frühere Schichten in Filamentfarbe. Aktuelle Schicht ohne Kopfposition (done = null) ganz orange;
+   mit Kopf: was er schon abgefahren hat orange („gerade gedruckt“), der Rest der Schicht blass – so sieht man das Einfärben
+   auch bei dunklem Filament. Danach die kommenden Schichten je nach Wahl (lvGhostApply). */
+const LV_PENDING = [0.42, 0.44, 0.48];
+function lvCurColour(i, split, withHead) { return !withHead || i < split ? LV_NOW : LV_PENDING; }
 function lvColour(cur, done) {
   const d = lv.data, col = lv.mesh.geometry.attributes.color.array, cache = {};
-  const end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, split = done == null ? d.layers[cur][1] : done;
+  const start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, withHead = done != null;
   for (let i = 0; i < end; i++) {
     let c;
-    if (i < split) { const k = d.a[2 * i + 1]; c = cache[k] || (cache[k] = hexToRgb01(toolColour(k))); }
-    else c = LV_NOW;
+    if (i < start) { const k = d.a[2 * i + 1]; c = cache[k] || (cache[k] = lvVisible(hexToRgb01(toolColour(k)))); }
+    else c = lvCurColour(i, done, withHead);
     for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
   }
-  const attr = lv.mesh.geometry.attributes.color;
-  attr.updateRange.offset = 0; attr.updateRange.count = -1; attr.needsUpdate = true;
+  lvColourDirty(0, end);
   lv.mesh.geometry.setDrawRange(0, end * 2);
   lv.ghost.geometry.setDrawRange(end * 2, (d.count - end) * 2);
   lvGhostApply();
   lv.shown = cur; lv.shownDone = done;
 }
-/* Während der Kopf fährt: Bahnen der aktuellen Schicht, die er schon abgefahren hat, in Filamentfarbe; läuft er zurück
-   (Korrektur nach einer Meldung), wieder orange. Nur der geänderte Bereich wird neu übertragen. */
+/* Während der Kopf fährt: abgefahrene Bahnen der aktuellen Schicht orange; läuft er zurück (Korrektur nach einer Meldung),
+   wieder blass. Nur der geänderte Bereich wird neu übertragen. */
 function lvColourTo(split) {
+  if (lv.shownDone == null) return;          // aktuelle Schicht ohne Kopf gezeichnet (ganz orange)
   const d = lv.data, cur = lv.shown, start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count;
   split = Math.max(start, Math.min(end, split));
-  const was = lv.shownDone == null ? start : lv.shownDone;
+  const was = lv.shownDone;
   if (split === was) return;
-  const attr = lv.mesh.geometry.attributes.color, col = attr.array, cache = {};
-  const [a, b] = split > was ? [was, split] : [split, was];
+  const col = lv.mesh.geometry.attributes.color.array, [a, b] = split > was ? [was, split] : [split, was];
   for (let i = a; i < b; i++) {
-    let c;
-    if (i < split) { const k = d.a[2 * i + 1]; c = cache[k] || (cache[k] = hexToRgb01(toolColour(k))); } else c = LV_NOW;
+    const c = lvCurColour(i, split, true);
     for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
   }
-  attr.updateRange.offset = a * 6; attr.updateRange.count = (b - a) * 6; attr.needsUpdate = true;
+  lvColourDirty(a, b);
   lv.shownDone = split;
 }
 function lvGhostApply() {
@@ -258,7 +411,7 @@ function liveUpdate(st) {
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {
-    lv.name = null; lv.data = null; lv.hs = null; if (lv.head) lv.head.visible = false;
+    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; }
     $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden');
     $('wbLiveInfo').textContent = '';
     return;
@@ -277,8 +430,8 @@ function liveUpdate(st) {
   // Mit echter Kopfposition: Schicht aus der gemeldeten Höhe und wie weit sie ist (genauer als die Schichtzahl des Druckers)
   const head = lv.head ? lvHeadSet(st, cur, L, T) : null, onPath = head && head.snapped;
   const li = onPath ? head.li : cur;
-  // neue Schicht: ganz orange; was der Kopf abfährt, färbt lvHeadTick nach und nach ein (ohne Kopf: bleibt orange)
-  if (li !== lv.shown) lvColour(li, head ? lv.data.layers[li][1] : null);
+  // neue Schicht: blass; was der Kopf abfährt, färbt lvHeadTick nach und nach orange (ohne Kopf: ganz orange)
+  if (li !== lv.shown || !!head !== (lv.shownDone != null)) lvColour(li, head ? lv.data.layers[li][1] : null);
   const z = lv.data.layers[li] ? lv.data.layers[li][0] : 0;
   $('wbLiveInfo').textContent = (onPath ? t('Schicht {l} von {n} ({p} %) · Z {z} mm', { l: li + 1, n, p: Math.round(head.frac * 100), z: de(z, 2) })
     : t('Schicht {l} von {n} · Z {z} mm', { l: L || cur + 1, n: T || n, z: de(z, 2) })) +

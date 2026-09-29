@@ -28,7 +28,8 @@ def parse(data):
     c = head["count"]
     q = struct.unpack("<%dH" % (4 * c), data[off:off + 8 * c])
     a = struct.unpack("<%dB" % (2 * c), data[off + 8 * c:off + 10 * c])
-    return head, q, a
+    v = struct.unpack("<%dB" % c, data[off + 10 * c:off + 11 * c])
+    return head, q, a, v
 
 
 GCODE = """M83
@@ -61,8 +62,12 @@ with tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False) as f:
     f.write(GCODE)
 data = gp.build_preview(f.name)
 os.unlink(f.name)
-head, q, a = parse(data)
-check("Kennung GCPV2", data[:5] == b"GCPV2")
+head, q, a, v = parse(data)
+check("Kennung GCPV3", data[:5] == b"GCPV3")
+# Vorschub je Bahn: Wand mit F3000 (50 mm/s), Füllung erbt F9000 der Fahrt davor (150 mm/s); Fahrgeschwindigkeit 150 mm/s
+mm_s = [x * head["speed_unit"] for x in v]
+check("Vorschub der Wand 50 mm/s, der Füllung 150 mm/s", mm_s[0] == 50 and mm_s[2] == 150, mm_s)
+check("Fahrgeschwindigkeit im Kopf", head["travel"] == 150, head.get("travel"))
 check("zwei Schichten", [l[0] for l in head["layers"]] == [0.2, 0.4], head["layers"])
 check("Werkzeuge 0 und 1", head["tools"] == [0, 1], head["tools"])
 kinds = [head["types"][a[2 * i]] for i in range(head["count"])]
