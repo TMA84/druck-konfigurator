@@ -151,12 +151,12 @@ function pvLegend() {
 
 async function pvLoad(plate) {
   $('pvStatus').textContent = t('Lade Vorschau von Platte {n} …', { n: plate }); $('pvStatus').classList.remove('hidden');
-  $('pvDownload').href = '/api/slice/' + pv.job + '/plate_' + plate + '.gcode';
+  $('pvDownload').href = 'api/slice/' + pv.job + '/plate_' + plate + '.gcode';
   $('pvDownload').download = (project ? project.name.replace(/\.(stl|3mf|zip)$/i, '').replace(/[^\w.-]+/g, '_') : t('druck')) + t('_Platte') + plate + '.gcode';
   const p = pv.plates.find(x => x.plate === plate);
   $('pvStats').textContent = p ? t('Druckzeit {time} · {g} g · {n} Farbwechsel · G-Code {mb} MB', { time: duration(p.time_s), g: de(p.total_g, 1), n: p.changes, mb: de(p.gcode_mb || 0, 1) }) : '';
   try {
-    const res = await fetch('/api/slice/' + pv.job + '/plate_' + plate + '.preview');
+    const res = await fetch('api/slice/' + pv.job + '/plate_' + plate + '.preview');
     if (!res.ok) throw Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
     pv.data = parsePreview(await res.arrayBuffer());
     pv.hidden = new Set();

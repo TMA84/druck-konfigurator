@@ -35,6 +35,8 @@ docker compose up -d --build
 
 Danach im Browser `http://<IP-des-NAS>:8765/` öffnen. Das Image enthält OrcaSlicer für die Kostenkalkulation (rund 1,5 GB, x86_64 und ARM). Der Container braucht nur ausgehende Verbindungen zum Drucker (Ports 18910 und 9883 im LAN-Modus); das normale Docker-Netz reicht. Die Seite hat keine Anmeldung – nur im Heimnetz betreiben, nicht ins Internet freigeben. Eigene Filamentwerte speichert weiterhin jeder Browser für sich.
 
+**Als Home-Assistant-Add-on:** In Home Assistant unter **Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories** `https://github.com/TMA84/ha-addons` hinzufügen, dann **Druck-Konfigurator** installieren. Das Tool erscheint in der Seitenleiste (Ingress, mit der HA-Anmeldung); optional zusätzlich direkt auf Port 8765. Spulen und Verbrauch der Filamentverwaltung liegen im Add-on unter `/data`.
+
 **Oder herunterladen:**
 
 1. **Code → Download ZIP**, entpacken.

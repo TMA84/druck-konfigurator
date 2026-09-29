@@ -67,7 +67,7 @@ async function queuePoll() {
   if (!q || !q.items.some(i => i.state === 'printing')) return;
   if (document.body.dataset.tab !== 'printer') {   // im Drucker-Tab fragt die Werkbank ohnehin ab
     const host = printerHost('kobra_s1');
-    if (host) { try { onQueueStatus(await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host))); } catch (e) { /* nächster Versuch */ } }
+    if (host) { try { onQueueStatus(await lanApi('api/anycubic/status?host=' + encodeURIComponent(host))); } catch (e) { /* nächster Versuch */ } }
   }
   queueTimer = setTimeout(queuePoll, QUEUE_POLL_MS);
 }

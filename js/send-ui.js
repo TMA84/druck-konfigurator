@@ -23,7 +23,7 @@ async function openSendDialog(plate, opts) {
   $('sendState').textContent = t('Frage den Drucker ab …'); $('sendState').className = 'note';
   $('sendMap').innerHTML = ''; $('sendGo').disabled = true;
   $('sendDlg').showModal();
-  try { sendInfo = await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host)); }
+  try { sendInfo = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); }
   catch (e) { sendInfo = null; $('sendState').textContent = t('Drucker nicht erreichbar: {msg}', { msg: t(e.message) }); $('sendState').className = 'note bad'; return; }
   renderSendDialog();
 }
@@ -58,7 +58,7 @@ $('sendGo').addEventListener('click', async () => {
   const plate = +$('sendPlate').value, host = printerHost(SEND_PRINTER), btn = $('sendGo');
   btn.disabled = true; btn.textContent = t('Lade hoch …');
   try {
-    const r = await lanApi('/api/anycubic/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    const r = await lanApi('api/anycubic/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       host, job: sendCtx.slice.job, plate, name: sendCtx.name ? sendCtx.name.replace(/\.(stl|3mf|zip)$/i, '') : 'druck',
       options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } }) });
     $('sendDlg').close();

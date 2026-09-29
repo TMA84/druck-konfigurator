@@ -17,7 +17,7 @@ const spoolLow = s => s.remaining_g < Math.min(150, s.net_g * 0.15);
 async function refreshSpools() {
   clearTimeout(spoolTimer);
   try {
-    const r = await fetch('/api/spools');
+    const r = await fetch('api/spools');
     spoolData = r.ok ? await r.json() : null;
   } catch (e) { spoolData = null; }
   if (spoolData) syncSpoolConfig();
@@ -38,7 +38,7 @@ function syncSpoolConfig() {
 }
 
 async function spoolPost(body) {
-  const r = await fetch('/api/spools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch('api/spools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw Error(t(d.error || 'Server antwortet mit HTTP {status}', { status: r.status }));
   spoolData = d;

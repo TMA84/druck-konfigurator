@@ -25,7 +25,7 @@ async function wbPoll() {
   if (document.body.dataset.tab !== 'printer') return;
   const host = wbHost();
   if (!host || !(await lanServerAvailable())) { wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : ''); return; }
-  try { wb.st = await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host)); wb.err = ''; }
+  try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); wb.err = ''; }
   catch (e) { wb.err = t(e.message); }
   wbRender();
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);   // Warteschlange (js/queue-ui.js)
@@ -204,7 +204,7 @@ $('wbCamBtn').addEventListener('click', () => {
   if (wb.player) { wbCamOff(); return; }
   if (typeof flvjs === 'undefined' || !flvjs.isSupported()) { $('wbCamNote').textContent = t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); return; }
   $('wbCamNote').textContent = t('Starte Kamera …');
-  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: location.origin + '/api/anycubic/camera?host=' + encodeURIComponent(wbHost()) },
+  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: location.origin + 'api/anycubic/camera?host=' + encodeURIComponent(wbHost()) },
     { enableStashBuffer: false, lazyLoad: false, liveBufferLatencyChasing: true });
   player.attachMediaElement($('wbVideo'));
   player.on(flvjs.Events.ERROR, (type, detail) => { $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail }); $('wbCamNote').classList.remove('hidden'); });

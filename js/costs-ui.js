@@ -195,7 +195,7 @@ async function runCosts() {
     const partial = changed && changed.length < sigs.plates.length;
     $('costPanelInfo').textContent = partial ? (changed.length ? t('Slicen: nur Platte {list} …', { list: changed.join(', ') }) : t('Übernehme den letzten Stand …')) : t('Slicen mit OrcaSlicer …');
     const q = partial ? '?plates=' + changed.join(',') + '&count=' + sigs.plates.length + '&reuse=' + costState.slice.job : '';
-    const res = await fetch('/api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
+    const res = await fetch('api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw Error(data.error || t('Server antwortet mit HTTP {status}', { status: res.status }));
     if (costState.stale || project !== costProject) { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; renderCostPanel(); return; }

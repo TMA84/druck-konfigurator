@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.2.0] – 2026-09-29
+
+### Neu
+- **Home-Assistant-Add-on** im Repo [TMA84/ha-addons](https://github.com/TMA84/ha-addons) (Ordner `druck-konfigurator`): in der Seitenleiste über Ingress, optional direkt auf Port 8765, Daten der Filamentverwaltung in `/data`, amd64 und aarch64.
+
+### Geändert
+- Aufrufe des eigenen Servers mit relativen Pfaden (`api/…` statt `/api/…`), damit das Tool hinter einem Proxy mit Präfix läuft (Home-Assistant-Ingress). Geprüft mit einem nachgebauten Ingress: Seite, Slicen, Vorschau, Download, Filamentverwaltung.
+
 ## [9.1.2] – 2026-09-29
 
 ### Neu

@@ -54,7 +54,7 @@ let healthInfo = null;
 // Was kann der Server? {lan: LAN-Modus (paho-mqtt + cryptography), slicer: Orca-Version oder null}
 function serverHealth() {
   if (!healthInfo) healthInfo = location.protocol.startsWith('http')
-    ? fetch('/api/health').then(r => r.ok ? r.json() : {}, () => ({})) : Promise.resolve({});
+    ? fetch('api/health').then(r => r.ok ? r.json() : {}, () => ({})) : Promise.resolve({});
   return healthInfo;
 }
 const lanServerAvailable = () => serverHealth().then(j => !!j.lan);
@@ -67,7 +67,7 @@ async function lanApi(path, opts) {
 }
 // Slots aller ACE-Einheiten hintereinander (Slot 5 = Box 2, Slot 1)
 async function fetchLanStatus(host) {
-  const st = await lanApi('/api/anycubic/status?host=' + encodeURIComponent(host));
+  const st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host));
   const slots = [];
   (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : t('leer'), present: s.present, box: box.id, index: s.index })));
   if (!slots.length) throw Error(st.has_ace === 0 ? t('Am Drucker ist keine ACE angeschlossen') : t('Drucker meldet keine ACE-Slots'));
@@ -75,7 +75,7 @@ async function fetchLanStatus(host) {
 }
 // Einstellungen schreiben: nur, was tools/anycubic_lan.py freigibt (WRITABLE)
 function lanCommand(host, type, action, data) {
-  return lanApi('/api/anycubic/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, type, action, data }) });
+  return lanApi('api/anycubic/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, type, action, data }) });
 }
 const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) || 0);
 // slots: [{box, index, type, colour}] – je ACE-Einheit ein Befehl
