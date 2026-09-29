@@ -27,3 +27,8 @@ I18N.add({
   'Drucker meldet keine ACE-Slots': "The printer doesn't report any ACE slots",
   'Drucker hat die Slot-Angabe abgelehnt': 'The printer rejected the slot data'
 });
+// Drucker aus den Server-/Add-on-Einstellungen (js/export-ui.js, Dialog Drucker-Verbindung)
+I18N.add({
+  'Drucker {ip} aus den Server-Einstellungen übernommen': 'Printer {ip} taken from the server settings',
+  'Voreingestellt in den Einstellungen des Servers (Home-Assistant-Add-on: printer_ip). Eine Änderung hier gilt nur für diesen Browser.': 'Preset in the server settings (Home Assistant add-on: <b>printer_ip</b>). A change here only applies to this browser.'
+});

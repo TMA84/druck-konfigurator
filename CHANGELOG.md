@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.3.0] – 2026-09-29
+
+### Neu
+- **Image automatisch bauen:** GitHub Actions (`.github/workflows/docker-image.yml`) baut bei jedem Push auf `main` `ghcr.io/tma84/druck-konfigurator` für amd64 und arm64 (je eigene Maschine, mit Kurztest: Server startet, OrcaSlicer da) – `:latest`, `:<Version>`, `:sha-…`. Das Home-Assistant-Add-on baut darauf auf.
+- **Drucker vorgeben:** `KONFIGURATOR_PRINTER=<IP>` (im Add-on die Option `printer_ip`). Die Seite übernimmt den Drucker von selbst (solange im Browser keine eigene Adresse steht), die Filamentverwaltung zählt ab dem Start des Servers mit. Im Dialog Drucker-Verbindung steht, dass er aus den Server-Einstellungen kommt.
+
 ## [9.2.0] – 2026-09-29
 
 ### Neu

@@ -18,6 +18,8 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
 
 Aufruf: python tools/serve.py [PORT]
   Standard: nur auf diesem Rechner (127.0.0.1). Im Container / auf dem NAS: KONFIGURATOR_HOST=0.0.0.0.
+  KONFIGURATOR_PRINTER=<IP>: Drucker vorgeben (z. B. aus den Einstellungen des Home-Assistant-Add-ons) – die Seite
+  übernimmt ihn, und die Filamentverwaltung zählt gleich ab dem Start mit.
 """
 import functools
 import http.server
@@ -69,7 +71,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/health":
-            return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version()})
+            return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version(), "printer": preset_printer()})
         if url.path == "/api/anycubic/status":
             host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
             return self._api(lambda: anycubic_lan.status(host))
@@ -174,6 +176,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self._api(run)
 
 
+def preset_printer():
+    """Vorgegebener Drucker aus KONFIGURATOR_PRINTER (nur private Adressen), sonst None."""
+    ip = (os.environ.get("KONFIGURATOR_PRINTER") or "").strip()
+    if not ip:
+        return None
+    try:
+        return anycubic_lan.check_host(ip)
+    except anycubic_lan.LanError:
+        return None
+
+
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("KONFIGURATOR_PORT", "8765"))
     host = os.environ.get("KONFIGURATOR_HOST", "127.0.0.1")
@@ -184,6 +197,11 @@ def main():
         if not anycubic_lan.AVAILABLE:
             print("Hinweis: LAN-Modus (Werksfirmware) braucht: pip install -r requirements.txt", flush=True)
         print("Kostenkalkulation: " + ("OrcaSlicer " + str(slicer.version()) + " unter " + slicer.find_orca() if slicer.find_orca() else "kein OrcaSlicer gefunden (ORCA_PATH setzen)"), flush=True)
+        if preset_printer():
+            spools.api_post({"action": "config", "host": preset_printer()})
+            print("Drucker vorgegeben: " + preset_printer(), flush=True)
+        elif os.environ.get("KONFIGURATOR_PRINTER"):
+            print("KONFIGURATOR_PRINTER ist keine private IP-Adresse – ignoriert", flush=True)
         spools.Tracker(anycubic_lan).start()   # Filamentverwaltung: Verbrauch mitzählen (tools/spools.py)
         print("Filamentverwaltung: " + spools.data_file(), flush=True)
         server.serve_forever()

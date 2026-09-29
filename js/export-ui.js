@@ -425,6 +425,8 @@ $('exportDlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.curr
 const IP_PATTERN=/^[A-Za-z0-9.-]+(:\d+)?$/;
 const LINK_PRINTERS=['kobra_s1','snapmaker_u1'].filter(id=>PRINTERS[id]); // ausgeblendete Drucker: js/config.js
 function openLinkDialog(){
+  const fromServer=store.settings.printerFromServer;
+  $('linkServerNote').classList.toggle('hidden',!(fromServer&&printerHost('kobra_s1')===fromServer));
   LINK_PRINTERS.forEach(id=>{$('host_'+id).value=printerHost(id);const res=$('linkRes_'+id);res.textContent='';res.className='muted small link-result'});
   if($('mode_kobra_s1'))$('mode_kobra_s1').value=linkMode('kobra_s1');
   $('aceBox').classList.add('hidden');
@@ -493,6 +495,16 @@ if(lastResult)updateExportMenu(lastResult);
 if(lastResult)renderSidePanels();
 if(lastResult&&printerHost(lastResult.printer.id))refreshSlotsFromPrinter(true).then(update);
 window.addEventListener('focus',()=>{if(lastResult&&printerHost(lastResult.printer.id)&&!(slotState.live&&slotState.printer===lastResult.printer.id))refreshSlotsFromPrinter(true).then(update)});
+// Drucker aus den Server-Einstellungen (Home-Assistant-Add-on: Option printer_ip, sonst KONFIGURATOR_PRINTER) übernehmen –
+// solange im Browser keine eigene Adresse steht oder die bisherige ebenfalls vom Server kam
+serverHealth().then(h=>{
+  const ip=h&&h.printer;if(!ip)return;
+  const cur=printerHost('kobra_s1');
+  if(cur&&cur!==store.settings.printerFromServer)return;
+  store.settings.printerFromServer=ip;
+  if(cur!==ip){saveLink('kobra_s1',ip,'lan');toast(t('Drucker {ip} aus den Server-Einstellungen übernommen',{ip}))}else persist();
+  if(lastResult&&lastResult.printer.id==='kobra_s1')refreshSlotsFromPrinter(true).then(update);
+});
 // Wo die Slot-Angaben herkommen – für Auswahllisten (Körper, Teil): nicht vom Drucker, obwohl einer eingerichtet ist?
 function slotOriginNote(){
   if(!lastResult||!printerHost(lastResult.printer.id))return '';

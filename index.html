@@ -408,6 +408,7 @@
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="export3mfSave">3MF speichern</button></div></dialog>
 
 <dialog id="linkDlg" aria-labelledby="linkTitle"><div class="ed-head"><h2 id="linkTitle">Drucker-Verbindung</h2><div class="muted">IP-Adresse deines Druckers im Heimnetz. Das Tool liest darüber die Filament-Belegung; mit der Werksfirmware kann es außerdem die ACE-Einstellungen (Slot-Filament, Nachfüllen) ändern – nie Druck- oder Bewegungsbefehle. Funktioniert, wenn das Tool über den Server läuft (Container oder „Konfigurator starten.cmd“).</div></div>
+  <p id="linkServerNote" class="note ok small hidden" style="margin:10px 20px 0">Voreingestellt in den Einstellungen des Servers (Home-Assistant-Add-on: <b>printer_ip</b>). Eine Änderung hier gilt nur für diesen Browser.</p>
   <div class="ed-body">
     <div class="note link-req">
       <b>Werksfirmware (Kobra S1):</b> am Drucker <i>Einstellungen → Netzwerk → LAN-Modus</i> einschalten. Im LAN-Modus ist der Drucker nicht mit der Anycubic-Cloud verbunden (keine App-Fernsteuerung).<br>
