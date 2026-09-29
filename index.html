@@ -59,6 +59,7 @@
         <hr>
         <span class="menu-group">Farben &amp; Kosten</span>
         <button type="button" role="menuitem" data-action="slots">Filament-Slots …</button>
+        <button type="button" role="menuitem" data-action="spools">Spulen &amp; Restmengen …</button>
         <button type="button" role="menuitem" data-action="purge">Farbwechsel &amp; Spülmenge …</button>
         <button type="button" role="menuitem" data-action="costs">Preise &amp; Sätze …</button>
       </div>
@@ -267,7 +268,7 @@
     </section>
 
     <section class="wb-card wb-acecard" aria-labelledby="wbAceT">
-      <div class="wb-head"><h3 id="wbAceT" class="wb-eyebrow">ACE</h3><span id="wbAceTemp" class="muted small"></span></div>
+      <div class="wb-head"><h3 id="wbAceT" class="wb-eyebrow">ACE</h3><span id="wbAceTemp" class="muted small"></span><button class="linkbtn" type="button" data-action="spools">Spulen &amp; Restmengen …</button></div>
       <ul id="wbAceSlots" class="wb-ace"></ul>
       <div id="wbDryBox" class="wb-drybox">
         <div class="wb-dry-state"><b>Trocknen</b><span id="wbDryState" class="muted small">aus</span><i class="wb-heatbar"><i id="wbDryBar"></i></i></div>
@@ -454,6 +455,9 @@
     <label class="wb-toggle hidden" id="ovAllRow"><input type="checkbox" id="ovAll"> Für alle Teile des Projekts übernehmen</label></div>
   <div class="ed-foot"><button class="btn sec" type="button" id="ovClear">Alle leeren (Vorschlag)</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="ovSave">Übernehmen</button></div></dialog>
 
+<dialog id="spoolDlg" class="spool-dlg" aria-labelledby="spoolDlgTitle"><div class="ed-head"><h2 id="spoolDlgTitle">Spulen &amp; Restmengen</h2><div class="muted">Der Server erkennt die Spulen in der ACE (RFID, Typ, Farbe) und zieht den Verbrauch jedes Drucks ab – auch bei Drucken aus anderen Programmen. Restmenge = Füllgewicht − Verbrauch − Spülabfall.</div></div>
+  <div class="ed-body" id="spoolBody"></div>
+  <div class="ed-foot"><button class="btn sec" type="button" id="spoolAdd">Spule ohne RFID hinzufügen</button><button class="btn" type="button" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
 <dialog id="costDlg" aria-labelledby="costDlgTitle"><div class="ed-head"><h2 id="costDlgTitle">Kosten: Preise &amp; Sätze</h2><div class="muted">Grundlage der Kostenkalkulation. Verbrauch und Druckzeit kommen aus dem exakten Slicen mit OrcaSlicer, der Spülabfall aus „Farbwechsel &amp; Spülmenge“.</div></div>
   <div class="ed-body">
     <div class="ed-group"><h4>Preis je Filamenttyp (€/kg)</h4>
@@ -534,6 +538,7 @@
 <script src="js/i18n/en-slice.js"></script>
 <script src="js/i18n/en-app.js"></script>
 <script src="js/i18n/en-server.js"></script>
+<script src="js/i18n/en-spools.js"></script>
 <script src="js/i18n/en-ui.js"></script>
 <script src="js/i18n/dom.js"></script>
 <script src="js/data.js"></script>
@@ -571,6 +576,7 @@
 <script src="js/workbench-ui.js"></script>
 <script src="js/send-ui.js"></script>
 <script src="js/queue-ui.js"></script>
+<script src="js/spools-ui.js"></script>
 <script src="js/printer-picker.js"></script>
 </body>
 </html>

@@ -293,6 +293,19 @@ Die Vorschau zeigt nur Druckbahnen (keine Fahrwege). Das Tool hebt die letzten f
 
 ---
 
+### Spulen & Restmengen (Filamentverwaltung)
+
+**⚙ Einstellungen → Spulen & Restmengen …** (oder der Link auf der ACE-Karte im Tab **Drucker**). Der Server erkennt die Spulen in der ACE selbst: an der RFID-Artikelnummer, am Typ und an der Farbe. Eine neue Spule legt er mit 1000 g an. Nimmst du eine heraus, wandert sie **ins Regal**; legst du sie wieder ein, erkennt er sie und rechnet weiter.
+
+Die ACE meldet keine Restmenge. Die **Restmenge errechnet** das Tool: Füllgewicht − Verbrauch − Spülabfall.
+- **Verbrauch:** Der Drucker meldet beim Drucken die verbrauchten Millimeter. Der Server rechnet sie über die Dichte des Filaments in Gramm um und zieht sie von der Spule ab, die gerade im Druckkopf steckt. Das gilt auch für Drucke aus dem Anycubic Slicer und wenn die Seite geschlossen ist; nur der Server muss laufen.
+- **Spülabfall:** Bei jedem Farbwechsel kommt der Abfall im Schacht dazu, passend zu deiner Spülmenge.
+- **Korrigieren:** Unter **Bearbeiten** trägst du die gewogene Restmenge ein (Gewicht mit Spule minus leere Spule). Dort stellst du auch das Füllgewicht (z. B. 750 g), Name, Marke und den **Preis je kg** ein. Der Preis geht in die Kosten ein.
+- **Warnung:** Braucht der Druck mehr, als auf einer Spule ist, steht es in **③ Slicen & Kosten** und im Senden-Dialog.
+- Spulen ohne RFID legst du mit **Spule ohne RFID hinzufügen** an. Leere Spulen kannst du **archivieren**.
+
+Die Daten liegen auf dem Server in `~/.druck-konfigurator/spools.json`, im Container im Volume `/data`.
+
 ### Drucker-Werkbank (Tab „Drucker“)
 
 Mit der Werksfirmware im LAN-Modus steuerst du den Kobra S1 im Tab **Drucker** – das Tool muss über den Server laufen (Container oder `Konfigurator starten.cmd`). Ist noch keine Verbindung eingerichtet, fragt der Tab nach der IP-Adresse.

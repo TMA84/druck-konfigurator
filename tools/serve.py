@@ -13,6 +13,8 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
        ?plates=2,3&count=4&reuse=<job>                  → nur diese Platten neu slicen, die übrigen aus <job> übernehmen
   GET  /api/slice/<job>/plate_<n>.preview              → kompakte Schichtvorschau (tools/gcode_preview.py)
   GET  /api/slice/<job>/plate_<n>.gcode                → G-Code zum Herunterladen
+  GET  /api/spools                                     → Filamentverwaltung: Spulen mit Restmenge (tools/spools.py)
+  POST /api/spools  {action: update|add|delete|config, …} → Spule ändern, Drucker für die Verbrauchszählung festlegen
 
 Aufruf: python tools/serve.py [PORT]
   Standard: nur auf diesem Rechner (127.0.0.1). Im Container / auf dem NAS: KONFIGURATOR_HOST=0.0.0.0.
@@ -30,6 +32,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anycubic_lan  # noqa: E402
 import slicer  # noqa: E402
+import spools  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_BODY = 64 * 1024
@@ -70,6 +73,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if url.path == "/api/anycubic/status":
             host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
             return self._api(lambda: anycubic_lan.status(host))
+        if url.path == "/api/spools":
+            return self._api(spools.api_get)
         if url.path == "/api/anycubic/camera":
             return self._camera(urllib.parse.parse_qs(url.query).get("host", [""])[0])
         m = re.match(r"^/api/slice/([0-9a-f]{16})/plate_(\d+)\.(preview|gcode)$", url.path)
@@ -133,6 +138,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
             reuse = q.get("reuse", [""])[0] or None
             return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
+        if path == "/api/spools":
+            if ctype != "application/json" or length > MAX_BODY:
+                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
+
+            def change():
+                req = json.loads(self.rfile.read(length) or b"{}")
+                if req.get("action") == "config" and req.get("host"):
+                    req["host"] = anycubic_lan.check_host(req["host"])   # nur private Adressen
+                return spools.api_post(req)
+            return self._api(change)
         if path == "/api/anycubic/print":
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
@@ -169,6 +184,8 @@ def main():
         if not anycubic_lan.AVAILABLE:
             print("Hinweis: LAN-Modus (Werksfirmware) braucht: pip install -r requirements.txt", flush=True)
         print("Kostenkalkulation: " + ("OrcaSlicer " + str(slicer.version()) + " unter " + slicer.find_orca() if slicer.find_orca() else "kein OrcaSlicer gefunden (ORCA_PATH setzen)"), flush=True)
+        spools.Tracker(anycubic_lan).start()   # Filamentverwaltung: Verbrauch mitzählen (tools/spools.py)
+        print("Filamentverwaltung: " + spools.data_file(), flush=True)
         server.serve_forever()
 
 

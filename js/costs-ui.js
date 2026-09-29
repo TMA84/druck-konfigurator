@@ -12,7 +12,10 @@ const COST_KINDS = Object.keys(KIND_LABEL);                       // pla, petg, 
 const kindOfType = t => COST_KINDS.find(k => slotMatchesKind(t, k)) || null;   // „PLA-CF“ → pla
 /* Preis eines Slots: eigener Preis des Filaments → Preis seines Typs → (sonst) Standard in computeCosts.
    Slots ohne Filamentprofil (z. B. Farben des Designers) nach dem Typ, den die ACE meldet. */
-function slotPrice(mat, liveType) {
+function slotPrice(mat, liveType, slot) {
+  // Preis der Spule im Slot (Filamentverwaltung, js/spools-ui.js) ist der genaueste
+  const sp = slot != null && typeof spoolInSlot === 'function' ? spoolInSlot(slot) : null;
+  if (sp && sp.price_per_kg > 0) return sp.price_per_kg;
   if (mat && filamentPrice(mat.id) > 0) return filamentPrice(mat.id);
   const kind = mat ? mat.kind : kindOfType(liveType);
   return kind && typePrice(kind) > 0 ? typePrice(kind) : undefined;
@@ -105,7 +108,7 @@ function renderCostPanel() {
   const slots = [], live = typeof slotChoices === 'function' ? slotChoices() : [];
   (costState.slice.total.grams || []).forEach((g, i) => {
     const m = costState.materials[i], lt = live[i] && live[i].present ? live[i].type : '';
-    slots[i] = { name: m ? m.name : lt ? t('{type} (laut ACE)', { type: lt }) : '', pricePerKg: slotPrice(m, lt) };
+    slots[i] = { name: m ? m.name : lt ? t('{type} (laut ACE)', { type: lt }) : '', pricePerKg: slotPrice(m, lt, i) };
   });
   const r = computeCosts(costState.slice, slots, costPurge(), costCfg()), tot = costState.slice.total;
   renderPlateCosts(slots, live);
@@ -127,6 +130,9 @@ function renderCostPanel() {
     (costState.slice.sliced != null && costState.slice.sliced < costState.slice.plates.length ? ' · ' + t('neu geslict: {n} von {total}', { n: costState.slice.sliced, total: costState.slice.plates.length }) : '') +
     (costState.slice.orca ? ' <span class="muted">(OrcaSlicer ' + esc(costState.slice.orca) + ')</span>' : '') +
     ((costState.notes || []).length ? '<br>' + costState.notes.map(esc).join('<br>') : '');
+  // Reicht das Filament auf den Spulen (Filamentverwaltung)?
+  const short = typeof spoolShortage === 'function' ? spoolShortage(tot.grams) : [];
+  if (short.length) info.innerHTML += '<span class="note bad small spool-short">' + esc(t('Zu wenig Filament:') + ' ' + spoolShortageText(short)) + '</span>';
 }
 
 /* Kosten auch im Slicer: filament_cost (€/kg je Slot) und time_cost (€/h = Strom + Verschleiß) in die 3MF –
@@ -138,7 +144,7 @@ function costMachine(tpl) {
   const mats = project && lastResult ? slotMaterials(exportPlan(costDefaultSlot())) : {}, live = typeof slotChoices === 'function' ? slotChoices() : [];
   for (let i = 0; i < n; i++) {
     const lt = live[i] && live[i].present ? live[i].type : '';
-    out.push({ label: t('Slot {n}: Filamentpreis (€/kg)', { n: i + 1 }), key: 'filament_cost', index: i, value: round(slotPrice(mats[i], lt) || c.pricePerKg) });
+    out.push({ label: t('Slot {n}: Filamentpreis (€/kg)', { n: i + 1 }), key: 'filament_cost', index: i, value: round(slotPrice(mats[i], lt, i) || c.pricePerKg) });
   }
   return out;
 }

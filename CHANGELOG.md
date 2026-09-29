@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.1.0] – 2026-09-29
+
+### Neu
+- **Filamentverwaltung „Spulen & Restmengen“** (⚙ Einstellungen und ACE-Karte im Tab Drucker). Der Server erkennt die Spulen in der ACE automatisch (RFID-Artikelnummer, Typ, Farbe) – neu eingelegt, herausgenommen, wieder eingelegt – und **errechnet die Restmenge**: Füllgewicht − Verbrauch − Spülabfall. Den Verbrauch zählt er beim Drucken selbst mit (vom Drucker gemeldete Millimeter, zugeordnet dem Slot im Druckkopf, Dichte je Typ; Spülabfall je Farbwechsel wie in ③), auch bei Drucken aus anderen Programmen und ohne offene Seite (`tools/spools.py`, Daten in `~/.druck-konfigurator/spools.json`, im Container im Volume `/data`).
+- Restmenge auf den ACE-Kacheln und in der Slot-Liste; Warnung in ③ und im Senden-Dialog, wenn eine Platte mehr braucht, als auf der Spule ist. Korrektur durch Wiegen, eigene Spulen ohne RFID, Archiv, Verbrauch der letzten Drucke. Spulenpreis (€/kg) fließt in die Kosten.
+- Die ACE meldet keine Restmenge (`consumables_percent` ist bei Firmware 2.7.2.7 immer 0) – deshalb die Rechnung.
+
+### Geprüft
+- `tests/spools.py` 25/25 (Erkennen, Umstecken, Wiedereinlegen, Verbrauch, Farbwechsel, Neustart mitten im Druck, Wiegen, Tracker). Am echten Kobra S1 (nur lesend): vier Spulen erkannt, laufender Druck zählt auf die ASA-Spule.
+
 ## [9.0.0] – 2026-09-29
 
 ### Neu

@@ -124,7 +124,8 @@ function wbRender() {
   const box = (st.ace || [])[0];
   $('wbAceSlots').innerHTML = box ? box.slots.map(s => '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
       '<div class="wb-swatch" style="' + (s.present ? 'background:' + esc(s.colour || '#dddddd') : '') + '"><span>' + (s.index + 1) + '</span></div>' +
-      '<div class="wb-slotinfo"><b>' + (s.present ? esc(s.type) : t('leer')) + '</b><small>' + (s.present ? (s.loaded ? t('im Drucker') : s.rfid ? 'RFID' : t('von Hand')) : '–') + '</small></div>' +
+      '<div class="wb-slotinfo"><b>' + (s.present ? esc(s.type) : t('leer')) + '</b><small>' + (s.present ? (s.loaded ? t('im Drucker') : s.rfid ? 'RFID' : t('von Hand')) : '–') + '</small>' +
+        (s.present && typeof spoolTileHTML === 'function' ? spoolTileHTML(s.index) : '') + '</div>' +
       (s.present ? '<div class="wb-feed"><button type="button" data-wb-feed="' + s.index + ',1"' + (printing ? ' disabled' : '') + ' title="' + t('Filament bis zur Düse laden') + '">' + t('Laden') + '</button><button type="button" data-wb-feed="' + s.index + ',2"' + (printing ? ' disabled' : '') + ' title="' + t('Filament zurückziehen') + '">' + t('Zurück') + '</button></div>' : '') + '</li>').join('')
     : '<li class="empty" style="grid-column:1/-1;padding:10px">' + (st.has_ace === 0 ? t('Keine ACE angeschlossen.') : t('Keine ACE-Daten.')) + '</li>';
   $('wbAutoFeed').disabled = !box; if (box && document.activeElement !== $('wbAutoFeed')) $('wbAutoFeed').checked = box.auto_feed === 1;

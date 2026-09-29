@@ -35,9 +35,13 @@ ENV KONFIGURATOR_HOST=0.0.0.0 \
     KONFIGURATOR_PORT=8765 \
     ORCA_PATH=/opt/orca/AppRun \
     HOME=/tmp \
+    DATA_DIR=/data \
     PYTHONUNBUFFERED=1 \
     PATH=/opt/venv/bin:$PATH
 EXPOSE 8765
+# Filamentverwaltung (tools/spools.py): Spulen und Verbrauch bleiben über Updates erhalten – Volume /data
+RUN mkdir -p /data && chown nobody /data
+VOLUME /data
 USER nobody
 
 HEALTHCHECK --interval=60s --timeout=5s \

@@ -370,7 +370,7 @@ function renderSidePanels(){
     const src=slotSource(tpl);
     $('slotPanelList').innerHTML=src.slots.map((s,i)=>{
       const how=s.own?(src.kind==='live'?t('überschrieben'):t('eigene Angabe')):src.kind==='live'?(s.present?t('vom Drucker'):t('leer')):t('unbekannt');
-      return '<li class="'+(s.own&&src.kind==='live'?'ovr':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+'</small></span></li>';
+      return '<li class="'+(s.own&&src.kind==='live'?'ovr':'')+'"><span class="pslot" style="background:'+esc(validHex(s.colour)?s.colour:'#dddddd')+'"></span><b>Slot '+(i+1)+'</b><span>'+(s.present&&s.type?esc(s.type):'<span class="muted">–</span>')+' <small>'+how+(src.kind==='live'&&s.present&&typeof spoolSlotText==='function'?spoolSlotText(i):'')+'</small></span></li>';
     }).join('');
     const live=slotState.live&&slotState.printer===r.printer.id?slotState.live:null;
     $('slotPanelSource').textContent=live?t('Gelesen {time} ({via})',{time:live.time.toLocaleTimeString(LOCALE(),{hour:'2-digit',minute:'2-digit'}),via:live.via==='lan'?t('Werksfirmware'):'Moonraker'})
