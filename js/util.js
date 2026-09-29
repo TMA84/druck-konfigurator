@@ -18,7 +18,9 @@ function t(s,p){let r=s;
   if(I18N.lang!=='de'&&typeof s==='string'){const d=I18N.dict[s];if(d)r=d;else{const m=I18N.rx.find(([re])=>re.test(s));if(m)r=s.replace(m[0],m[1])}}
   if(p)r=r.replace(/\{(\w+)\}/g,(m,k)=>k in p?p[k]:m);return r}
 const LOCALE=()=>I18N.lang==='de'?'de-DE':'en-GB';
-// Zahl mit d Nachkommastellen im Format der Sprache (Name aus v4: „de“)
-function de(v,d){return Number(v).toLocaleString(LOCALE(),{minimumFractionDigits:d,maximumFractionDigits:d})}
+// Zahl mit d Nachkommastellen im Format der Sprache (Name aus v4: „de“). Ein Formatierer je Sprache und
+// Stellenzahl – toLocaleString baute bei jedem Aufruf einen neuen (≈ ⅔ der Rechenzeit eines update(), gemessen 2026-09-29)
+const DE_FMT=new Map();
+function de(v,d){const k=LOCALE()+'|'+d;let f=DE_FMT.get(k);if(!f){f=new Intl.NumberFormat(LOCALE(),{minimumFractionDigits:d,maximumFractionDigits:d});DE_FMT.set(k,f)}return f.format(Number(v))}
 const nkey=d=>String(Number(d));
 const num=v=>{if(v===null||v===undefined)return NaN;const n=parseFloat(String(v).trim().replace(',','.'));return n};

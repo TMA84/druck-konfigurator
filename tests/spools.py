@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import tempfile
+import time
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -248,6 +249,82 @@ with tempfile.TemporaryDirectory() as d:
     check("api_post import: Meldung und Zahlen", res["note"] == "Spulen ersetzt" and res["imported"]["total"] == 3 and len(spools.load(p)["spools"]) == 3, res.get("note"))
     nm, bd = spools.api_export(p)
     check("api_export liefert JSON", json.loads(bd)["format"] == spools.EXPORT_FORMAT)
+
+# ---------- Druckhistorie: Kosten, Dauer, Plan (Schätzung aus dem Tool) ----------
+hs = spools.empty_state()
+spools.sync_slots(hs, ace(ASA, PLA_G), now=1000)
+ha, hg = hs["spools"]
+spools.update(hs, {"action": "update", "id": ha["id"], "price_per_kg": 40, "profile_id": "u123"})
+check("profile_id an der Spule", ha["profile_id"] == "u123")
+check("Standardpreis 25", spools.view(hs)["price_default"] == 25)
+spools.update(hs, {"action": "config", "price_default": 20})
+check("Standardpreis änderbar", hs["price_default"] == 20)
+fails("Standardpreis 0 abgelehnt", lambda: spools.update(hs, {"action": "config", "price_default": 0}), "Standardpreis")
+r = spools.update(hs, {"action": "plan", "job_name": "Würfel_Platte2.gcode", "plate": 2,
+                       "estimate": {"grams": [10, 5.5], "total_g": 15.5, "time_s": 3600, "cost_eur": 0.52, "name": "Würfel"}})
+check("Plan gespeichert, Schlüssel ohne Endung", r == "Plan gespeichert" and list(hs["plans"]) == ["Würfel_Platte2"], hs["plans"])
+fails("Plan ohne Namen", lambda: spools.update(hs, {"action": "plan", "estimate": {}}), "job_name")
+fails("Plan mit kaputten Gramm", lambda: spools.update(hs, {"action": "plan", "job_name": "x", "estimate": {"grams": ["a"]}}), "grams")
+pj = {"filename": "/useremain/app/gk/Würfel_Platte2.gcode", "progress": 0, "supplies_usage": 0}
+spools.track(hs, pj, 0, now=2000)
+spools.track(hs, dict(pj, supplies_usage=1000, progress=50), 0, now=2600)
+spools.track(hs, dict(pj, supplies_usage=1000, progress=60), 1, now=2700)
+spools.track(hs, dict(pj, supplies_usage=2000, progress=90), 1, now=3000)
+spools.track(hs, None, 1, now=5600)
+e = hs["history"][-1]
+ga, gg = spools.mm_to_g(1000, "ASA"), spools.mm_to_g(1000, "PLA") + spools.purge_g(1.5)
+check("Historie: Dauer", e["duration_s"] == 3600, e)
+check("Historie: Gramm gesamt", abs(e["grams_total"] - (ga + gg)) < 0.05, e)
+check("Historie: Kosten je Spulenpreis bzw. Standard", abs(e["cost_eur"] - (ga / 1000 * 40 + gg / 1000 * 20)) < 0.005, e)
+check("Historie: Gramm je Typ", set(e["types"]) == {"ASA", "PLA"} and abs(e["types"]["ASA"] - ga) < 0.01, e["types"])
+check("Historie: Plan als Schätzung angehängt", e.get("estimate", {}).get("total_g") == 15.5 and e["estimate"]["plate"] == 2 and not hs["plans"], e.get("estimate"))
+spools.track(hs, {"filename": "fremd.gcode", "progress": 0, "supplies_usage": 0}, 0, now=6000)
+spools.track(hs, None, 0, now=6100)
+check("fremder Druck ohne Schätzung", "estimate" not in hs["history"][-1])
+# Plan als Endung (Drucker setzt ein Präfix)
+spools.update(hs, {"action": "plan", "job_name": "Teil_Platte1", "estimate": {"grams": [1]}})
+check("Plan passt als Endung", spools.find_plan(hs, "/x/2026-0929-Teil_Platte1.gcode") == "Teil_Platte1")
+for i in range(60):
+    spools.add_plan(hs, {"job_name": "p%d" % i, "estimate": {}}, now=10000 + i)
+check("höchstens 50 Pläne, die ältesten fliegen", len(hs["plans"]) == 50 and "p59" in hs["plans"] and "p0" not in hs["plans"])
+# Monatsstatistik (für Home Assistant)
+now = time.time()
+ms = spools.empty_state()
+ms["history"] = [{"job": "a", "start": now - 7200, "end": now - 3600, "used": {}, "grams_total": 100, "cost_eur": 2.5, "duration_s": 3600, "changes": 0},
+                 {"job": "b", "start": now - 3600, "end": now, "used": {"x": 50}, "changes": 0},
+                 {"job": "alt", "start": 1000, "end": 2000, "used": {"x": 999}, "grams_total": 999, "cost_eur": 99, "duration_s": 1000, "changes": 0}]
+sm = spools.stats(ms, now)
+check("Monat: Drucke, Gramm, Kosten, Stunden", sm["prints"] == 2 and sm["grams"] == 150 and sm["cost_eur"] == 2.5 and sm["hours"] == 1, sm)
+check("Seite bekommt Statistik und nur die letzten Drucke", spools.view(ms)["stats"]["prints"] == 2 and spools.view(ms)["history_total"] == 3)
+many = spools.empty_state()
+many["history"] = [{"job": "j%d" % i, "start": i, "end": i + 1, "used": {}, "changes": 0} for i in range(600)]
+spools.track(many, {"filename": "n.gcode", "progress": 0}, 0, now=700)
+spools.track(many, None, 0, now=800)
+check("Historie auf 500 begrenzt", len(many["history"]) == 500 and many["history"][-1]["job"] == "n.gcode")
+check("GET liefert nur 50", len(spools.view(many)["history"]) == spools.VIEW_HISTORY)
+# Export/Import mit den neuen Feldern
+nm, bd = spools.export_state(hs)
+ex = json.loads(bd)
+check("Export: Schätzung, Kosten, profile_id, Standardpreis", ex["history"][0]["estimate"]["total_g"] == 15.5 and ex["history"][0]["cost_eur"] > 0
+      and any(sp.get("profile_id") == "u123" for sp in ex["spools"]) and ex["price_default"] == 20)
+rt = spools.empty_state()
+r = spools.import_state(rt, ex, "replace")
+check("Import replace: neue Felder bleiben", rt["history"][0].get("estimate") == hs["history"][0]["estimate"] and rt["history"][0]["types"] == hs["history"][0]["types"]
+      and rt["price_default"] == 20 and next(sp for sp in rt["spools"] if sp["id"] == ha["id"])["profile_id"] == "u123" and r["imported"]["idmap"], rt["history"][0])
+fails("Import: Schätzung kaputt", lambda: spools.import_state(spools.empty_state(), dict(ex, history=[dict(ex["history"][0], estimate={"grams": [-1]})]), "replace"), "grams")
+fails("Import: Kosten als Text", lambda: spools.import_state(spools.empty_state(), dict(ex, history=[dict(ex["history"][0], cost_eur="1")]), "replace"), "cost_eur")
+fails("Import: Typen kaputt", lambda: spools.import_state(spools.empty_state(), dict(ex, history=[dict(ex["history"][0], types={"PLA": "x"})]), "replace"), "types")
+# große Datei in Teilen: erst Spulen, dann Drucke nachreichen (mit Umschreiben der ids)
+part = spools.empty_state()
+spools.sync_slots(part, ace(ASA), now=1)                       # dieselbe ASA-Spule hier unter anderer id
+r = spools.import_state(part, dict(ex, history=[]), "merge")
+own_asa = part["spools"][0]["id"]
+check("merge: idmap in der Antwort", r["imported"]["idmap"].get(ha["id"]) == own_asa, r["imported"])
+r = spools.update(part, {"action": "import_history", "history": ex["history"], "idmap": r["imported"]["idmap"]})
+check("Drucke nachgereicht, ids umgeschrieben", r["history_total"] == len(ex["history"]) and own_asa in part["history"][0]["used"], part["history"][0]["used"])
+spools.update(part, {"action": "import_history", "history": ex["history"], "idmap": {}})
+check("nachgereicht zweimal: nichts doppelt", len(part["history"]) == len(ex["history"]))
+fails("import_history: kaputt", lambda: spools.update(part, {"action": "import_history", "history": "x"}), "history")
 
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

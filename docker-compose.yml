@@ -7,6 +7,9 @@ services:
     ports:
       - "8765:8765"
     restart: unless-stopped
+    # Optional: Zugriffsschutz mit PIN (4–32 Zeichen) – ohne PIN ist die Seite im ganzen Heimnetz offen
+    # environment:
+    #   KONFIGURATOR_PIN: "1234"
     # Filamentverwaltung: Spulen und Verbrauch (spools.json) bleiben beim Neubau erhalten
     volumes:
       - konfigurator-daten:/data

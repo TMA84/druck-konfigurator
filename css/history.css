@@ -1,0 +1,46 @@
+/* Druckhistorie & Statistik (js/history-ui.js). Filamenttypen in fester Reihenfolge und Farbe (Kategorien-Palette,
+   hell/dunkel je eigene Stufen). */
+:root {
+  --hs-pla: #2a78d6; --hs-petg: #eb6834; --hs-abs: #1baf7a; --hs-asa: #eda100; --hs-tpu: #e87ba4; --hs-other: #4a3aa7; --hs-unknown: #9aa1ab;
+}
+:root[data-theme="dark"] {
+  --hs-pla: #3987e5; --hs-petg: #d95926; --hs-abs: #199e70; --hs-asa: #c98500; --hs-tpu: #d55181; --hs-other: #9085e9; --hs-unknown: #6b7280;
+}
+.history-dlg { max-width: 900px; }
+.history-dlg .ed-body { max-height: 70vh; }
+.hs-sums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0 4px; }
+.hs-sum { border: 1px solid var(--rule); border-radius: var(--r-s); padding: 10px 12px; background: var(--sheet); }
+.hs-sum h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.hs-sum dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.hs-sum dt { font-size: 12px; color: var(--ink-3); }
+.hs-sum dd { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hs-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin: 2px 0 4px; }
+.hs-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.hs-legend i { width: 10px; height: 10px; border-radius: 3px; background: currentColor; }
+.hs-chart { display: block; width: 100%; height: auto; max-height: 240px; }
+.hs-chart .hs-grid { stroke: var(--rule); stroke-width: 1; }
+.hs-chart .hs-ax { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.hs-chart .hs-ax.sel { fill: var(--ink); font-weight: 700; }
+.hs-chart .hs-hit { fill: transparent; }
+.hs-chart .hs-bar { cursor: pointer; }
+.hs-chart .hs-bar:hover .hs-hit, .hs-chart .hs-bar.sel .hs-hit { fill: var(--paper-2); }
+.hs-t-pla { fill: var(--hs-pla); color: var(--hs-pla); }
+.hs-t-petg { fill: var(--hs-petg); color: var(--hs-petg); }
+.hs-t-abs { fill: var(--hs-abs); color: var(--hs-abs); }
+.hs-t-asa { fill: var(--hs-asa); color: var(--hs-asa); }
+.hs-t-tpu { fill: var(--hs-tpu); color: var(--hs-tpu); }
+.hs-t-other { fill: var(--hs-other); color: var(--hs-other); }
+.hs-t-unknown { fill: var(--hs-unknown); color: var(--hs-unknown); }
+.hs-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 14px 0 6px; font-size: 13px; }
+.hs-filter label { font-weight: 600; color: var(--ink-2); }
+.hs-filter select { margin-left: 4px; padding: 4px 6px; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: var(--field, #fff); color: var(--ink); font: inherit; font-weight: 400; }
+.hs-table-wrap { overflow-x: auto; }
+.hs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hs-table th { text-align: left; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--rule-strong); padding: 6px 8px 6px 0; white-space: nowrap; }
+.hs-table td { border-bottom: 1px solid var(--rule); padding: 6px 8px 6px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+.hs-table td small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.hs-table .num { text-align: right; }
+.hs-table td:first-child { white-space: nowrap; }
+.hs-diff { font-weight: 600; color: var(--ink-2); }
+.hs-diff.big { color: var(--warn, #a16207); }
+@media (max-width: 700px) { .hs-sums { grid-template-columns: 1fr; } .hs-sum dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

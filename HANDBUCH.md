@@ -28,7 +28,11 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 ## 1. Installation und Start
 
-**Als Container (empfohlen für die Drucker-Verbindung):** auf dem NAS oder Heimserver im Projektordner `docker compose up -d --build`, dann im Browser `http://<IP-des-NAS>:8765/` – von jedem Gerät im Heimnetz. Die Seite hat keine Anmeldung: nur im Heimnetz betreiben, nicht ins Internet freigeben. Eigene Filamentwerte speichert weiterhin jeder Browser für sich (über **Profile exportieren/importieren** übertragen).
+**Als Container (empfohlen für die Drucker-Verbindung):** auf dem NAS oder Heimserver im Projektordner `docker compose up -d --build`, dann im Browser `http://<IP-des-NAS>:8765/` – von jedem Gerät im Heimnetz. Ohne weitere Einstellung hat die Seite keine Anmeldung: nur im Heimnetz betreiben, nicht ins Internet freigeben. Mit `KONFIGURATOR_PIN` (4–32 Zeichen, in `docker-compose.yml`) fragt sie nach einer **PIN**; die Anmeldung gilt 30 Tage, nach 5 Fehlversuchen ist sie für 5 Minuten gesperrt. Eigene Filamentwerte speichert weiterhin jeder Browser für sich (über **Profile exportieren/importieren** übertragen).
+
+**Als Home-Assistant-Add-on:** Repository `https://github.com/TMA84/ha-addons` hinzufügen, **Druck-Konfigurator** installieren, in der Konfiguration die **Drucker-IP** eintragen. Das Tool erscheint in der Seitenleiste (geschützt durch die Anmeldung von Home Assistant). Den optionalen direkten Port 8765 schützt die Option **access_pin**. Mehr unter [Home Assistant](#home-assistant).
+
+**Tablet:** Die Seite passt sich an Tablets an (Hoch- und Querformat); im Tab **Drucker** sind Knöpfe, Achsen und Regler für Finger groß genug.
 
 **Online:** https://wolfb63-del.github.io/druck-konfigurator/ – ohne Download, auch auf Mac, Linux und Tablet. Die Live-Abfrage vom Drucker geht dort nicht; „Belegung eintragen“ schon. Eigene Filamentwerte speichert der Browser getrennt von der heruntergeladenen Version.
 
@@ -123,6 +127,20 @@ Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Be
 - Passt ein Teil nicht in den **Bauraum** (Breite, Tiefe oder Höhe), steht es hier und in der 3D-Ansicht rot.
 
 In **③ Slicen & Kosten** stehen dann **Zeit, Filament und Kosten je Platte** und eine empfohlene **Reihenfolge**: erst alles, was mit dem eingelegten Filament druckt, danach gruppiert nach Spulentausch. Änderst du nur eine Platte, slict der Server nur diese neu („neu geslict: 1 von 4“), der Rest bleibt.
+
+### Beschriftung: Text auf ein Teil
+
+![Beschriftung](docs/img/beschriftung.png)
+
+Unter **Beschriftung** in ① Modell setzt du Text auf das gewählte Teil:
+
+- **Text** eingeben (eine Zeile, bis 60 Zeichen, auch Umlaute, € und °), **Höhe** (Standard 8 mm), **Tiefe** (1 mm), **Strichstärke** und **Drehung** (0/90/180/270°).
+- **erhaben:** Die Schrift steht auf der Fläche und bekommt einen **eigenen Slot** – so druckst du sie in einer anderen Farbe (z. B. weiße Schrift auf schwarzem Schild).
+- **vertieft:** Die Schrift wird in die Fläche eingelassen (OrcaSlicer zieht sie beim Slicen ab).
+- Standard ist die oberste ebene Fläche; mit **Fläche wählen** klickst du in der 3D-Ansicht eine andere an (z. B. eine Seitenwand).
+- Das Tool warnt, wenn der Text über die Fläche oder das Teil hinausragt oder die Striche zu dünn werden.
+
+Die Schrift ist Hershey Simplex (frei nutzbar). Grenzen: nur ebene Flächen; bei Makerworld-3MF nur für hinzugefügte Teile, nicht für die Objekte des Designers.
 
 ### Mehrfarbig: mehrere Farben in einem Teil
 
@@ -318,7 +336,21 @@ Die ACE meldet keine Restmenge. Die **Restmenge errechnet** das Tool: Füllgewic
 - **Warnen unter … g** (Standard 100 g): darunter wird die Anzeige rot, und vor dem Drucken warnt das Tool, wenn eine Spule nicht reicht („Zu wenig Filament“) oder danach unter die Schwelle fiele („Filament wird knapp“).
 - **Exportieren / Importieren** überträgt die Spulen zwischen zwei Servern (z. B. vom Mac ins Home-Assistant-Add-on): **Zusammenführen** gleicht Spulen ab (neuerer Stand gewinnt) und fügt unbekannte hinzu, **Ersetzen** übernimmt alles.
 
+- **Als Filamentprofil anlegen** (im Bearbeiten-Formular, wenn Marke oder Name eingetragen sind) macht aus der Spule ein eigenes Filamentprofil mit den Startwerten des Typs; „Filament aus dem ACE übernehmen“ nimmt dann dieses Profil.
+
 Die Daten liegen auf dem Server in `~/.druck-konfigurator/spools.json`, im Container und im Home-Assistant-Add-on in `/data`.
+
+### Druckhistorie & Statistik
+
+![Druckhistorie & Statistik](docs/img/historie.png)
+
+**⚙ Einstellungen → Druckhistorie & Statistik …** (oder **Alle Drucke & Statistik …** im Spulen-Dialog) zeigt alle gezählten Drucke:
+
+- **Dieser Monat** und **letzte 12 Monate**: Anzahl, Filament, Kosten, Druckzeit; darunter der Filamentverbrauch je Monat nach Typ.
+- Tabelle je Druck: Datum, Name, Dauer, Filament und **echte Kosten** (gezählter Verbrauch × Preis der Spule, sonst Standardpreis aus „Preise & Sätze“). Bei Drucken aus dem Tool steht die **Schätzung** aus ③ daneben mit der Abweichung in Prozent.
+- Monat wählen (oder im Diagramm auf einen Balken klicken) filtert die Tabelle; **Als CSV exportieren** speichert sie für Excel.
+
+Mit Home Assistant gibt es dazu die Sensoren **Filament diesen Monat**, **Kosten diesen Monat** und **Drucke diesen Monat**.
 
 ### Drucker-Werkbank (Tab „Drucker“)
 
@@ -358,7 +390,7 @@ Gedruckt wird genau der Stand der letzten Kostenberechnung. Hast du danach etwas
 
 ### Home Assistant
 
-Als **Home-Assistant-Add-on** (Repository `https://github.com/TMA84/ha-addons`) läuft das Tool in der Seitenleiste von Home Assistant. In den Add-on-Einstellungen trägst du die **Drucker-IP** ein; die Seite verbindet sich damit von selbst.
+Als **Home-Assistant-Add-on** (Repository `https://github.com/TMA84/ha-addons`) läuft das Tool in der Seitenleiste von Home Assistant. In den Add-on-Einstellungen trägst du die **Drucker-IP** ein; die Seite verbindet sich damit von selbst. **access_pin** schützt den optionalen direkten Port 8765 mit einer PIN (der Weg über die Seitenleiste bleibt durch Home Assistant geschützt).
 
 Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensoren an Home Assistant (Gerät „Druck-Konfigurator Anycubic Kobra S1“):
 
@@ -368,6 +400,7 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Düse, Heizbett | Temperaturen |
 | Warteschlange, Restzeit Warteschlange, Platten fertig/gesamt | Warteschlange |
 | **Bett abräumen** (an/aus) | an, sobald eine Platte der Warteschlange fertig ist – bis die nächste startet |
+| Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
 
 Damit lassen sich Automationen bauen, z. B. eine Handy-Benachrichtigung bei **Bett abräumen** oder bei wenig Filament; ein Beispiel steht in der README des Add-ons. Ohne Home Assistant geht dasselbe mit einem eigenen MQTT-Broker (Umgebungsvariablen `MQTT_HOST`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASSWORD`).

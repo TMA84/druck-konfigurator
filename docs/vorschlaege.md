@@ -20,7 +20,7 @@ Gesammelt beim Bedientest. Nichts davon ist umgesetzt – Entscheidung liegt bei
 13. ~~Vorlagenwerte statt Exportwerte in Orca~~ – behoben (different_settings_to_system + passende System-Presets).
 
 ## Idee 2026-09-27 (noch nicht umgesetzt)
-15. **Text auf ein Teil gravieren:** Fläche anklicken (wie "Fläche aufs Bett"), Text/Größe/Tiefe eingeben. Technisch als zweites Netz mit Orca-"Negative Part" (Abzug beim Slicen, keine eigene 3D-Boolesche-Operation nötig) – ähnlich wie die Bohrloch-Verstärkung. Braucht eine neue Bibliothek für Text-zu-Umriss plus eine lizenzfreie Schriftart, neue Bedienung, Prüfung per Orca-CLI (genauer Part-Subtyp muss verifiziert werden). Entscheidung 27.09.: erst später angehen.
+15. ~~Text auf ein Teil gravieren~~ – umgesetzt 2026-09-29 (10.1.0: erhaben mit eigenem Slot oder vertieft als negative_part, Hershey-Schrift, Fläche wählen). Ursprüngliche Notiz: Fläche anklicken (wie "Fläche aufs Bett"), Text/Größe/Tiefe eingeben. Technisch als zweites Netz mit Orca-"Negative Part" (Abzug beim Slicen, keine eigene 3D-Boolesche-Operation nötig) – ähnlich wie die Bohrloch-Verstärkung. Braucht eine neue Bibliothek für Text-zu-Umriss plus eine lizenzfreie Schriftart, neue Bedienung, Prüfung per Orca-CLI (genauer Part-Subtyp muss verifiziert werden). Entscheidung 27.09.: erst später angehen.
 
 ## Geplant 2026-09-26 (nach Import/Ausrichtung/Stützwerte/Werte je Teil/Makerworld-3MF)
 14. **Bohrlöcher verstärken:** zylindrische Löcher erkennen, in der 3MF je Loch einen Orca-Modifikator (Zylinder, Loch + 2 × ~3 mm) mit 100 % Füllung und ggf. mehr Wänden. Offen: automatisch oder nur als Vorschlag.

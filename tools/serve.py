@@ -24,14 +24,21 @@ Aufruf: python tools/serve.py [PORT]
   KONFIGURATOR_PRINTER=<IP>: Drucker vorgeben (z. B. aus den Einstellungen des Home-Assistant-Add-ons) – die Seite
   übernimmt ihn, und die Filamentverwaltung zählt gleich ab dem Start mit.
   MQTT_HOST=<Broker> (dazu MQTT_PORT, MQTT_USER, MQTT_PASSWORD …): Stand für Home Assistant (tools/ha_mqtt.py).
+  KONFIGURATOR_PIN=<4–32 Zeichen>: Zugriffsschutz für den direkten Zugriff (NAS, Add-on-Port) – siehe „Zugriffsschutz“.
 """
 import functools
+import hmac
+import html
+import http.cookies
 import http.server
 import json
 import os
 import re
+import secrets
 import shutil
 import sys
+import threading
+import time
 import urllib.parse
 import urllib.request
 
@@ -44,6 +51,7 @@ import spools  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_BODY = 64 * 1024
+MAX_SPOOL_BODY = 4 * 1024 * 1024   # Import der Filamentverwaltung (bis 500 Drucke Historie in einem Stück)
 STATUS_FOR = {"forbidden": 403, "missing_libs": 501, "unreachable": 502, "lan_off": 409, "unsupported": 409,
               "rejected": 502, "bad_response": 502, "timeout": 504, "no_slicer": 501, "bad_request": 400, "failed": 422}
 WATCHER = None   # printqueue.Watcher: fragt den Drucker für Warteschlange und Home Assistant ab (main)
@@ -92,10 +100,85 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except (ValueError, KeyError) as e:
             self._json(400, {"error": "Ungültige Anfrage: " + str(e), "kind": "bad_request"})
 
+    # ---------- Zugriffsschutz (KONFIGURATOR_PIN), Hilfsfunktionen unten bei „Zugriffsschutz“ ----------
+    def _auth_ok(self):
+        """Ohne PIN, über den HA-Ingress oder mit gültiger Sitzung → True."""
+        if not auth_pin() or is_ingress(self.client_address[0], self.headers):
+            return True
+        c = http.cookies.SimpleCookie()
+        try:
+            c.load(self.headers.get("Cookie") or "")
+        except http.cookies.CookieError:
+            return False
+        return SESSION_COOKIE in c and session_valid(c[SESSION_COOKIE].value)
+
+    def _auth_gate(self):
+        """True, wenn die Anfrage hier schon beantwortet wurde (Anmeldeseite, 401, Umleitung)."""
+        if not auth_pin():
+            return False
+        url = urllib.parse.urlparse(self.path)
+        if url.path == "/login":
+            if self.command == "POST":
+                self._login_post()
+            else:
+                self._login_page(urllib.parse.parse_qs(url.query).get("next", [""])[0])
+            return True
+        if (url.path == "/api/health" and self.command in ("GET", "HEAD")) or self._auth_ok():
+            return False
+        if url.path.startswith("/api/") or self.command != "GET":
+            self._json(401, {"error": "Anmeldung nötig", "kind": "auth"})
+            return True
+        # relativ umleiten (funktioniert auch hinter einem Präfix): /js/x.js → ../login?next=js/x.js
+        target = self.path.lstrip("/")
+        self.send_response(303)
+        self.send_header("Location", "../" * url.path.lstrip("/").count("/") + "login?next=" + urllib.parse.quote(target, safe=""))
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return True
+
+    def _login_page(self, nxt, error="", code=200):
+        page = LOGIN_HTML.replace("{{NEXT}}", html.escape(safe_next(nxt), quote=True)).replace(
+            "{{ERROR}}", '<p class="err">%s</p>' % html.escape(error) if error else "")
+        body = page.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'")
+        self.send_header("X-Frame-Options", "DENY")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _login_post(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        form = urllib.parse.parse_qs(self.rfile.read(min(length, 4096)).decode("utf-8", "replace")) if length > 0 else {}
+        nxt, ip = form.get("next", [""])[0], self.client_address[0]
+        if login_blocked(ip):
+            return self._login_page(nxt, "Zu viele Versuche – bitte 5 Minuten warten. / Too many attempts, wait 5 minutes.", 429)
+        if not pin_matches(form.get("pin", [""])[0]):
+            login_failed(ip)
+            return self._login_page(nxt, "falsche PIN / wrong PIN", 401)
+        login_reset(ip)
+        self.send_response(303)
+        self.send_header("Set-Cookie", "%s=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Strict"
+                         % (SESSION_COOKIE, session_new(), SESSION_SECONDS))
+        self.send_header("Location", "./" + safe_next(nxt))
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self):
+        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+            return
+        super().do_HEAD()
+
     def do_GET(self):
+        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+            return
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/health":
-            return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version(), "printer": preset_printer()})
+            # ohne Anmeldung (Healthcheck, HA-Watchdog) keine Drucker-Adresse
+            printer = preset_printer() if self._auth_ok() else None
+            return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version(), "printer": printer})
         if url.path == "/api/anycubic/status":
             host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
             return self._api(lambda: anycubic_lan.status(host))
@@ -165,6 +248,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile, 1024 * 1024)
 
     def do_POST(self):
+        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+            return
         path = urllib.parse.urlparse(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
         ctype = self.headers.get("Content-Type", "").split(";")[0].strip()
@@ -181,7 +266,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             reuse = q.get("reuse", [""])[0] or None
             return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
         if path == "/api/spools":
-            if ctype != "application/json" or length > MAX_BODY:
+            if ctype != "application/json" or length > MAX_SPOOL_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
 
             def change():
@@ -220,6 +305,87 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             req = json.loads(self.rfile.read(length) or b"{}")
             return anycubic_lan.command(req["host"], req["type"], req["action"], req.get("data"))
         return self._api(run)
+
+
+# ---------- Zugriffsschutz (KONFIGURATOR_PIN) ----------
+# Ohne KONFIGURATOR_PIN ist alles offen wie bisher. Mit PIN braucht jede Anfrage eine Sitzung (Cookie, 30 Tage, nur im
+# Speicher – nach einem Neustart neu anmelden). Ausgenommen: GET /api/health (Docker-Healthcheck, HA-Watchdog), die
+# Anmeldeseite /login und der Home-Assistant-Ingress (Supervisor-Proxy 172.30.32.2 UND Kopfzeile X-Ingress-Path –
+# die Kopfzeile allein kann jeder setzen). Höchstens 5 falsche PINs je Adresse in 5 Minuten, danach 429.
+SESSION_COOKIE = "dk_session"
+SESSION_SECONDS = 30 * 24 * 3600
+SESSION_MAX = 1000
+INGRESS_PROXY = "172.30.32.2"
+LOGIN_MAX_FAILS, LOGIN_WINDOW = 5, 300
+LOGIN_HTML = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "login.html"), encoding="utf-8").read()
+_sessions = {}   # Token → Ablaufzeit
+_fails = {}      # Client-Adresse → Zeitpunkte falscher Versuche
+_auth_lock = threading.Lock()
+
+
+def auth_pin():
+    """PIN aus KONFIGURATOR_PIN oder None (kein Schutz)."""
+    return (os.environ.get("KONFIGURATOR_PIN") or "").strip() or None
+
+
+def pin_matches(pin):
+    expected = auth_pin()
+    return bool(expected) and hmac.compare_digest(str(pin).strip().encode(), expected.encode())
+
+
+def is_ingress(client_ip, headers):
+    """Anfrage über den Home-Assistant-Ingress: nur vom Supervisor-Proxy UND mit X-Ingress-Path."""
+    ip = str(client_ip or "")
+    ip = ip[7:] if ip.startswith("::ffff:") else ip
+    return ip == INGRESS_PROXY and bool(headers) and headers.get("X-Ingress-Path") is not None
+
+
+def session_new():
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    with _auth_lock:
+        for t in [t for t, exp in _sessions.items() if exp < now]:
+            del _sessions[t]
+        while len(_sessions) >= SESSION_MAX:
+            del _sessions[min(_sessions, key=_sessions.get)]
+        _sessions[token] = now + SESSION_SECONDS
+    return token
+
+
+def session_valid(token):
+    with _auth_lock:
+        exp = _sessions.get(str(token))
+    return exp is not None and exp > time.time()
+
+
+def _recent_fails(ip, now):
+    return [t for t in _fails.get(ip, []) if now - t < LOGIN_WINDOW]
+
+
+def login_blocked(ip):
+    with _auth_lock:
+        return len(_recent_fails(ip, time.time())) >= LOGIN_MAX_FAILS
+
+
+def login_failed(ip):
+    now = time.time()
+    with _auth_lock:
+        _fails[ip] = _recent_fails(ip, now) + [now]
+        for k in [k for k in _fails if not _recent_fails(k, now)]:
+            del _fails[k]
+
+
+def login_reset(ip):
+    with _auth_lock:
+        _fails.pop(ip, None)
+
+
+def safe_next(nxt):
+    """Ziel nach der Anmeldung: nur relative Pfade dieses Servers (keine fremden Seiten)."""
+    nxt = str(nxt or "").lstrip("/\\")
+    if not re.fullmatch(r"[\w\-./?=&%+,~;:]*", nxt) or "://" in nxt or nxt.startswith("login") or ":" in nxt.split("/")[0]:
+        return ""
+    return nxt
 
 
 # ---------- Vorschau gestarteter Drucke (Live-Ansicht) ----------
@@ -278,10 +444,13 @@ def preset_printer():
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("KONFIGURATOR_PORT", "8765"))
     host = os.environ.get("KONFIGURATOR_HOST", "127.0.0.1")
+    if auth_pin() and not 4 <= len(auth_pin()) <= 32:
+        sys.exit("KONFIGURATOR_PIN muss 4 bis 32 Zeichen lang sein – Server nicht gestartet")
     handler = functools.partial(Handler, directory=ROOT)
     with http.server.ThreadingHTTPServer((host, port), handler) as server:
         shown = "127.0.0.1" if host in ("127.0.0.1", "0.0.0.0") else host
         print(f"Druck-Konfigurator unter http://{shown}:{port}/" + (" (im ganzen Netz erreichbar)" if host == "0.0.0.0" else " – Fenster offen lassen."), flush=True)
+        print("Zugriffsschutz: " + ("PIN nötig (außer Home-Assistant-Ingress und /api/health)" if auth_pin() else "aus (KONFIGURATOR_PIN nicht gesetzt)"), flush=True)
         if not anycubic_lan.AVAILABLE:
             print("Hinweis: LAN-Modus (Werksfirmware) braucht: pip install -r requirements.txt", flush=True)
         print("Kostenkalkulation: " + ("OrcaSlicer " + str(slicer.version()) + " unter " + slicer.find_orca() if slicer.find_orca() else "kein OrcaSlicer gefunden (ORCA_PATH setzen)"), flush=True)

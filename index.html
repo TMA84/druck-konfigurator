@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#c2410c">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/modern.css">
+<link rel="stylesheet" href="css/engrave.css">
+<link rel="stylesheet" href="css/history.css">
 <script src="js/theme.js"></script>
 </head>
 <body data-printer="kobra_s1" data-tab="settings">
@@ -65,6 +67,7 @@
         <span class="menu-group">Farben &amp; Kosten</span>
         <button type="button" role="menuitem" data-action="slots">Filament-Slots …</button>
         <button type="button" role="menuitem" data-action="spools">Spulen &amp; Restmengen …</button>
+        <button type="button" role="menuitem" data-action="history">Druckhistorie &amp; Statistik …</button>
         <button type="button" role="menuitem" data-action="purge">Farbwechsel &amp; Spülmenge …</button>
         <button type="button" role="menuitem" data-action="costs">Preise &amp; Sätze …</button>
       </div>
@@ -352,6 +355,28 @@
           <ul id="holeList" class="hole-list"></ul>
           <button type="button" id="holeAll" class="linkbtn hidden">Alle an/aus</button>
         </section>
+        <section id="textBox" class="engrave hidden" aria-labelledby="textTitle">
+          <span class="eyebrow" id="textTitle">Beschriftung</span>
+          <p id="textInfo" class="muted small"></p>
+          <ul id="textList" class="text-list"></ul>
+          <div class="text-form">
+            <label class="text-wide">Text <input id="txText" type="text" maxlength="60" placeholder="z. B. Name oder Nummer" autocomplete="off"></label>
+            <label>Höhe <span class="unit"><input id="txHeight" type="number" min="1" max="200" step="0.5" value="8" inputmode="decimal"> mm</span></label>
+            <label>Tiefe <span class="unit"><input id="txDepth" type="number" min="0.2" max="20" step="0.2" value="1" inputmode="decimal"> mm</span></label>
+            <label title="Breite der Striche in Prozent der Texthöhe">Strichstärke <span class="unit"><input id="txStroke" type="number" min="5" max="40" step="1" value="12" inputmode="numeric"> %</span></label>
+            <label>Drehung <select id="txRot"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+            <label>Art <select id="txMode"><option value="raised">erhaben</option><option value="engraved">vertieft</option></select></label>
+            <label id="txSlotWrap">Slot <select id="txSlot"></select></label>
+          </div>
+          <p class="text-face small">Fläche: <b id="txFace">Oberseite</b> <span id="txSize" class="muted"></span></p>
+          <div class="orient-tools">
+            <button type="button" id="txPick" title="In der 3D-Ansicht die Fläche anklicken, auf die der Text soll – er sitzt mittig auf dem angeklickten Punkt">Fläche wählen …</button>
+            <button type="button" id="txTop" title="Text mittig auf die Oberseite des Teils legen">Oberseite</button>
+            <button type="button" id="txAdd" class="btn-accent" disabled>Text hinzufügen</button>
+            <button type="button" id="txNew" class="linkbtn hidden">Neuer Text</button>
+          </div>
+          <p id="txWarn" class="note bad small hidden"></p>
+        </section>
         <p class="oh-info muted"></p>
         <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
@@ -470,6 +495,9 @@
 <dialog id="spoolDlg" class="spool-dlg" aria-labelledby="spoolDlgTitle"><div class="ed-head"><h2 id="spoolDlgTitle">Spulen &amp; Restmengen</h2><div class="muted">Der Server erkennt die Spulen in der ACE (RFID, Typ, Farbe) und zieht den Verbrauch jedes Drucks ab – auch bei Drucken aus anderen Programmen. Restmenge = Füllgewicht − Verbrauch − Spülabfall.</div></div>
   <div class="ed-body" id="spoolBody"></div>
   <div class="ed-foot"><button class="btn sec" type="button" id="spoolAdd">Spule ohne RFID hinzufügen</button><button class="btn sec" type="button" id="spoolExport" title="Alle Spulen und letzten Drucke als Datei sichern, z. B. für den Umzug auf einen anderen Server">Exportieren</button><button class="btn sec" type="button" id="spoolImportBtn">Importieren …</button><input type="file" id="spoolImportFile" accept=".json,application/json" hidden><button class="btn" type="button" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
+<dialog id="historyDlg" class="history-dlg" aria-labelledby="historyDlgTitle"><div class="ed-head"><h2 id="historyDlgTitle">Druckhistorie &amp; Statistik</h2><div class="muted">Alle gezählten Drucke mit echtem Filamentverbrauch und Kosten – bei Drucken aus diesem Tool auch im Vergleich zur Schätzung.</div></div>
+  <div class="ed-body" id="historyBody"></div>
+  <div class="ed-foot"><button class="btn sec" type="button" id="historyCsv" title="Die gezeigten Drucke (Filter nach Monat) als Tabelle für Excel/Numbers">Als CSV exportieren</button><button class="btn" type="button" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
 <dialog id="costDlg" aria-labelledby="costDlgTitle"><div class="ed-head"><h2 id="costDlgTitle">Kosten: Preise &amp; Sätze</h2><div class="muted">Grundlage der Kostenkalkulation. Verbrauch und Druckzeit kommen aus dem exakten Slicen mit OrcaSlicer, der Spülabfall aus „Farbwechsel &amp; Spülmenge“.</div></div>
   <div class="ed-body">
     <div class="ed-group"><h4>Preis je Filamenttyp (€/kg)</h4>
@@ -553,6 +581,8 @@
 <script src="js/i18n/en-app.js"></script>
 <script src="js/i18n/en-server.js"></script>
 <script src="js/i18n/en-spools.js"></script>
+<script src="js/i18n/en-engrave.js"></script>
+<script src="js/i18n/en-history.js"></script>
 <script src="js/i18n/en-mw.js"></script>
 <script src="js/i18n/en-queue.js"></script>
 <script src="js/i18n/en-ui.js"></script>
@@ -563,6 +593,8 @@
 <script src="js/import.js"></script>
 <script src="js/orient.js"></script>
 <script src="js/holes.js"></script>
+<script src="js/font-hershey.js"></script>
+<script src="js/engrave.js"></script>
 <script src="js/store.js"></script>
 <script src="js/engine.js"></script>
 <script src="vendor/fflate.min.js"></script>
@@ -583,6 +615,7 @@
 <script src="js/part-settings.js"></script>
 <script src="js/holes-ui.js"></script>
 <script src="js/bodies-ui.js"></script>
+<script src="js/engrave-ui.js"></script>
 <script src="js/overrides-ui.js"></script>
 <script src="js/costs-ui.js"></script>
 <script src="js/design-ui.js"></script>
@@ -594,6 +627,7 @@
 <script src="js/send-ui.js"></script>
 <script src="js/queue-ui.js"></script>
 <script src="js/spools-ui.js"></script>
+<script src="js/history-ui.js"></script>
 <script src="js/printer-picker.js"></script>
 </body>
 </html>

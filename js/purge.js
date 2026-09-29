@@ -27,6 +27,7 @@ function estimateColourChanges(items, defaultSlot, layer, firstLayer = layer) {
           for (let i = b.start * 9 + 2; i < (b.start + b.count) * 9; i += 3) { const z = g.pos[i]; if (z < lo) lo = z; if (z > hi) hi = z; }
           return { lo: lo - g.mn[2], hi: hi - g.mn[2], slot: b.slot ?? own }; })
       : [{ lo: 0, hi: g.z, slot: own }];
+    if (it.textRanges) ranges.push(...it.textRanges);   // erhabene Beschriftung (js/export-ui.js purgeItems)
     const p = it.plate || 1;
     (plates.get(p) || plates.set(p, []).get(p)).push(...ranges);
   }

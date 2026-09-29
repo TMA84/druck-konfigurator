@@ -138,7 +138,11 @@ const flushOptions=f=>ACE_FLUSH_CHOICES.map(x=>'<option value="'+x+'"'+(x===f?' 
 const duration=s=>s<3600?Math.max(1,Math.round(s/60))+' min':Math.floor(s/3600)+' h '+Math.round(s%3600/60)+' min';
 function purgeItems(tpl,plan){
   const lay=projectLayout(tpl);
-  return plan.jobs.map((j,i)=>({geom:j.geom,slot:j.slot,bodies:j.bodies,plate:lay.plateOf[i]}));
+  // erhabene Beschriftungen: Höhenbereich ihres Netzes im Slot der Schrift (für die Farbwechsel-Schätzung)
+  const textRanges=j=>(typeof textMesh!=='function'?[]:(j.part.texts||[]).filter(x=>x.mode!=='engraved'&&x.slot!=null).map(x=>{
+    const pos=textMesh(x,j.part.R);let lo=Infinity,hi=-Infinity;for(let k=2;k<pos.length;k+=3){if(pos[k]<lo)lo=pos[k];if(pos[k]>hi)hi=pos[k]}
+    return {lo:Math.max(0,lo-j.geom.mn[2]),hi:hi-j.geom.mn[2],slot:x.slot}}));
+  return plan.jobs.map((j,i)=>({geom:j.geom,slot:j.slot,bodies:j.bodies,plate:lay.plateOf[i],textRanges:textRanges(j)}));
 }
 // Druckerwerte für die 3MF: Wechselzeit (Spülmenge) und Kosten (js/costs-ui.js costMachine)
 function exportMachine(tpl){return [...purgeMachine(tpl),...(typeof costMachine==='function'?costMachine(tpl):[])]}
@@ -256,7 +260,7 @@ function save3mf(){
   const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   try{
     const {bytes,notes:towerNotes}=exportBytes(chosenSlot());
-    const slotsUsed=new Set(plan.jobs.flatMap(j=>[j.slot===null?slot:j.slot,...(j.bodies||[]).filter(b=>b.slot!=null).map(b=>b.slot)]));
+    const slotsUsed=new Set(plan.jobs.flatMap(j=>[j.slot===null?slot:j.slot,...(j.bodies||[]).filter(b=>b.slot!=null).map(b=>b.slot),...(typeof textSlots==='function'?textSlots(j.part):[])]));
     const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':r.printer.id==='orca'?r.printer.label.replace(/[^w.-]+/g,''):'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
@@ -368,7 +372,7 @@ ACTIONS.slots=openSlotDialog;
 function slotsInUse(){
   const out=new Set();if(!project||!lastResult)return out;
   const def=+(store.last[slotKey(lastResult.printer.id)]||0);
-  for(const p of project.parts){out.add(p.slot??def);for(const b of p.bodies||[])if(b.slot!=null)out.add(b.slot)}
+  for(const p of project.parts){out.add(p.slot??def);for(const b of p.bodies||[])if(b.slot!=null)out.add(b.slot);if(typeof textSlots==='function')textSlots(p).forEach(s=>out.add(s))}
   return out;
 }
 /* ③ Slot anklicken = damit drucken. Ein Teil (bzw. alle Platzierungen/Kopien desselben Teils): dessen Slot;

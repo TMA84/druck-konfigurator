@@ -17,7 +17,6 @@ I18N.add({
   'zuletzt gesehen {date}': 'last seen {date}',
   'ohne RFID': 'no RFID',
   '{rest} von {net}': '{rest} of {net}',
-  'Bearbeiten': 'Edit',
   'Name': 'Name',
   'Marke': 'Brand',
   'Farbe': 'Color',
@@ -42,7 +41,6 @@ I18N.add({
   'Spule steckt noch in der ACE – erst herausnehmen': 'The spool is still in the ACE – take it out first',
   'Spülmenge 0,1–3': 'Flush amount 0.1–3',
   'Restmenge außerhalb 0–20000': 'Remaining amount outside 0–20000',
-  'gespeichert': 'saved',
   'gelöscht': 'deleted',
   // Neue Spule, Warnschwelle, Export/Import
   'Slot {n}: danach bleiben nur ≈ {left} (Warnschwelle {lim}).': 'Slot {n}: only ≈ {left} would be left afterwards (warning threshold {lim}).',
@@ -56,11 +54,8 @@ I18N.add({
   'Zusammenführen: Spulen abgleichen, neuere Angaben gewinnen, unbekannte kommen dazu. Ersetzen: alles aus der Datei übernehmen (die Drucker-Adresse bleibt).': 'Merge: match spools, newer data wins, unknown spools are added. Replace: take everything from the file (the printer address stays).',
   'Zusammenführen': 'Merge',
   'Ersetzen': 'Replace',
-  'Abbrechen': 'Cancel',
   'Import: {n} Spulen übernommen': 'Import: {n} spools taken over',
   'Import: {added} Spulen neu, {updated} aktualisiert': 'Import: {added} new spools, {updated} updated',
-  'Import fehlgeschlagen: {msg}': 'Import failed: {msg}',
-  'Datei zu groß (höchstens 60 KB)': 'File too large (max. 60 KB)',
   'keine gültige JSON-Datei': 'not a valid JSON file',
   'Exportieren': 'Export',
   'Importieren …': 'Import …',
@@ -71,5 +66,18 @@ I18N.add({
   'Import: Art „merge“ oder „replace“ angeben': 'Import: specify mode “merge” or “replace”',
   'Warnschwelle 0–5000 g': 'Warning threshold 0–5000 g',
   'Spulen ersetzt': 'Spools replaced',
-  'Spulen zusammengeführt': 'Spools merged'
+  'Spulen zusammengeführt': 'Spools merged',
+  // Filamentprofil aus der Spule, Druckhistorie, großer Import
+  'Alle Drucke & Statistik …': 'All prints & statistics …',
+  'Als Filamentprofil anlegen': 'Create filament profile',
+  'Aus der Spule angelegt: {type}, Farbe {colour}': 'Created from spool: {type}, color {colour}',
+  'Datei zu groß (höchstens 2 MB)': 'File too large (max. 2 MB)',
+  'Eigenes Filamentprofil mit den Startwerten des passenden Standardprofils, verknüpft mit dieser Spule': 'Own filament profile with the start values of the matching standard profile, linked to this spool',
+  'Filamentprofil „{name}“ angelegt – auswählbar unter „Eigene Filamente“': 'Filament profile “{name}” created – selectable under “Own filaments”',
+  'Filamentprofil: „{name}“': 'Filament profile: “{name}”',
+  '„{name}“ nach {type}': '“{name}” based on {type}',
+  'Plan gespeichert': 'Plan saved',
+  'Drucke übernommen': 'Prints imported',
+  'Standardpreis 0–20000 €/kg': 'Default price 0–20000 €/kg',
+  '„idmap“ ungültig': '“idmap” invalid'
 });

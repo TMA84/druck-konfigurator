@@ -437,8 +437,9 @@ body.dragging #stage { outline: 3px dashed var(--accent); outline-offset: -8px; 
   .view-model { grid-template-columns: 300px minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
-  .view-model { display: flex; flex-direction: column; overflow-y: auto; }
-  .view-model > .model-col { height: auto; border-right: 0; border-bottom: 1px solid var(--rule-strong); }
+  /* #view3d.view-model: sonst gewinnt #view3d { overflow: hidden } und die Spalte schrumpft auf wenige Zeilen */
+  #view3d.view-model:not([hidden]) { display: flex; flex-direction: column; overflow-y: auto; }
+  .view-model > .model-col { flex: none; height: auto; border-right: 0; border-bottom: 1px solid var(--rule-strong); }
   .view-model > #stage { flex: none; height: 70vh; }
 }
 @media (max-width: 860px) {

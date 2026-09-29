@@ -268,6 +268,22 @@ function meshModelXML(geom, vols, mods = []) {
    Ids liegen weit über denen der Teile, damit sie in keiner Datei kollidieren. */
 const HOLE_MOD_ID_BASE = 10000;
 const HOLE_MOD_SETTINGS = [['sparse_infill_density', '100%']];
+
+/* Beschriftung (js/engrave.js): texts eines Teils (item.texts oder item.part.texts, Anker in origPos-Koordinaten,
+   Drehung item.part.R). Erhaben = weiteres Bauteil (normal_part) mit eigenem Slot, vertieft = negative_part
+   (Orca zieht es beim Slicen ab; Subtyp per Orca-CLI geprüft 2026-09-29). Ergebnis {vols, negs} wie bodyVolumes/holeMods. */
+const TEXT_ID_BASE = 2000000;
+const itemTexts = p => (p.texts || (p.part && p.part.texts) || []).filter(x => x && String(x.text || '').trim());
+function textVolumes(k, p) {
+  const R = (p.part && p.part.R) || null, vols = [], negs = [];
+  itemTexts(p).forEach((x, j) => {
+    const e = { id: TEXT_ID_BASE + k * 1000 + j + 1, pos: textMesh(x, R), name: (x.mode === 'engraved' ? 'Gravur' : 'Schrift') + ' „' + String(x.text).slice(0, 40) + '“' };
+    if (x.mode === 'engraved') negs.push({ ...e, subtype: 'negative_part', settings: [] }); else vols.push({ ...e, slot: x.slot ?? null });
+  });
+  return { vols, negs };
+}
+// Slots erhabener Beschriftungen eines Teils
+const textSlots = p => itemTexts(p).filter(x => x.mode !== 'engraved' && x.slot != null).map(x => x.slot);
 function holeMods(k, holes) {
   return (holes || []).map((h, j) => ({ id: HOLE_MOD_ID_BASE + k * 1000 + j + 1, pos: holeModifierMesh(h), name: 'Verstärkung Loch ' + h.id + ' (Ø ' + de(2 * h.r, 1) + ' mm)' }));
 }
@@ -460,8 +476,8 @@ function objectConfigXML(o) {
     o.vols.map((v, j) => '    <part id="' + v.id + '" subtype="normal_part">\n      <metadata key="name" value="' + xmlEsc(v.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
       (v.slot !== null ? '      <metadata key="extruder" value="' + (v.slot + 1) + '"/>\n' : '') + '      <metadata key="source_file" value="' + o.name + '"/>\n' +
       '      <metadata key="source_object_id" value="0"/>\n      <metadata key="source_volume_id" value="' + j + '"/>\n      <metadata key="source_offset_x" value="0"/>\n      <metadata key="source_offset_y" value="0"/>\n      <metadata key="source_offset_z" value="0"/>\n    </part>\n').join('') +
-    (o.mods || []).map(m => '    <part id="' + m.id + '" subtype="modifier_part">\n      <metadata key="name" value="' + xmlEsc(m.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
-      HOLE_MOD_SETTINGS.map(([k, v]) => '      <metadata key="' + k + '" value="' + v + '"/>\n').join('') + '    </part>\n').join('') + '  </object>\n';
+    (o.mods || []).map(m => '    <part id="' + m.id + '" subtype="' + (m.subtype || 'modifier_part') + '">\n      <metadata key="name" value="' + xmlEsc(m.name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
+      (m.settings || HOLE_MOD_SETTINGS).map(([k, v]) => '      <metadata key="' + k + '" value="' + v + '"/>\n').join('') + '    </part>\n').join('') + '  </object>\n';
 }
 function modelSettingsXML(objs, plateCount) {
   const object = objectConfigXML;
@@ -483,7 +499,8 @@ function slotPlan(items, r, slot) {
   const extra = [], notes = [];
   // Körper mit eigenem Slot belegen diesen Slot mit dem Filament ihres Teils
   const users = items.flatMap(p => [p, ...(p.bodies || []).filter(b => b.slot !== null && b.slot !== undefined)
-    .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot }))]);
+    .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot })),
+    ...textSlots(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Beschriftung') }, r: p.r, slot: s }))]);
   for (const p of users) {
     const ps = partSlot(p), pr = p.r || r;
     if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(t('{part}: {material} im selben Slot wie {main} – es gelten die Filamentwerte von {main}.', { part: p.geom.name, material: pr.m.name, main: r.m.name })); continue; }
@@ -569,7 +586,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
     items.forEach((p, i) => {
       const pl = places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(p.geom, pl);
       q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
-      q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); });
+      q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); }); textSlots(p).forEach(s => q.slots.add(s));
       q.idx.push(i);
     });
     const tp = planTowers(settings, tpl, plates);
@@ -579,8 +596,8 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   }
   const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
   // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
-  const objs = items.map((p, i) => ({ g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
-    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: holeMods(i + 1, p.holes), vols: bodyVolumes(p.geom, p.bodies, i + 1) }));
+  const objs = items.map((p, i) => { const tv = textVolumes(i + 1, p); return { g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
+    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: tv.negs.concat(holeMods(i + 1, p.holes)), vols: bodyVolumes(p.geom, p.bodies, i + 1).concat(tv.vols) }; });
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
@@ -720,7 +737,8 @@ function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, 
       return;
     }
     // Hinzugefügtes Teil: Körper und Loch-Modifikatoren als Netze, lokal um die Mitte (wie build3mfFiles)
-    const vols = bodyVolumes(g, j.bodies, 1).map(v => ({ ...v, id: nextId++ })), mods = holeMods(1, j.holes).map(m => ({ ...m, id: nextId++ }));
+    const tv = textVolumes(1, j);
+    const vols = bodyVolumes(g, j.bodies, 1).concat(tv.vols).map(v => ({ ...v, id: nextId++ })), mods = tv.negs.concat(holeMods(1, j.holes)).map(m => ({ ...m, id: nextId++ }));
     const oid = nextId++, center = [c[0], c[1], (g.mn[2] + g.mx[2]) / 2];
     const mesh = (pos, id) => { const x = meshObjectXML(pos, center, id); return hasP ? x : x.replace(/ p:UUID="[^"]*"/, ''); };
     resources.push(...vols.map(v => mesh(v.pos, v.id)), ...mods.map(m => mesh(m.pos, m.id)),
@@ -782,7 +800,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     items.forEach((j, i) => {
       const pl = lay.places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(j.geom, pl);
       q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
-      q.slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(Math.min(b.slot, nFil - 1)); });
+      q.slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(Math.min(b.slot, nFil - 1)); }); textSlots(j).forEach(s => q.slots.add(Math.min(s, nFil - 1)));
       if (j.part && (j.part.painted || (j.part.modSlots || []).length)) q.slots.add('bemalt');
       q.idx.push(i);
     });
@@ -800,7 +818,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     for (const j of items) {
       const id = j.plate || 1, [sx, sy] = shifts.get(id) || [0, 0], pi = id - 1, ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
       plates[pi].rects.push([j.geom.mn[0] + sx - ox, j.geom.mn[1] + sy - oy, j.geom.mx[0] + sx - ox, j.geom.mx[1] + sy - oy]);
-      plates[pi].slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) plates[pi].slots.add(Math.min(b.slot, nFil - 1)); });
+      plates[pi].slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) plates[pi].slots.add(Math.min(b.slot, nFil - 1)); }); textSlots(j).forEach(s => plates[pi].slots.add(Math.min(s, nFil - 1)));
       if (j.part && j.part.painted) plates[pi].slots.add('bemalt'); // Farben des Designers → mehrfarbig, Turm nötig
     }
     const tp = planTowers(settings, tpl, plates);

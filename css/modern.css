@@ -190,3 +190,115 @@ dialog::backdrop { background: rgba(10, 12, 16, .45); backdrop-filter: blur(2px)
 /* Draufsicht der Platten im Dunkelmodus: dunkle Teile (z. B. schwarzes Filament) auf dunklem Bett sichtbar halten */
 :root[data-theme="dark"] .plate-svg rect[data-pick] { stroke: rgba(255, 255, 255, .6); }
 :root[data-theme="dark"] .plate-svg .bed { fill: var(--paper-2); }
+
+/* ================= Tablet (etwa 761–1250 px, hoch und quer) =================
+   Über 1250 px bleibt alles wie am Desktop. Touch-Größen (≥ 44 px) nur bei grobem Zeiger (Finger). */
+@media (max-width: 1250px) {
+  /* Tabs: bleiben eine Zeile, notfalls seitlich wischen statt umbrechen */
+  .tabs { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: none; white-space: nowrap; }
+  /* Kopfzeile: Gruppen nicht zusammenquetschen – lieber umbrechen */
+  .topbar { flex-wrap: wrap; }
+  .machine, .menus, .top-prefs, .printer-switch, .nozzle { flex: none; }
+  .menu-btn, .printer-switch button { white-space: nowrap; }
+}
+@media (max-width: 1250px) and (pointer: coarse) { .brand { display: none; } }
+@media (max-width: 1140px) {
+  /* Kopfzeile: ohne Schriftzug passt sie bis etwa 960 px in eine Zeile, darunter sauber in zwei */
+  .brand { display: none; }
+  .topbar { flex-wrap: wrap; gap: 8px 16px; padding: 8px 16px; }
+  .menus { margin-left: auto; }
+}
+@media (max-width: 960px), (max-width: 1140px) and (pointer: coarse) {
+  .machine { flex: 1 1 100%; flex-wrap: wrap; gap: 8px 16px; }
+  .menus { margin-left: -8px; }
+  .top-prefs { margin-left: auto; }
+}
+
+/* Werkbank quer: Auftrag und Kamera/3D nebeneinander, darunter Temperaturen | ACE, dann Achsen */
+@media (max-width: 1250px) and (min-width: 761px) and (orientation: landscape) {
+  .wb-job { grid-column: span 5; }
+  .wb-cam { grid-column: span 7; }
+}
+/* Werkbank hoch: Auftrag über der Kamera, Temperaturen | ACE mit Kacheln 2 × 2 */
+@media (max-width: 1250px) and (min-width: 761px) and (orientation: portrait) {
+  .wb-jobinfo { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wb-cam .wb-live, .wb-cam .wb-video { height: min(56vw, 460px); max-height: none; }
+  .wb-ace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1250px) and (min-width: 761px) {
+  .workbench { padding: 14px 16px 24px; }
+  .wb-grid { gap: 14px; }
+  /* Achsen über die ganze Breite: Steuerkreuz links, Schritt und Hinweis daneben */
+  .wb-axes #wbAxBody:not(.hidden) { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 28px; }
+  .wb-axes #wbAxBody > .wb-jog { grid-row: 1 / span 2; justify-content: flex-start; }
+  .wb-axes #wbAxBody > .wb-row { justify-content: flex-start; gap: 8px 24px; }
+}
+
+/* ① Modell bei 761–860 px (Tablet hoch): Spalte und 3D-Ansicht nebeneinander statt untereinander */
+@media (min-width: 761px) and (max-width: 860px) {
+  #view3d.view-model:not([hidden]) { display: grid; grid-template-columns: 290px minmax(0, 1fr); overflow: hidden; }
+  .view-model > .model-col { height: 100%; border-bottom: 0; border-right: 1px solid var(--rule); padding: 14px 12px 18px 14px; }
+  .view-model > #stage { height: auto; }
+  .model-head { flex-wrap: wrap; gap: 2px 8px; }
+}
+/* ③ Slicen quer (Tablet): Kosten/Ausgabe links, Vorschau rechts statt weit unten */
+@media (min-width: 900px) and (max-width: 1100px) and (orientation: landscape) {
+  .slice-grid { grid-template-columns: 320px minmax(0, 1fr); gap: 16px; }
+  .preview-panel { position: sticky; height: calc(100dvh - var(--topbar-h) - var(--tabs-h) - 40px); min-height: 420px; }
+}
+
+/* ---------- Finger statt Maus ---------- */
+@media (pointer: coarse) {
+  /* Kopfzeile, Tabs, Menüs */
+  .menu-btn { min-height: 44px; padding: 10px 14px; }
+  .help-btn { width: 44px; height: 44px; }
+  .menu-list button { padding: 12px 12px; }
+  .seg button { min-width: 40px; min-height: 40px; padding: 6px 10px; font-size: 13px; }
+  .nozzle select { min-height: 44px; font-size: 16px; }
+  .printer-switch button { min-height: 44px; }
+  .tabs button { min-height: 48px; padding: 0 16px; }
+  .help { width: 24px; height: 24px; font-size: 13px; }
+  /* allgemeine Knöpfe und Felder; 16 px verhindert das Hineinzoomen von iOS beim Antippen */
+  .btn, .btn-accent { min-height: 44px; }
+  .field select, .field input, .slot-connect input, .part-scope select { min-height: 44px; font-size: 16px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  .stepper button { width: 44px; min-height: 40px; font-size: 18px; }
+  .stepper input { width: 48px; font-size: 16px; }
+  .orient-tools button, .body-join button { min-height: 40px; padding: 8px 12px; }
+  .hud button { min-height: 40px; padding: 8px 12px; }
+  .part-list button { padding: 10px 8px 10px 10px; }
+  .plate-parts select, .design-list select, .body-list select { min-height: 36px; font-size: 14px; }
+  .pv-layer input { height: 36px; }
+  .field-links .linkbtn, .orient-head .linkbtn, .model-head .linkbtn, .plate-parts .linkbtn, .side-panel > .linkbtn { min-height: 36px; }
+
+  /* Werkbank */
+  .wb-card .btn { min-height: 44px; padding: 10px 18px; font-size: 14.5px; }
+  .wb-bar { gap: 8px 12px; }
+  .wb-bar .linkbtn, .wb-card .linkbtn { min-height: 44px; padding: 8px 4px; font-size: 14px; }
+  .wb-toggle { min-height: 44px; font-size: 14.5px; gap: 10px; }
+  .wb-pill { font-size: 13px; padding: 5px 12px; }
+  .wb-cam .wb-view button { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+  .wb-temp-set { gap: 8px; align-items: center; }
+  .wb-temp-set input { width: 92px; min-height: 44px; padding: 8px 10px; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .wb-chip { min-height: 44px; padding: 8px 16px; font-size: 14px; }
+  .wb-presets { gap: 8px; }
+  .wb-fans { gap: 2px; font-size: 14px; }
+  .wb-fans label { grid-template-columns: 76px minmax(0, 1fr) 46px; min-height: 44px; }
+  .wb-fans input[type="range"] { height: 44px; margin: 0; }
+  .wb-ace { gap: 10px; }
+  .wb-ace .wb-swatch { height: 44px; }
+  .wb-ace .wb-slotinfo { padding: 7px 10px 8px; font-size: 14px; }
+  .wb-ace .wb-slotinfo b { font-size: 16px; }
+  .wb-ace .wb-slotinfo small { font-size: 12px; }
+  .wb-ace .wb-feed button { min-height: 44px; font-size: 13.5px; }
+  .wb-dry { gap: 8px; }
+  .wb-dry input { width: 76px; min-height: 44px; padding: 8px; font-size: 16px; }
+  .wb-pad { grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 56px); gap: 8px; }
+  .wb-z { grid-template-rows: repeat(3, 56px); gap: 8px; width: 72px; }
+  .wb-pad button, .wb-z button { font-size: 15px; }
+  #wbStep { min-height: 44px; font-size: 16px; padding: 6px 10px; }
+  .wb-queue-list li { padding: 10px 0; }
+  .wb-queue-list .q-act { gap: 12px; }
+}

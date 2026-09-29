@@ -6,7 +6,8 @@ Einstellungen über Umgebungsvariablen (im Add-on setzt run.sh sie aus dem MQTT-
 
 Themen (base = MQTT_BASE_TOPIC):
   <base>/availability     online | offline (Last Will, retained)
-  <base>/state            JSON mit allen Werten (siehe payload()), alle 15 s und bei Änderung
+  <base>/state            JSON mit allen Werten (siehe payload()), alle 15 s und bei Änderung – auch Filament, Kosten und
+                          Anzahl der Drucke im laufenden Monat (aus der Druckhistorie, tools/spools.py stats)
   <base>/slot/<n>         JSON je ACE-Slot (1 …): remaining_g, name, type, colour, net_g, brand
   <prefix>/<component>/<base>/<key>/config   Discovery (retained)
 Ein Gerät „Druck-Konfigurator <Druckermodell>“. Der Server liest nur – über MQTT wird nichts gesteuert.
@@ -43,6 +44,10 @@ ENTITIES = [
     ("queue_remaining_min", "sensor", "Warteschlange Restzeit", "min", "duration", None, "mdi:timer-sand"),
     ("plates", "sensor", "Platten fertig", None, None, None, "mdi:layers-outline"),
     ("bed_clear", "binary_sensor", "Bett abräumen", None, None, None, "mdi:printer-3d-nozzle-alert"),
+    # Druckhistorie der Filamentverwaltung (tools/spools.py stats): laufender Monat, beginnt am 1. wieder bei 0
+    ("month_filament_g", "sensor", "Filament diesen Monat", "g", "weight", "total", "mdi:printer-3d-nozzle"),
+    ("month_cost_eur", "sensor", "Filamentkosten diesen Monat", "EUR", "monetary", "total", "mdi:cash"),
+    ("month_prints", "sensor", "Drucke diesen Monat", None, None, "total", "mdi:counter"),
 ]
 PRINTER_STATE = {"free": "frei", "busy": "beschäftigt", "offline": "offline"}
 
@@ -80,22 +85,31 @@ def printer_state(st):
     return PRINTER_STATE.get(st.get("state"), st.get("state") or "frei")
 
 
-def payload(st, queue, now=None):
-    """Werte für <base>/state. st = anycubic_lan.status (oder None), queue = printqueue.api_get()."""
+def month_values(spool_view):
+    """Monatswerte aus spools.view()["stats"] (ohne Filamentverwaltung: None)."""
+    sm = (spool_view or {}).get("stats") if isinstance(spool_view, dict) else None
+    if not isinstance(sm, dict):
+        return {"month_filament_g": None, "month_cost_eur": None, "month_prints": None, "month": None}
+    return {"month_filament_g": round(sm.get("grams") or 0, 1), "month_cost_eur": round(sm.get("cost_eur") or 0, 2),
+            "month_prints": int(sm.get("prints") or 0), "month": sm.get("month"), "month_hours": round(sm.get("hours") or 0, 2)}
+
+
+def payload(st, queue, now=None, spool_view=None):
+    """Werte für <base>/state. st = anycubic_lan.status (oder None), queue = printqueue.api_get(), spool_view = spools.api_get()."""
     now = now or time.time()
     job = (st or {}).get("job") or {}
     temps = (st or {}).get("temps") or {}
     sm = (queue or {}).get("summary") or {}
     rnd = lambda v: round(v, 1) if isinstance(v, (int, float)) else None
     rem = job.get("remaining_min") if isinstance(job.get("remaining_min"), (int, float)) else None
-    return {"printer_state": printer_state(st), "progress": job.get("progress") if isinstance(job.get("progress"), (int, float)) else None,
+    return dict({"printer_state": printer_state(st), "progress": job.get("progress") if isinstance(job.get("progress"), (int, float)) else None,
             "remaining_min": rem, "finish": _finish(rem, now) if job else None, "job": job.get("name") or None,
             "layer": "%s/%s" % (job.get("layer"), job.get("layers")) if job.get("layers") else None,
             "nozzle_temp": rnd(temps.get("curr_nozzle_temp")), "bed_temp": rnd(temps.get("curr_hotbed_temp")),
             "queue_state": sm.get("text") or "keine", "queue_remaining_min": round((sm.get("remaining_s") or 0) / 60),
             "plates": "%d/%d" % (sm.get("done") or 0, sm.get("total") or 0), "plates_done": sm.get("done") or 0,
             "plates_total": sm.get("total") or 0, "queue_current": sm.get("current"), "queue_next": sm.get("next"),
-            "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}
+            "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view))
 
 
 def slot_payloads(st, spool_view):
@@ -171,7 +185,7 @@ class Publisher:
                 c["icon"] = icon
             if comp == "binary_sensor":
                 c.update(payload_on="ON", payload_off="OFF")
-            if key in ("printer_state", "queue_state"):
+            if key in ("printer_state", "queue_state", "month_prints"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
         for n in slots:
@@ -230,8 +244,9 @@ class Publisher:
         if not self.connected:
             return False
         st = self.status_fn()
-        state = payload(st, self.queue_fn(), now)
-        slots = slot_payloads(st, self.spools_fn())
+        spool_view = self.spools_fn()
+        state = payload(st, self.queue_fn(), now, spool_view)
+        slots = slot_payloads(st, spool_view)
         dev = self.device(st)
         key = (dev["name"], dev.get("sw_version"), tuple(slots))
         if self.need_discovery or key != self.disc_key:

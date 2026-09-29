@@ -1,0 +1,170 @@
+# Tests bei jedem Push auf main und bei Pull Requests:
+#   node    – Rechenkern (tests/*.js, die ohne Browser und ohne OrcaSlicer laufen)
+#   python  – Server-Teile (LAN-Modus gegen nachgebauten Drucker, Spulen, Warteschlange, MQTT, Zugriffsschutz …)
+#   orca    – gegen die echte OrcaSlicer-CLI (2.4.2, wie im Dockerfile)
+#   browser – Bedientest tests/ui-smoke.js in Chrome ohne Fenster (tools/headless.js)
+# Kein Test spricht mit einem echten Drucker. Das Container-Image baut .github/workflows/docker-image.yml.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORCA_VERSION: "2.4.2"
+
+jobs:
+  node:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Node-Tests
+        run: |
+          set -u
+          # nicht hier: ui-smoke.js (läuft in der Seite → Job browser), make-test-3mf.js (Hilfsskript für slice.py),
+          # verify-3mf.js / verify-orca-printers.js / export-project-arrange.js (brauchen OrcaSlicer → Job orca)
+          skip=" ui-smoke.js make-test-3mf.js verify-3mf.js verify-orca-printers.js export-project-arrange.js "
+          failed=""
+          for f in tests/*.js; do
+            n=$(basename "$f")
+            case "$skip" in *" $n "*) continue ;; esac
+            echo "::group::$n"
+            node "$f" || failed="$failed $n"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Fehlgeschlagen:$failed"; exit 1; fi
+
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Python-Tests
+        env:
+          DATA_DIR: ${{ runner.temp }}/data
+        run: |
+          set -u
+          failed=""
+          # slice.py prüft ohne OrcaSlicer nur den G-Code-Parser (echtes Slicen im Job orca)
+          for t in lan spools printqueue ha_mqtt printed preview slice auth; do
+            echo "::group::$t.py"
+            python "tests/$t.py" || failed="$failed $t.py"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Fehlgeschlagen:$failed"; exit 1; fi
+
+  orca:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # Laufzeit-Bibliotheken, die Orca auch für --slice lädt – dieselbe Liste wie im Dockerfile
+      - name: Bibliotheken für OrcaSlicer
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libwebkit2gtk-4.1-0 libglu1-mesa libegl1 libgl1 libopengl0 libglx0 \
+            libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libsecret-1-0 libmspack0t64 libsoup-3.0-0 \
+            libwayland-client0 libwayland-egl1 libwayland-server0 libxkbcommon0 libdbus-1-3 libsm6 libice6 fonts-dejavu-core
+
+      - name: OrcaSlicer-AppImage aus dem Cache
+        id: orca-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/orca-appimage
+          key: orca-appimage-${{ runner.os }}-${{ runner.arch }}-${{ env.ORCA_VERSION }}
+
+      - name: OrcaSlicer herunterladen
+        if: steps.orca-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/orca-appimage
+          curl -fsSL -o ~/orca-appimage/orca.AppImage \
+            "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
+
+      # entpackt wie im Dockerfile (braucht kein FUSE)
+      - name: OrcaSlicer entpacken
+        run: |
+          set -euo pipefail
+          chmod +x ~/orca-appimage/orca.AppImage
+          mkdir -p "$RUNNER_TEMP/orca-x" && cd "$RUNNER_TEMP/orca-x"
+          ~/orca-appimage/orca.AppImage --appimage-extract >/dev/null
+          echo "ORCA_PATH=$RUNNER_TEMP/orca-x/squashfs-root/AppRun" >> "$GITHUB_ENV"
+          echo "ORCA=$RUNNER_TEMP/orca-x/squashfs-root/AppRun" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/orca-x/squashfs-root/AppRun" --help | head -1
+
+      - name: slice.py (echtes Slicen)
+        run: python tests/slice.py
+
+      - name: verify-3mf.js
+        run: node tests/verify-3mf.js
+
+      - name: verify-orca-printers.js
+        run: node tests/verify-orca-printers.js
+
+      # braucht zwei echte Makerworld-3MF (PORTA3MF/ACE3MF, sonst ~/Downloads) – fehlen sie, meldet der Test
+      # „Datei fehlt … Test übersprungen“ und endet erfolgreich
+      - name: export-project-arrange.js
+        run: node tests/export-project-arrange.js
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      KONFIGURATOR_PORT: "8765"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # Ubuntu 24.04 sperrt unprivilegierte User-Namespaces per AppArmor – sonst startet Chromes Sandbox evtl. nicht
+      - name: Chrome-Sandbox erlauben
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Server starten
+        env:
+          DATA_DIR: ${{ runner.temp }}/data
+        run: |
+          nohup python tools/serve.py > "$RUNNER_TEMP/serve.log" 2>&1 &
+          for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:$KONFIGURATOR_PORT/api/health" && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/serve.log"; exit 1
+
+      - name: Bedientest (tools/headless.js smoke)
+        run: CHROME="$(which google-chrome)" node tools/headless.js smoke
+
+      - name: Server-Log
+        if: always()
+        run: cat "$RUNNER_TEMP/serve.log" || true

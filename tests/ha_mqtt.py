@@ -165,11 +165,15 @@ ST = {"model": "Anycubic Kobra S1", "firmware": "2.7.2.7", "connected": True, "s
       "ace": [{"slots": [{"index": i} for i in range(4)], "loaded_slot": 0}]}
 SPOOLS = {"spools": [{"id": "a1", "slot": 0, "remaining_g": 812.5, "net_g": 1000, "type": "PLA", "colour": "#FFFFFF", "name": "Weiß", "brand": "Anycubic", "archived": False},
                      {"id": "b2", "slot": None, "remaining_g": 100, "net_g": 1000, "type": "PETG", "colour": "#000000", "name": "", "brand": "", "archived": False},
-                     {"id": "c3", "slot": 2, "remaining_g": 5, "net_g": 250, "type": "ASA", "colour": "#010101", "name": "", "brand": "", "archived": True}]}
+                     {"id": "c3", "slot": 2, "remaining_g": 5, "net_g": 250, "type": "ASA", "colour": "#010101", "name": "", "brand": "", "archived": True}],
+          "stats": {"month": "2026-09", "prints": 3, "grams": 412.34, "cost_eur": 10.305, "hours": 7.5}}
 p = ha_mqtt.payload(ST, None, now=1_000_000_000)
 check("Stand: Druck", p["printer_state"] == "druckt" and p["progress"] == 42 and p["remaining_min"] == 30 and p["job"] == "Teil_Platte2" and p["layer"] == "12/200", p)
 check("Stand: Fertig um", p["finish"] == "2001-09-09T02:16:00+00:00", p["finish"])
 check("Stand: Temperaturen gerundet", p["nozzle_temp"] == 219.6 and p["bed_temp"] == 60.2)
+check("Stand: ohne Filamentverwaltung keine Monatswerte", p["month_prints"] is None and p["month_filament_g"] is None)
+pm = ha_mqtt.payload(ST, None, now=1_000_000_000, spool_view=SPOOLS)
+check("Stand: Monatswerte", pm["month_filament_g"] == 412.3 and pm["month_cost_eur"] == 10.3 and pm["month_prints"] == 3 and pm["month"] == "2026-09", pm)
 check("Stand: ohne Warteschlange", p["queue_state"] == "keine" and p["plates"] == "0/0" and p["bed_clear"] == "OFF")
 p0 = ha_mqtt.payload(None, None)
 check("Stand: Drucker offline", p0["printer_state"] == "offline" and p0["progress"] is None and p0["finish"] is None and p0["layer"] is None)
@@ -201,7 +205,7 @@ check("ohne Drucker keine Slot-Sensoren außer bekannten", wait(lambda: disc("se
 status["st"] = ST
 check("Discovery neu mit Modell", wait(lambda: disc("sensor", "slot4_remaining") is not None))
 keys = ["printer_state", "progress", "remaining_min", "finish", "job", "layer", "nozzle_temp", "bed_temp", "queue_state",
-        "queue_remaining_min", "plates"]
+        "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints"]
 check("alle Sensoren angemeldet", all(disc("sensor", k) for k in keys), [k for k in keys if not disc("sensor", k)])
 check("Discovery retained", all(disc("sensor", k)[2] for k in keys) and disc("binary_sensor", "bed_clear")[2])
 c = json.loads(disc("sensor", "progress")[1])
@@ -219,9 +223,16 @@ check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attribut
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
 check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 1 + 4, sorted(set(uids)))
+mc = json.loads(disc("sensor", "month_cost_eur")[1])
+check("Kosten diesen Monat: monetary EUR", mc["device_class"] == "monetary" and mc["unit_of_measurement"] == "EUR" and mc["state_class"] == "total"
+      and mc["value_template"] == "{{ value_json.month_cost_eur }}", mc)
+mg = json.loads(disc("sensor", "month_filament_g")[1])
+check("Filament diesen Monat: Gramm", mg["unit_of_measurement"] == "g" and mg["device_class"] == "weight" and mg["name"] == "Filament diesen Monat", mg)
+check("Drucke diesen Monat: Zähler", json.loads(disc("sensor", "month_prints")[1])["state_class"] == "total")
 check("Stand gesendet", wait(lambda: broker.last("dk_test/state") and json.loads(broker.last("dk_test/state")[1])["progress"] == 42))
 st = json.loads(broker.last("dk_test/state")[1])
 check("Stand: Warteschlange", st["queue_state"] == "Platte 1 druckt" and st["plates"] == "0/2" and st["bed_clear"] == "OFF" and st["queue_remaining_min"] == 45, st)
+check("Stand: Monatswerte gesendet", st["month_prints"] == 3 and st["month_filament_g"] == 412.3, st)
 check("Stand nicht retained", broker.last("dk_test/state")[2] is False)
 sl1 = json.loads(broker.last("dk_test/slot/1")[1])
 check("Slot 1 gesendet", sl1["remaining_g"] == 812.5 and sl1["name"] == "Weiß" and sl1["colour"] == "#FFFFFF", sl1)

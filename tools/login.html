@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- Anmeldeseite des Zugriffsschutzes (KONFIGURATOR_PIN, tools/serve.py). Eigenständig: keine Skripte, keine
+     externen Dateien, alle Pfade relativ (funktioniert auch hinter einem Präfix). {{NEXT}}/{{ERROR}} setzt der Server. -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Druck-Konfigurator – Anmeldung</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f3f4f6; color: #111; display: flex; min-height: 100vh; margin: 0;
+         align-items: center; justify-content: center; }
+  form { background: #fff; padding: 24px 28px; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.12); width: 300px; }
+  h1 { font-size: 1.2em; margin: 0 0 4px; }
+  p { margin: 6px 0; font-size: .92em; }
+  .en { color: #666; font-size: .85em; }
+  input[type=password] { width: 100%; box-sizing: border-box; font-size: 1.2em; padding: 8px; margin: 10px 0; }
+  button { width: 100%; font-size: 1em; padding: 8px; cursor: pointer; }
+  .err { color: #b00020; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { body { background: #1b1d21; color: #eee; } form { background: #2a2d33; } .en { color: #aaa; } }
+</style>
+</head>
+<body>
+<form method="post" action="login">
+  <h1>Druck-Konfigurator</h1>
+  <p>Bitte PIN eingeben.</p>
+  <p class="en">Please enter the PIN.</p>
+  {{ERROR}}
+  <input type="password" name="pin" autocomplete="current-password" inputmode="text" maxlength="64" required autofocus
+         aria-label="PIN">
+  <input type="hidden" name="next" value="{{NEXT}}">
+  <button type="submit">Anmelden / Sign in</button>
+</form>
+</body>
+</html>

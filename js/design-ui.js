@@ -22,6 +22,7 @@ function usedSlots(plan, idx) {
     used.add(j.slot ?? plan.slot);
     for (const b of j.bodies || []) if (b.slot != null) used.add(b.slot);
     for (const d of j.part.modSlots || []) used.add(map[d] ?? d);
+    if (typeof textSlots === 'function') textSlots(j.part).forEach(s => used.add(s));   // erhabene Beschriftung (js/engrave.js)
   }
   return [...used].filter(s => s != null).sort((a, b) => a - b);
 }
@@ -99,7 +100,9 @@ function slotMaterialChanges() {
   for (const p of project.parts) {
     const s = slots[p.slot ?? def];
     if (!s || !s.type || !p.input) continue;
-    const m = materialForSlotType(s.type, p.input.material);
+    // mit der Spule im Slot verknüpftes Filamentprofil zuerst (Filamentverwaltung), sonst passend zum Typ
+    const linked = typeof spoolProfileForSlot === 'function' ? spoolProfileForSlot(p.slot ?? def) : null;   // Profil-Id oder null
+    const m = linked || materialForSlotType(s.type, p.input.material);
     if (m !== p.input.material) out.push([p, m]);
   }
   return out;

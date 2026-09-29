@@ -35,9 +35,14 @@
   const d = I18N.dict;
   if (d[document.title]) document.title = d[document.title];
   walk(document.body, x => {
-    const v = d[x.key]; if (!v) return;
+    const v = d[x.key]; if (!v || v === x.key) return;   // gleiches Wort (z. B. „Filament“): nichts anfassen
     if (x.kind === 'attr') x.el.setAttribute(x.attr, v);
-    else if (x.kind === 'block') x.el.innerHTML = v;
+    else if (x.kind === 'block') {
+      // Inline-Elemente mit id (z. B. <span id="matBadge">) müssen erhalten bleiben – sonst nur die Textknoten übersetzen
+      const ids = [...x.el.querySelectorAll('[id]')].map(e => e.id);
+      if (ids.every(id => v.includes('id="' + id + '"'))) x.el.innerHTML = v;
+      else { const tn = [...x.el.childNodes].find(n => n.nodeType === 3 && n.nodeValue.trim()); if (tn && !/</.test(v)) tn.nodeValue = tn.nodeValue.replace(/\S[\s\S]*\S|\S/, v); }
+    }
     else x.node.nodeValue = x.node.nodeValue.replace(/\S[\s\S]*\S|\S/, v);
   });
 })();

@@ -1,0 +1,25 @@
+/* Beschriftung (① Modell, js/engrave-ui.js) – Aufbau wie „Mehrfarbig“/„Bohrlöcher“ in css/app.css */
+.engrave { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.engrave.hidden, .engrave .hidden { display: none; }
+.engrave p { margin: 4px 0 0; font-size: 13px; }
+.engrave p:empty { display: none; }
+.text-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 200px; overflow-y: auto; scrollbar-width: thin; }
+.text-list:empty { display: none; }
+.text-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.text-list li:hover, .text-list li:focus-within, .text-list li.editing { background: var(--accent-soft); }
+.text-list .pslot { display: inline-block; width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.35); }
+.text-list .tname { font: inherit; text-align: left; background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
+.text-list small { display: block; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); }
+.text-list small.bad { color: var(--bad, #c0392b); font-family: inherit; }
+.text-list .tdel { font: inherit; font-size: 12px; background: none; border: 1px solid transparent; border-radius: var(--r-s); color: var(--ink-3); cursor: pointer; padding: 1px 6px; }
+.text-list .tdel:hover { border-color: var(--rule-strong); color: var(--ink); }
+.text-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 8px; margin-top: 8px; font-size: 12.5px; }
+.text-form label { display: flex; flex-direction: column; gap: 2px; color: var(--ink-2, inherit); }
+.text-form .text-wide { grid-column: 1 / -1; }
+.text-form input, .text-form select { font: inherit; font-size: 12.5px; padding: 3px 6px; min-width: 0; width: 100%; box-sizing: border-box; }
+.text-form .unit { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.text-form .unit input { flex: 1; }
+.engrave .text-face { margin-top: 6px; }
+.engrave #txSize { margin-left: 6px; font-family: var(--f-mono); font-size: 11.5px; }
+.engrave .orient-tools button.active { border-color: var(--accent); background: var(--accent-soft); }
+.engrave .btn-accent:disabled { opacity: .45; cursor: default; }

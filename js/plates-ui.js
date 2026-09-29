@@ -10,8 +10,17 @@
 const plTpl = () => lastResult && exportTemplate(lastResult.printer.id, lastResult.dSel);
 
 // Platzierung aller Teile: count Platten, plateOf[i] (1-basiert), places (Bettkoordinaten; null = Lage des Designers)
+// Zwischengespeichert (layoutKey): update() fragt je Durchlauf mehrfach (Platten, Kosten, Spülmenge, Export-Dialog …),
+// mit 30–50 Kopien wäre sonst jedes Mal neu zu packen. Das Ergebnis nicht verändern – es wird geteilt.
 function projectLayout(tpl) {
   if (!project || !tpl) return null;
+  const key = layoutKey(tpl);
+  if (plCache.lay && plCache.lay.key === key) return plCache.lay.val;
+  const val = computeLayout(tpl);
+  plCache.lay = { key, val };
+  return val;
+}
+function computeLayout(tpl) {
   if (project.threemf && needsRelayout(project.threemf, project.parts)) {
     const r = layout3mf(project.parts.map(p => ({ geom: p.geom, plate: p.plate, own: ownPlaced(p) })), tpl, project.threemf.layout || null);
     return { count: r.count, plateOf: r.plateOf, places: r.places, oversize: r.oversize, oversizePlates: r.oversizePlates, overflow: r.overflow, designer: r.designer };
@@ -22,8 +31,33 @@ function projectLayout(tpl) {
       oversize: project.parts.map((p, i) => i).filter(i => volumeExcess(project.parts[i].geom, vol).length),
       oversizePlates: plateShifts(project.parts.map(p => ({ geom: p.geom, plate: p.plate })), tpl).oversize };
   }
-  const r = project.platesFixed ? arrangeByPlate(project.parts, tpl) : arrangeParts(project.parts.map(p => p.geom), tpl);
+  const r = project.platesFixed ? arrangeByPlate(project.parts, tpl) : packAll(tpl);
   return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: r.overflow };
+}
+// Alle Teile platzsparend auf möglichst wenige Platten (ohne Zuordnung) – auch für „Platzsparend wären es n Platten“
+function packAll(tpl) {
+  const key = layoutKey(tpl, true);
+  if (plCache.all && plCache.all.key === key) return plCache.all.val;
+  const val = arrangeParts(project.parts.map(p => p.geom), tpl);
+  plCache.all = { key, val };
+  return val;
+}
+/* Schlüssel für den Zwischenspeicher: Projekt, Bett (Größe, Mitte, Höhe), Anordnungsart und je Teil die Geometrie
+   (Objekt-Identität – Drehen erzeugt eine neue, js/orient-ui.js – und Maße), Platte und „selbst platziert“.
+   Verschieben, Kopieren, Löschen, Drehen und ein anderer Drucker ändern ihn. packOnly: nur, was arrangeParts liest. */
+const plCache = { lay: null, all: null, ids: new WeakMap(), n: 0 };
+function geomId(g) {
+  if (!g || typeof g !== 'object') return '-';
+  let id = plCache.ids.get(g);
+  if (!id) { id = ++plCache.n; plCache.ids.set(g, id); }
+  return id;
+}
+function layoutKey(tpl, packOnly) {
+  const tm = project.threemf;
+  const head = [geomId(project), bedSize(tpl).join('x'), (tpl.bedCenter || []).join(','), [].concat(tpl.settings && tpl.settings.printable_height || [])[0],
+    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length].join('|');
+  return head + '|' + project.parts.map(p => { const g = p.geom || {};
+    return geomId(g) + ':' + g.x + ':' + g.y + ':' + g.z + (packOnly ? '' : ':' + (p.plate || '') + (ownPlaced(p) ? '*' : '')); }).join(';');
 }
 
 // Ab der ersten Änderung feste Zuordnung: jedes Teil behält die Platte, auf der es gerade steht
@@ -114,7 +148,7 @@ function renderPlates() {
   $('plateInfo').textContent = fixed ? t('{plates} aus der 3MF des Designers, Lage wie vom Designer.', { plates: plN })
     : plN + ' · ' + (designerLayout ? t('Platten des Designers wie angelegt, eigene Teile platzsparend') : auto ? t('automatisch platzsparend verteilt') : t('eigene Zuordnung'));
   // Platzsparend anordnen: bei eigener Zuordnung, bei Makerworld-3MF, wenn es Platten spart (Modifikatoren und Bemalung bleiben)
-  const packed = project.parts.length > 1 ? arrangeParts(project.parts.map(p => p.geom), tpl).plateCount : lay.count;
+  const packed = project.parts.length > 1 ? packAll(tpl).plateCount : lay.count;
   $('plateAuto').classList.toggle('hidden', auto || (designerLayout && packed >= lay.count));
   $('plateAuto').title = designerLayout ? t('Platzsparend: {n} statt {m} Platten. Farb-Modifikatoren und Bemalung des Designers bleiben erhalten.', { n: packed, m: lay.count })
     : t('Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen');

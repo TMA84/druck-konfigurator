@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.1.0] – 2026-09-29
+
+### Neu
+- **Beschriftung:** Text auf ein Teil – **erhaben** mit eigenem Slot (andere Farbe) oder **vertieft** (Orca `negative_part`); Höhe, Tiefe, Strichstärke, Drehung, oberste Fläche oder Fläche anklicken, Warnungen bei Überstand. Schrift Hershey Simplex (eigene Umsetzung, `js/font-hershey.js`, Lizenzhinweis in THIRD_PARTY_NOTICES). Mit Orca geprüft (erhaben druckt aus dem eigenen Slot, vertieft schneidet die oberen Schichten).
+- **Druckhistorie & Statistik:** echter Verbrauch und Kosten je Druck, Vergleich mit der Schätzung aus ③ (bei Drucken aus dem Tool), Monatsübersicht und Diagramm nach Filamenttyp, Filter, CSV-Export; bis 500 Drucke. HA-Sensoren „Filament/Kosten/Drucke diesen Monat“.
+- **Filamentprofil aus einer Spule** anlegen und verknüpfen; „Filament aus dem ACE übernehmen“ nimmt dann dieses Profil.
+- **PIN-Schutz** für den direkten Zugriff (`KONFIGURATOR_PIN`, Add-on-Option `access_pin`): Anmeldeseite, Sitzung 30 Tage, Sperre nach 5 Fehlversuchen; Home-Assistant-Ingress und `/api/health` bleiben frei.
+- **Tests auf GitHub** (`.github/workflows/tests.yml`): Node, Python, OrcaSlicer (Slicen, 3MF-Prüfung) und Bedientest im Chrome ohne Fenster bei jedem Push.
+- **Tablet-Ansicht:** Kopfzeile, Tabs und Drucker-Werkbank für Hoch- und Querformat, Bedienelemente ≥ 44 px bei Touch.
+
+### Geändert
+- Schneller bei vielen Teilen: Plattenverteilung zwischengespeichert, Zahlenformat mit festem Formatierer (`de()` war ≈ ⅔ der Rechenzeit eines Updates; ein Update jetzt ≈ 13–15 statt 35–50 ms).
+- Wörterbücher aufgeräumt: 95 doppelt geführte Begriffe (teils mit abweichendem Englisch) an einer Stelle, 3 ungenutzte Einträge entfernt. Import der Filamentverwaltung bis 4 MB.
+
+### Behoben
+- Auf Englisch konnte ein Modell nicht geladen werden („Cannot set properties of null“): Der Übersetzer ersetzte den Block „Filament“ und löschte dabei die Kennzeichnung daneben. Er ersetzt jetzt nichts mehr, wenn die Übersetzung gleich ist, und behält Elemente mit id.
+- ① Modell ließ sich unter 860 px Breite nicht scrollen.
+
+### Geprüft
+- Node: import 25, orient 15, export-project 11, holes 9, purge 11, costs 8, overrides 15, plates 44, engrave 26, export-project-arrange 56 (Orca). Python: lan 49, spools 93, printqueue 65, ha_mqtt 52, printed 7, preview 9, auth 36, slice 21 (Orca). verify-3mf ohne Fehler, Bedientest 127/127, Englisch ohne deutsche Reste.
+
 ## [10.0.0] – 2026-09-29
 
 ### Neu

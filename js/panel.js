@@ -89,6 +89,7 @@ function update(){
   if(typeof renderOverrideBar==='function')renderOverrideBar();
   if(typeof renderDesignColours==='function')renderDesignColours();
   if(typeof renderPlates==='function')renderPlates();
+  if(typeof renderEngrave==='function')renderEngrave();
   if(geom&&typeof showVolume==='function')showVolume();
   if(typeof renderCostPanel==='function')renderCostPanel();
   if(typeof enhanceHelp==='function')enhanceHelp();

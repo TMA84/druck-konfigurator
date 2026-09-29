@@ -58,6 +58,8 @@ Ausführlich: **[Handbuch](HANDBUCH.md)** (auch als [PDF](docs/Handbuch.pdf)).
 
 ## Für Entwickler
 
+Bei jedem Push laufen die Tests auf GitHub (`.github/workflows/tests.yml`: Node, Python, OrcaSlicer, Bedientest).
+
 Reines HTML/CSS/JavaScript ohne Build-Schritt (`<script src>`, funktioniert auch über `file://`). Tests mit Node:
 
 ```
@@ -78,6 +80,8 @@ python tests/spools.py        # Filamentverwaltung (Erkennen, Verbrauch, Export/
 python tests/printqueue.py    # Warteschlange auf dem Server
 python tests/ha_mqtt.py       # Home-Assistant-MQTT (gegen einen nachgebauten Broker)
 python tests/printed.py       # Vorschau gestarteter Drucke (3D-Fortschritt)
+node tests/engrave.js         # Beschriftung: Schrift, Platzierung, 3MF (mit OrcaSlicer)
+python tests/auth.py          # PIN-Schutz
 node tools/headless.js smoke  # Bedientest im Chrome ohne Fenster (Server muss laufen)
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
 node tests/verify-orca-printers.js  # 3MF für beliebige Drucker gegen die OrcaSlicer-CLI (dauert lang)

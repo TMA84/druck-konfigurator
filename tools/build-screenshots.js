@@ -42,6 +42,19 @@ const SHOTS = {
            window.fetch = (orig => (u, o) => String(u).startsWith('api/printing/preview') ? orig('api/slice/' + costState.slice.job + '/plate_1.preview') : orig(u, o))(window.fetch);
            spoolData = {host:'', flush:1.5, low_g:100, history:[], track:{}, spools:__fakeSlots.map((s,i)=>({id:'s'+i, slot:i, type:s.type, colour:s.colour, sku:'', rfid:true, name:'', brand:'Anycubic', net_g:1000, used_g:[180,620,90,860][i], purge_g:0, adjust_g:0, remaining_g:[820,380,910,140][i]}))};
            wb.st = st; wb.err = ''; clearTimeout(wb.timer); wbRender(); liveMode('live'); liveUpdate(st); await new Promise(r=>setTimeout(r,2500)); liveUpdate(st); wbRender();`,
+  beschriftung: `await loadFiles([__stl('schild.stl',__box(0,0,0,80,40,6))]); setTab('3d'); await new Promise(r=>setTimeout(r,500));
+           $('txText').value='Werkstatt'; $('txText').dispatchEvent(new Event('input',{bubbles:true}));
+           if ($('txSlot')) { $('txSlot').value='1'; $('txSlot').dispatchEvent(new Event('change',{bubbles:true})); }
+           await new Promise(r=>setTimeout(r,300)); $('txAdd').disabled=false; $('txAdd').click(); await new Promise(r=>setTimeout(r,800));`,
+  historie: `await loadFiles([__pilz()]);
+           const now = Date.now() / 1000, day = 86400, types = ['PLA','PLA','PETG','PLA','ASA'], hist = [];
+           for (let k = 0; k < 60; k++) { const end = now - k * 5.5 * day - (k % 3) * 3600, g = 20 + ((k * 37) % 140), ty = types[k % 5];
+             hist.push({ job: ['halter','deckel','haken','schild','kasten'][k % 5] + '_Platte' + (1 + k % 2) + '.gcode', start: end - g * 90, end, duration_s: g * 90,
+               used: { s0: g }, grams_total: g, types: { [ty]: g }, cost_eur: g / 1000 * 25, changes: k % 4,
+               estimate: k % 2 ? null : { total_g: g * (0.94 + (k % 5) * 0.03), time_s: g * 88, cost_eur: g / 1000 * 25 * (0.95 + (k % 4) * 0.03) } }); }
+           const data = { format:'druck-konfigurator-spools', version:1, spools:[], history: hist.reverse(), price_default:25 };
+           window.fetch = (orig => (u, o) => String(u).startsWith('api/spools/export') ? Promise.resolve(new Response(JSON.stringify(data), {headers:{'Content-Type':'application/json'}})) : orig(u, o))(window.fetch);
+           openHistoryDialog(); await new Promise(r=>setTimeout(r,1200));`,
   spulen: `await loadFiles([__pilz()]); clearTimeout(spoolTimer);
            spoolData = {host:'', flush:1.5, low_g:100, track:{}, history:[{job:'halter_Platte1.gcode', end:Date.now()/1000-3600, used:{s0:42.5, s3:3.1}, changes:3}],
              spools:__fakeSlots.map((s,i)=>({id:'s'+i, slot:i, type:s.type, colour:s.colour, sku:['AHPLCG-107','AHPLBW-107','AHPLBL-107','HPETBK-103'][i], rfid:true, name:'', brand:'Anycubic', net_g:1000, used_g:[180,620,90,860][i], purge_g:[4,6,2,9][i], adjust_g:0, remaining_g:[816,374,908,131][i], last_seen:Date.now()/1000, added:Date.now()/1000}))

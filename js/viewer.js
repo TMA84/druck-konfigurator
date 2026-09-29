@@ -13,6 +13,7 @@ const Viewer = (() => {
   const clip = { on: false, axis: 'x', fraction: 0, plane: null, helper: null };
   const measure = { on: false, points: [], markers: [], line: null, onChange: () => {} };
   const pick = { on: false, onPick: null };   // Fläche anklicken → Dreiecksindex
+  let extras = [], offset = [0, 0, 0];        // Zusatznetze (Beschriftung), Verschiebung geom → Szene
   const AXIS_INDEX = { x: 0, y: 1, z: 2 };
   const AXIS_VECTORS = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 
@@ -93,6 +94,8 @@ const Viewer = (() => {
     geomRef = geom;
     const g = new THREE.BufferGeometry();
     const cx = (geom.mn[0] + geom.mx[0]) / 2, cy = (geom.mn[1] + geom.mx[1]) / 2, cz = geom.mn[2];
+    offset = [cx, cy, cz];
+    setExtras([]);
     const p = new Float32Array(geom.pos.length);
     for (let i = 0; i < p.length; i += 3) { p[i] = geom.pos[i] - cx; p[i + 1] = geom.pos[i + 1] - cy; p[i + 2] = geom.pos[i + 2] - cz; }
     g.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -118,6 +121,7 @@ const Viewer = (() => {
 
   function clear() {
     disposeMesh();
+    setExtras([]);
     geomRef = null;
     clearMeasurement();
   }
@@ -141,7 +145,28 @@ const Viewer = (() => {
   }
   function setPaint(p) { paint = p && p.length ? p : null; colorize(lastTh); }
 
-  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; }
+  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; extras.forEach(m => { m.material.wireframe = on; }); }
+
+  /* Zusatznetze zum Teil (z. B. Beschriftung): list = [{pos (geom-Koordinaten wie geom.pos), color (0xRRGGBB), opacity?}].
+     Werden bei show()/clear() entfernt. */
+  function setExtras(list) {
+    if (!renderer) return;
+    for (const m of extras) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+    extras = [];
+    for (const e of list || []) {
+      if (!e.pos || !e.pos.length) continue;
+      const p = new Float32Array(e.pos.length);
+      for (let i = 0; i < p.length; i += 3) { p[i] = e.pos[i] - offset[0]; p[i + 1] = e.pos[i + 1] - offset[1]; p[i + 2] = e.pos[i + 2] - offset[2]; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      g.computeVertexNormals();
+      const op = e.opacity == null ? 1 : e.opacity;
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: e.color ?? 0xffcc00, roughness: .55, metalness: .05, flatShading: true, side: THREE.DoubleSide,
+        transparent: op < 1, opacity: op, depthWrite: op >= 1, wireframe: wireframeOn, clippingPlanes: clip.on ? [clip.plane] : [], polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+      scene.add(m);
+      extras.push(m);
+    }
+  }
   function setAxes(on) { if (axes) axes.visible = on; }
 
   /* ---------- Schnitt ---------- */
@@ -150,6 +175,7 @@ const Viewer = (() => {
     if (!renderer) return;
     clip.helper.visible = on;
     if (mesh) mesh.material.clippingPlanes = on ? [clip.plane] : [];
+    extras.forEach(m => { m.material.clippingPlanes = on ? [clip.plane] : []; });
   }
   function setClipAxis(axis) {
     clip.axis = axis;
@@ -214,10 +240,11 @@ const Viewer = (() => {
       // Der Raycaster kennt keine Schnittebene: weggeschnittene Treffer (negative Seite) überspringen.
       const hit = raycaster.intersectObject(mesh).find(h => !clip.on || clip.plane.distanceToPoint(h.point) >= 0);
       if (!hit) return;
-      if (pick.on) { const cb = pick.onPick; setPick(false); if (cb) cb(hit.faceIndex); return; }
+      // zweites Argument: getroffener Punkt in geom-Koordinaten (für die Beschriftung)
+      if (pick.on) { const cb = pick.onPick; setPick(false); if (cb) cb(hit.faceIndex, [hit.point.x + offset[0], hit.point.y + offset[1], hit.point.z + offset[2]]); return; }
       addMeasurePoint(hit.point.clone());
     });
   }
 
-  return { available, init, show, clear, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick };
+  return { available, init, show, clear, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
 })();

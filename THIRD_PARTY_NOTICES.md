@@ -20,6 +20,11 @@ Vom Server genutzte Python-Pakete (`requirements.txt`, im Container installiert,
 
 Die Anbindung der Anycubic-Werksfirmware (`tools/anycubic_lan.py`) ist eigener Code nach der Protokollbeschreibung des Projekts [anycubic-lan](https://github.com/Nino6689/anycubic-lan) (docs/PROTOCOL.md, MIT, Copyright © 2026 Nino Bondonno); die ACE-Konfigurationswerte stammen aus der Dokumentation von [Rinkhals](https://github.com/rinkhals-community/Rinkhals). Hochladen und Druckstart folgen den beobachteten Abläufen in [kobra-connect](https://github.com/rvanderp3/kobra-connect) (docs/mqtt-commands.md, Apache-2.0) und [anycubic-orca-plugin](https://github.com/ianloic/anycubic-orca-plugin) (AGPL-3.0; nur Protokollfakten übernommen, kein Code).
 
+**Schrift für die Beschriftung** (`js/font-hershey.js`): Hershey Simplex Roman, Zeichen 32–126 aus `futural.jhf` des Projekts [hershey-fonts](https://github.com/kamalmostafa/hershey-fonts) (nur die Schriftdaten, nicht der GPL-Code des Projekts); Ä Ö Ü ä ö ü ß € ° sind eigene Ergänzungen im Stil der Schrift. Die Hershey-Schriften gelten allgemein als gemeinfrei; ihre Weitergabebedingungen erlauben jede Nutzung, auch kommerziell, sofern folgende Hinweise mitgeliefert werden (und die Daten nicht im NTIS-Format weitergegeben werden):
+
+> The Hershey Fonts were originally created by Dr. A. V. Hershey while working at the U. S. National Bureau of Standards.
+> The format of the Font data in this distribution was originally created by James Hurt, Cognition, Inc., 900 Technology Park Drive, Billerica, MA 01821 (mit-eddie!ci-dandelion!hurt).
+
 ## MIT-Lizenz (Wortlaut)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

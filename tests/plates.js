@@ -86,5 +86,30 @@ check('Objekt-Slot unverändert', /<object id="10">\n    <metadata key="extruder
 check('anderes Objekt unverändert', /<part id="6"[\s\S]*?extruder" value="2"/.test(out));
 check('ohne Zuordnung unverändert', K.patchModifierExtruders(ms, '10', {}, 4) === ms);
 
+// Zwischenspeicher der Platzierung (js/plates-ui.js projectLayout): gleiches Ergebnis, bei Änderungen neu gerechnet
+ctx.document = { getElementById: () => ({ addEventListener() {}, classList: { toggle() {}, add() {}, remove() {} } }) };
+vm.runInContext('var lastResult = null; var project = null;', ctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'plates-ui.js'), 'utf8'), ctx, { filename: 'plates-ui.js' });
+ctx.tplT = tpl;
+const L = code => vm.runInContext(code, ctx);
+L("project = { parts: Array.from({ length: 50 }, (_, k) => ({ name: 'p' + k, geom: k < 30 ? { name: 'a', x: 40, y: 40, z: 10 } : { name: 'b', x: 50, y: 30, z: 4 } })) }; globalThis.arrCalls = 0; " +
+  "const arrOrig = arrangeParts; arrangeParts = function (...a) { arrCalls++; return arrOrig.apply(this, a); };");
+const l1 = L('projectLayout(tplT)'), l2 = L('projectLayout(tplT)');
+check('Zwischenspeicher: zweiter Aufruf ohne neues Packen', l1 === l2 && L('arrCalls') === 1, L('arrCalls'));
+check('Zwischenspeicher: gleiches Ergebnis wie direkt gepackt', JSON.stringify(l1.places) === JSON.stringify(K.arrangeParts(L('project.parts.map(p => p.geom)'), tpl).places));
+L("project.parts[0].geom = { name: 'a', x: 40, y: 10, z: 40 }");   // gedreht: neue Geometrie
+check('Drehen → neu gepackt', L('projectLayout(tplT)') !== l1 && L('arrCalls') === 2);
+L('project.parts.splice(49, 1)');
+check('Löschen → neu gepackt', L('projectLayout(tplT).plateOf.length') === 49 && L('arrCalls') === 3);
+L('project.parts.push({ ...project.parts[0], name: "k" })');
+check('Kopie → neu gepackt', L('projectLayout(tplT).plateOf.length') === 50 && L('arrCalls') === 4);
+L('project.platesFixed = true; project.parts.forEach((p, i) => { p.plate = i < 25 ? 1 : 2; })');
+const f1 = L('projectLayout(tplT)');
+L('project.parts[0].plate = 3');
+const f2 = L('projectLayout(tplT)');
+check('Verschieben → neue Zuordnung', f1 !== f2 && f2.count === 3 && f2.plateOf[0] === 3, f2.count);
+L("project = { parts: project.parts.slice(0, 3) }");
+check('anderes Projekt → neu gepackt', L('projectLayout(tplT).plateOf.length') === 3);
+
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

@@ -6,7 +6,12 @@
    Die Seite nennt dem Server Drucker-Adresse und Spülmenge (config), damit er richtig zählt.
    Neu erkannte Spulen (needs_check) fragt die Seite nach dem Füllgewicht (Hinweis auf der ACE-Karte in ④ und im Dialog).
    Warnschwelle low_g (Server, Standard 100 g): rote Anzeige und Warnung vor dem Drucken, wenn weniger übrig bliebe.
-   Export/Import: ganzer Stand als JSON-Datei, zum Umziehen zwischen zwei Servern (Mac ↔ Home-Assistant-Add-on). */
+   Export/Import: ganzer Stand als JSON-Datei, zum Umziehen zwischen zwei Servern (Mac ↔ Home-Assistant-Add-on).
+   Große Dateien (bis 500 Drucke in der Historie) gehen in Teilen: erst die Spulen, dann die Drucke (import_history).
+   Filamentprofil aus einer Spule: „Als Filamentprofil anlegen“ legt ein eigenes Profil (store.profiles, wie „Neues
+   Filament“ in js/panel.js) nach dem passenden Standardprofil an und verknüpft es (spool.profile_id).
+   spoolProfileForSlot(i) liefert das verknüpfte Profil der Spule im Slot – für die Filamentwahl nach der ACE.
+   Druckhistorie & Statistik: js/history-ui.js. */
 
 const SPOOL_POLL_MS = 15000;
 let spoolData = null, spoolTimer = 0, spoolCfgSent = '', spoolEdit = null, spoolImport = null;
@@ -17,6 +22,7 @@ const spoolPct = s => s.net_g > 0 ? Math.max(0, Math.min(100, s.remaining_g / s.
 const spoolName = s => s.name || [s.brand, s.type].filter(Boolean).join(' ') || s.type;
 const spoolLowG = () => spoolData && typeof spoolData.low_g === 'number' ? spoolData.low_g : 100;
 const spoolLow = s => s.remaining_g < spoolLowG();
+const SPOOL_IMPORT_CHUNK = 56 * 1024;   // der Server nimmt höchstens 64 KB je Anfrage (tools/serve.py MAX_BODY)
 const spoolChecks = () => spoolData ? spoolData.spools.filter(s => s.slot != null && s.needs_check && !s.archived).sort((a, b) => a.slot - b.slot) : [];
 
 async function refreshSpools() {
@@ -36,8 +42,12 @@ function syncSpoolConfig() {
   if (!host || !spoolData) return;
   const own = typeof acePurgeOwn === 'function' ? acePurgeOwn() : null;
   const cfg = { action: 'config', host, flush: typeof aceFlush === 'function' ? aceFlush() : 1.5, purge_g: own && own.grams > 0 ? own.grams : null };
+  // Standardpreis (€/kg) aus „Preise & Sätze“ für die Kosten der Druckhistorie bei Spulen ohne eigenen Preis
+  const price = typeof costCfg === 'function' ? costCfg().pricePerKg : null;
+  if (price > 0) cfg.price_default = price;
   const sig = JSON.stringify(cfg);
-  if (sig === spoolCfgSent || (spoolData.host === cfg.host && spoolData.flush === cfg.flush && (spoolData.purge_g || null) === cfg.purge_g)) { spoolCfgSent = sig; return; }
+  if (sig === spoolCfgSent || (spoolData.host === cfg.host && spoolData.flush === cfg.flush && (spoolData.purge_g || null) === cfg.purge_g &&
+    (!cfg.price_default || spoolData.price_default === cfg.price_default))) { spoolCfgSent = sig; return; }
   spoolCfgSent = sig;
   spoolPost(cfg).catch(() => { spoolCfgSent = ''; });
 }
@@ -138,10 +148,54 @@ function renderSpoolDialog() {
     html += '<h4 class="spool-h">' + t('Letzte Drucke') + '</h4><ul class="spool-hist">' + hist.map(h => {
       const name = typeof wbJobTitle === 'function' ? wbJobTitle(String(h.job).replace(/^.*\//, '').replace(/\.(gcode|3mf)$/i, '')).title : h.job;
       const used = Object.entries(h.used || {}).map(([id, g]) => { const s = byId[id]; return '<span class="spool-chip"><i style="background:' + esc(s ? s.colour : '#999') + '"></i>' + (s ? esc(s.type) : '?') + ' ' + spoolGrams(g) + '</span>'; }).join('');
-      return '<li><b>' + esc(name) + '</b><small>' + new Date((h.end || 0) * 1000).toLocaleString(LOCALE(), { dateStyle: 'short', timeStyle: 'short' }) + (h.changes ? ' · ' + t('{n} Farbwechsel', { n: h.changes }) : '') + '</small><span>' + (used || '–') + '</span></li>';
-    }).join('') + '</ul>';
+      return '<li><b>' + esc(name) + '</b><small>' + new Date((h.end || 0) * 1000).toLocaleString(LOCALE(), { dateStyle: 'short', timeStyle: 'short' }) + (h.changes ? ' · ' + t('{n} Farbwechsel', { n: h.changes }) : '') +
+        (typeof h.cost_eur === 'number' ? ' · ≈ ' + de(h.cost_eur, 2) + ' €' : '') + '</small><span>' + (used || '–') + '</span></li>';
+    }).join('') + '</ul>' + (typeof openHistoryDialog === 'function' ? '<p class="small"><button type="button" class="linkbtn" data-spool-history>' + t('Alle Drucke & Statistik …') + '</button></p>' : '');
   }
   body.innerHTML = html;
+}
+
+/* ---------- Filamentprofil aus einer Spule ---------- */
+// Verknüpftes eigenes Profil (nur wenn es im Browser noch existiert)
+function spoolProfile(s) {
+  if (!s || !s.profile_id || typeof store === 'undefined' || !store.profiles[s.profile_id] || typeof allMats !== 'function') return null;
+  return allMats().find(m => m.id === s.profile_id) || null;
+}
+/* Für die Filamentwahl nach der ACE (z. B. js/design-ui.js slotMaterialChanges, „Filament aus dem ACE übernehmen“):
+   id des Filamentprofils, das mit der Spule in Slot i verknüpft ist, sonst null. */
+function spoolProfileForSlot(i) {
+  const m = spoolProfile(spoolInSlot(i));
+  return m ? m.id : null;
+}
+// PLA/PETG/ABS/ASA/TPU (auch „PLA-CF“, „PETG HF“) → Filamentart der Standardprofile
+const spoolKind = type => { const T = String(type || '').toUpperCase(); return ['petg', 'pla', 'abs', 'asa', 'tpu'].find(k => T.startsWith(k.toUpperCase())) || 'pla'; };
+const spoolProfileName = s => [s.brand, s.name || s.type].map(x => String(x || '').trim()).filter(Boolean).join(' ');
+function spoolProfileHTML(s) {
+  const m = spoolProfile(s);
+  if (m) return '<p class="muted small">' + t('Filamentprofil: „{name}“', { name: esc(m.name) }) + '</p>';
+  if (!s.brand && !s.name) return '';
+  return '<p class="small"><button type="button" class="linkbtn" data-spool-profile="' + s.id + '" title="' + esc(t('Eigenes Filamentprofil mit den Startwerten des passenden Standardprofils, verknüpft mit dieser Spule')) + '">' +
+    t('Als Filamentprofil anlegen') + '</button> <span class="muted">' + esc(t('„{name}“ nach {type}', { name: spoolProfileName(s), type: KIND_LABEL[spoolKind(s.type)] || s.type })) + '</span></p>';
+}
+// Wie „Neues Filament“ in js/panel.js: Startwerte des Standardprofils der Art, eigene id, store.profiles + persist()
+async function spoolCreateProfile(s) {
+  const kind = spoolKind(s.type), base = builtinOf(KIND_TEMPLATE[kind]) || builtinOf('pla');
+  const keys = typeof EDIT_KEYS !== 'undefined' ? EDIT_KEYS : Object.keys(base).filter(k => !['id', 'builtin', 'status', 'src'].includes(k));
+  const out = {};
+  keys.forEach(k => { if (k in base) out[k] = Array.isArray(base[k]) ? base[k].slice() : base[k]; });
+  const T = String(s.type || '').toUpperCase();
+  Object.assign(out, { name: spoolProfileName(s), kind, abrasive: !!out.abrasive || /\b(CF|GF)\b|-(CF|GF)/.test(T), colour: s.colour,
+    notes: t('Aus der Spule angelegt: {type}, Farbe {colour}', { type: s.type, colour: s.colour }) + (s.sku ? ' · RFID ' + s.sku : '') + (s.notes ? '\n' + s.notes : '') });
+  const id = 'u' + Date.now().toString(36);
+  store.profiles[id] = out;
+  if (s.price_per_kg > 0) store.settings.filamentPrices = { ...(store.settings.filamentPrices || {}), [id]: s.price_per_kg };
+  persist();
+  await spoolPost({ action: 'update', id: s.id, profile_id: id });
+  // Auswahlliste neu (die Auswahl bleibt), Ergebnis neu rechnen – wie nach „Neues Filament“
+  try { if (typeof fillMaterialSelect === 'function') fillMaterialSelect($('material').value); if (typeof update === 'function') update(); }
+  catch (e) { console.warn('Filamentliste nicht aktualisiert', e); }
+  toast(t('Filamentprofil „{name}“ angelegt – auswählbar unter „Eigene Filamente“', { name: out.name }));
+  return id;
 }
 
 function spoolRow(s) {
@@ -160,10 +214,27 @@ function spoolRow(s) {
     f('net_g', t('Füllgewicht (g, ohne Spule)'), s.net_g, 'type="number" min="0" max="20000" step="10"') +
     f('remaining_g', t('Restmenge jetzt (g, gewogen ohne Spule)'), '', 'type="number" min="0" max="20000" step="1" placeholder="' + de(s.remaining_g, 0) + '"') +
     f('price_per_kg', t('Preis (€/kg)'), s.price_per_kg, 'type="number" min="0" step="0.5" inputmode="decimal"') + f('notes', t('Notiz'), s.notes) +
+    spoolProfileHTML(s) +
     '<p class="muted small">' + t('Verbraucht bisher ≈ {used} (davon Spülabfall ≈ {purge}). Gewogen: Gewicht mit Spule minus Gewicht der leeren Spule.', { used: spoolGrams(used), purge: spoolGrams(s.purge_g || 0) }) + '</p>' +
     '<div class="spool-actions"><button type="button" class="btn" data-spool-save="' + s.id + '">' + t('Speichern') + '</button>' +
     (s.slot == null ? '<button type="button" class="btn sec" data-spool-arch="' + s.id + '">' + (s.archived ? t('Zurückholen') : t('Archivieren')) + '</button><button type="button" class="btn danger" data-spool-del="' + s.id + '">' + t('Löschen') + '</button>' : '') +
     '</div></div></li>';
+}
+
+// Import; zu große Dateien in Teilen (erst Spulen ohne Drucke, dann die Drucke in Stücken mit der id-Zuordnung des Servers)
+async function spoolImportPost(mode, data) {
+  const body = { action: 'import', mode, data };
+  const hist = Array.isArray(data.history) ? data.history : [];
+  if (JSON.stringify(body).length <= SPOOL_IMPORT_CHUNK || !hist.length) return spoolPost(body);
+  const d = await spoolPost({ action: 'import', mode, data: { ...data, history: [] } }), idmap = (d.imported || {}).idmap || {};
+  let part = [], res = d;
+  const send = async () => { if (part.length) res = await spoolPost({ action: 'import_history', history: part, idmap }); part = []; };
+  for (const h of hist) {
+    if (part.length && JSON.stringify({ action: 'import_history', history: part.concat([h]), idmap }).length > SPOOL_IMPORT_CHUNK) await send();
+    part.push(h);
+  }
+  await send();
+  return { ...res, imported: d.imported };
 }
 
 $('spoolBody').addEventListener('click', async e => {
@@ -174,11 +245,18 @@ $('spoolBody').addEventListener('click', async e => {
     spoolImport = null;
     if (!mode) { renderSpoolDialog(); return; }
     try {
-      const d = await spoolPost({ action: 'import', mode, data }), n = d.imported || {};
+      const d = await spoolImportPost(mode, data), n = d.imported || {};
       toast(mode === 'replace' ? t('Import: {n} Spulen übernommen', { n: n.total || 0 }) : t('Import: {added} Spulen neu, {updated} aktualisiert', { added: n.added || 0, updated: n.updated || 0 }));
     }
     catch (err) { toast(t('Import fehlgeschlagen: {msg}', { msg: t(err.message) })); }
     renderSpoolDialog(); return;
+  }
+  if (e.target.closest('[data-spool-history]')) { openHistoryDialog(); return; }
+  const pr = e.target.closest('[data-spool-profile]');
+  if (pr) {
+    const s = spoolData.spools.find(x => x.id === pr.dataset.spoolProfile);
+    try { if (s) { await spoolCreateProfile(s); renderSpoolDialog(); } } catch (err) { toast(t(err.message)); }
+    return;
   }
   const ed = e.target.closest('[data-spool-edit]'), sv = e.target.closest('[data-spool-save]'), ar = e.target.closest('[data-spool-arch]'), dl = e.target.closest('[data-spool-del]');
   try {
@@ -215,7 +293,7 @@ $('spoolImportFile').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   try {
-    if (file.size > 60 * 1024) throw Error(t('Datei zu groß (höchstens 60 KB)'));
+    if (file.size > 2 * 1024 * 1024) throw Error(t('Datei zu groß (höchstens 2 MB)'));
     const data = JSON.parse(await file.text());
     if (!data || typeof data !== 'object' || !Array.isArray(data.spools)) throw Error(t('Keine Spulendatei des Druck-Konfigurators'));
     delete data.track;

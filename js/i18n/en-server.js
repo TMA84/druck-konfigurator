@@ -5,8 +5,6 @@
    unten; zusammengesetzte Gründe werden dort mit t() weiter übersetzt. */
 I18N.add({
   // tools/anycubic_lan.py – PRINT_STATUS (nur zur Anzeige übersetzen; im Code wird mit dem deutschen Wert verglichen)
-  'druckt': 'printing',
-  'fertig': 'finished',
   'abgebrochen': 'canceled',
   'lädt herunter': 'downloading',
   'prüft': 'checking',
@@ -16,14 +14,12 @@ I18N.add({
 
   // tools/serve.py
   'Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen': 'Slice job not found (anymore) – please calculate again',
-  'unbekannt': 'unknown',
   '3MF als application/octet-stream erwartet': '3MF expected as application/octet-stream',
   '3MF zu groß (höchstens 200 MB)': '3MF too large (200 MB max)',
   'JSON erwartet': 'JSON expected',
   'Anfrage zu groß': 'Request too large',
 
   // tools/anycubic_lan.py – LanError
-  'Ungültige Adresse': 'Invalid address',
   'Nur Drucker im Heimnetz (private IP-Adressen) sind erlaubt': 'Only printers on your home network (private IP addresses) are allowed',
   'Verbindung abgelehnt – LAN-Modus an? Läuft das Tool in einem Container, der das Heimnetz nicht erreicht?': "Connection refused – is LAN mode on? Is the tool running in a container that can't reach your home network?",
   'keine Antwort (Zeitüberschreitung) – eingeschaltet, im selben Netz?': 'no answer (timeout) – is it switched on and on the same network?',
@@ -51,9 +47,7 @@ I18N.add({
   'Drucker lehnt das Hochladen ab (Anmeldung abgelaufen) – bitte noch einmal senden': 'The printer rejects the upload (login expired) – please send it again',
   'Datei hochgeladen und Start gesendet – der Drucker meldet noch keinen Auftrag. Bitte am Drucker prüfen.': "File uploaded and start sent – the printer doesn't report a job yet. Please check on the printer.",
   // Namen in „… muss eine ganze Zahl von … bis … sein“
-  'Düsentemperatur': 'Nozzle temperature',
   'Betttemperatur': 'Bed temperature',
-  'Trockentemperatur': 'Drying temperature',
   'Dauer (min)': 'Duration (min)',
   'Weg (mm)': 'Distance (mm)',
 
@@ -65,11 +59,6 @@ I18N.add({
   'OrcaSlicer hat keine Platte geslict': "OrcaSlicer didn't slice any plate",
 
   // js/printer-link.js – Fehler von lanApi() und fetchLanStatus()
-  'Server des Konfigurators nicht erreichbar': "Can't reach the configurator's server",
-  'Am Drucker ist keine ACE angeschlossen': 'No ACE is connected to the printer',
-  'Drucker meldet keine ACE-Slots': "The printer doesn't report any ACE slots",
-  'Drucker hat die Slot-Angabe abgelehnt': 'The printer rejected the slot data',
-  'Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt)': "The server doesn't support LAN mode (included in the container; locally: pip install -r requirements.txt)"
 });
 
 // Meldungen mit wechselnden Teilen. Reihenfolge: das erste passende Muster gilt.

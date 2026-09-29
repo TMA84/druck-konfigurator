@@ -1,0 +1,42 @@
+'use strict';
+/* Englische Texte (Beschriftung: js/engrave.js, js/engrave-ui.js, Abschnitt „Beschriftung“ in index.html). */
+I18N.add({
+  // index.html
+  'Beschriftung': 'Lettering',
+  'Text': 'Text',
+  'z. B. Name oder Nummer': 'e.g. name or number',
+  'Strichstärke': 'Stroke width',
+  'Breite der Striche in Prozent der Texthöhe': 'Stroke width as a percentage of the text height',
+  'Drehung': 'Rotation',
+  'Art': 'Type',
+  'erhaben': 'raised',
+  'vertieft': 'engraved',
+  'Slot': 'Slot',
+  'mm': 'mm',
+  'Fläche: Oberseite': 'Face: <b id="txFace">top face</b> <span id="txSize" class="muted"></span>',
+  'Fläche wählen …': 'Pick face …',
+  'In der 3D-Ansicht die Fläche anklicken, auf die der Text soll – er sitzt mittig auf dem angeklickten Punkt': 'Click the face in the 3D view where the text should go – it is centred on the point you click',
+  'Oberseite': 'Top face',
+  'Text mittig auf die Oberseite des Teils legen': 'Centre the text on the top face of the part',
+  'Text hinzufügen': 'Add text',
+  'Neuer Text': 'New text',
+  // Meldungen
+  '(wie Teil)': '(same as part)',
+  'Entfernen': 'Remove',
+  'Diese Zeichen kennt die Schrift nicht (werden „?“): {chars}': 'The font does not know these characters (they become “?”): {chars}',
+  'Erhaben wird der Text ein eigenes Bauteil mit eigenem Slot (andere Farbe), vertieft schneidet OrcaSlicer ihn aus dem Teil.': 'Raised text becomes a separate part with its own slot (another colour); engraved text is cut out of the part by OrcaSlicer.',
+  'Erhabene Schrift auf der Unterseite liegt unter dem Teil – besser vertieft oder eine andere Fläche.': 'Raised text on the bottom face ends up below the part – better engrave it or pick another face.',
+  'Fläche für den Text anklicken (Esc bricht ab)': 'Click the face for the text (Esc cancels)',
+  'Strich nur {w} mm breit – mit einer 0,4-mm-Düse unter {min} mm kaum sauber. Text größer oder Strichstärke höher.': 'Stroke only {w} mm wide – below {min} mm a 0.4 mm nozzle hardly prints it cleanly. Make the text larger or the stroke thicker.',
+  'Text geändert': 'Text changed',
+  'Text ragt über das Teil hinaus.': 'Text extends beyond the part.',
+  'Text ragt über die gewählte Fläche hinaus ({pct} % der Punkte) – kleiner, drehen oder eine größere Fläche.': 'Text extends beyond the chosen face ({pct} % of the points) – make it smaller, rotate it or pick a larger face.',
+  'Text „{text}“ entfernen': 'Remove text “{text}”',
+  'Text „{text}“ hinzugefügt': 'Text “{text}” added',
+  'erhaben {d} mm · Slot {n}': 'raised {d} mm · slot {n}',
+  'gewählte Fläche': 'picked face',
+  'keine ebene Fläche gefunden – bitte wählen': 'no flat face found – please pick one',
+  'vertieft {d} mm': 'engraved {d} mm',
+  '{h} mm hoch': '{h} mm high',
+  'Änderung übernehmen': 'Apply change'
+});
