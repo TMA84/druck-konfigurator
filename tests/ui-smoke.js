@@ -225,8 +225,10 @@ async function runSmoke(opts={}){
   $('editMat').click();$('edDelete').click();
   ok(!$('material').querySelector('option[value="'+newId+'"]'),'Eigenes Filament gelöscht');
   const dt=new DataTransfer();dt.items.add(new File([JSON.stringify(profJson)],'p.json',{type:'application/json'}));
-  $('importFile').files=dt.files;$('importFile').dispatchEvent(new Event('change'));await wait(200);
-  ok(!!$('material').querySelector('option[value="'+newId+'"]'),'Import stellt gelöschtes Filament wieder her');
+  const nAlerts=alerts.length;
+  $('importFile').files=dt.files;$('importFile').dispatchEvent(new Event('change'));
+  for(let i=0;i<30&&!$('material').querySelector('option[value="'+newId+'"]');i++)await wait(100); // Datei lesen dauert auf langsamen Rechnern länger
+  ok(!!$('material').querySelector('option[value="'+newId+'"]'),'Import stellt gelöschtes Filament wieder her'+(alerts.length>nAlerts?' ('+alerts.slice(nAlerts).join(' | ')+')':''));
   sel('material','pla_hs');$('editMat').click();$('edReset').click();
   ok($('matBadge').textContent==='Getestet','Zurücksetzen auf Standard');
 
