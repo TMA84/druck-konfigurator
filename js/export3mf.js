@@ -33,10 +33,10 @@ function orcaBrim(brim) {
 }
 
 /* Stützen wie im Datenblatt (Stützparameter): gleiches Material wie das Teil, Z-Abstand = Schichthöhe
-   (PETG +0,05 mm), Spannen („1,0–1,5 mm“) mit der unteren Grenze. „Nur kritische Bereiche“ bleibt AUS:
-   damit erzeugt Orca nur Stützen für Spitzen und Auskragungen, bei normalen Überhängen gar keine (per Orca-CLI
-   geprüft 2026-09-29: ACE-Guide 0 statt 110 Stützbahnen, Trichterform 0 statt 98; der Pilz-Test vom 2026-09-26
-   hatte nur eine Auskragung). Sparen tun Baumstützen, Schwellenwinkel und „Kleine Überhänge entfernen“.
+   (PETG +0,05 mm), Spannen („1,0–1,5 mm“) mit der unteren Grenze. „Nur kritische Bereiche“ nach r.supCritical
+   (Vorschlag an, je Auftrag umschaltbar): Damit erzeugt Orca nur Stützen für Spitzen und Auskragungen, bei normalen
+   Überhängen gar keine (per Orca-CLI geprüft 2026-09-29: ACE-Guide 0 statt 110 Stützbahnen, Trichterform 0 statt 98;
+   der Pilz-Test vom 2026-09-26 hatte nur eine Auskragung).
    Astabstand/-durchmesser: die v4-Werte entsprechen den organischen Baumstützen (Orca-Standard 1 mm / 2 mm);
    der klassische Astabstand (Standard 5 mm) bleibt unverändert. */
 function supportChanges(r) {
@@ -44,7 +44,7 @@ function supportChanges(r) {
   const out = [
     [t('Stützentyp'), 'support_type', 'tree(auto)'],
     [t('Schwellenwinkel'), 'support_threshold_angle', sp.angle],
-    [t('Nur kritische Bereiche'), 'support_critical_regions_only', 0],
+    [t('Nur kritische Bereiche'), 'support_critical_regions_only', r.supCritical === false ? 0 : 1],
     [t('Nur auf Druckplatte'), 'support_on_build_plate_only', 1],
     [t('Kleine Überhänge entfernen'), 'support_remove_small_overhang', sp.small === 'Ein' ? 1 : 0],
     [t('Raft'), 'raft_layers', 0],

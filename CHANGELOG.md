@@ -4,8 +4,11 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [9.3.3] – 2026-09-29
 
+### Neu
+- **„Nur kritische Bereiche“ (Stützen) je Auftrag einstellbar:** ② → *Werte für diesen Auftrag anpassen* → „Nur kritische Bereiche“ an/aus. Vorschlag bleibt **an** (wie bisher). An = OrcaSlicer stützt nur Spitzen und Auskragungen, normale Überhänge nicht; aus = auch normale Überhänge. Datenblatt, Stützparameter und Anleitung zeigen den gewählten Wert; bei „an“ erklärt die Anleitung, dass normale Überhänge ungestützt bleiben und wo man es ausschaltet.
+
 ### Behoben
-- **Stützen erschienen beim Slicen nicht.** Das Tool setzte immer „Nur kritische Bereiche“ (`support_critical_regions_only`). Damit stützt OrcaSlicer nur Spitzen und Auskragungen, normale Überhänge gar nicht – auch wenn das Tool Stützen empfahl oder du sie über „Werte anpassen“ eingeschaltet hattest. Jetzt bleibt die Option aus. Geprüft mit Orca: ACE-Guide (Makerworld) 0 → 110 Stützbahnen, Trichterform 0 → 98. Empfehlung bei wenigen Überhängen heißt jetzt „Ja – wenige Baumstützen“; Datenblatt und Anleitung („nur kritische Bereiche ausgeschaltet lassen“) angepasst. Neuer Test in `tests/slice.py` zählt die Stützbahnen im G-Code.
+- **Stützen erschienen beim Slicen scheinbar nicht:** Mit „nur kritische Bereiche“ erzeugt Orca bei normalen Überhängen keine Stützen, obwohl sie empfohlen oder eingeschaltet waren – das war nicht zu erkennen und nicht änderbar. Geprüft mit Orca: ACE-Guide (Makerworld) an 0 / aus 110 Stützbahnen, Trichterform an 0 / aus 98. Empfehlung bei wenigen Überhängen heißt jetzt „Ja – wenige Baumstützen“. Tests: `tests/slice.py` zählt die Stützbahnen im G-Code (an/aus), `tests/overrides.js` prüft Vorschlag und Umschalten.
 
 ## [9.3.2] – 2026-09-29
 

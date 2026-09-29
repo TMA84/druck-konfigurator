@@ -187,6 +187,10 @@ function compute(I,geom,ctx){
 
   sugg.support=supOn?'on':'off';
   if(has('support')){supOn=ov.support==='on';sup=supOn?'Ja – Baumstützen (angepasst)':'Aus (angepasst)'}
+  // „Nur kritische Bereiche“ (Orca: Stützen nur für Spitzen und Auskragungen, normale Überhänge nicht) –
+  // Vorschlag an wie in v4, je Auftrag umschaltbar (Werte anpassen). Geprüft 2026-09-29: ACE-Guide mit an 0, mit aus 110 Stützbahnen.
+  sugg.critical='on';
+  const supCritical=has('critical')?ov.critical==='on':true;
 
   // Haftung
   let brim='Nicht nötig',brimNote='';
@@ -207,7 +211,7 @@ function compute(I,geom,ctx){
 
   // Übersicht; angepasste Werte bekommen den Vorschlag als Hinweis und eine Markierung (4. Feld)
   const changed=Object.keys(sugg).filter(k=>has(k)&&String(ov[k])!==String(sugg[k]));
-  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'?v+' %':/^sp_/.test(k)?v+' mm/s':k==='support'?(v==='on'?t('an'):t('aus')):t(String(v))};
+  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'?v+' %':/^sp_/.test(k)?v+' mm/s':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
   const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));return c.length?[row[0],row[1],[t('angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]:row};
   const rows=[
     mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
@@ -233,7 +237,7 @@ function compute(I,geom,ctx){
       ['Füllung',sp_fill+' mm/s',nFill],['Obere Fläche',top+' mm/s'],['Lückenfüllung',m.gap+' mm/s'],['Travel',m.travel+' mm/s'],
       ['Beschleunigung',accelTxt,accelNote]].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
     ['Stützen',supOn?[
-      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],['Nur kritische Bereiche',t('Aus')],
+      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
       ['Nur auf Druckplatte',t('Ein, zuerst testen')],['Kleine Überhänge entfernen',t(sp.small)],['Raft',t('0 Schichten')],
       ['Oberer Z-Abstand',de(supZ.top,2)+' mm'],['Unterer Z-Abstand',de(supZ.bottom,2)+' mm'],['Stützen/Objekt XY-Abstand',sp.xy],
       ['Obere Schnittstellenschichten',sp.iface],['Schnittstellenabstand',sp.gap]
@@ -288,7 +292,7 @@ function compute(I,geom,ctx){
   if(o==='watertight')warn.push(t('<b>Wasserdicht:</b> Dicht wird ein Teil über die Wand: {w} Wandlinien, {t} / {b} Deck-/Bodenschichten, +{boost} °C und eine langsamere Außenwand sind gesetzt; im Slicer „Lückenfüllung überall“. Lüfter eher niedrig halten. PETG und ASA werden dichter als PLA. Einfache Gefäße ohne Deckel: Vasenmodus mit breiter Linie (0,6–0,8 mm) ist oft dichter. Für dauerhaften Wasserkontakt oder Druck innen mit Epoxidharz beschichten. Nicht für Trinkwasser oder Lebensmittel geeignet – nach dem Druck mit Wasser testen.',{w,t:tt,b,boost:WATERTIGHT_TEMP_BOOST}));
   if(o==='thin')warn.push(t('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.'));
 
-  return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
+  return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer:N.fl,brim,seam,supZ,
