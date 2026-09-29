@@ -262,7 +262,7 @@ try{const t=localStorage.getItem(TAB_KEY);setTab(tabs[t]?t:'3d')}catch(e){setTab
 
 /* Haftungsausschluss: beim ersten Start (und nach inhaltlicher Änderung, neue Versionsnummer) einmal bestätigen.
    Ist kein Speichern möglich, erscheint er bei jedem Start – lieber einmal zu oft als gar nicht. */
-const DISCLAIMER_KEY='druckKonfigurator.disclaimer',DISCLAIMER_VERSION='1';
+const DISCLAIMER_KEY='druckKonfigurator.disclaimer',DISCLAIMER_VERSION='2';
 $('disclaimerOk').addEventListener('click',()=>{try{localStorage.setItem(DISCLAIMER_KEY,DISCLAIMER_VERSION)}catch(e){/* nicht speicherbar */}$('disclaimerDlg').close()});
 {let seen=null;try{seen=localStorage.getItem(DISCLAIMER_KEY)}catch(e){/* nicht lesbar */}
  if(seen!==DISCLAIMER_VERSION)$('disclaimerDlg').showModal()}

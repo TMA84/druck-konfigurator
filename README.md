@@ -25,7 +25,7 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 
 ## Schnellstart
 
-**Online ausprobieren:** https://wolfb63-del.github.io/druck-konfigurator/ – läuft direkt im Browser, auch auf Mac, Linux und Tablet (ohne Live-Abfrage vom Drucker).
+**Online ausprobieren (Ursprungsprojekt):** https://wolfb63-del.github.io/druck-konfigurator/ – der Konfigurator von wolfb63-del direkt im Browser, auch auf Mac, Linux und Tablet (ohne die Drucker- und Server-Funktionen dieses Forks).
 
 **Als Container (NAS/Heimserver, empfohlen für die Drucker-Verbindung):**
 
@@ -83,16 +83,22 @@ Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Date
 
 Die Nutzung erfolgt auf eigene Verantwortung. Der Druck-Konfigurator ist ein privates, nicht kommerzielles Projekt und wird ohne jede Gewährleistung bereitgestellt.
 
-1. **Keine Gewähr für die Werte.** Alle berechneten Einstellungen sind Startwerte. Filamente unterscheiden sich je nach Hersteller und Charge; die Angaben auf der Rolle, die Vorschau im Slicer und ein Testdruck haben immer Vorrang.
-2. **Keine Haftung für Schäden an Drucker und Zubehör.** Für Schäden an Düse, Druckplatte (z. B. PETG auf glatter PEI-Platte ohne Trennmittel), Hotend oder anderen Teilen, für Verstopfungen, Fehldrucke oder verbrauchtes Material wird keine Haftung übernommen.
-3. **Keine zugesicherte Eignung der gedruckten Teile.** Ob ein Teil für eine sicherheitskritische oder tragende Anwendung, für den Kontakt mit Lebensmitteln oder als Kinderspielzeug geeignet ist, beurteilt allein der Nutzer. Auch die Bohrloch-Verstärkung ersetzt keine Festigkeitsprüfung.
-4. **Gesundheit und Sicherheit.** Beim Drucken – besonders mit ABS und ASA – entstehen Dämpfe und ultrafeine Partikel: Raum gut lüften, nicht in Wohn- oder Schlafräumen drucken. 3D-Drucker nicht unbeaufsichtigt betreiben.
-5. **Drucker-Verbindung.** Die optionale Live-Abfrage liest über Moonraker nur die Filament-Belegung und sendet keine Steuerbefehle. Moonraker läuft nicht mit der Werksfirmware, sondern erfordert eine Fremd-Firmware (z. B. Rinkhals oder die Extended Firmware von paxx12) – deren Installation und Nutzung liegt vollständig in der Verantwortung des Nutzers.
-6. **Marken.** Dieses Projekt steht in keiner Verbindung zu Anycubic, Snapmaker, Bambu Lab, Makerworld oder OrcaSlicer. Produkt- und Markennamen werden nur zur Beschreibung verwendet und gehören ihren Inhabern.
-7. **Fremde Modelle.** Wer Projekte anderer (z. B. von Makerworld) mit dem Tool umstellt, ist selbst für die Einhaltung ihrer Lizenz verantwortlich – etwa „nicht kommerziell“ oder „keine Weitergabe“.
+1. **Keine Gewähr für die Werte.** Alle berechneten Einstellungen – auch die für einen Auftrag angepassten – sind Startwerte. Filamente unterscheiden sich je nach Hersteller und Charge; die Angaben auf der Rolle, die Vorschau im Slicer und ein Testdruck haben immer Vorrang.
+2. **Keine Haftung für Schäden an Drucker und Zubehör.** Für Schäden an Düse, Druckplatte (z. B. PETG auf glatter PEI-Platte ohne Trennmittel), Hotend, ACE oder anderen Teilen, für Verstopfungen, Fehldrucke, Kollisionen oder verbrauchtes Material wird keine Haftung übernommen.
+3. **Steuern und Drucken aus dem Tool.** Über den LAN-Modus der Werksfirmware kann das Tool den Drucker steuern: Druck hochladen und starten, pausieren und abbrechen, Temperaturen, Lüfter, Licht, Achsen, Filament laden und Trocknen. Vor jedem Start prüfst du selbst, dass das Bett frei ist, die richtige Druckplatte liegt und das Filament in den Slots zum G-Code passt. Die Warteschlange startet nie von selbst. Anycubic unterstützt diese Schnittstelle offiziell nicht; eine neue Firmware kann sie ändern oder abschalten. Die optionale Anbindung über Moonraker setzt eine Fremd-Firmware voraus (z. B. Rinkhals) – deren Installation und Nutzung liegt vollständig in deiner Verantwortung.
+4. **Kosten, Zeiten und Restmengen sind Schätzungen.** Die Kosten beruhen auf dem Slicen mit OrcaSlicer und deinen Preisen; sie sind kein verbindliches Angebot. Die Restmenge der Spulen errechnet das Tool aus dem gemeldeten Verbrauch – sie kann abweichen (Messfehler, Drucke ohne laufenden Server, Spülabfall). Für einen Druck, der knapp wird, lieber nachwiegen.
+5. **Keine zugesicherte Eignung der gedruckten Teile.** Ob ein Teil für eine sicherheitskritische oder tragende Anwendung, für den Kontakt mit Lebensmitteln oder als Kinderspielzeug geeignet ist, beurteilt allein der Nutzer. Auch die Bohrloch-Verstärkung ersetzt keine Festigkeitsprüfung.
+6. **Gesundheit und Sicherheit.** Beim Drucken – besonders mit ABS und ASA – entstehen Dämpfe und ultrafeine Partikel: Raum gut lüften, nicht in Wohn- oder Schlafräumen drucken. 3D-Drucker nicht unbeaufsichtigt betreiben – auch nicht, wenn du aus der Ferne (Kamera, Home Assistant) zusiehst.
+7. **Betrieb als Server, Container oder Home-Assistant-Add-on.** Die Seite hat keine eigene Anmeldung. Nur im Heimnetz betreiben und nicht ins Internet freigeben; im Home-Assistant-Add-on schützt die Anmeldung von Home Assistant (Ingress), der optionale direkte Port nicht. Daten (Spulen, Verbrauch) liegen nur lokal auf dem Server bzw. im Browser.
+8. **Marken.** Dieses Projekt steht in keiner Verbindung zu Anycubic, Snapmaker, Bambu Lab, Makerworld, OrcaSlicer oder Home Assistant. Produkt- und Markennamen werden nur zur Beschreibung verwendet und gehören ihren Inhabern.
+9. **Fremde Modelle und Software.** Wer Projekte anderer (z. B. von Makerworld) mit dem Tool umstellt, ist selbst für die Einhaltung ihrer Lizenz verantwortlich – etwa „nicht kommerziell“ oder „keine Weitergabe“. Das Container-Image enthält OrcaSlicer unverändert unter dessen eigener Lizenz (AGPL-3.0), siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Dank
+
+Dieses Projekt ist ein Fork des **[Druck-Konfigurators von wolfb63-del](https://github.com/wolfb63-del/druck-konfigurator)**. Von dort stammen die Grundlage des Tools – die Empfehlungslogik und das Datenblatt (Konfigurator v4/v5), die 3D-Ansicht mit Überhang-Analyse, Lage auf dem Bett, Bohrloch-Verstärkung, Makerworld-Import und der 3MF-Export für OrcaSlicer. **Vielen Dank für die Arbeit und dafür, dass sie offen geteilt wird!** Die Erweiterungen in diesem Fork (Anycubic-Werkbank, Mehrfarbdruck, Kosten, mehrere Platten, Filamentverwaltung, Container und Home-Assistant-Add-on, Englisch) stehen unter derselben Lizenz.
 
 ## Änderungen und Lizenz
 
 - Versionen und Änderungen: [CHANGELOG.md](CHANGELOG.md)
-- Lizenz: [CC BY-NC 4.0](LICENSE) – nutzen, ändern und weitergeben erlaubt, **nicht kommerziell**, mit Namensnennung.
+- Lizenz: [CC BY-NC 4.0](LICENSE) – nutzen, ändern und weitergeben erlaubt, **nicht kommerziell**, mit Namensnennung (Urheber: wolfb63-del, Erweiterungen: TMA84).
 - Mitgelieferte Bibliotheken (three.js, fflate) stehen unter MIT-Lizenz, siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

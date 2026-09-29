@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [9.3.1] – 2026-09-29
+
+### Geändert
+- **Haftungsausschluss überarbeitet** (README und Dialog, Version 2 – wird einmal neu bestätigt): Steuern und Drucken über den LAN-Modus (Werkbank, Warteschlange, inoffizielle Schnittstelle), Kosten/Zeiten/Restmengen als Schätzungen, Betrieb als Server/Container/Home-Assistant-Add-on ohne eigene Anmeldung, OrcaSlicer unter eigener Lizenz, Home Assistant bei den Marken. Der alte Punkt „liest nur und steuert nichts“ stimmte nicht mehr.
+- **Dank an das Ursprungsprojekt** [wolfb63-del/druck-konfigurator](https://github.com/wolfb63-del/druck-konfigurator): README (Abschnitt „Dank“), Fußzeile der Seite, Haftungsausschluss-Dialog, LICENSE (Urheber und Hinweis auf die Änderungen, wie CC BY-NC 4.0 es verlangt) und README des Home-Assistant-Add-ons.
+
 ## [9.3.0] – 2026-09-29
 
 ### Neu
