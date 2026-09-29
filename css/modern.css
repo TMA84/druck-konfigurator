@@ -77,7 +77,8 @@ b { font-weight: 600; }
 ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
 
 /* ---------- Kopfzeile ---------- */
-.topbar { background: color-mix(in srgb, var(--sheet) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px); color: var(--ink);
+/* position/z-index: backdrop-filter macht die Kopfzeile zu einer eigenen Ebene – ohne z-index lägen ihre Menüs hinter dem Inhalt */
+.topbar { position: relative; z-index: 40; background: color-mix(in srgb, var(--sheet) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px); color: var(--ink);
   border-bottom: 1px solid var(--rule); gap: 22px; padding: 8px 20px; }
 .brand { color: var(--ink-2); font-family: var(--f-display); font-weight: 650; letter-spacing: .02em; text-transform: none; font-size: 13.5px; line-height: 1.1; }
 .brand-mark { border-radius: 7px; border-width: 2.5px; }
