@@ -37,11 +37,17 @@ const SHOTS = {
              job:{name:'pilz_Platte1', status:'druckt', progress:62, layer:78, layers:126, remaining_min:14, elapsed_min:22, paused:false, filament_mm:2100},
              temps:{curr_nozzle_temp:220, target_nozzle_temp:220, curr_hotbed_temp:60, target_hotbed_temp:60}, fans:{fan_speed_pct:100, aux_fan_speed_pct:0, box_fan_level:0},
              lights:[{type:2,status:1,brightness:80}], position:null, camera:true, has_ace:1,
-             ace:[{id:0, loaded_slot:0, temp:28, drying:{status:0}, auto_feed:0, slots:__fakeSlots.map((s,i)=>({index:i,type:s.type,colour:s.colour,present:true,loaded:i===0,rfid:true,sku:''}))}]};
+             ace:[{id:0, loaded_slot:0, temp:28, drying:{status:0}, auto_feed:0, slots:__fakeSlots.map((s,i)=>({index:i,type:s.type,colour:s.colour,present:true,loaded:i===0,rfid:true,sku:''}))},
+                  {id:1, loaded_slot:-1, temp:41, drying:{status:1, target_temp:45, duration:240, remain_time:150}, auto_feed:0, slots:['ASA','PETG','PLA',''].map((ty,i)=>({index:i,type:ty,colour:['#B71C1C','#F9A825','#6A1B9A',''][i],present:!!ty,loaded:false,rfid:false,sku:''}))}]};
            // Vorschau des geslicten Auftrags als „laufenden Druck“ zeigen
            window.fetch = (orig => (u, o) => String(u).startsWith('api/printing/preview') ? orig('api/slice/' + costState.slice.job + '/plate_1.preview') : orig(u, o))(window.fetch);
            spoolData = {host:'', flush:1.5, low_g:100, history:[], track:{}, spools:__fakeSlots.map((s,i)=>({id:'s'+i, slot:i, type:s.type, colour:s.colour, sku:'', rfid:true, name:'', brand:'Anycubic', net_g:1000, used_g:[180,620,90,860][i], purge_g:0, adjust_g:0, remaining_g:[820,380,910,140][i]}))};
-           wb.st = st; wb.err = ''; clearTimeout(wb.timer); wbRender(); liveMode('live'); liveUpdate(st); await new Promise(r=>setTimeout(r,2500)); liveUpdate(st); wbRender();`,
+           wb.st = st; wb.err = ''; clearTimeout(wb.timer); wbRender(); liveMode('live'); liveUpdate(st);
+           for (let i = 0; i < 100 && !(lv.data && lv.pos); i++) { await new Promise(r=>setTimeout(r,100)); liveUpdate(st); }
+           // echte Kopfposition: 60 % der Schicht, die zur gemeldeten Schicht passt
+           const li = Math.round(78 / 126 * lv.data.layers.length) - 1, tr = lvTrack(li), hp = lvPointAt(tr, tr.len * 0.6);
+           st.position = {x: hp.x + lv.cx, y: hp.y + lv.cy, z: hp.z}; st.position_age_s = 1;
+           liveUpdate(st); wbRender(); await new Promise(r=>setTimeout(r,1500));`,
   beschriftung: `await loadFiles([__stl('schild.stl',__box(0,0,0,80,40,6))]); setTab('3d'); await new Promise(r=>setTimeout(r,500));
            $('txText').value='Werkstatt'; $('txText').dispatchEvent(new Event('input',{bubbles:true}));
            if ($('txSlot')) { $('txSlot').value='1'; $('txSlot').dispatchEvent(new Event('change',{bubbles:true})); }
@@ -70,7 +76,7 @@ const SHOTS = {
     await b.evaluate("localStorage.clear(); localStorage.setItem('druckKonfigurator.lang','de'); localStorage.setItem('druckKonfigurator.theme','light'); localStorage.setItem('druckKonfigurator.disclaimer','2'); true");
     for (const name of want) {
       await b.go(BASE);
-      for (let i = 0; i < 100 && await b.evaluate("typeof loadFiles === 'function' && typeof liveUpdate === 'function'") !== true; i++) await sleep(100);
+      for (let i = 0; i < 100 && await b.evaluate("typeof loadFiles === 'function' && typeof liveUpdate === 'function' && typeof exportTemplate === 'function' && typeof renderSpoolDialog === 'function' && document.readyState === 'complete'") !== true; i++) await sleep(100);
       await b.evaluate('(async()=>{' + PREP + SHOTS[name] + '})()');
       await sleep(900);
       const png = await b.send('Page.captureScreenshot', { format: 'png' });

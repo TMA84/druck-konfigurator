@@ -159,6 +159,7 @@ b { font-weight: 600; }
 .slot { background: var(--field); }
 .wb-ace li.empty .wb-swatch { background: repeating-linear-gradient(45deg, var(--paper-2), var(--paper-2) 6px, var(--paper) 6px, var(--paper) 12px); }
 .part-list button[aria-current="true"], .pick-list button[aria-current="true"] { background: var(--accent-soft); }
+.part-list button[aria-current="true"] + .pdel { background: var(--accent-soft); }
 .part-list button:hover, .pick-list button:hover:not(:disabled) { background: var(--paper-2); }
 .part-list, .part-list li, .hole-list li, .body-list li, .design-list li, .plate-parts li, .pick-list, .pick-list li { border-color: var(--rule); }
 .plevel { font-weight: 600; }

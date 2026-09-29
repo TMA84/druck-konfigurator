@@ -205,6 +205,7 @@ I18N.add({
  "„{name}“ entfernt": "“{name}” removed",
  "Rückgängig": "Undo",
  "Kommende Schichten": "Upcoming layers",
+ "Schicht {l} von {n} ({p} %) · Z {z} mm": "Layer {l} of {n} ({p} %) · Z {z} mm",
  "durchsichtig": "transparent",
  "ausblenden": "hide",
  "voll": "solid",

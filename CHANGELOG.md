@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.4.0] – 2026-09-29
+
+### Neu
+- **Druckkopf folgt den Bahnen:** Die echte Position rastet auf der nächsten G-Code-Bahn ein; zwischen zwei Meldungen fährt der Kopf mit der gemessenen Geschwindigkeit weiter, Abweichungen gleichen sich weich aus (bei Fahrten/Parken gleitet er gerade). Flüssige Bewegung auch bei der Schätzung.
+- **Genauerer Fortschritt:** Schicht aus der gemeldeten Höhe, Fortschritt innerhalb der Schicht in %; jede Bahn färbt sich in Filamentfarbe ein, sobald der Kopf sie abgefahren hat.
+- **Echte Kopfposition standardmäßig an** (am Kobra S1 geprüft); Kopf passt sich der Modellgröße an.
+- Handbuch-Bilder und PDF neu (3D-Fortschritt mit Druckkopf, zwei ACE, ✕ in der Teileliste).
+
+### Intern
+- Tests auf GitHub: Chrome ohne Fenster startet zuverlässig (Port von Chrome gewählt, bis zu 3 Versuche, kein Hängen mehr); Profil-Import im Bedientest abgewartet.
+
 ## [10.3.0] – 2026-09-29
 
 ### Neu
