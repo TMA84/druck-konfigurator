@@ -129,6 +129,15 @@ try { imp([{ name: 'foto.png', bytes: new Uint8Array(4) }]); } catch (e) { err =
 check('Falscher Dateityp meldet Fehler', /nur STL, 3MF oder ZIP/.test(err), err);
 
 // 8) Echte Makerworld-3MF (optional)
+// STL in Meter (Blender, Onshape …): 43 × 78 × 3,5 mm als 0,043 × 0,078 × 0,0035 gespeichert → auf mm umgerechnet, mit Hinweis
+{ const box = (x0, y0, z0, x1, y1, z1) => { const v = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+    return [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]].map(t => t.map(i => v[i])); };
+  const m = imp([{ name: 'halter-meter.stl', bytes: stlBytes(box(0, 0, 0, 0.043, 0.078, 0.0035)) }]), g = K.makeGeom('', m.parts[0].pos);
+  check('STL in Meter: auf mm umgerechnet (43 × 78 × 3,5)', Math.abs(g.x - 43) < 0.01 && Math.abs(g.y - 78) < 0.01 && Math.abs(g.z - 3.5) < 0.01, [g.x, g.y, g.z]);
+  check('STL in Meter: Hinweis', m.notes.some(n => /Meter/.test(n)), m.notes);
+  const s = imp([{ name: 'klein.stl', bytes: stlBytes(box(0, 0, 0, 2, 1, 1)) }]), gs = K.makeGeom('', s.parts[0].pos);
+  check('kleines Teil in mm (2 mm) bleibt', Math.abs(gs.x - 2) < 1e-6 && !s.notes.some(n => /Meter/.test(n))); }
+
 const mw = process.env.MW3MF;
 if (mw && fs.existsSync(mw)) {
   const t0 = Date.now();

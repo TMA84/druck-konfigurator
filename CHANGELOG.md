@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **STL in Meter** (z. B. aus Blender oder Onshape) wurde als winziges Teil gelesen und ließ sich nicht slicen (RFID-Halter). Wie OrcaSlicer rechnet das Tool solche Dateien jetzt auf Millimeter um und zeigt einen Hinweis.
+
 ## [10.7.0] – 2026-09-30
 
 ### Neu

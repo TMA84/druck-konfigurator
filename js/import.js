@@ -272,8 +272,22 @@ function parse3MF(fileName, zip, zipLib) {
 }
 
 /* ---------- Einstieg ---------- */
-function stlParts(fileName, bytes) {
-  const pos = readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+/* STL hat keine Einheit. Manche Programme (Blender, Onshape …) speichern in Meter – dann ist das Teil nur Bruchteile
+   eines Millimeters groß und Orca kann es nicht slicen. Wie OrcaSlicer: ist die längste Seite unter 0,5 mm und wären es
+   in Meter gelesen 5–1000 mm, wird auf mm umgerechnet (mit Hinweis). */
+const STL_METER_MAX_MM = 0.5;
+function stlToMm(pos, fileName, notes) {
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i++) { const k = i % 3; if (pos[i] < lo[k]) lo[k] = pos[i]; if (pos[i] > hi[k]) hi[k] = pos[i]; }
+  const size = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+  if (!(size > 0) || size >= STL_METER_MAX_MM || size * 1000 < 5 || size * 1000 > 1000) return pos;
+  const out = new Float32Array(pos.length);
+  for (let i = 0; i < pos.length; i++) out[i] = pos[i] * 1000;
+  notes.push(t('{file}: in Meter gespeichert ({size} mm groß) – auf Millimeter umgerechnet ({mm} mm).', { file: fileName.replace(/^.*[\\/]/, ''), size: de(size, 3), mm: de(size * 1000, 1) }));
+  return out;
+}
+function stlParts(fileName, bytes, notes = []) {
+  const pos = stlToMm(readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), fileName, notes);
   const groups = splitBodyGroups(pos);
   const base = fileName.replace(/^.*[\\/]/, '');
   return groups.map((g, i) => ({ name: groups.length > 1 ? base + ' · Teil ' + (i + 1) : base, pos: g.pos,
@@ -308,7 +322,7 @@ function importModels(entries, zipLib) {
       const r = parse3MF(f.name, zipLib.unzipSync(f.bytes), zipLib);
       parts.push(...r.parts); notes.push(...r.notes);
       if (files.length === 1) threemf = r.threemf;
-    } else parts.push(...stlParts(f.name, f.bytes));
+    } else parts.push(...stlParts(f.name, f.bytes, notes));
   }
   if (files.length > 1 && tmf.length) notes.push(t('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.'));
   const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : t('{n} Teile', { n: parts.length });

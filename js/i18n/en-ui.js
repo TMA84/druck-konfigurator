@@ -402,5 +402,6 @@ I18N.add({
  "Fläche bis": "Area up to",
  "Lücken füllen": "Fill gaps",
  "Lücken bis zu dieser Fläche füllen": "Fill gaps up to this area",
- "Was wird gemalt": "What to paint"
+ "Was wird gemalt": "What to paint",
+ "{file}: in Meter gespeichert ({size} mm groß) – auf Millimeter umgerechnet ({mm} mm).": "{file}: saved in metres ({size} mm in size) – converted to millimetres ({mm} mm)."
 });
