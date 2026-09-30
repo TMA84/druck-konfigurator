@@ -118,7 +118,7 @@ b { font-weight: 600; }
 .eyebrow, .wb-eyebrow, .ov-group, .ed-group h4 { font-family: var(--f-body); font-weight: 650; font-size: 11px; letter-spacing: .07em; color: var(--ink-3); }
 .field label { font-family: var(--f-body); font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink-2); }
 .field select, .field input, .ed-in input, .ed-in select, .ed-in textarea, .picker-row select, .picker-row input,
-.slot-connect input, .preview-bar select, .part-scope select, .body-list select, .body-join select, .plate-parts select, .design-list select,
+.slot-connect input, .preview-bar select, .part-scope select, .body-list select, .body-join select, .plate-parts select,
 .wb-temp-set input, .wb-dry input, .ov-row input, .ov-row select, .purge-set select, .slot-edit-row select {
   background: var(--field); color: var(--ink); border: 1px solid var(--rule-strong); border-radius: var(--r-s); box-shadow: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast); }
@@ -161,7 +161,7 @@ b { font-weight: 600; }
 .part-list button[data-part][aria-current="true"], .pick-list button[aria-current="true"] { background: var(--accent-soft); }
 .part-list li.sel { background: var(--accent-soft); }
 .part-list button[data-part]:hover, .pick-list button:hover:not(:disabled) { background: var(--paper-2); }
-.part-list, .part-list li, .hole-list li, .body-list li, .design-list li, .plate-parts li, .pick-list, .pick-list li { border-color: var(--rule); }
+.part-list, .part-list li, .hole-list li, .body-list li, .plate-parts li, .pick-list, .pick-list li { border-color: var(--rule); }
 .plevel { font-weight: 600; }
 table.changes th { border-bottom: 1px solid var(--rule-strong); }
 .cost-table tr.total td { border-top: 1px solid var(--rule-strong); }
@@ -270,7 +270,7 @@ dialog::backdrop { background: rgba(10, 12, 16, .45); backdrop-filter: blur(2px)
   .orient-tools button, .body-join button { min-height: 40px; padding: 8px 12px; }
   .hud button { min-height: 40px; padding: 8px 12px; }
   .part-list button[data-part] { padding: 10px 8px 10px 10px; }
-  .plate-parts select, .design-list select, .body-list select { min-height: 36px; font-size: 14px; }
+  .plate-parts select, .body-list select { min-height: 36px; font-size: 14px; }
   .pv-layer input { height: 36px; }
   .field-links .linkbtn, .orient-head .linkbtn, .model-head .linkbtn, .plate-parts .linkbtn, .side-panel > .linkbtn { min-height: 36px; }
 

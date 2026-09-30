@@ -10,18 +10,27 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Modell laden:** STL (auch mit mehreren Körpern), mehrere Dateien, 3MF, Makerworld-ZIP
 - **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
 - **Datenblatt:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung
-- **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil
-- **Mehrfarbig:** mehrere Körper in einem Teil, jeder mit eigenem Slot – auch mehrere STLs (eine je Farbe) zu einem Teil vereinen
+- **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil; Kopien, Modelle kombinieren, einzelne Teile oder Modelle wieder entfernen
+- **Slots wie in OrcaSlicer:** farbige Slot-Chips in der Teileliste, Filamentleiste, bei Makerworld-3MF „Modell → Slot“ mit automatischer Zuordnung nach Farbe und Material; das Filament in den Druckwerten folgt dem Slot
+- **Mehrfarbig:** mehrere Körper in einem Teil, jeder mit eigenem Slot – auch mehrere STLs (eine je Farbe) zu einem Teil vereinen; **Bemalung** und Farb-Modifikatoren von Makerworld-Modellen werden angezeigt und auf die eigenen Slots umgeschrieben (auch mehr Farben als Slots)
+- **Werkzeugleiste in der 3D-Ansicht:** hinzufügen, neue Platte, ausrichten, anordnen, Kopien, trennen, Fläche aufs Bett, drehen, **Größe** (Prozent oder mm je Achse), Schnitt, Text, messen, ganze Platte – auch für Makerworld-3MF
+- **Platten:** platzsparend anordnen, Kosten je Platte, Reihenfolge nach Filament, **Druck Objekt für Objekt** mit Abstand für den Druckkopf
+- **Beschriftung:** Text erhaben (eigene Farbe) oder vertieft auf ein Teil
 - **Weniger Spülabfall (Kobra S1):** Schätzung von Farbwechseln, Abfall und Zeit; Empfehlung für die Spülmenge am Drucker
 - **Kostenkalkulation:** exakt geslict mit OrcaSlicer (im Container) – Filament je Slot, Spülabfall, Strom, Verschleiß, optional Aufschlag und MwSt.
 - **Slice-Vorschau:** der geslicte G-Code als Schichtansicht im Tool (Linienart oder Filament, Schichtregler) und zum Herunterladen
-- **Drucker-Werkbank (Kobra S1, LAN-Modus):** Druckauftrag mit Pause/Abbruch, Kamera, Temperaturen, Lüfter, Licht, Achsen und ACE (Trocknen, Laden, Nachfüllen)
+- **Drucker-Werkbank (Kobra S1, LAN-Modus):** Druckauftrag mit Pause/Abbruch, Kamera, Temperaturen, Lüfter, Licht, Achsen und ACE (Trocknen, Laden, Nachfüllen) – auch mit mehreren ACE-Einheiten
+- **3D-Fortschritt:** der laufende Druck Schicht für Schicht, mit Druckkopf auf der echten Position (folgt den Bahnen mit den Geschwindigkeiten aus dem G-Code), Druckbett und Gestänge
+- **Filamentverwaltung und Druckhistorie:** Spulen mit errechneter Restmenge, Verbrauch und Kosten je Druck, Monatsstatistik
+- **Warteschlange:** Platten nacheinander drucken, mit „Bett abräumen“-Hinweis
+- **Home Assistant:** als Add-on (Seitenleiste, Einstellungen dort) und Sensoren über MQTT (Fortschritt, Restzeit, Warteschlange, Restmenge je Slot)
 - **Direkt drucken:** geslicte Platte an den Kobra S1 senden und starten – mit Prüfung der ACE-Belegung
 - **Bohrlöcher verstärken:** erkannte Löcher per Häkchen mit einem 100-%-Füllung-Ring versehen (Orca-Modifikator)
 - **3MF für OrcaSlicer:** Werte, Stützen und Slots landen direkt im Projekt
 - **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
 - **Drucker-Verbindung (Kobra S1):** mit der **Werksfirmware im LAN-Modus** die ACE-Belegung live lesen und Slot-Filament sowie „Nachfüllen“ am Drucker ändern – oder über Rinkhals/Moonraker lesen. Ohne Verbindung: Belegung einmal eintragen
-- **Als Container** (z. B. auf dem NAS) oder lokal im Browser, ohne Cloud
+- **Als Container** (z. B. auf dem NAS) oder lokal im Browser, ohne Cloud; das geladene Projekt übersteht ein Neuladen, optional mit PIN geschützt
+- **Deutsch und Englisch, hell und dunkel, Desktop, Tablet und Handy**
 
 ## Schnellstart
 
@@ -81,6 +90,8 @@ python tests/printqueue.py    # Warteschlange auf dem Server
 python tests/ha_mqtt.py       # Home-Assistant-MQTT (gegen einen nachgebauten Broker)
 python tests/printed.py       # Vorschau gestarteter Drucke (3D-Fortschritt)
 node tests/engrave.js         # Beschriftung: Schrift, Platzierung, 3MF (mit OrcaSlicer)
+node tests/paint.js           # Bemalung je Dreieck (paint_color): lesen, umschreiben, Import
+node tests/designer-3mf.js    # Makerworld-Aufbau: Bemalung, Modifikator, Drehen/Größe, Text am Objekt (mit Orca-CLI)
 python tests/auth.py          # PIN-Schutz
 node tools/headless.js smoke  # Bedientest im Chrome ohne Fenster (Server muss laufen)
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)

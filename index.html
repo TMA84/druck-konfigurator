@@ -325,12 +325,6 @@
         </div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
         <p id="importNotes" class="muted hidden"></p>
-        <section id="designBox" class="plates hidden" aria-labelledby="designTitle">
-          <div class="orient-head"><span class="eyebrow" id="designTitle">Farben des Designers</span><span><button type="button" id="designAuto" class="linkbtn" title="Jede Farbe des Designers auf den Slot mit der ähnlichsten Farbe legen (Belegung vom Drucker oder eigene Angabe)">Automatisch zuordnen</button> <button type="button" id="designReset" class="linkbtn hidden">Wie vom Designer</button></span></div>
-          <p class="muted small">Jede Farbe auf einen Slot deiner ACE legen – z. B. auf einen mit derselben Filamentart.</p>
-          <ul id="designList" class="design-list"></ul>
-          <p id="designNote" class="muted small hidden"></p>
-        </section>
         <section id="plateBox" class="plates hidden" aria-labelledby="plateTitle">
           <div class="orient-head"><span class="eyebrow" id="plateTitle">Platten</span><button type="button" id="plateAuto" class="linkbtn hidden" title="Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen">Platzsparend anordnen</button></div>
           <p id="plateInfo" class="muted small"></p>
@@ -370,7 +364,6 @@
         <section id="bodyBox" class="bodies hidden" aria-labelledby="bodyTitle">
           <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><label class="muted small body-show"><input type="checkbox" id="bodyShow" checked> Farben zeigen</label></div>
           <p id="bodyInfo"></p>
-          <ul id="bodyList" class="body-list"></ul>
           <div id="bodyJoin" class="body-join hidden"><label for="bodyJoinSel">Mit Teil vereinen</label><select id="bodyJoinSel"></select><button type="button" id="bodyJoinBtn">Vereinen</button></div>
           <button type="button" id="bodySplit" class="linkbtn hidden">In einzelne Teile trennen</button>
         </section>
@@ -409,6 +402,8 @@
     <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
     <p id="volWarn" class="hud vol-warn hidden" role="status"></p>
     <div id="controls" class="hud toolbar" role="toolbar" aria-label="Werkzeuge">
+      <span class="tb-group" role="group" aria-label="Verlauf"><button type="button" id="tbUndo" title="Rückgängig (Strg/⌘+Z)" aria-label="Rückgängig (Strg/⌘+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="tb-label">Rückgängig</span></button><button type="button" id="tbRedo" title="Wiederholen (Strg/⌘+Umschalt+Z)" aria-label="Wiederholen (Strg/⌘+Umschalt+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span class="tb-label">Wiederholen</span></button></span>
+      <span class="hud-sep" aria-hidden="true"></span>
       <span class="tb-group" role="group" aria-label="Modell"><button type="button" data-action="add" title="Modell hinzufügen (kombiniert drucken)" aria-label="Modell hinzufügen (kombiniert drucken)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/><path d="M18 15v6M15 18h6" class="plus"/></svg><span class="tb-label">Hinzufügen</span></button><button type="button" id="tbNewPlate" title="Gewähltes Teil auf eine neue Platte" aria-label="Gewähltes Teil auf eine neue Platte"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="1.5"/><path d="M3 10h14M3 14.5h14M7.7 5v14M12.3 5v14"/><path d="M19 3v6M16 6h6" class="plus"/></svg><span class="tb-label">Neue Platte</span></button><button type="button" data-orient="all" id="tbOrientAll" title="Alle Teile nach Vorschlag ausrichten" aria-label="Alle Teile nach Vorschlag ausrichten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M8 15l4-9 4 9z"/><path d="M12 3v2"/><path d="M17 9a6 6 0 0 1 2 5" /><path d="M19 14l1.5-2.2M19 14l-2.4-.8"/></svg><span class="tb-label">Ausrichten</span></button><button type="button" id="tbArrange" title="Platzsparend anordnen" aria-label="Platzsparend anordnen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="6" width="5" height="5"/><rect x="13" y="6" width="5" height="5"/><rect x="6" y="13" width="12" height="5"/></svg><span class="tb-label">Anordnen</span></button></span>
       <span class="hud-sep" aria-hidden="true"></span>
       <span class="tb-group" role="group" aria-label="Teil"><button type="button" id="tbCopyPlus" title="Eine Kopie mehr" aria-label="Eine Kopie mehr"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg><span class="tb-label">Kopie +</span></button><button type="button" id="tbCopyMinus" title="Eine Kopie weniger" aria-label="Eine Kopie weniger"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg><span class="tb-label">Kopie −</span></button><button type="button" id="tbSplit" title="In einzelne Teile trennen (Körper)" aria-label="In einzelne Teile trennen (Körper)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="tb-label">Trennen</span></button><button type="button" id="tbDelete" title="Gewähltes Teil entfernen" aria-label="Gewähltes Teil entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4.5h6V7M7 7l1 13h8l1-13"/><path d="M10.5 11v6M13.5 11v6"/></svg><span class="tb-label">Entfernen</span></button></span>
@@ -652,6 +647,7 @@
 <script src="js/size-ui.js"></script>
 <script src="js/sections-ui.js"></script>
 <script src="js/toolbar-ui.js"></script>
+<script src="js/undo.js"></script>
 <script src="js/preview-ui.js"></script>
 <script src="vendor/flv.min.js"></script>
 <script src="js/workbench-ui.js"></script>

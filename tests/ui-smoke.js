@@ -150,8 +150,14 @@ async function runSmoke(opts={}){
     z=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop()));
     const msh=fflate.strFromU8(z['Metadata/model_settings.config']);
     ok(/modifier_part/.test(msh)&&/sparse_infill_density" value="100%"/.test(msh),'Mit Häkchen: Modifikator mit 100 % Füllung');
+    // gewähltes Loch bleibt bei Größe und Drehung gewählt (wird im neuen Netz wiedergefunden)
+    { const p=project.parts[project.selected];setPartScale(p,[1.5,1.5,1.5]);await wait(80);
+      ok(p.holes.length===1&&Math.abs(p.holes[0].r-3.75)<0.1,'Größe 150 %: Bohrloch bleibt gewählt (Ø '+(p.holes[0]?de(2*p.holes[0].r,1):'–')+' mm)');
+      document.querySelector('.orient-tools [data-orient="x"]').click();await wait(120);
+      ok(p.holes.length===1&&p.holes[0].axis!=='z','Gedreht: Bohrloch bleibt gewählt (jetzt Achse '+(p.holes[0]&&p.holes[0].axis)+')');
+      setPartScale(p,[1,1,1]);document.querySelector('.orient-tools [data-orient="reset"]').click();await wait(80); }
     document.querySelector('.orient-tools [data-orient="x"]').click();await wait(80);
-    ok(!project.parts[0].holes.length&&$('holeList').querySelectorAll('[data-hole]').length===1,'Nach Drehung neu erkannt, Auswahl zurückgesetzt');
+    ok(project.parts[0].holes.length===1&&$('holeList').querySelectorAll('[data-hole]:checked').length===1,'Nach Drehung neu erkannt, gewähltes Loch bleibt angehakt');
     $('clear').click();await wait(50);}
   sel('material','pla_hs');sel('object','general'); // Ausgangslage für die folgenden Prüfungen
 
@@ -395,8 +401,19 @@ async function runSmoke(opts={}){
       $('szX').value=String(x0*1.5);$('szX').dispatchEvent(new Event('change'));await wait(80);
       ok(Math.abs(project.parts[0].geom.x-x0*1.5)<0.05&&Math.abs(project.parts[0].scale[1]-1.5)<1e-3,'Zielmaß X: gleichmäßig auf 150 %');
       $('szReset').click();await wait(80);ok(!project.parts[0].scale&&Math.abs(project.parts[0].geom.x-x0)<0.01,'Original stellt die Größe wieder her');
-      const n=project.parts.length;$('tbCopyPlus').click();await wait(100);ok(project.parts.length===n+1&&!$('tbCopyMinus').disabled,'Werkzeugleiste: Kopie +');
-      $('tbCopyMinus').click();await wait(100);ok(project.parts.length===n,'Werkzeugleiste: Kopie −'); }
+      const n=project.parts.length;await wait(450);$('tbCopyPlus').click();await wait(450);ok(project.parts.length===n+1&&!$('tbCopyMinus').disabled,'Werkzeugleiste: Kopie +');
+      $('tbCopyMinus').click();await wait(450);ok(project.parts.length===n,'Werkzeugleiste: Kopie −');
+      // Rückgängig/Wiederholen (Strg+Z / Knöpfe): Kopie − zurücknehmen und wiederholen
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true}));await wait(500);
+      ok(project.parts.length===n+1,'Strg+Z nimmt „Kopie −“ zurück');
+      $('tbRedo').click();await wait(500);ok(project.parts.length===n&&!$('tbUndo').disabled,'Wiederholen stellt es wieder her'); }
+    // Projekt übersteht Neuladen (js/project-store.js): Slot, Größe, Drehung speichern, Projekt im Speicher verwerfen, wiederherstellen
+    { const p=project.parts[0];setPartSlot(p,2);setPartScale(p,[1.25,1.25,1.25]);setPartRotation(p,rotateAxis('x',90));update();await wait(1600);
+      const want=JSON.stringify(project.parts.map(q=>[q.name,q.slot,q.scale,q.R,+q.geom.x.toFixed(2),+q.geom.z.toFixed(2)]));
+      project=null;const okR=await restoreProject();await wait(200);
+      const got=project&&JSON.stringify(project.parts.map(q=>[q.name,q.slot,q.scale,q.R,+q.geom.x.toFixed(2),+q.geom.z.toFixed(2)]));
+      ok(okR&&got===want,'Projekt wiederhergestellt: Teile, Slot, Größe, Drehung wie vorher',got);
+      setPartScale(project.parts[0],[1,1,1]);setPartRotation(project.parts[0],IDENTITY3);update();await wait(100); }
     // Modell hinzufügen statt ersetzen
     addMode=true;await dropFile(mk('deckel.stl',50,30,4));await wait(300);
     ok(project.parts.length===4&&/ \+ /.test(project.name),'Modell hinzufügen erweitert das Projekt ('+project.name+')');

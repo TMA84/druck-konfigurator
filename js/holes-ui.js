@@ -1,9 +1,42 @@
 'use strict';
 /* Bohrlöcher verstärken – nur als Vorschlag (Entscheidung 2026-09-26): erkannte Löcher des gewählten
    Teils mit Häkchen; angehakte bekommen beim 3MF-Export einen Orca-Modifikator mit 100 % Füllung.
-   Nach einer Drehung wird neu erkannt und die Auswahl zurückgesetzt (die Lage der Löcher ändert sich). */
+   Nach einer Drehung oder Größenänderung wird neu erkannt; gewählte Löcher werden dabei wiedergefunden (holesRemember /
+   holesRestore: Mittelpunkt mitdrehen/-skalieren, nächstes erkanntes Loch nehmen). */
 
 const AXIS_LABEL = { z: t('senkrecht'), x: t('waagerecht (X)'), y: t('waagerecht (Y)') };
+
+// Gewählte Löcher als Punkte in Originalkoordinaten merken (vor einer Änderung von Drehung oder Größe)
+function holesRemember(part) {
+  if (!part.holes || !part.holes.length || part.holeGeom !== part.geom) return null;
+  const g = part.geom, pv = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]], s = part.scale || [1, 1, 1], R = part.R || IDENTITY3;
+  return part.holes.map(h => {
+    const [iu, iv, iw] = HOLE_AXES[h.axis], p = [0, 0, 0];
+    p[iu] = h.c[0]; p[iv] = h.c[1]; p[iw] = (h.w0 + h.w1) / 2;
+    const un = p.map((v, k) => pv[k] + (v - pv[k]) / s[k]);              // Größe heraus
+    return { orig: [0, 1, 2].map(k => R[k] * un[0] + R[3 + k] * un[1] + R[6 + k] * un[2]), r: h.r };   // Rᵀ · p: Drehung heraus
+  });
+}
+// … und nach der Änderung im neuen Netz wiederfinden (höchstens 2 mm bzw. ein halber Radius daneben)
+function holesRestore(part, mem) {
+  if (!mem || !mem.length) return 0;
+  const cands = partHoles(part), g = part.geom, pv = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]], s = part.scale || [1, 1, 1], R = part.R || IDENTITY3;
+  const picked = [];
+  for (const m of mem) {
+    const rp = [0, 1, 2].map(k => R[k * 3] * m.orig[0] + R[k * 3 + 1] * m.orig[1] + R[k * 3 + 2] * m.orig[2]);
+    const p = rp.map((v, k) => pv[k] + (v - pv[k]) * s[k]);
+    let best = null, bd = Infinity;
+    for (const h of cands) {
+      const [iu, iv, iw] = HOLE_AXES[h.axis];
+      if (p[iw] < h.w0 - 1 || p[iw] > h.w1 + 1) continue;
+      const d = Math.hypot(p[iu] - h.c[0], p[iv] - h.c[1]);
+      if (d < bd) { bd = d; best = h; }
+    }
+    if (best && bd <= Math.max(2, best.r / 2) && !picked.includes(best)) picked.push(best);
+  }
+  part.holes = picked;
+  return picked.length;
+}
 
 function partHoles(part) {
   if (part.holeGeom !== part.geom) { part.holeCands = findHoles(part.geom); part.holeGeom = part.geom; part.holes = []; }

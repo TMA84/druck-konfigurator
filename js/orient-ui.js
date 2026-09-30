@@ -14,8 +14,10 @@ const ORIENT_MAX_TRIS = 150000;
 const mm2 = v => de(v, 0) + ' mm²';
 
 function setPartRotation(part, R) {
+  const mem = typeof holesRemember === 'function' ? holesRemember(part) : null;   // gewählte Bohrlöcher mitdrehen
   part.R = R;
   part.geom = partGeom(part);
+  if (mem) holesRestore(part, mem);
   orientCache.delete(part);
   if (part === selectedPart()) showModel(part.geom); else renderPartList();
 }

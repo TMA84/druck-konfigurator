@@ -11,13 +11,16 @@ function sizeOrig(part) {   // Maße ohne Skalierung (nach der Drehung)
 }
 function setPartScale(part, s) {
   s = s.map(v => Math.min(SZ_MAX, Math.max(SZ_MIN, Math.round(v * 1e5) / 1e5)));
-  const hadHoles = (part.holes || []).length;
+  const had = (part.holes || []).length;
+  let kept = had;
   for (const p of samePlacements(part)) {
+    const mem = typeof holesRemember === 'function' ? holesRemember(p) : null;
     p.scale = s.every(v => v === 1) ? null : s;
     p.geom = partGeom(p);
+    if (mem) { const n = holesRestore(p, mem); if (p === part) kept = n; }
     if (typeof orientCache !== 'undefined') orientCache.delete(p);
   }
-  if (hadHoles) toast(t('Größe geändert – Bohrlöcher bitte neu wählen'));
+  if (had && kept < had) toast(t('Größe geändert – {n} von {m} Bohrlöchern wiedergefunden, bitte prüfen', { n: kept, m: had }));
   if (part === project.parts[project.selected]) showModel(part.geom); else update();
 }
 

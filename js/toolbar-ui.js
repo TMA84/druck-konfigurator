@@ -20,7 +20,7 @@ function updateToolbar() {
   dis('tbDelete', noPart || (!many && t('ein Teil bleibt immer – zum Leeren „Entfernen“ in der Modellkarte')));
   dis('tbScale', noPart);
   dis('tbRotate', noPart);
-  dis('tbText', noPart || (typeof txUsable === 'function' && !txUsable(p) && t('bei Objekten aus einer Makerworld-3MF noch nicht möglich')));
+  dis('tbText', noPart);
   dis('btnPlate', noPart || (!many && t('nur bei mehreren Teilen')));
 }
 

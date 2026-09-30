@@ -768,6 +768,68 @@ function partItemTransform(m, part, g) {
   }
   return o;
 }
+/* Beschriftung auf Objekten des Designers (Makerworld-3MF): je Text ein weiteres Bauteil im Objekt – erhaben mit eigenem
+   Slot (normal_part), vertieft als negative_part, wie OrcaSlicer es selbst speichert. Das Netz kommt als eigenes Objekt ins
+   Hauptmodell und als Komponente in das Objekt des Designers, in dessen Koordinaten: Text (Koordinaten wie part.geom) →
+   Größe und Drehung des Teils heraus → Welt der 3MF → Objekt (Umkehrung der ursprünglichen Transformation des Build-Items).
+   Muss vor dem Verschieben der Build-Items laufen (braucht deren ursprüngliche Transformation). */
+function inv3x4(m) {   // Umkehrung einer 3MF-Transformation (Zeilenvektor · 3×3 + t)
+  const [a, b, c, d, e, f, g, h, i] = m, det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-12) return null;
+  const r = [(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det, (f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det,
+    (d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det];
+  const t = [0, 1, 2].map(k => -(m[9] * r[k] + m[10] * r[3 + k] + m[11] * r[6 + k]));
+  return r.concat(t);
+}
+function designerTexts(out, rootPath, items, zipLib, nFil) {
+  const withText = [], seen = new Set();
+  for (const j of items) {
+    const p = j.part;
+    if (!p || p.extra || p.objectId == null || seen.has(String(p.objectId)) || !itemTexts(j).length) continue;
+    seen.add(String(p.objectId)); withText.push(j);
+  }
+  if (!withText.length || typeof textMesh !== 'function') return 0;
+  let model = zipLib.strFromU8(out[rootPath]), ms = zipLib.strFromU8(out['Metadata/model_settings.config'] || zipLib.strToU8(''));
+  let maxId = 0;
+  for (const [name, data] of Object.entries(out)) if (/\.model$/i.test(name)) {
+    const text = name === rootPath ? model : zipLib.strFromU8(data);
+    for (const m of text.matchAll(/<(?:\w+:)?object\b[^>]*?\bid="(\d+)"/g)) maxId = Math.max(maxId, +m[1]);
+  }
+  for (const m of ms.matchAll(/<(?:object|part) id="(\d+)"/g)) maxId = Math.max(maxId, +m[1]);
+  const hasP = /<(?:\w+:)?model\b[^>]*xmlns:p=/.test(model), resources = [];
+  let added = 0;
+  for (const j of withText) {
+    const p = j.part, id = String(p.objectId);
+    const item = [...model.matchAll(/<(?:\w+:)?item\b([^>]*)>/g)].map(x => x[1]).find(a => (/objectid="([^"]+)"/.exec(a) || [])[1] === id);
+    const tr = item && (/transform="([^"]+)"/.exec(item) || [])[1], M = tr ? tr.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+    const Mi = inv3x4(M); if (!Mi) continue;
+    const g = p.geom, pv = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]], s = p.scale || [1, 1, 1], R = p.R || [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const toLocal = (x, y, z) => {
+      const u = [x, y, z].map((v, k) => pv[k] + (v - pv[k]) / s[k]);                                     // Größe heraus
+      const w = [0, 1, 2].map(k => R[k] * u[0] + R[3 + k] * u[1] + R[6 + k] * u[2]);                   // Drehung heraus (Rᵀ)
+      return [0, 1, 2].map(k => w[0] * Mi[k] + w[1] * Mi[3 + k] + w[2] * Mi[6 + k] + Mi[9 + k]);    // Welt → Objekt
+    };
+    let partsXml = '';
+    for (const x of itemTexts(j)) {
+      const mesh = textMesh(typeof textScaled === 'function' ? textScaled(x, p) : x, p.R || null), loc = new Float32Array(mesh.length);
+      for (let i = 0; i < mesh.length; i += 3) { const q = toLocal(mesh[i], mesh[i + 1], mesh[i + 2]); loc[i] = q[0]; loc[i + 1] = q[1]; loc[i + 2] = q[2]; }
+      const oid = ++maxId, xml = meshObjectXML(loc, [0, 0, 0], oid);
+      resources.push(hasP ? xml : xml.replace(/ p:UUID="[^"]*"/, ''));
+      model = model.replace(new RegExp('(<(?:\\w+:)?object\\b[^>]*\\bid="' + id + '"[^>]*>[\\s\\S]*?)(</(?:\\w+:)?components>)'),
+        (all, head, close) => head + '   <component objectid="' + oid + '"' + (hasP ? ' p:UUID="' + uuid(oid, 'b206-40ff-9872-83e8017abed1') + '"' : '') + ' transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n  ' + close);
+      const name = (x.mode === 'engraved' ? 'Gravur' : 'Schrift') + ' „' + String(x.text).slice(0, 40) + '“';
+      partsXml += '    <part id="' + oid + '" subtype="' + (x.mode === 'engraved' ? 'negative_part' : 'normal_part') + '">\n      <metadata key="name" value="' + xmlEsc(name) + '"/>\n' +
+        '      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n' +
+        (x.mode !== 'engraved' && x.slot != null ? '      <metadata key="extruder" value="' + (Math.min(x.slot, nFil - 1) + 1) + '"/>\n' : '') + '    </part>\n';
+      added++;
+    }
+    ms = ms.replace(new RegExp('(<object id="' + id + '">[\\s\\S]*?)(\\n?[ \\t]*</object>)'), (all, body, close) => body + '\n' + partsXml.replace(/\n$/, '') + close);
+  }
+  if (resources.length) model = model.replace(/(\n?[ \t]*<\/(?:\w+:)?resources>)/, '\n' + resources.join('').replace(/\n$/, '') + '$1');
+  out[rootPath] = zipLib.strToU8(model);
+  out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
+  return added;
+}
 const geomPivot = g => [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]];
 const fmtTransform = m => m.map(v => { const s = String(Math.round(v * 1e6) / 1e6); return s === '-0' ? '0' : s; }).join(' ');
 const PLATE_FILE_KEYS = /[ \t]*<metadata key="(thumbnail_file|thumbnail_no_light_file|top_file|pick_file|pattern_file|pattern_bbox_file)" value="[^"]*"\/>\n?/g;
@@ -920,6 +982,8 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   else setVersion('3D/3dmodel.model', /(<metadata name="OrcaSlicer">)[^<]*(<\/metadata>)/, '$1' + xmlEsc(tpl.orcaVersion) + '$2');
   setVersion('Metadata/slice_info.config', /(header_item key="X-BBL-Client-Version" value=")[^"]*(")/, '$1' + BBL_FILE_VERSION + '$2');
 
+  // Beschriftung auf Objekten des Designers als weitere Bauteile (vor dem Verschieben: braucht die ursprünglichen Transformationen)
+  designerTexts(out, Object.keys(out).find(k => /^3D\/3dmodel\.model$/i.test(k)), items, zipLib, nFil);
   // Build-Items verschieben (Translation = letzte drei Werte der Matrix)
   const rootPath = Object.keys(out).find(k => /^3D\/3dmodel\.model$/i.test(k));
   if (!relayout) {

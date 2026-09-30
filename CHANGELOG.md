@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Rückgängig / Wiederholen** für das ganze Projekt: Strg/⌘+Z, Strg/⌘+Umschalt+Z (oder Strg+Y) und zwei Knöpfe vorn in der Werkzeugleiste – Slot, Größe, Drehung, Platte, Kopien, Entfernen, Farbzuordnung, Druckreihenfolge, Beschriftung, Bohrlöcher (bis 60 Schritte).
+- **Beschriftung auf Objekten des Designers** (Makerworld-/Orca-3MF): erhaben mit eigenem Slot oder vertieft; kommt als weiteres Bauteil ins Objekt, wie OrcaSlicer es speichert (mit Orca-CLI geprüft).
+
+### Verbessert
+- **Bohrlöcher bleiben gewählt**, wenn ein Teil gedreht oder in der Größe geändert wird (das Loch wird im neuen Netz wiedergefunden).
+- Test `tests/designer-3mf.js`: Makerworld-Aufbau ohne echte Datei – Bemalung, Farb-Modifikator, Drehen und Größe, Text am Objekt, Objekt für Objekt; mit Orca-CLI geslict (auch auf GitHub). Bedientest prüft zusätzlich Rückgängig, Bohrlöcher nach Größe/Drehung und das Wiederherstellen nach Neuladen.
+- Aufgeräumt: alter Abschnitt „Farben des Designers“ und die alte Körperliste (beides steckt seit 10.6 in der Filamentliste und der Teileliste).
+- Englische Oberfläche: fehlende Übersetzungen der neuen Tooltips und Bedienhilfen ergänzt.
+- Handy: der gewählte Reiter wird in der Reiterleiste ins Bild geholt.
+- Test `tests/paint.js` für die Bemalung je Dreieck (auch auf GitHub).
+- README: Funktionsliste auf den Stand von 10.6 gebracht.
+
 ## [10.6.1] – 2026-09-30
 
 ### Neu

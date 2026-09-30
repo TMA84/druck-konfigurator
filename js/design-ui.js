@@ -1,5 +1,5 @@
 'use strict';
-/* Farben des Designers → Slot (① Modell, nur Makerworld-/Orca-3MF): Jede Farbe, die der Designer vergeben hat
+/* Farben des Designers → Slot (① Modell → Filamente → „Modell → Slot“, nur Makerworld-/Orca-3MF): Jede Farbe, die der Designer vergeben hat
    (Objekt, Körper, Farb-Modifikator wie ein Schriftzug), lässt sich auf einen anderen ACE-Slot legen – z. B. auf
    einen Slot mit Filament derselben Art, damit PLA und ASA/ABS nicht auf einer Platte landen.
    Objekt und Körper: part.slot / body.slot werden umgestellt. Modifikatoren: project.threemf.designMap
@@ -61,28 +61,6 @@ function designColours() {
   return [...out.values()].sort((a, b) => a.d - b.d);
 }
 
-function renderDesignColours() {
-  const box = $('designBox');
-  if (!project || !project.threemf) { box.classList.add('hidden'); return; }
-  const cols = designColours();
-  if (cols.length < 2) { box.classList.add('hidden'); return; }
-  box.classList.remove('hidden');
-  if (typeof secSum === 'function') secSum('design', t('{n} Farben', { n: cols.length }));
-  const map = project.threemf.designMap || (project.threemf.designMap = {});
-  const slots = typeof slotChoices === 'function' ? slotChoices() : [], n = Math.max(4, slots.length);
-  const sw = c => '<span class="pslot" style="background:' + (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '#dddddd') + '"></span>';
-  $('designList').innerHTML = cols.map(c => {
-    const to = map[c.d] ?? c.d;
-    const opts = Array.from({ length: n }, (_, s) => { const x = slots[s] || {}; return '<option value="' + s + '"' + (s === to ? ' selected' : '') + '>Slot ' + (s + 1) + (x.type ? ' · ' + esc(x.type) : '') + (x.name && !x.type ? ' · ' + esc(x.name) : '') + '</option>'; }).join('');
-    return '<li>' + sw(c.colour) + '<span class="dc-name" title="' + esc([...c.uses].join(', ')) + '">' + t('Farbe {n}', { n: c.d + 1 }) + (c.type ? ' <small class="muted">' + esc(c.type) + '</small>' : '') + '<small>' + esc([...c.uses].slice(0, 2).join(', ') + (c.uses.size > 2 ? ' …' : '')) + '</small></span>' +
-      '<span class="dc-arrow">→</span>' + sw((slots[to] || {}).colour) + '<select data-design="' + c.d + '" aria-label="' + t('Slot für Farbe {n}', { n: c.d + 1 }) + '">' + opts + '</select></li>';
-  }).join('');
-  const painted = project.parts.some(p => p.paintTris);
-  $('designNote').textContent = painted ? t('Bemalte Flächen (Farbpinsel des Designers) behalten ihren Slot – umlegen geht dort nur in OrcaSlicer.') : '';
-  $('designNote').classList.toggle('hidden', !painted);
-  $('designReset').classList.toggle('hidden', !Object.keys(map).length);
-}
-
 // Objekt und Körper mit Farbe des Designers folgen der Zuordnung (eigene Slot-Änderungen an ihnen werden dabei ersetzt)
 // Nur Teile/Körper, die genau diese Farbe des Designers haben, bekommen den neuen Slot – eigene Slotwahl für andere
 // Teile oder den Grundkörper bleibt (vorher wurden alle aus der Zuordnung neu gesetzt und so zurückgestellt)
@@ -97,8 +75,12 @@ function setDesignSlot(d, s) {
   if (typeof adoptSlotMaterialFor === 'function') adoptSlotMaterialFor(moved);
   update();
 }
-$('designList').addEventListener('change', e => { const s = e.target.closest('[data-design]'); if (s) setDesignSlot(+s.dataset.design, +s.value); });
-$('designReset').addEventListener('click', () => { Object.keys(project.threemf.designMap).map(Number).forEach(d => setDesignSlot(d, d)); toast(t('Farben wieder wie vom Designer')); });
+// „Wie vom Designer“ (Filamente des Modells, js/slot-picker.js): alle Farben wieder auf ihren eigenen Slot
+function resetDesignColours() {
+  if (!project || !project.threemf) return;
+  Object.keys(project.threemf.designMap || {}).map(Number).forEach(d => setDesignSlot(d, d));
+  toast(t('Farben wieder wie vom Designer'));
+}
 
 // Filament der Teile auf das stellen, was in ihrem Slot liegt (z. B. ABS-Profil → ASA, wenn die ACE ASA meldet)
 function slotMaterialChanges() {
@@ -149,7 +131,8 @@ function autoMapDesignColours() {
   }
   return moved;
 }
-$('designAuto').addEventListener('click', () => {
+// „Automatisch“ (Filamente des Modells): neu nach Farbe und Material zuordnen
+function autoAssignDesignColours() {
   const tm = project && project.threemf; if (!tm) return;
   // neu zuordnen: bisherige Zuordnung verwerfen, Teile/Körper wieder auf die Farben des Designers, dann nach Ähnlichkeit
   tm.designMap = {};
@@ -157,4 +140,4 @@ $('designAuto').addEventListener('click', () => {
   const n = autoMapDesignColours();
   update();
   toast(n ? t('{n} Farben des Designers auf ähnliche Slots gelegt', { n }) : t('Farben passen schon zu den Slots'));
-});
+}

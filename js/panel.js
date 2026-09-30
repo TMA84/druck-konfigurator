@@ -82,7 +82,8 @@ function update(){
   if(r.a){const txt=r.a.level==='none'?t('Keine relevanten Überhänge über {th}° (Bodenfläche ausgenommen).',{th:r.a.th}):t('Über {th}°: ca. {area} mm² ({pct} % der Oberfläche, Bodenfläche ausgenommen).',{th:r.a.th,area:de(r.a.flagged,0),pct:de(r.a.ratio*100,1)});document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=txt})}
   lastResult=r;
   if(typeof renderPartList==='function')renderPartList();
-  if(typeof scheduleProjectSave==='function')scheduleProjectSave();   // Projekt übersteht Neuladen (js/project-store.js)
+  if(typeof scheduleProjectSave==='function')scheduleProjectSave();
+  if(typeof undoRecord==='function')undoRecord();   // Rückgängig/Wiederholen (js/undo.js)   // Projekt übersteht Neuladen (js/project-store.js)
   if(typeof renderOrient==='function')renderOrient();
   if(typeof renderSize==='function')renderSize();
   if(typeof updateToolbar==='function')updateToolbar();
@@ -92,7 +93,6 @@ function update(){
   if(typeof updateExportMenu==='function')updateExportMenu(r);
   if(typeof renderSidePanels==='function')renderSidePanels();
   if(typeof renderOverrideBar==='function')renderOverrideBar();
-  if(typeof renderDesignColours==='function')renderDesignColours();
   if(typeof renderPlates==='function')renderPlates();
   if(typeof renderEngrave==='function')renderEngrave();
   if(geom&&typeof showVolume==='function')showVolume();

@@ -1,9 +1,8 @@
 'use strict';
-/* Aufklappbare Abschnitte in der Modellkarte (Tab ①): Farben des Designers, Platten, Lage, Mehrfarbig, Bohrlöcher,
-   Beschriftung. Der Titel wird ein Knopf mit Pfeil und Kurzinfo (secSum, z. B. „2 Platten“, „keine“); zugeklappt
+/* Aufklappbare Abschnitte in der Modellkarte (Tab ①): Platten, Lage, Größe, Mehrfarbig, Bohrlöcher, Beschriftung. Der Titel wird ein Knopf mit Pfeil und Kurzinfo (secSum, z. B. „2 Platten“, „keine“); zugeklappt
    bleibt nur die Kopfzeile. Offen/zu je Abschnitt merkt sich das Tool (store.settings.secOpen). */
-const SECTIONS = { design: 'designBox', plates: 'plateBox', orient: 'orientBox', size: 'sizeBox', bodies: 'bodyBox', holes: 'holeBox', text: 'textBox' };
-const SEC_DEFAULT_OPEN = { design: true, plates: true, orient: true, size: false, bodies: true, holes: true, text: false };
+const SECTIONS = { plates: 'plateBox', orient: 'orientBox', size: 'sizeBox', bodies: 'bodyBox', holes: 'holeBox', text: 'textBox' };
+const SEC_DEFAULT_OPEN = { plates: true, orient: true, size: false, bodies: true, holes: true, text: false };
 const secOpen = key => { const o = store.settings.secOpen || {}; return key in o ? !!o[key] : SEC_DEFAULT_OPEN[key]; };
 
 function secInit() {

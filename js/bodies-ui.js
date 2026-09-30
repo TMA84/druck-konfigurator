@@ -20,21 +20,6 @@ function importedBodies(p) {
 // fromPart: Körper stammt aus einem vereinten Teil – beim Trennen bekommt er wieder dessen Namen
 const bodiesOf = p => p.bodies || [{ name: p.name, start: 0, count: p.origPos.length / 9, slot: null, partId: null, fromPart: true }];
 
-// Maße je Körper, einmal je Netz berechnet
-const bodyDimCache = new WeakMap();
-function bodyDims(part) {
-  let d = bodyDimCache.get(part.geom);
-  if (d) return d;
-  const pos = part.geom.pos;
-  d = part.bodies.map(b => {
-    const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
-    for (let i = b.start * 9; i < (b.start + b.count) * 9; i++) { const k = i % 3, v = pos[i]; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
-    return [0, 1, 2].map(k => mx[k] - mn[k]);
-  });
-  bodyDimCache.set(part.geom, d);
-  return d;
-}
-
 const defaultSlot = () => lastResult ? +(store.last[slotKey(lastResult.printer.id)] || 0) : 0;
 function slotColour(i, slots) {
   const s = slots[i];
@@ -130,27 +115,13 @@ function renderBodies() {
     ? t('{n} Körper – jeder kann einen eigenen Slot bekommen: oben in der Teileliste unter dem Teil. „wie Teil“ = {slot}.', { n: part.bodies.length, slot: own === null ? t('Slot aus dem Export-Dialog') : 'Slot ' + (own + 1) }) +
       (places.length > 1 ? t(' Gilt für alle {n} Platzierungen dieses Objekts (Platte {plates}).', { n: places.length, plates: plates.join(', ') }) : '')
     : t('Gehören mehrere Dateien zu <b>einem</b> mehrfarbigen Modell (z. B. je Farbe eine STL), hier zu einem Teil vereinen – die Lage aus den Dateien bleibt.');
-  if (multi) {
-    const dims = bodyDims(part);
-    // Slot je Körper: in der Teileliste (Zeile des gewählten Teils, wie die Unterobjekte in OrcaSlicer)
-    $('bodyList').innerHTML = '';
-  } else $('bodyList').innerHTML = '';
+  // Slot je Körper: in der Teileliste (Zeile des gewählten Teils, wie die Unterobjekte in OrcaSlicer)
   $('bodyJoin').classList.toggle('hidden', !joinable);
   if (joinable) $('bodyJoinSel').innerHTML = project.parts.map((p, i) => i === project.selected ? '' : '<option value="' + i + '">' + esc(p.name) + '</option>').join('');
   $('bodySplit').classList.toggle('hidden', !multi);
   paintBodies(part);
 }
 
-$('bodyList').addEventListener('click', e => {
-  const c = e.target.closest('[data-body-slot]'); if (!c) return;
-  const part = project.parts[project.selected], j = +c.dataset.bodySlot, b = part.bodies[j];
-  openSlotPicker(c, b.slot ?? null, { title: t('Slot für {name}', { name: t(b.name) }), std: t('wie Teil'), stdSlot: part.slot ?? defaultSlot() }, v => {
-    samePlacements(part).forEach(p => { if (p.bodies && p.bodies[j]) p.bodies[j].slot = v; });
-    update();
-  });
-});
-$('bodyList').addEventListener('mouseover', e => { const li = e.target.closest('[data-body]'); if (li) paintBodies(project.parts[project.selected], +li.dataset.body); });
-$('bodyList').addEventListener('mouseleave', () => paintBodies(project.parts[project.selected]));
 $('bodyShow').addEventListener('change', () => paintBodies(project && project.parts[project.selected]));
 
 function replaceParts(parts, selected) {

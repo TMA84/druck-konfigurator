@@ -17,7 +17,7 @@ function slotInk(hex) {
 function slotChipHTML(slot, eff, attrs, label) {
   const slots = typeof slotChoices === 'function' ? slotChoices() : [], s = slots[slot ?? eff] || {};
   const bg = validSlotHex(s.colour) ? s.colour : '#c7ccd4', n = (slot ?? eff ?? 0) + 1;
-  const title = (slot == null ? t('Standard') + ' – ' : '') + 'Slot ' + n + (s.type ? ' · ' + s.type : '') + (label ? ' · ' + label : '');
+  const title = (slot == null ? t('Standard-Slot') + ' – ' : '') + 'Slot ' + n + (s.type ? ' · ' + s.type : '') + (label ? ' · ' + label : '');
   return '<button type="button" class="slot-chip' + (slot == null ? ' std' : '') + '" ' + attrs + ' style="--chip:' + bg + ';--chip-ink:' + slotInk(bg) + '"' +
     ' title="' + esc(title) + '" aria-label="' + esc(title) + '" aria-haspopup="listbox">' + n + '</button>';
 }
@@ -118,7 +118,7 @@ function renderFilamentBar() {
   $('filBarList').innerHTML = slots.map((s, i) => {
     const bg = validSlotHex(s.colour) ? s.colour : '#c7ccd4';
     return '<li><button type="button" data-fil="' + i + '" class="fil' + (i === cur ? ' sel' : '') + (s.present === false ? ' empty' : '') + '" style="--chip:' + bg + ';--chip-ink:' + slotInk(bg) + '"' +
-      ' title="' + esc((typeof slotLabel === 'function' ? slotLabel(i, n) : 'Slot ' + (i + 1)) + (s.type ? ' · ' + s.type : '') + (i === def ? ' · ' + t('Standard') : '') + ' – ' + t('Klick: für das gewählte Teil')) + '">' +
+      ' title="' + esc((typeof slotLabel === 'function' ? slotLabel(i, n) : 'Slot ' + (i + 1)) + (s.type ? ' · ' + s.type : '') + (i === def ? ' · ' + t('Standard-Slot') : '') + ' – ' + t('Klick: für das gewählte Teil')) + '">' +
       '<span class="fil-n">' + (i + 1) + '</span><span class="fil-t">' + esc(s.present === false ? t('leer') : s.type || '–') + '</span>' +
       (uses[i] ? '<span class="fil-u" title="' + esc(t('{n} Teil(e)', { n: uses[i] })) + '">' + uses[i] + '</span>' : '') + (i === def ? '<span class="fil-std">★</span>' : '') + '</button></li>';
   }).join('');
@@ -133,13 +133,11 @@ $('filBarList').addEventListener('click', e => {
 $('filBarEdit').addEventListener('click', () => { if (typeof openSlotDialog === 'function') openSlotDialog(); });
 
 /* „Filamente des Modells“ wie in OrcaSlicer: je Filament des Designers (Makerworld-3MF) Farbe, Nummer und Material, dazu
-   der Slot, auf den es gedruckt wird (designMap; Klick → Slot wählen, wie „Remap filaments“). Ersetzt den Abschnitt
-   „Farben des Designers“, der bleibt nur ohne Filamentliste (kein Drucker mit Slots). */
+   der Slot, auf den es gedruckt wird (designMap; Klick → Slot wählen, wie „Remap filaments“). */
 function renderDesignFilaments(slots) {
   const box = $('filDesign'), tm = project && project.threemf, cols = tm && typeof designColours === 'function' ? designColours() : [];
   const show = !!tm && cols.length >= 2 && slots.length > 0;
   box.classList.toggle('hidden', !show);
-  $('designBox').classList.toggle('in-bar', show);
   if (!show) return;
   const map = tm.designMap || {}, n = slots.length;
   $('filDesignReset').classList.toggle('hidden', !Object.keys(map).length);
@@ -157,8 +155,8 @@ $('filDesignList').addEventListener('click', e => {
   const d = +c.dataset.dfil, map = project.threemf.designMap || {};
   openSlotPicker(c, map[d] ?? d, { title: t('Slot für Farbe {n} des Designers', { n: d + 1 }) }, v => { if (v != null) setDesignSlot(d, v); });
 });
-$('filDesignAuto').addEventListener('click', () => $('designAuto').click());
-$('filDesignReset').addEventListener('click', () => $('designReset').click());
+$('filDesignAuto').addEventListener('click', () => autoAssignDesignColours());
+$('filDesignReset').addEventListener('click', () => resetDesignColours());
 // Farben in der 3D-Ansicht: Slotfarben (so wird gedruckt) oder wie vom Designer angelegt
 const colourView = () => store.settings.colourView === 'designer' ? 'designer' : 'slot';
 function applyColourView() {

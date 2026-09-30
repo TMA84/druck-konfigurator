@@ -35,8 +35,8 @@ jobs:
         run: |
           set -u
           # nicht hier: ui-smoke.js (läuft in der Seite → Job browser), make-test-3mf.js (Hilfsskript für slice.py),
-          # verify-3mf.js / verify-orca-printers.js / export-project-arrange.js (brauchen OrcaSlicer → Job orca)
-          skip=" ui-smoke.js make-test-3mf.js verify-3mf.js verify-orca-printers.js export-project-arrange.js "
+          # verify-3mf.js / verify-orca-printers.js / export-project-arrange.js / designer-3mf.js (brauchen OrcaSlicer → Job orca)
+          skip=" ui-smoke.js make-test-3mf.js verify-3mf.js verify-orca-printers.js export-project-arrange.js designer-3mf.js "
           failed=""
           for f in tests/*.js; do
             n=$(basename "$f")
@@ -128,6 +128,10 @@ jobs:
 
       - name: verify-orca-printers.js
         run: node tests/verify-orca-printers.js
+
+      # Makerworld-Aufbau ohne echte Datei: Bemalung, Modifikator, Drehen/Größe, Text am Objekt, Objekt für Objekt
+      - name: designer-3mf.js
+        run: node tests/designer-3mf.js
 
       # braucht zwei echte Makerworld-3MF (PORTA3MF/ACE3MF, sonst ~/Downloads) – fehlen sie, meldet der Test
       # „Datei fehlt … Test übersprungen“ und endet erfolgreich

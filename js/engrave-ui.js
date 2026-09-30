@@ -11,7 +11,8 @@ const txState = { part: null, geom: null, anchor: null, picked: false, editing: 
 const topFaceCache = new WeakMap();   // geom → Oberseite (Anker mit Fläche)
 
 const txPart = () => project && project.parts[project.selected];
-const txUsable = p => !!p && (!project.threemf || !!p.extra);
+// seit 10.6.2 auch auf Objekten des Designers (js/export3mf.js designerTexts: weiteres Bauteil im Objekt)
+const txUsable = p => !!p;
 function txTop(geom) {
   if (!topFaceCache.has(geom)) topFaceCache.set(geom, topFace(geom));
   return topFaceCache.get(geom);

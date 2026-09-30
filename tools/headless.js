@@ -55,15 +55,18 @@ async function open() {
     if (r.exceptionDetails) throw Error((r.exceptionDetails.exception && r.exceptionDetails.exception.description) || r.exceptionDetails.text);
     return r.result.value;
   };
-  // erst warten, bis die neue Seite da ist (sonst läuft JS noch in der alten), dann bis sie fertig geladen hat
+  /* erst warten, bis die neue Seite da ist (sonst läuft JS noch in der alten), dann bis sie fertig geladen hat – beim
+     Konfigurator bis sein letztes Skript gelaufen ist (restoreProject, js/project-store.js). Nur „complete“ reichte nicht:
+     gelegentlich lief das Skript des Tests dann in einer halb aufgebauten Seite (z. B. „store is not defined“). */
+  const READY = "document.readyState === 'complete' && (!document.querySelector('script[src$=\"project-store.js\"]') || typeof restoreProject === 'function')";
   const go = async url => {
     const before = await evaluate('performance.timeOrigin');
     await send('Page.navigate', { url });
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 200; i++) {
       await sleep(100);
-      try { if (await evaluate('performance.timeOrigin') !== before && await evaluate('document.readyState') === 'complete') break; } catch (e) { /* lädt */ }
+      try { if (await evaluate('performance.timeOrigin') !== before && await evaluate(READY) === true) break; } catch (e) { /* lädt */ }
     }
-    await sleep(800);
+    await sleep(500);
   };
   const close = () => { try { ws.close(); } catch (e) { /* zu */ } proc.kill(); setTimeout(() => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { /* Chrome schreibt noch – Temp-Ordner bleibt */ } }, 500); };
   return { send, evaluate, go, close, events };
