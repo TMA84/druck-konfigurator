@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.8.0] – 2026-09-30
 
 ### Neu
 - **Objekte überspringen** während des Drucks (Tab ④ → Druckauftrag → Objekte): ein Teil, das sich gelöst hat, lässt sich weglassen, der Rest druckt weiter. Befehl der Werksfirmware (skip im Kanal „web“, Protokoll-Fakt aus anycubic-orca-plugin); Objekte aus dem G-Code, Umrisse im 3D-Fortschritt. Nur für Drucke aus dem Tool.
