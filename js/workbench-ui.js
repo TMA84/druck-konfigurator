@@ -210,7 +210,8 @@ $('wbDry').addEventListener('click', e => {
 });
 $('wbRaw').addEventListener('click', () => { $('wbRawOut').classList.toggle('hidden'); if (wb.st) $('wbRawOut').textContent = JSON.stringify(wb.st.raw, null, 1); });
 
-/* ---------- Kamera: HTTP-FLV vom Drucker, über den Server (flv.js spielt es im Browser ab) ----------
+/* ---------- Kamera: HTTP-FLV vom Drucker, über den Server (mpegts.js spielt es im Browser ab – Nachfolger von flv.js,
+   läuft auch auf dem iPhone ab iOS 17.1 über Apples ManagedMediaSource; flv.js ging dort gar nicht) ----------
    Gegen ein „altes Bild“: Bleibt der Strom stehen (keine neuen Bilder, aber auch kein Fehler – das letzte Bild bliebe
    stehen), verbindet ein Wächter nach CAM_STALL_MS neu; wächst der Rückstand im Puffer (z. B. nach einem Tab im
    Hintergrund), springt die Wiedergabe ans Ende; kommt das Fenster wieder nach vorn, startet der Strom frisch. */
@@ -230,16 +231,19 @@ function wbCamOff() {
   $('wbCamBtn').textContent = t('Kamera starten'); $('wbCamNote').textContent = t('Kamera aus'); $('wbCamNote').classList.remove('hidden');
 }
 function wbCamStart(reconnect) {
-  if (typeof flvjs === 'undefined' || !flvjs.isSupported()) { $('wbCamNote').textContent = t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); return; }
+  if (typeof mpegts === 'undefined' || !mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
+    $('wbCamNote').textContent = /iPhone|iPod/.test(navigator.userAgent) ? t('Das Kamerabild braucht auf dem iPhone iOS 17.1 oder neuer.') : t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); $('wbCamNote').classList.remove('hidden'); return;
+  }
   wbCamStop(true);
   wb.camOn = true;
   $('wbCamNote').textContent = reconnect ? t('Kamerabild hing – verbinde neu …') : t('Starte Kamera …'); $('wbCamNote').classList.remove('hidden');
   // „&t=“ gegen zwischengespeicherte Antworten; der Server startet die Übertragung am Drucker jedes Mal neu
-  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: new URL('api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&t=' + Date.now(), location.href).href },
-    { enableStashBuffer: false, lazyLoad: false, autoCleanupSourceBuffer: true, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: CAM_MAX_LAG_S, liveBufferLatencyMinRemain: 0.3 });
+  const player = mpegts.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: new URL('api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&t=' + Date.now(), location.href).href },
+    { enableStashBuffer: false, lazyLoad: false, autoCleanupSourceBuffer: true, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: CAM_MAX_LAG_S, liveBufferLatencyMinRemain: 0.3,
+      enableWorker: false });
   player.attachMediaElement($('wbVideo'));
-  // Fehlerart, Detail und Meldung von flv.js (z. B. NetworkError · HttpStatusCodeInvalid · 502) – danach neu versuchen
-  player.on(flvjs.Events.ERROR, (type, detail, info) => {
+  // Fehlerart, Detail und Meldung von mpegts.js (z. B. NetworkError · HttpStatusCodeInvalid · 502) – danach neu versuchen
+  player.on(mpegts.Events.ERROR, (type, detail, info) => {
     $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail: [detail, info && (info.msg || info.code)].filter(Boolean).join(' · ') }); $('wbCamNote').classList.remove('hidden');
     wb.camLast = 0;
   });

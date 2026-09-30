@@ -7,7 +7,7 @@ Die Dateien in `vendor/` stammen von Dritten und stehen unter deren Lizenz, nich
 | `vendor/three.min.js` | [three.js](https://github.com/mrdoob/three.js) r128 | MIT, Copyright © 2010–2021 three.js authors |
 | `vendor/OrbitControls.js` | three.js (examples/js) r128 | MIT, Copyright © 2010–2021 three.js authors |
 | `vendor/fflate.min.js` | [fflate](https://github.com/101arrowz/fflate) 0.8.2 | MIT, Copyright © Arjun Barrett |
-| `vendor/flv.min.js` | [flv.js](https://github.com/bilibili/flv.js) 1.6.2 | Apache-2.0, Copyright © Bilibili; Lizenztext in `vendor/flv.js-LICENSE.txt` |
+| `vendor/mpegts.min.js` | [mpegts.js](https://github.com/xqq/mpegts.js) 1.8.2 (Nachfolger von flv.js) | Apache-2.0, Copyright © Bilibili, xqq; Lizenztext in `vendor/mpegts.js-LICENSE.txt` |
 
 Vom Server genutzte Python-Pakete (`requirements.txt`, im Container installiert, nicht mitgeliefert):
 

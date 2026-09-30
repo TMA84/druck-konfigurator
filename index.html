@@ -256,7 +256,7 @@
       <h3 id="wbCamT" class="visually-hidden">Kamera</h3>
       <span class="seg wb-view" role="group" aria-label="Ansicht"><button type="button" data-wb-view="live" aria-pressed="false">3D-Fortschritt</button><button type="button" data-wb-view="cam" aria-pressed="false">Kamera</button></span>
       <div id="wbLiveStage" class="wb-live hidden"><p id="wbLiveNote" class="wb-video-note">Kein Druck aktiv.</p><span id="wbLiveInfo" class="wb-live-info"></span><label class="wb-live-ghost">Kommende Schichten <select id="wbLiveGhost"><option value="ghost">durchsichtig</option><option value="off">ausblenden</option><option value="full">voll</option></select></label><label class="wb-live-pos" title="Fragt die Kopfposition auch während des Drucks ab (alle 5 s)"><input type="checkbox" id="wbLivePos"> Echte Kopfposition</label></div>
-      <div class="wb-video"><video id="wbVideo" muted playsinline></video>
+      <div class="wb-video"><video id="wbVideo" muted playsinline autoplay disableremoteplayback x-webkit-airplay="deny"></video>
         <p id="wbCamNote" class="wb-video-note">Kamera aus</p>
         <button class="btn wb-cam-btn" type="button" id="wbCamBtn">Kamera starten</button></div>
     </section>
@@ -668,7 +668,7 @@
 <script src="js/paint-ui.js"></script>
 <script src="js/undo.js"></script>
 <script src="js/preview-ui.js"></script>
-<script src="vendor/flv.min.js"></script>
+<script src="vendor/mpegts.min.js"></script>
 <script src="js/workbench-ui.js"></script>
 <script src="js/live-ui.js"></script>
 <script src="js/skip-ui.js"></script>
