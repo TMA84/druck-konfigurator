@@ -402,6 +402,7 @@ async function lvLoad(name) {
     lv.data = parsePreview(await r.arrayBuffer());
     if (!lvInit()) { lv.missing = true; return; }
     lvResize(); lvBuild();
+    if (typeof skDrawLines === 'function' && wb.st && wb.st.job) skDrawLines(new Set(wb.st.job.skipped || []));
   } catch (e) { lv.missing = true; }
   finally { lv.loading = false; if (wb.st) liveUpdate(wb.st); }
 }

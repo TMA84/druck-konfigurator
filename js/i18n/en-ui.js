@@ -403,5 +403,18 @@ I18N.add({
  "Lücken füllen": "Fill gaps",
  "Lücken bis zu dieser Fläche füllen": "Fill gaps up to this area",
  "Was wird gemalt": "What to paint",
- "{file}: in Meter gespeichert ({size} mm groß) – auf Millimeter umgerechnet ({mm} mm).": "{file}: saved in metres ({size} mm in size) – converted to millimetres ({mm} mm)."
+ "{file}: in Meter gespeichert ({size} mm groß) – auf Millimeter umgerechnet ({mm} mm).": "{file}: saved in metres ({size} mm in size) – converted to millimetres ({mm} mm).",
+ "{name} (Kopie {n})": "{name} (copy {n})",
+ "Objekte": "Objects",
+ "{n} von {m} werden gedruckt": "{n} of {m} being printed",
+ "übersprungen": "skipped",
+ "übersprungen (gesendet)": "skipped (sent)",
+ "Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen": "The last object cannot be skipped – cancel the print instead",
+ "Überspringen": "Skip",
+ "Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.": "The printer stops printing skipped objects right away – this cannot be undone.",
+ "„{name}“ ab jetzt nicht mehr drucken? Das lässt sich nicht zurücknehmen.": "Stop printing “{name}” from now on? This cannot be undone.",
+ "„{name}“ wird übersprungen": "Skipping “{name}”",
+ "Kamerabild hing – verbinde neu …": "Camera image stalled – reconnecting …",
+ "Kamerabild von vor {s} s – warte auf neue Bilder …": "Camera image is {s} s old – waiting for new frames …",
+ "Kamera liefert keine Bilder – später erneut starten": "Camera delivers no images – try again later"
 });

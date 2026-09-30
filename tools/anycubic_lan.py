@@ -195,6 +195,7 @@ class PrinterLink:
         self.recent = collections.deque(maxlen=40)   # (Zeit, Art, Aktion, msgid?, state, code) – zur Fehlersuche
         self.seen = {}             # Art → Zeitpunkt des letzten Berichts
         self.pos_until = 0         # bis dahin Kopfposition auch während des Drucks abfragen (status(…, pos=True))
+        self.skipped = {}          # Auftrag (task_id) → übersprungene Objekte, die das Tool gesendet hat (skip/start)
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -460,6 +461,15 @@ def loaded_slot(boxes):
 PRINT_STATUS = {1: "druckt", 2: "fertig", 3: "abgebrochen", 4: "lädt herunter", 5: "prüft", 6: "heizt vor", 7: "slict", 9: "nivelliert"}
 
 
+def _reported_skips(project):
+    """Übersprungene Objekte, falls die Firmware sie im Auftrag meldet (Feldname je nach Version) – sonst []."""
+    for k in ("objects_skip_parts", "model_objects_skip_parts", "skip_parts"):
+        v = (project or {}).get(k)
+        if isinstance(v, list):
+            return sorted({int(x) for x in v if str(x).strip().isdigit()})
+    return []
+
+
 def _job(project):
     if not project:
         return None
@@ -469,7 +479,17 @@ def _job(project):
             "layer": project.get("curr_layer"), "layers": project.get("total_layers"),
             "elapsed_min": project.get("print_time"), "remaining_min": project.get("remain_time"),
             "state": project.get("state"), "status": PRINT_STATUS.get(project.get("print_status"), project.get("print_status")),
-            "paused": bool(project.get("pause")), "filament_mm": project.get("supplies_usage")}
+            "paused": bool(project.get("pause")), "filament_mm": project.get("supplies_usage"),
+            "skipped_reported": _reported_skips(project)}
+
+
+def _job_with_skips(link, project):
+    job = _job(project)
+    if job:
+        sent = sorted(link.skipped.get(str(job.get("task_id")), set()))
+        job["skipped"] = sorted(set(sent) | set(job["skipped_reported"]))
+        job["skipped_confirmed"] = bool(job["skipped_reported"])
+    return job
 
 
 POS_WHILE_PRINTING_S = 20   # so lange nach der letzten Anfrage mit pos=True weiter abfragen
@@ -491,7 +511,7 @@ def status(host, pos=False):
     lights = light.get("lights") if isinstance(light.get("lights"), list) else ([light] if light.get("type") is not None else [])
     return {"model": info.get("model") or link.discovery.get("modelName"), "model_id": link.model_id,
             "name": info.get("printerName"), "firmware": info.get("version"), "ip": info.get("ip"),
-            "state": info.get("state"), "printing": bool(info.get("project")), "job": _job(info.get("project")),
+            "state": info.get("state"), "printing": bool(info.get("project")), "job": _job_with_skips(link, info.get("project")),
             "temps": temps, "fans": {k: fan.get(k, info.get(k)) for k in ("fan_speed_pct", "aux_fan_speed_pct", "box_fan_level")},
             "speed_mode": info.get("print_speed_mode"), "lights": lights,
             "position": (axis.get("coordinates") if isinstance(axis, dict) else None),
@@ -508,11 +528,15 @@ def status(host, pos=False):
 MAX_NOZZLE_C, MAX_BED_C, MAX_JOG_MM, MAX_DRY_C, MAX_DRY_MIN = 300, 110, 50, 70, 24 * 60
 WRITABLE = {("multiColorBox", "setInfo"), ("multiColorBox", "setAutoFeed"), ("multiColorBox", "setDry"), ("multiColorBox", "feedFilament"),
             ("print", "pause"), ("print", "resume"), ("print", "stop"), ("light", "control"), ("tempature", "set"),
-            ("fan", "setSpeed"), ("axis", "move"), ("axis", "turnOff"), ("video", "startCapture")}
-VERIFIABLE = {("light", "control"), ("multiColorBox", "setDry"), ("multiColorBox", "setAutoFeed"), ("fan", "setSpeed")}
+            ("fan", "setSpeed"), ("axis", "move"), ("axis", "turnOff"), ("video", "startCapture"), ("skip", "start")}
+VERIFIABLE = {("skip", "start"), ("light", "control"), ("multiColorBox", "setDry"), ("multiColorBox", "setAutoFeed"), ("fan", "setSpeed")}
 NOT_WHILE_PRINTING = {("axis", "move"), ("axis", "turnOff"), ("multiColorBox", "feedFilament")}
 REFRESH_AFTER = {"multiColorBox": ("multiColorBox", "getInfo"), "light": ("light", "query"), "fan": ("fan", "query"),
-                 "tempature": ("tempature", "query"), "axis": ("axis", "query"), "print": ("info", "query")}
+                 "tempature": ("tempature", "query"), "axis": ("axis", "query"), "print": ("info", "query"), "skip": ("info", "query")}
+# Objekt überspringen (skip/start im Kanal „web“, data {"objects_skip_parts": ["0", "2", …]}): Nummer = Reihenfolge der
+# Objekte im G-Code (EXCLUDE_OBJECT_DEFINE, ab 0). Protokoll-Fakt aus anycubic-orca-plugin (dort am echten Drucker
+# geprüft; KX-Bridge); gesendet wird wie bei Orca/Bambu die ganze Liste, also auch schon übersprungene Objekte.
+MAX_SKIP_PARTS = 64
 
 
 def _int(v, lo, hi, name):
@@ -535,6 +559,16 @@ def _payload(kind, action, data, link):
     d = data or {}
     if (kind, action) in NOT_WHILE_PRINTING and link and link._printing():
         raise LanError("Während eines Drucks gesperrt", "forbidden")
+    if kind == "skip":
+        job = link and link.project()
+        if not job or not job.get("task_id"):
+            raise LanError("Es läuft kein Druckauftrag", "forbidden")
+        parts = d.get("parts")
+        if not isinstance(parts, list) or not parts or len(parts) > MAX_SKIP_PARTS:
+            raise LanError("Objekt-Nummern fehlen", "forbidden")
+        new = {_int(p, 0, MAX_SKIP_PARTS - 1, "Objekt") for p in parts}
+        done = set(link.skipped.get(str(job["task_id"]), set())) | set(_reported_skips(job))
+        return {"objects_skip_parts": [str(p) for p in sorted(done | new)]}
     if kind == "print":
         job = link and link.project()
         if not job or not job.get("task_id"):
@@ -604,6 +638,16 @@ def command(host, kind, action, data):
             link.request(kind_q, action_q, None, timeout=4)
         except LanError:
             pass
+    if kind == "skip":
+        # Merken, was gesendet wurde – die Firmware quittiert je nach Version nicht; die Anzeige zeigt es als „gesendet“
+        job = link.project() or {}
+        parts = {int(x) for x in (payload or {}).get("objects_skip_parts", [])}
+        with link.lock:
+            link.skipped[str(job.get("task_id"))] = parts
+        if rep is None or ok:
+            reported = set(_reported_skips(link.project()))
+            return {"ok": True, "state": "verified" if parts <= reported else "sent", "code": rep and rep.get("code"), "msg": rep and rep.get("msg"),
+                    "reply": rep and rep.get("data"), "skipped": sorted(parts)}
     if rep is None:
         # Keine erkennbare Quittung: Die Werksfirmware führt Licht/Trocknen aus, antwortet aber je nach Version
         # anders (ohne msgid, andere Aktion …). Dann zählt, ob der Drucker den neuen Zustand meldet.

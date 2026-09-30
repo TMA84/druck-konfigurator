@@ -136,3 +136,30 @@ def build_preview(path):
                        "tools": sorted(tools), "speed_unit": SPEED_UNIT, "travel": round(travel, 1)}).encode()
     pad = (-(5 + 4 + len(head))) % 4
     return b"GCPV3" + struct.pack("<I", len(head)) + head + b" " * pad + q.tobytes() + attrs.tobytes() + speeds.tobytes()
+
+
+# Objekte im G-Code (Orca „Objekte beschriften“/„Objekte ausschließen“, Klipper): EXCLUDE_OBJECT_DEFINE NAME=… CENTER=x,y
+# POLYGON=[[x,y],…] – in dieser Reihenfolge nummeriert der Drucker sie (0, 1, …) zum Überspringen (tools/anycubic_lan.py).
+_OBJ_RE = re.compile(r"^EXCLUDE_OBJECT_DEFINE\s+NAME=(\S+)(?:\s+CENTER=([-\d.]+),([-\d.]+))?(?:\s+POLYGON=(\[.*\]))?")
+
+
+def read_objects(path, max_lines=20000):
+    """[{id, name, center:[x,y], polygon:[[x,y],…]}] aus dem Kopf des G-Codes (die Definitionen stehen vor dem Druck)."""
+    out = []
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for n, line in enumerate(f):
+            if n > max_lines and out:
+                break
+            if n > 200000:
+                break
+            m = _OBJ_RE.match(line)
+            if not m:
+                continue
+            try:
+                poly = json.loads(m.group(4)) if m.group(4) else []
+            except ValueError:
+                poly = []
+            out.append({"id": len(out), "name": m.group(1),
+                        "center": [float(m.group(2)), float(m.group(3))] if m.group(2) else None,
+                        "polygon": [[float(a), float(b)] for a, b in poly if isinstance(a, (int, float))] if isinstance(poly, list) else []})
+    return out

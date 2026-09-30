@@ -1043,3 +1043,13 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .mat-colours .mc-swatch:hover { transform: scale(1.15); }
 .mat-colours .mc-foot { font-size: 11.5px; }
 @media (max-width: 640px) { .mat-colours .mc-swatch { width: 28px; height: 28px; } }
+/* Objekte überspringen (Tab ④, js/skip-ui.js) */
+.wb-objects { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); display: grid; gap: 6px; font-size: 13px; }
+.wb-objects.hidden { display: none; }
+.wb-obj-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow: auto; }
+.wb-obj-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+.wb-obj-list li:hover { background: var(--paper, rgba(0,0,0,.04)); }
+.wb-obj-list li.off .wb-obj-name { text-decoration: line-through; color: var(--ink-3); }
+.wb-obj-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.wb-obj-state { color: var(--bad, #c0392b); font-size: 12px; white-space: nowrap; }
+.wb-obj-note { margin: 0; font-size: 11.5px; }

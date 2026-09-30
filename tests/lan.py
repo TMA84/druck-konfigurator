@@ -376,7 +376,26 @@ except lan.LanError as e:
     check("Achsen während des Drucks gesperrt", e.kind == "forbidden" and "Druck" in str(e), e)
 lan.command("127.0.0.1", "print", "pause", {"taskid": "irgendwas"})
 check("Pause mit task_id des laufenden Auftrags", any(m["type"] == "print" and m["action"] == "pause" and m["data"] == {"taskid": "614707220"} for _, m in broker.commands))
+# Objekt überspringen: skip/start im Kanal „web“, ganze Liste als Texte; zweites Objekt dazu → beide; ohne Quittung „gesendet“
+r = lan.command("127.0.0.1", "skip", "start", {"parts": [2]})
+sk = [(tp, m) for tp, m in broker.commands if m["type"] == "skip"]
+check("Überspringen: skip/start im Kanal web mit objects_skip_parts", sk and "/web/" in sk[-1][0] and sk[-1][1]["action"] == "start" and sk[-1][1]["data"] == {"objects_skip_parts": ["2"]}, sk[-1:] )
+check("Überspringen ohne Quittung: als gesendet gemerkt", r["ok"] and r["state"] == "sent" and r["skipped"] == [2], r)
+lan.command("127.0.0.1", "skip", "start", {"parts": [0]})
+check("zweites Objekt: ganze Liste gesendet (0 und 2)", [m for _, m in broker.commands if m["type"] == "skip"][-1]["data"] == {"objects_skip_parts": ["0", "2"]})
+st = lan.status("127.0.0.1")
+check("Stand: übersprungene Objekte am Auftrag", st["job"]["skipped"] == [0, 2] and st["job"]["skipped_confirmed"] is False, st["job"])
+for bad in ({"parts": []}, {"parts": [-1]}, {"parts": [64]}, {"parts": ["x"]}, {}):
+    try:
+        lan.command("127.0.0.1", "skip", "start", bad); check("Überspringen abgelehnt " + str(bad), False)
+    except lan.LanError as e:
+        check("Überspringen abgelehnt " + str(bad), e.kind == "forbidden", e)
 INFO["project"] = None
+lan.close_all()
+try:
+    lan.command("127.0.0.1", "skip", "start", {"parts": [1]}); check("Überspringen ohne Druck abgelehnt", False)
+except lan.LanError as e:
+    check("Überspringen ohne Druck abgelehnt", e.kind == "forbidden" and "Druck" in str(e), e)
 lan.close_all()
 
 # 3c) Druck senden: G-Code hochladen (multipart, signierte Adresse) und print/start im Kanal „slicer“

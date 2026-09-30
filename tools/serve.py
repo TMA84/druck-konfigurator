@@ -17,6 +17,7 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/spools                                     → Filamentverwaltung: Spulen mit Restmenge (tools/spools.py)
   POST /api/spools  {action: update|add|delete|config, …} → Spule ändern, Drucker für die Verbrauchszählung festlegen
   GET  /api/printing/preview?name=<Auftrag>          → Schichtvorschau eines aus dem Tool gestarteten Drucks (Live-Ansicht)
+  GET  /api/printing/objects?name=<Auftrag>          → Objekte dieses Drucks (Name, Mitte, Umriss) zum Überspringen
   GET  /api/queue                                      → Druckwarteschlange des Servers (tools/printqueue.py) mit Restzeit
   POST /api/queue  {action: create|started|skip|again|end, …} → Warteschlange anlegen/ändern (Druckstart bleibt ein Klick)
 
@@ -45,6 +46,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anycubic_lan  # noqa: E402
+import gcode_preview  # noqa: E402
 import ha_mqtt  # noqa: E402
 import printqueue  # noqa: E402
 import slicer  # noqa: E402
@@ -190,6 +192,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not path:
                 return self._json(404, {"error": "Keine Vorschau für diesen Druck (nur für Drucke aus dem Tool)", "kind": "not_found"})
             return self._file(path, "application/octet-stream")
+        if url.path == "/api/printing/objects":
+            # Objekte des laufenden Drucks (Name, Mitte, Umriss) – zum Überspringen; nur für Drucke aus dem Tool
+            path = printed_preview(urllib.parse.parse_qs(url.query).get("name", [""])[0])
+            objs = path and path[:-len(".preview")] + ".objects.json"
+            if not objs or not os.path.exists(objs):
+                return self._json(404, {"error": "Keine Objektliste für diesen Druck (nur für Drucke aus dem Tool)", "kind": "not_found"})
+            return self._file(objs, "application/json")
         if url.path == "/api/spools":
             return self._api(spools.api_get)
         if url.path == "/api/queue":
@@ -228,11 +237,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Type", upstream.headers.get("Content-Type") or "video/x-flv")
         self.end_headers()
         try:
+            # read1: sofort weiterreichen, was angekommen ist – read(64 KB) wartete, bis ein ganzer Block voll war; bei der
+            # geringen Datenrate der Kamera kam das Bild dann Sekunden zu spät („altes Bild“)
+            read = getattr(upstream, "read1", upstream.read)
             while True:
-                chunk = upstream.read(64 * 1024)
+                chunk = read(64 * 1024)
                 if not chunk:
                     break
                 self.wfile.write(chunk)
+                self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass   # Browser hat die Ansicht geschlossen
         finally:
@@ -414,9 +427,16 @@ def remember_print(filename, job, plate):
         os.makedirs(d, exist_ok=True)
         key = re.sub(r"[^\w.\-]+", "_", _stem(filename))[:120] or "druck"
         shutil.copyfile(prev, os.path.join(d, key + ".preview"))
+        # Objekte des G-Codes (zum Überspringen im Tab ④)
+        gcode = slicer.job_file(job, plate, "gcode")
+        if gcode:
+            with open(os.path.join(d, key + ".objects.json"), "w", encoding="utf-8") as f:
+                json.dump(gcode_preview.read_objects(gcode), f)
         old = sorted((os.path.join(d, f) for f in os.listdir(d) if f.endswith(".preview")), key=os.path.getmtime)
         for f in old[:max(0, len(old) - PRINTED_KEEP)]:
             os.remove(f)
+            if os.path.exists(f[:-len(".preview")] + ".objects.json"):
+                os.remove(f[:-len(".preview")] + ".objects.json")
     except OSError as e:
         print("Vorschau für die Live-Ansicht nicht gespeichert: " + str(e), flush=True)
 

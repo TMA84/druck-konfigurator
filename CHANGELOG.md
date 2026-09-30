@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Objekte überspringen** während des Drucks (Tab ④ → Druckauftrag → Objekte): ein Teil, das sich gelöst hat, lässt sich weglassen, der Rest druckt weiter. Befehl der Werksfirmware (skip im Kanal „web“, Protokoll-Fakt aus anycubic-orca-plugin); Objekte aus dem G-Code, Umrisse im 3D-Fortschritt. Nur für Drucke aus dem Tool.
+
+### Behoben
+- **Kamera zeigte oft ein altes Bild:** Der Server reichte den Strom erst in vollen 64-KB-Blöcken weiter – bei der geringen Datenrate der Kamera Sekunden zu spät. Jetzt sofort; dazu verbindet sich die Kamera neu, wenn keine Bilder mehr kommen, holt Rückstand auf und startet frisch, wenn das Fenster wieder nach vorn kommt.
+
 ## [10.7.1] – 2026-09-30
 
 ### Behoben

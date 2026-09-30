@@ -425,6 +425,20 @@ async function runSmoke(opts={}){
       ok(sl&&sl.colour==='#002FA7'&&sl.type==='PLA','Farbe angeklickt: Slot bekommt PLA Klein Blue');
       store.settings.manualSlots=JSON.parse(saved)||undefined;if(!store.settings.manualSlots)delete store.settings.manualSlots;persist();
       $('material').value=before;$('material').dispatchEvent(new Event('change',{bubbles:true}));await wait(150); }
+    // Objekte überspringen (Tab ④): Liste aus dem G-Code, Befehl skip/start mit der Nummer (Drucker nachgestellt)
+    { const objs=[{id:0,name:'a.stl_id_0_copy_0',polygon:[[0,0],[10,0],[10,10]]},{id:1,name:'a.stl_id_0_copy_1',polygon:[[20,0],[30,0],[30,10]]},{id:2,name:'b.stl_id_1_copy_0',polygon:[[40,0],[50,0],[50,10]]}];
+      const of=window.fetch,sent=[],oc=window.confirm,hosts=store.settings.printerHosts;
+      window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/printing/objects'))return Promise.resolve(new Response(JSON.stringify(objs),{status:200}));
+        if(u.startsWith('api/anycubic/command')){sent.push(JSON.parse(o.body));return Promise.resolve(new Response('{"ok":true,"state":"sent"}',{status:200,headers:{'Content-Type':'application/json'}}))}
+        if(u.startsWith('api/anycubic/status'))return new Promise(()=>{});return of(u,o)};
+      window.confirm=()=>true;store.settings.printerHosts={...(hosts||{}),[WB_PRINTER]:'10.0.0.9'};
+      const st={connected:true,printing:true,job:{name:'Smoke_Platte1',progress:10,skipped:[2],skipped_confirmed:false},temps:{},fans:{},lights:[],ace:[]};
+      skRender(st);await wait(300);
+      const rows=[...$('wbObjects').querySelectorAll('[data-sk-row]')];
+      ok(rows.length===3&&/Kopie 2/.test(rows[1].textContent)&&/übersprungen/.test(rows[2].textContent),'Objekte: Liste mit Kopien, übersprungenes markiert');
+      $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(400);
+      ok(sent.length===1&&sent[0].type==='skip'&&sent[0].action==='start'&&JSON.stringify(sent[0].data)==='{"parts":[1]}','Überspringen: skip/start mit Objekt 1');
+      window.fetch=of;window.confirm=oc;store.settings.printerHosts=hosts;skRender(null); }
     // Bemalen (Werkzeugleiste): Strich mit der Maus auf dem Teil, Umschalt radiert, Rückgängig, Export mit paint_color, übersteht Neuladen
     { selectPart(0);setTab('3d');await wait(300);const p=project.parts[0];p.paintUser=null;
       ok(!$('tbPaint').disabled,'Werkzeugleiste: Bemalen verfügbar');

@@ -104,6 +104,7 @@ function wbRender() {
   } else $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + t('Kein Druck aktiv. Drucken lässt sich aus dem Schritt <b>③ Slicen &amp; Kosten</b>.') + '</p>';
   $('wbPause').disabled = !job || job.paused; $('wbResume').disabled = !job || !job.paused; $('wbStop').disabled = !job;
   $('wbPause').classList.toggle('hidden', !job || job.paused); $('wbResume').classList.toggle('hidden', !(job && job.paused)); $('wbStop').classList.toggle('hidden', !job);
+  if (typeof skRender === 'function') skRender(st);   // Objekte überspringen (js/skip-ui.js)
   const badge = $('printerBadge');
   badge.textContent = job ? (job.progress ?? 0) + ' %' : ''; badge.classList.toggle('hidden', !job);
 
@@ -209,24 +210,59 @@ $('wbDry').addEventListener('click', e => {
 });
 $('wbRaw').addEventListener('click', () => { $('wbRawOut').classList.toggle('hidden'); if (wb.st) $('wbRawOut').textContent = JSON.stringify(wb.st.raw, null, 1); });
 
-/* ---------- Kamera: HTTP-FLV vom Drucker, über den Server (flv.js spielt es im Browser ab) ---------- */
-function wbCamOff() {
-  if (wb.player) { try { wb.player.destroy(); } catch (e) { /* schon zu */ } wb.player = null; }
-  $('wbCamBtn').textContent = t('Kamera starten'); $('wbCamNote').textContent = t('Kamera aus'); $('wbCamNote').classList.remove('hidden');
-  $('wbVideo').removeAttribute('src'); $('wbVideo').load();
+/* ---------- Kamera: HTTP-FLV vom Drucker, über den Server (flv.js spielt es im Browser ab) ----------
+   Gegen ein „altes Bild“: Bleibt der Strom stehen (keine neuen Bilder, aber auch kein Fehler – das letzte Bild bliebe
+   stehen), verbindet ein Wächter nach CAM_STALL_MS neu; wächst der Rückstand im Puffer (z. B. nach einem Tab im
+   Hintergrund), springt die Wiedergabe ans Ende; kommt das Fenster wieder nach vorn, startet der Strom frisch. */
+const CAM_STALL_MS = 6000, CAM_MAX_LAG_S = 1.5, CAM_RETRY_MAX = 5;
+function wbCamFrames() {
+  const v = $('wbVideo'), q = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : null;
+  return q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || Math.round(v.currentTime * 30));
 }
-$('wbCamBtn').addEventListener('click', () => {
-  if (wb.player) { wbCamOff(); return; }
+function wbCamStop(keepButton) {
+  clearInterval(wb.camWatch); wb.camWatch = 0;
+  if (wb.player) { try { wb.player.destroy(); } catch (e) { /* schon zu */ } wb.player = null; }
+  $('wbVideo').removeAttribute('src'); $('wbVideo').load();
+  if (!keepButton) wb.camOn = false;
+}
+function wbCamOff() {
+  wbCamStop();
+  $('wbCamBtn').textContent = t('Kamera starten'); $('wbCamNote').textContent = t('Kamera aus'); $('wbCamNote').classList.remove('hidden');
+}
+function wbCamStart(reconnect) {
   if (typeof flvjs === 'undefined' || !flvjs.isSupported()) { $('wbCamNote').textContent = t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); return; }
-  $('wbCamNote').textContent = t('Starte Kamera …');
-  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: new URL('api/anycubic/camera?host=' + encodeURIComponent(wbHost()), location.href).href },
-    { enableStashBuffer: false, lazyLoad: false, liveBufferLatencyChasing: true });
+  wbCamStop(true);
+  wb.camOn = true;
+  $('wbCamNote').textContent = reconnect ? t('Kamerabild hing – verbinde neu …') : t('Starte Kamera …'); $('wbCamNote').classList.remove('hidden');
+  // „&t=“ gegen zwischengespeicherte Antworten; der Server startet die Übertragung am Drucker jedes Mal neu
+  const player = flvjs.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: new URL('api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&t=' + Date.now(), location.href).href },
+    { enableStashBuffer: false, lazyLoad: false, autoCleanupSourceBuffer: true, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: CAM_MAX_LAG_S, liveBufferLatencyMinRemain: 0.3 });
   player.attachMediaElement($('wbVideo'));
-  // Fehlerart, Detail und Meldung von flv.js (z. B. NetworkError · HttpStatusCodeInvalid · 502)
-  player.on(flvjs.Events.ERROR, (type, detail, info) => { $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail: [detail, info && (info.msg || info.code)].filter(Boolean).join(' · ') }); $('wbCamNote').classList.remove('hidden'); });
-  $('wbVideo').onplaying = () => $('wbCamNote').classList.add('hidden');
+  // Fehlerart, Detail und Meldung von flv.js (z. B. NetworkError · HttpStatusCodeInvalid · 502) – danach neu versuchen
+  player.on(flvjs.Events.ERROR, (type, detail, info) => {
+    $('wbCamNote').textContent = t('Kamera nicht verfügbar ({detail})', { detail: [detail, info && (info.msg || info.code)].filter(Boolean).join(' · ') }); $('wbCamNote').classList.remove('hidden');
+    wb.camLast = 0;
+  });
+  $('wbVideo').onplaying = () => { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; };
   player.load(); player.play().catch(() => { /* Autoplay: startet nach Klick */ });
   wb.player = player; $('wbCamBtn').textContent = t('Kamera stoppen');
-});
+  wb.camFrames = -1; wb.camLast = Date.now();
+  wb.camWatch = setInterval(() => {
+    const v = $('wbVideo'), f = wbCamFrames(), now = Date.now();
+    if (f !== wb.camFrames) { wb.camFrames = f; wb.camLast = now; }
+    // Rückstand aufholen: ans Ende des Puffers springen
+    if (v.buffered.length) { const end = v.buffered.end(v.buffered.length - 1); if (end - v.currentTime > CAM_MAX_LAG_S) v.currentTime = Math.max(0, end - 0.3); }
+    const idle = now - wb.camLast;
+    if (idle > 2500 && idle < CAM_STALL_MS) { $('wbCamNote').textContent = t('Kamerabild von vor {s} s – warte auf neue Bilder …', { s: Math.round(idle / 1000) }); $('wbCamNote').classList.remove('hidden'); }
+    if (idle >= CAM_STALL_MS && !document.hidden) {
+      wb.camRetries = (wb.camRetries || 0) + 1;
+      if (wb.camRetries > CAM_RETRY_MAX) { wbCamStop(); $('wbCamBtn').textContent = t('Kamera starten'); $('wbCamNote').textContent = t('Kamera liefert keine Bilder – später erneut starten'); $('wbCamNote').classList.remove('hidden'); return; }
+      wbCamStart(true);
+    }
+  }, 1000);
+}
+$('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); return; } wb.camRetries = 0; wbCamStart(false); });
+// Fenster/Tab wieder vorn: frisch verbinden (im Hintergrund drosselt der Browser, danach käme ein altes Bild)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && wb.camOn && wb.player) { wb.camRetries = 0; wbCamStart(true); } });
 
 if (document.body.dataset.tab === 'printer') wbPoll();
