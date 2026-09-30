@@ -102,7 +102,7 @@ function renderExportDialog(){
     warn.innerHTML=t('<b>Hinweis:</b> In Slot {n} steckt {where} <b>{type}</b>, gewählt ist <b>{material}</b> ({kind}). Die Werte werden trotzdem für {kind} geschrieben.',{n:slot+1,where,type:esc(s.type),material:esc(r.m.name),kind});
     warn.classList.remove('hidden');
   }else warn.classList.add('hidden');
-  const objCount=plan.jobs.reduce((n,j)=>n+objectOverrides(settings,j.r).length,0)*(plan.jobs.length>1?1:0);
+  const objCount=plan.jobs.reduce((n,j)=>n+objectOverrides(settings,j.r,j.part).length,0)*(plan.jobs.length>1?1:0);
   $('changesTitle').textContent=objCount?t('Was geändert wird ({n} Werte + {m} je Teil)',{n:changes.length,m:objCount}):t('Was geändert wird ({n} Werte)',{n:changes.length});
   $('changesList').innerHTML='<table class="changes"><thead><tr><th>'+t('Einstellung')+'</th><th>'+t('Vorlage')+'</th><th>'+t('Neu')+'</th></tr></thead><tbody>'+
     changes.map(c=>'<tr><td>'+esc(c.label)+'<small>'+esc(c.key)+'</small></td><td>'+esc(c.before??'–')+'</td><td><b>'+esc(c.after)+'</b></td></tr>').join('')+'</tbody></table>';
@@ -122,7 +122,7 @@ function renderPartPlan(tpl,plan,partSlot,notes,settings){
     plan.jobs.map(j=>{
       const si=partSlot(j),s=slots[si],bad=s&&s.type&&!slotMatchesKind(s.type,j.r.m.kind);
       if(bad)mismatch++;
-      const own=objectOverrides(settings,j.r);
+      const own=objectOverrides(settings,j.r,j.part);
       return '<tr><td>'+esc(j.geom.name)+'</td><td>'+(si+1)+(j.slot===null?' <small>'+t('Standard')+'</small>':'')+(s&&s.type?'<small>'+esc(s.type)+'</small>':'')+'</td>'+
         '<td'+(bad?' class="bad"':'')+'>'+esc(j.r.m.name)+(bad?'<small>'+t('passt nicht zu {type}',{type:esc(s.type)})+'</small>':'')+'</td>'+
         '<td title="'+esc(own.map(c=>c.label+': '+c.value).join('\n'))+'">'+(own.length?t('{n} Werte',{n:own.length}):'–')+'</td></tr>'+
@@ -275,7 +275,7 @@ function save3mf(){
   const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   try{
     const {bytes,notes:towerNotes}=exportBytes(chosenSlot());
-    const slotsUsed=new Set(plan.jobs.flatMap(j=>[j.slot===null?slot:j.slot,...(j.bodies||[]).filter(b=>b.slot!=null).map(b=>b.slot),...(typeof textSlots==='function'?textSlots(j.part):[])]));
+    const slotsUsed=new Set(plan.jobs.flatMap(j=>[j.slot===null?slot:j.slot,...(j.bodies||[]).filter(b=>b.slot!=null).map(b=>b.slot),...(typeof extraSlots==='function'?extraSlots(j.part):[])]));
     const base=project.name.replace(/\.(stl|3mf|zip)$/i,'').replace(/[^\w.-]+/g,'_');
     const short=r.printer.id==='snapmaker_u1'?'U1':r.printer.id==='orca'?r.printer.label.replace(/[^w.-]+/g,''):'KobraS1';
     const blob=new Blob([bytes],{type:'model/3mf'});
@@ -400,7 +400,7 @@ ACTIONS.slots=openSlotDialog;
 function slotsInUse(){
   const out=new Set();if(!project||!lastResult)return out;
   const def=+(store.last[slotKey(lastResult.printer.id)]||0);
-  for(const p of project.parts){out.add(p.slot??def);for(const b of p.bodies||[])if(b.slot!=null)out.add(b.slot);if(typeof textSlots==='function')textSlots(p).forEach(s=>out.add(s))}
+  for(const p of project.parts){out.add(p.slot??def);for(const b of p.bodies||[])if(b.slot!=null)out.add(b.slot);if(typeof extraSlots==='function')extraSlots(p).forEach(s=>out.add(s))}
   return out;
 }
 /* ③ Slot anklicken = damit drucken. Ein Teil (bzw. alle Platzierungen/Kopien desselben Teils): dessen Slot;

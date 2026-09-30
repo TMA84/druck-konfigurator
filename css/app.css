@@ -999,3 +999,47 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .tab-spin.hidden { display: none; }
 @keyframes tab-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .slice-bar.waiting .sb-track i, .tab-spin { animation: none; } }
+/* Bemalen (js/paint-ui.js): Feld links unter der Werkzeugleiste, wie das Mal-Werkzeug in OrcaSlicer */
+.paint-panel { position: absolute; z-index: 5; left: 10px; top: 58px; width: 250px; display: grid; gap: 8px; padding: 10px 12px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 10px; color: var(--hud-ink); font-size: 12.5px; }
+.paint-panel.hidden { display: none; }
+.paint-panel .pt-head { display: flex; justify-content: space-between; align-items: center; }
+.paint-panel button { background: rgba(255,255,255,.06); color: var(--hud-ink); border: 1px solid var(--hud-border); border-radius: 6px; padding: 4px 8px; font: inherit; cursor: pointer; }
+.paint-panel button.primary { background: #d9642a; border-color: #d9642a; color: #fff; }
+.paint-panel .pt-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+.paint-panel .pt-tools button.active, .paint-panel .pt-erase.active { background: #f0a371; border-color: #f0a371; color: #1d1d1d; }
+.paint-panel .pt-slots { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.paint-panel .slot-chip { width: 26px; height: 26px; background: var(--chip); color: var(--chip-ink); border: 1px solid rgba(0,0,0,.3); }
+/* gewählte Farbe: nur der orange Rahmen, die Füllung bleibt die Slotfarbe (sonst gewinnt .hud button.active) */
+.paint-panel .slot-chip.active { background: var(--chip); color: var(--chip-ink); border-color: rgba(0,0,0,.3); outline: 2px solid #f0a371; outline-offset: 2px; }
+.paint-panel .pt-row { display: flex; align-items: center; gap: 8px; }
+.paint-panel .pt-row input[type=range] { flex: 1; min-width: 0; }
+.paint-panel .pt-val { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.paint-panel .pt-note { margin: 0; color: #f0a371; }
+.paint-panel .pt-help { margin: 0; font-size: 11.5px; color: var(--hud-ink-2, #b9b4ab); line-height: 1.4; }
+.paint-panel .pt-note.hidden, .paint-panel .pt-row.hidden { display: none; }
+@media (max-width: 640px) {
+  .paint-panel { left: 6px; right: 6px; width: auto; top: auto; bottom: 6px; max-height: 45%; overflow: auto; }
+  .paint-panel .pt-help { display: none; }
+  .paint-panel .slot-chip { width: 32px; height: 32px; }
+}
+.paint-panel .pt-label { font-size: 11.5px; color: var(--hud-ink-2, #b9b4ab); margin-bottom: -4px; }
+.paint-panel .pt-current { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.paint-panel .pt-current i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.35); }
+.paint-panel .pt-current small { color: var(--hud-ink-2, #b9b4ab); }
+.paint-panel .pt-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--hud-border); border-radius: 7px; overflow: hidden; }
+.paint-panel .pt-modes button { border: 0; border-radius: 0; padding: 5px 4px; }
+.paint-panel .pt-modes button.active { background: var(--accent); color: #fff; }
+.paint-panel .pt-mark { display: inline-flex; align-items: center; gap: 5px; }
+.paint-panel .pt-mark i { width: 12px; height: 12px; border-radius: 3px; }
+.paint-panel .pt-mark.active { outline: 2px solid #f0a371; outline-offset: 1px; }
+.paint-panel .pt-gap { display: grid; gap: 6px; }
+.paint-panel .pt-gap.hidden { display: none; }
+/* Farben des Herstellers (Tab ②, js/panel.js renderMatColours) */
+.badge.vendor { background: var(--accent-soft, #fbe7da); color: var(--accent, #d9642a); border: 1px solid var(--accent, #d9642a); }
+.mat-colours { margin-top: 8px; display: grid; gap: 6px; font-size: 12.5px; }
+.mat-colours.hidden { display: none; }
+.mat-colours .mc-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 96px; overflow: auto; padding: 2px; }
+.mat-colours .mc-swatch { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(0,0,0,.3); background: var(--sw); padding: 0; cursor: pointer; }
+.mat-colours .mc-swatch:hover { transform: scale(1.15); }
+.mat-colours .mc-foot { font-size: 11.5px; }
+@media (max-width: 640px) { .mat-colours .mc-swatch { width: 28px; height: 28px; } }

@@ -57,7 +57,7 @@ const BUILTIN=[
 ];
 const KIND_LABEL={pla:'PLA',petg:'PETG',abs:'ABS',asa:'ASA',tpu:t('TPU / flexibel')};
 const KIND_TEMPLATE={pla:'pla',petg:'petg',abs:'abs',asa:'asa',tpu:'tpu'};
-const STATUS={tested:['tested',t('Getestet')],generic:['generic',t('Allgemeiner Startwert')],user:['user',t('Eigene Werte')]};
+const STATUS={tested:['tested',t('Getestet')],generic:['generic',t('Allgemeiner Startwert')],user:['user',t('Eigene Werte')],vendor:['vendor',t('Herstellerwerte')]};
 
 // Düsen: v = Volumenstrom-Faktor ggü. 0,4 mm, lh = Schichthöhe [Q,A,S], fl = erste Schicht, lw/lwo/lwf = Linienbreiten
 const NOZ={

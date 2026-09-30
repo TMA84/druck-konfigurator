@@ -69,6 +69,14 @@ function modOverlayFor(part, slots, xf) {
   });
 }
 
+// Schichten mehrerer Teile (ganze Platte) zu einer
+function ptMergeLayers(list) {
+  if (!list.length) return [null, null];
+  if (list.length === 1) return [list[0].pos, list[0].col];
+  const n = list.reduce((s, l) => s + l.pos.length, 0), pos = new Float32Array(n), col = new Float32Array(n);
+  let o = 0; for (const l of list) { pos.set(l.pos, o); col.set(l.col, o); o += l.pos.length; }
+  return [pos, col];
+}
 // Vorschau: alle Körper in ihrer Slotfarbe (Häkchen) oder ein Körper hervorgehoben (Zeile unter der Maus)
 function paintBodies(part, highlight) {
   let paint = null;
@@ -83,20 +91,33 @@ function paintBodies(part, highlight) {
           : [{ start: r.start, count: r.count, rgb: viewRgb(showHex(q ? q.slot ?? defaultSlot() : 0, q && q.dSlot, slots)) }]; });
       over = shownPlate.ranges.flatMap(r => project.parts[r.i] ? modOverlayFor(project.parts[r.i], slots, r.xf) : []);
     }
+    // Bemalung je Dreieck (eigene und geteilte Dreiecke des Designers, js/paint-ui.js) obendrauf
+    const layers = [];
+    if (paint && typeof paintView === 'function') for (const r of shownPlate.ranges) {
+      const q = project.parts[r.i], pv = q && paintView(q, slotChoices(), r.start, r.xf);
+      if (pv) { paint = paint.concat(pv.runs); if (pv.pos.length) layers.push(pv); }
+    }
     Viewer.setPaint(paint);
     if (Viewer.setOverlay) Viewer.setOverlay(over);
+    if (Viewer.setPaintLayer) Viewer.setPaintLayer(...ptMergeLayers(layers));
     return;
   }
+  // Malen von Stützen/Naht (js/paint-ui.js): eigene Anzeige
+  if (highlight == null && typeof ptMarkDisplay === 'function' && ptMarkDisplay(part)) { if (miniReady) MiniView.setPaint(null); return; }
   const slots = slotChoices();
   if (part && part.bodies) {
     if (highlight != null) paint = part.bodies.map((b, j) => ({ start: b.start, count: b.count, rgb: j === highlight ? [1, .8, 0] : [.35, .37, .4] }));
     else if ($('bodyShow').checked) paint = part.bodies.map(b => ({ start: b.start, count: b.count, rgb: viewRgb(showHex(bodySlot(part, b), b.dSlot, slots)) }));
   } else if (part && part.paintState && part.paintState.length === part.geom.n && $('bodyShow').checked) {
     paint = paintedColours(part, slots);
-  } else if (part && part.modVols && $('bodyShow').checked) {
-    // nur Modifikatoren: das Teil selbst in seiner Slotfarbe, damit die Farben zusammenpassen
+  } else if (part && (part.modVols || paintUserCodes(part)) && $('bodyShow').checked) {
+    // nur Modifikatoren oder eigene Bemalung: das Teil selbst in seiner Slotfarbe, damit die Farben zusammenpassen
     paint = [{ start: 0, count: part.geom.n, rgb: viewRgb(showHex(part.slot ?? defaultSlot(), part.dSlot, slots)) }];
   }
+  const pv = paint && highlight == null && typeof paintView === 'function' ? paintView(part, slots) : null;
+  if (pv) paint = paint.concat(pv.runs);
+  if (Viewer.setPaintLayer) Viewer.setPaintLayer(pv && pv.pos, pv && pv.col);
+  if (typeof PT !== 'undefined' && PT.on && highlight == null && !PT.stroke) ptRender();
   Viewer.setPaint(paint);
   if (Viewer.setOverlay) Viewer.setOverlay(part && $('bodyShow').checked && highlight == null ? modOverlayFor(part, slots, null) : []);
   if (miniReady) MiniView.setPaint(paint);
@@ -133,12 +154,27 @@ function replaceParts(parts, selected) {
 }
 
 // Teil j in das gewählte Teil aufnehmen: Lage aus den Dateien, Körper behalten ihren Slot
+// Bemalung eines Dreiecksbereichs (Trennen): Codes mit neuen Indizes; user = als paintUser (mit Slots)
+function ptSlice(codes, start, count, user) {
+  if (!codes) return null;
+  const out = {};
+  for (const k in codes) if (+k >= start && +k < start + count) out[+k - start] = codes[k];
+  if (!Object.keys(out).length) return null;
+  if (!user) return out;
+  const slots = new Set();
+  for (const k in out) for (const s of paintTreeStates(paintTree(out[k]))) if (s) slots.add(s - 1);
+  return { rev: Date.now() * 1000 + start % 1000, codes: out, slots: [...slots].sort((x, y) => x - y) };
+}
 function joinParts(i, j) {
   const a = project.parts[i], b = project.parts[j], na = a.origPos.length / 9;
   const origPos = new Float32Array(a.origPos.length + b.origPos.length);
   origPos.set(a.origPos); origPos.set(b.origPos, a.origPos.length);
   const bodies = [...bodiesOf(a).map(x => ({ ...x })), ...bodiesOf(b).map(x => ({ ...x, start: x.start + na, slot: x.slot ?? b.slot ?? null }))];
-  const joined = { ...a, origPos, R: IDENTITY3, geom: makeGeom(a.name, origPos), bodies, holes: [], holeGeom: null, holeCands: null };
+  // eigene Bemalung beider Teile: Dreiecke von b hinter denen von a
+  const ca = paintUserCodes(a) || {}, cb = paintUserCodes(b) || {}, codes = { ...ca };
+  for (const k in cb) codes[+k + na] = cb[k];
+  const paintUser = Object.keys(codes).length ? { rev: Date.now() * 1000, codes, slots: [...new Set(paintUserSlots(a).concat(paintUserSlots(b)))].sort((x, y) => x - y) } : null;
+  const joined = { ...a, origPos, R: IDENTITY3, geom: makeGeom(a.name, origPos), bodies, holes: [], holeGeom: null, holeCands: null, paintUser };
   const parts = project.parts.map(p => p === a ? joined : p).filter(p => p !== b);
   replaceParts(parts, parts.indexOf(joined));
   toast(t('{b} mit {a} vereint ({n} Körper)', { b: b.name, a: a.name, n: bodies.length }));
@@ -150,7 +186,8 @@ $('bodySplit').addEventListener('click', () => {
   const part = project.parts[project.selected], i = project.selected, tm = project.threemf;
   const pieces = part.bodies.map(b => {
     const name = b.fromPart ? b.name : part.name + ' · ' + b.name, origPos = part.origPos.slice(b.start * 9, (b.start + b.count) * 9);
-    const piece = { ...part, name, origPos, geom: partGeom({ ...part, name, origPos }), slot: b.slot ?? part.slot ?? null, input: part.input && { ...part.input }, bodies: null, holes: [], holeGeom: null, holeCands: null, copyGroup: null };
+    const piece = { ...part, name, origPos, geom: partGeom({ ...part, name, origPos }), slot: b.slot ?? part.slot ?? null, input: part.input && { ...part.input }, bodies: null, holes: [], holeGeom: null, holeCands: null, copyGroup: null,
+      paintUser: ptSlice(paintUserCodes(part), b.start, b.count, true), paintCodes: ptSlice(part.paintCodes, b.start, b.count, false), paintSrc: null };
     // aus einer Makerworld-3MF: eigene Teile mit eigenem Netz (das Objekt des Designers entfällt); Bemalung des Körpers bleibt
     if (tm) Object.assign(piece, { extra: true, objectId: null, instance: 0, modSlots: [], modVols: [], painted: false, dSlot: null,
       paintState: part.paintState ? part.paintState.slice(b.start, b.start + b.count) : null, paintSlots: part.paintState ? part.paintSlots : [] });

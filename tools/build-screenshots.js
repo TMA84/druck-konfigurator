@@ -23,6 +23,16 @@ const PREP = `
   if (typeof update === 'function' && lastResult) update();
 `;
 const SHOTS = {
+  // Bemalen (Werkzeugleiste → Pinsel): Strich mit Slot 3 auf der Oberseite des Pilzes, Feld links
+  bemalen: `await loadFiles([__pilz()]); setTab('3d'); await new Promise(r=>setTimeout(r,500));
+    paintMode(true); PT.slot=2; PT.radius=4; ptRender();
+    const g=project.parts[0].geom,P=g.pos; let top=-1; for(let t=0;t<g.n;t++){if([2,5,8].every(k=>Math.abs(P[t*9+k]-g.mx[2])<1e-4)){top=t;break}}
+    const cx=(g.mn[0]+g.mx[0])/2,cy=(g.mn[1]+g.mx[1])/2;
+    ptStroke('start',{tri:top,point:[cx-12,cy-6,g.mx[2]],normal:[0,0,1],dir:[0,0,-1]},{});
+    for(let k=1;k<=12;k++)ptStroke('move',{tri:top,point:[cx-12+k*2,cy-6+Math.sin(k/2)*6,g.mx[2]],normal:[0,0,1],dir:[0,0,-1]},{});
+    ptStroke('end',null,{}); await new Promise(r=>setTimeout(r,800));`,
+  // Filamente der Hersteller (② Druckwerte): SUNLU PLA+ 2.0 mit Farben
+  filamente: `await loadFiles([__pilz()]); setTab('settings'); $('material').value='sl_pla_plus2'; $('material').dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,800));`,
   uebersicht: `await loadFiles([__pilz()]); setTab('settings'); await new Promise(r=>setTimeout(r,800));`,
   modell: `await loadFiles([__pilz(), __stl('deckel.stl',__box(0,0,0,50,30,4)), __stl('halter.stl',__box(0,0,0,60,40,25))]); setTab('3d');
            selectPart(1); setCopies(project.parts[1], 2); await new Promise(r=>setTimeout(r,800));`,
@@ -76,7 +86,7 @@ const SHOTS = {
     await b.evaluate("localStorage.clear(); localStorage.setItem('druckKonfigurator.lang','de'); localStorage.setItem('druckKonfigurator.theme','light'); localStorage.setItem('druckKonfigurator.disclaimer','2'); true");
     for (const name of want) {
       await b.go(BASE);
-      for (let i = 0; i < 100 && await b.evaluate("typeof loadFiles === 'function' && typeof liveUpdate === 'function' && typeof exportTemplate === 'function' && typeof renderSpoolDialog === 'function' && document.readyState === 'complete'") !== true; i++) await sleep(100);
+      for (let i = 0; i < 100 && await b.evaluate("typeof loadFiles === 'function' && typeof liveUpdate === 'function' && typeof exportTemplate === 'function' && typeof renderSpoolDialog === 'function' && typeof restoreProject === 'function' && document.readyState === 'complete'") !== true; i++) await sleep(100);
       await b.evaluate('(async()=>{' + PREP + SHOTS[name] + '})()');
       await sleep(900);
       const png = await b.send('Page.captureScreenshot', { format: 'png' });

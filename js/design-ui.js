@@ -23,7 +23,7 @@ function usedSlots(plan, idx) {
     for (const b of j.bodies || []) if (b.slot != null) used.add(b.slot);
     for (const d of j.part.modSlots || []) used.add(map[d] ?? d);
     for (const d of j.part.paintSlots || []) used.add(map[d] ?? d);   // Bemalung je Dreieck (js/paint.js)
-    if (typeof textSlots === 'function') textSlots(j.part).forEach(s => used.add(s));   // erhabene Beschriftung (js/engrave.js)
+    if (typeof extraSlots === 'function') extraSlots(j.part).forEach(s => used.add(s));   // erhabene Beschriftung (js/engrave.js), eigene Bemalung (js/paint-ui.js)
   }
   return [...used].filter(s => s != null).sort((a, b) => a - b);
 }
@@ -74,6 +74,12 @@ function setDesignSlot(d, s) {
   }
   if (typeof adoptSlotMaterialFor === 'function') adoptSlotMaterialFor(moved);
   update();
+  // selbst übermalte Stellen (js/paint-ui.js) haben feste Slots und folgen der Zuordnung nicht
+  const d1 = d + 1, over = project.parts.some(p => { const u = typeof paintUserCodes === 'function' && paintUserCodes(p);
+    if (!u) return false;
+    for (const k in u) { const dc = typeof paintDesignerCode === 'function' ? paintDesignerCode(p, +k) : ''; if (dc && paintStates(dc).includes(d1)) return true; }
+    return false; });
+  if (over) toast(t('Hinweis: Wo du Farbe {n} des Designers selbst übermalt hast, bleibt deine Farbe.', { n: d1 }));
 }
 // „Wie vom Designer“ (Filamente des Modells, js/slot-picker.js): alle Farben wieder auf ihren eigenen Slot
 function resetDesignColours() {

@@ -130,13 +130,19 @@ function parseModelXML(text) {
       const ts = [];
       let painted = false; // Bambu/Orca-Farbbemalung je Dreieck (paint_color) = Mehrfarbdruck ohne eigene Körper (painted: auch Farb-Modifikatoren)
       // Bemalung: überwiegendes Filament je Dreieck (für die Anzeige) und alle vorkommenden Filamente (js/paint.js)
-      const ps = [], pstates = new Set(), canPaint = typeof paintMain === 'function';
+      // geteilte Dreiecke behalten ihren Code (pc: Index → Code) – die 3D-Ansicht zeigt die Teilstücke genau (js/paint-ui.js)
+      const ps = [], pstates = new Set(), canPaint = typeof paintMain === 'function', pc = {};
+      // gemalte Stützen und Naht des Designers (paint_supports, paint_seam): Index → Code
+      let sc = null, zc = null;
       for (const t of meshXml[2].matchAll(tagRe('triangle'))) {
         const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3);
-        if (ta.paint_color) { painted = true; if (canPaint) { ps[ts.length / 3 - 1] = paintMain(ta.paint_color); if (ta.paint_color.length > 2) paintStates(ta.paint_color).forEach(s => pstates.add(s)); } }
+        if (ta.paint_supports) (sc = sc || {})[ts.length / 3 - 1] = ta.paint_supports;
+        if (ta.paint_seam) (zc = zc || {})[ts.length / 3 - 1] = ta.paint_seam;
+        if (ta.paint_color) { painted = true; if (canPaint) { ps[ts.length / 3 - 1] = paintMain(ta.paint_color); if (ta.paint_color.length > 2) paintStates(ta.paint_color).forEach(s => pstates.add(s));
+          if (parseInt(ta.paint_color[ta.paint_color.length - 1], 16) & 3) pc[ts.length / 3 - 1] = ta.paint_color; } }
       }
       if (painted && canPaint) for (let i = 0; i < ts.length / 3; i++) { ps[i] = ps[i] || 0; pstates.add(ps[i]); }
-      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted, ...(painted && canPaint ? { ps: Uint8Array.from(ps), pstates } : {}) };
+      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted, sc, zc, ...(painted && canPaint ? { ps: Uint8Array.from(ps), pstates, pc } : {}) };
     }
     for (const c of body.matchAll(tagRe('component'))) {
       const ca = attrsOf(c[1]);
@@ -193,6 +199,11 @@ function parse3MF(fileName, zip, zipLib) {
     if (obj.mesh && obj.mesh.painted) flags.painted = flags.paintTris = true;
     if (obj.mesh) {
       const { v, t } = obj.mesh;
+      // Herkunft der Dreiecke (Datei, Objekt, erster Index im Teil): eigene Bemalung wird beim Export dorthin geschrieben
+      (flags.src = flags.src || []).push({ path, id, start: out.length / 9, count: t.length / 3 });
+      if (obj.mesh.pc) for (const [i, code] of Object.entries(obj.mesh.pc)) (flags.pc = flags.pc || {})[out.length / 9 + +i] = code;
+      if (obj.mesh.sc) for (const [i, code] of Object.entries(obj.mesh.sc)) (flags.sc = flags.sc || {})[out.length / 9 + +i] = code;
+      if (obj.mesh.zc) for (const [i, code] of Object.entries(obj.mesh.zc)) (flags.zc = flags.zc || {})[out.length / 9 + +i] = code;
       // Filament je Dreieck parallel zu out (0 = unbemalt); erst anlegen, wenn eine Bemalung vorkommt
       if (obj.mesh.ps || flags.ps) {
         if (!flags.ps) flags.ps = new Array(out.length / 9).fill(0);
@@ -248,7 +259,9 @@ function parse3MF(fileName, zip, zipLib) {
       ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {}), ...(mods.length ? { modifiers: mods } : {}), ...(flags.paintTris ? { paintTris: true } : {}),
       ...(modVols.length ? { modVols } : {}),
       // Bemalung: Filament je Dreieck (1-basiert, 0 = Slot des Teils) und die vorkommenden Filamente des Designers
-      ...(flags.ps && flags.ps.length === out.length / 9 ? { paintState: Uint8Array.from(flags.ps), paintSlots: [...flags.pstates].filter(s => s > 0).sort((a, b) => a - b) } : {})
+      ...(flags.ps && flags.ps.length === out.length / 9 ? { paintState: Uint8Array.from(flags.ps), paintSlots: [...flags.pstates].filter(s => s > 0).sort((a, b) => a - b) } : {}),
+      ...(flags.pc && flags.ps && flags.ps.length === out.length / 9 ? { paintCodes: flags.pc } : {}), ...(flags.src ? { paintSrc: flags.src } : {}),
+      ...(flags.sc ? { supCodes: flags.sc } : {}), ...(flags.zc ? { seamCodes: flags.zc } : {})
     });
   });
   if (!parts.length) throw Error(t('keine druckbaren Objekte in {file}', { file: fileName }));

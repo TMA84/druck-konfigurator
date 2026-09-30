@@ -15,6 +15,8 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Mehrfarbig:** mehrere Körper in einem Teil, jeder mit eigenem Slot – auch mehrere STLs (eine je Farbe) zu einem Teil vereinen; **Bemalung** und Farb-Modifikatoren von Makerworld-Modellen werden angezeigt und auf die eigenen Slots umgeschrieben (auch mehr Farben als Slots)
 - **Werkzeugleiste in der 3D-Ansicht:** hinzufügen, neue Platte, ausrichten, anordnen, Kopien, trennen, Fläche aufs Bett, drehen, **Größe** (Prozent oder mm je Achse), Schnitt, Text, messen, ganze Platte – auch für Makerworld-3MF
 - **Platten:** platzsparend anordnen, Kosten je Platte, Reihenfolge nach Filament, **Druck Objekt für Objekt** mit Abstand für den Druckkopf
+- **Bemalen wie in OrcaSlicer:** Farbe, Stützen (erzwingen/verhindern) und Naht je Fläche – Kreis, Kugel, Dreieck, Füllen mit Vorschau, Höhenbereich, Lücken füllen, Radierer; Orca-kompatibel (paint_color, paint_supports, paint_seam), auch auf Makerworld-Modellen
+- **Filamente von Anycubic und SUNLU** mit den Druckwerten der Hersteller und ihren Farben (Anycubic mit offiziellen Farbcodes) – Farbe anklicken trägt sie für den Slot ein
 - **Beschriftung:** Text erhaben (eigene Farbe) oder vertieft auf ein Teil
 - **Weniger Spülabfall (Kobra S1):** Schätzung von Farbwechseln, Abfall und Zeit; Empfehlung für die Spülmenge am Drucker
 - **Kostenkalkulation:** exakt geslict mit OrcaSlicer (im Container) – Filament je Slot, Spülabfall, Strom, Verschleiß, optional Aufschlag und MwSt.
@@ -90,8 +92,10 @@ python tests/printqueue.py    # Warteschlange auf dem Server
 python tests/ha_mqtt.py       # Home-Assistant-MQTT (gegen einen nachgebauten Broker)
 python tests/printed.py       # Vorschau gestarteter Drucke (3D-Fortschritt)
 node tests/engrave.js         # Beschriftung: Schrift, Platzierung, 3MF (mit OrcaSlicer)
-node tests/paint.js           # Bemalung je Dreieck (paint_color): lesen, umschreiben, Import
-node tests/designer-3mf.js    # Makerworld-Aufbau: Bemalung, Modifikator, Drehen/Größe, Text am Objekt (mit Orca-CLI)
+node tests/paint.js           # Bemalung je Dreieck (paint_color): lesen, schreiben, Teilstücke wie Orca, Pinsel, Füllen, Import
+node tests/filaments.js       # Filamente der Hersteller: Werte stimmig, Farbcodes, Rechenkern
+node tests/paint-orca.js      # Bemalen gegen Orca: Farbe, Stützen (erzwingen/verhindern), Naht im G-Code
+node tests/designer-3mf.js    # Makerworld-Aufbau: Bemalung (auch eigene), Modifikator, Drehen/Größe, Text am Objekt (mit Orca-CLI)
 python tests/auth.py          # PIN-Schutz
 node tools/headless.js smoke  # Bedientest im Chrome ohne Fenster (Server muss laufen)
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)

@@ -16,7 +16,7 @@ const ctx = vm.createContext({ console, TextDecoder });
 for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'font-hershey', 'engrave', 'paint', 'export3mf', 'import'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext(`({ importModels, makeGeom, compute, getMat, store, exportTemplate, build3mfFromProject, partGeom, rotateAxis,
-  topFace, anchorToOrig, anchorUnscaled, paintStates, setPrintSequence, clearanceOf, IDENTITY3 })`, ctx);
+  topFace, anchorToOrig, anchorUnscaled, paintStates, setPrintSequence, clearanceOf, IDENTITY3, paintTree, paintCode, paintApply, paintBrushSphere, paintTreeStates })`, ctx);
 
 let pass = 0, fail = 0;
 const check = (name, ok, detail) => { if (ok) { pass++; console.log('ok   ' + name); } else { fail++; console.log('FEHL ' + name + (detail !== undefined ? ': ' + JSON.stringify(detail) : '')); } };
@@ -61,7 +61,7 @@ const load = bytes => K.importModels([{ name: 'designer.3mf', bytes }], fflate);
 function toParts(imp) {
   return imp.parts.map((p, i) => ({ id: i, name: p.name, origPos: p.pos, R: K.IDENTITY3, geom: K.makeGeom(p.name, p.pos), slot: p.extruder ? p.extruder - 1 : null, plate: p.plate || 1,
     objectId: p.objectId || null, instance: p.instance || 0, bodies: null, painted: !!p.painted, dSlot: p.extruder ? p.extruder - 1 : null, modSlots: (p.modifiers || []).map(e => e - 1),
-    paintTris: !!p.paintTris, modVols: (p.modVols || []).map(m => ({ dSlot: m.extruder - 1, pos: m.pos })), paintState: p.paintState || null, paintSlots: (p.paintSlots || []).map(e => e - 1) }));
+    paintTris: !!p.paintTris, modVols: (p.modVols || []).map(m => ({ dSlot: m.extruder - 1, pos: m.pos })), paintState: p.paintState || null, paintSlots: (p.paintSlots || []).map(e => e - 1), paintCodes: p.paintCodes || null, paintSrc: p.paintSrc || null }));
 }
 const tpl = K.exportTemplate('kobra_s1', '0.4');
 const BASE = { printer: 'kobra_s1', nozD: '0.4', nozM: 'steel_hardened', material: 'pla_hs', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
@@ -117,6 +117,24 @@ bemalt.scale = [1.5, 1.5, 1.5]; bemalt.geom = K.partGeom(bemalt);
   bemalt.texts.pop();
   const f = path.join(OUT, 'text.3mf'); fs.writeFileSync(f, res.bytes); slices.push({ name: 'Text', file: f, plates: 2, textSlot: 2 }); }
 
+/* 4b) Eigene Bemalung auf dem Objekt des Designers (js/paint-ui.js): Seite vorn (Dreieck 4) mit einer Kugel in Slot 4 bemalen,
+   die bemalte Deckfläche (Dreieck 3, Filament 5 des Designers) ausradieren – beides landet in den Dreiecken des Designers */
+{ check('Herkunft der Dreiecke bekannt (Datei, Netz)', JSON.stringify(bemalt.paintSrc) === JSON.stringify([{ path: '3D/Objects/object_1.model', id: '1', start: 0, count: 12 }]), bemalt.paintSrc);
+  const P = bemalt.origPos, tri = i => [0, 1, 2].map(v => [P[i * 9 + v * 3], P[i * 9 + v * 3 + 1], P[i * 9 + v * 3 + 2]]);
+  const [a, b, c] = tri(4), m = [0, 1, 2].map(k => (a[k] + b[k] + c[k]) / 3), tree = K.paintApply({ s: 0 }, a, b, c, K.paintBrushSphere(m, m, 4), 4, 0.25);
+  check('Kugel teilt das Dreieck am Rand', !!tree.c, K.paintCode(tree));
+  bemalt.paintUser = { rev: 1, codes: { 4: K.paintCode(tree), 3: '0' }, slots: [3] };
+  const { res, z } = build(parts, tm), obj = fflate.strFromU8(z['3D/Objects/object_1.model']);
+  const tris = [...obj.matchAll(/<triangle\b[^>]*>/g)].map(m => (/paint_color="([^"]*)"/.exec(m[0]) || [])[1] || '');
+  check('eigener Code im Dreieck 4 des Designers', tris[4] === K.paintCode(tree), tris[4]);
+  check('ausradiert: Dreieck 3 ohne Bemalung', tris[3] === '', tris[3]);
+  check('Bemalung des Designers bleibt daneben (Dreieck 2: Filament 2)', tris[2] === '8', tris[2]);
+  check('Slot 4 bekommt ein Filament (Projekt mit 4 Filamenten)', JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config'])).filament_settings_id.length === 4);
+  const re = load(res.bytes).parts.find(p => /bemalt/.test(p.name));
+  check('wieder eingelesen: Filament 4 kommt vor', (re.paintSlots || []).includes(4), re.paintSlots);
+  const f = path.join(OUT, 'eigen.3mf'); fs.writeFileSync(f, res.bytes); slices.push({ name: 'Eigene Bemalung', file: f, plates: 2, usesSlot: 3 });
+  bemalt.paintUser = null; }
+
 /* 5) Druck Objekt für Objekt: print_sequence und Abstand für den Druckkopf */
 { K.setPrintSequence(true);
   const ps = JSON.parse(fflate.strFromU8(build(parts, tm).z['Metadata/project_settings.config']));
@@ -134,6 +152,8 @@ else for (const c of slices) {
   check(c.name + ': Orca slict ' + g.length + ' Platten', g.length === c.plates, g);
   const txt = n => fs.readFileSync(path.join(dir, 'plate_' + n + '.gcode'), 'utf8');
   if (c.turmHeight && g.length > 1) { const zmax = +(/; max_z_height: ([\d.]+)/.exec(txt(2)) || [])[1]; check(c.name + ': gedrehter Turm ' + zmax + ' mm hoch', Math.abs(zmax - c.turmHeight) < 0.3); }
+  if (c.usesSlot != null && g.length) { const used = ((/; filament used \[g\] = (.*)/.exec(txt(1)) || [])[1] || '').split(',').map(Number);
+    check(c.name + ': Slot ' + (c.usesSlot + 1) + ' wird gedruckt (' + (used[c.usesSlot] || 0) + ' g)', used[c.usesSlot] > 0, used); }
   if (c.textSlot != null && g.length) { const used = ((/; filament used \[g\] = (.*)/.exec(txt(1)) || [])[1] || '').split(',').map(Number);
     check(c.name + ': Slot ' + (c.textSlot + 1) + ' druckt den Text (' + (used[c.textSlot] || 0) + ' g)', used[c.textSlot] > 0, used); }
 }

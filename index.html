@@ -104,7 +104,8 @@
         <div id="partUses" class="part-uses hidden"></div>
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
-        <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div></div>
+        <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div>
+        <div id="matColours" class="mat-colours hidden"></div></div>
       <div class="field"><label for="object">Objekt</label><select id="object">
         <option value="general">Funktionsteil</option>
         <option value="holder">Halterung / Befestigung</option>
@@ -408,11 +409,25 @@
       <span class="hud-sep" aria-hidden="true"></span>
       <span class="tb-group" role="group" aria-label="Teil"><button type="button" id="tbCopyPlus" title="Eine Kopie mehr" aria-label="Eine Kopie mehr"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg><span class="tb-label">Kopie +</span></button><button type="button" id="tbCopyMinus" title="Eine Kopie weniger" aria-label="Eine Kopie weniger"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg><span class="tb-label">Kopie −</span></button><button type="button" id="tbSplit" title="In einzelne Teile trennen (Körper)" aria-label="In einzelne Teile trennen (Körper)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="tb-label">Trennen</span></button><button type="button" id="tbDelete" title="Gewähltes Teil entfernen" aria-label="Gewähltes Teil entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4.5h6V7M7 7l1 13h8l1-13"/><path d="M10.5 11v6M13.5 11v6"/></svg><span class="tb-label">Entfernen</span></button></span>
       <span class="hud-sep" aria-hidden="true"></span>
-      <span class="tb-group" role="group" aria-label="Bearbeiten"><button type="button" data-orient="pick" id="btnPick" title="Fläche anklicken, die aufs Bett soll" aria-label="Fläche anklicken, die aufs Bett soll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18"/><path d="M6 15l6-9 6 9z"/><path d="M6 15h12" class="thick"/></svg><span class="tb-label">Fläche aufs Bett</span></button><button type="button" id="tbRotate" aria-haspopup="true" title="Drehen (90° um X, Y oder Z)" aria-label="Drehen (90° um X, Y oder Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M17 3v4.5h-4.5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span class="tb-label">Drehen</span></button><button type="button" id="tbScale" aria-haspopup="true" title="Größe ändern" aria-label="Größe ändern"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.5"/><rect x="8" y="8" width="8" height="8" rx="1"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/></svg><span class="tb-label">Größe</span></button><button type="button" id="btnClip" title="Schnittansicht" aria-label="Schnittansicht"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" stroke-dasharray="3 2"/><rect x="5" y="4" width="14" height="16" rx="1.5"/></svg><span class="tb-label">Schnitt</span></button><button type="button" id="tbText" title="Beschriftung hinzufügen" aria-label="Beschriftung hinzufügen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="tb-label">Text</span></button><button type="button" id="btnMeasure" title="Abstand messen (zwei Punkte anklicken)" aria-label="Abstand messen (zwei Punkte anklicken)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/></svg><span class="tb-label">Messen</span></button></span>
+      <span class="tb-group" role="group" aria-label="Bearbeiten"><button type="button" data-orient="pick" id="btnPick" title="Fläche anklicken, die aufs Bett soll" aria-label="Fläche anklicken, die aufs Bett soll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18"/><path d="M6 15l6-9 6 9z"/><path d="M6 15h12" class="thick"/></svg><span class="tb-label">Fläche aufs Bett</span></button><button type="button" id="tbRotate" aria-haspopup="true" title="Drehen (90° um X, Y oder Z)" aria-label="Drehen (90° um X, Y oder Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M17 3v4.5h-4.5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span class="tb-label">Drehen</span></button><button type="button" id="tbScale" aria-haspopup="true" title="Größe ändern" aria-label="Größe ändern"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.5"/><rect x="8" y="8" width="8" height="8" rx="1"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/></svg><span class="tb-label">Größe</span></button><button type="button" id="btnClip" title="Schnittansicht" aria-label="Schnittansicht"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" stroke-dasharray="3 2"/><rect x="5" y="4" width="14" height="16" rx="1.5"/></svg><span class="tb-label">Schnitt</span></button><button type="button" id="tbText" title="Beschriftung hinzufügen" aria-label="Beschriftung hinzufügen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="tb-label">Text</span></button><button type="button" id="tbPaint" title="Bemalen (Farbe je Fläche, wie in OrcaSlicer)" aria-label="Bemalen (Farbe je Fläche, wie in OrcaSlicer)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-8 8-5-5z"/><path d="M6.5 12.5L4 20l7.5-2.5"/><path d="M13 6l5 5" class="thick"/></svg><span class="tb-label">Bemalen</span></button><button type="button" id="btnMeasure" title="Abstand messen (zwei Punkte anklicken)" aria-label="Abstand messen (zwei Punkte anklicken)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/></svg><span class="tb-label">Messen</span></button></span>
       <span class="hud-sep" aria-hidden="true"></span>
       <span class="tb-group" role="group" aria-label="Ansicht"><button type="button" id="btnPlate" title="Alle Teile der Platte des gewählten Teils an ihrem Platz zeigen" aria-label="Alle Teile der Platte des gewählten Teils an ihrem Platz zeigen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="11" rx="1.5"/><path d="M7 9V6h4v3M13 9V4h4v5"/></svg><span class="tb-label">Ganze Platte</span></button><button type="button" id="btnWireframe" title="Drahtgitter" aria-label="Drahtgitter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5M4 16.5l8-4.5 8 4.5" stroke-dasharray="2 2"/></svg><span class="tb-label">Drahtgitter</span></button><button type="button" id="btnAxes" class="active" title="Achsen zeigen" aria-label="Achsen zeigen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V5M5 19h14M5 19l10-7"/><path d="M5 5l-1.5 2M5 5l1.5 2M19 19l-2-1.5M19 19l-2 1.5"/></svg><span class="tb-label">Achsen</span></button></span>
     </div>
     <div id="tbPop" class="hud tb-pop hidden" role="dialog" aria-label="Werkzeug"></div>
+    <div id="paintPanel" class="hud paint-panel hidden" role="dialog" aria-label="Bemalen">
+      <div class="pt-head"><b>Bemalen</b><button type="button" id="ptDone" class="primary" title="Bemalen beenden (Esc)">Fertig</button></div>
+      <div id="ptModes" class="pt-modes" role="group" aria-label="Was wird gemalt"></div>
+      <div id="ptTools" class="pt-tools" role="group" aria-label="Werkzeug"></div>
+      <div id="ptLabel" class="pt-label">Farbe (Slot) – anklicken oder Taste 1–9</div>
+      <div id="ptSlots" class="pt-slots" role="group" aria-label="Farbe"></div>
+      <div id="ptCurrent" class="pt-current" role="status"></div>
+      <label id="ptSizeRow" class="pt-row">Größe <input type="range" id="ptSize" min="0.2" max="20" step="0.1" value="2" aria-label="Pinselgröße (Radius)"><span id="ptSizeVal" class="pt-val"></span></label>
+      <label id="ptAngleRow" class="pt-row hidden">Winkel <input type="range" id="ptAngle" min="0" max="90" step="1" value="30" aria-label="Füllen bis zu Kanten über diesem Winkel"><span id="ptAngleVal" class="pt-val"></span></label>
+      <div id="ptGapRow" class="pt-gap hidden"><label class="pt-row">Fläche bis <input type="range" id="ptGap" min="0.1" max="20" step="0.1" value="1" aria-label="Lücken bis zu dieser Fläche füllen"><span id="ptGapVal" class="pt-val"></span></label><button type="button" id="ptGapRun" class="primary">Lücken füllen</button></div>
+      <p id="ptNote" class="pt-note hidden"></p>
+      <div class="pt-row"><button type="button" id="ptClear" title="Alle Bemalung dieses Teils entfernen (auch die des Designers)">Alles entfernen</button></div>
+      <p class="pt-help">Linke Maustaste bzw. Finger auf dem Teil: malen · Umschalt: radieren · daneben ziehen: drehen · Alt+Mausrad: Größe · 1–9: Slot · E: Radierer · Strg/⌘+Z: zurück</p>
+    </div>
     <div id="subControls" class="hud">
       <div id="clipPanel" class="hidden"><span>Achse:</span>
         <button id="clipAxisX" type="button" class="active">X</button><button id="clipAxisY" type="button">Y</button><button id="clipAxisZ" type="button">Z</button>
@@ -606,8 +621,10 @@
 <script src="js/i18n/en-mw.js"></script>
 <script src="js/i18n/en-queue.js"></script>
 <script src="js/i18n/en-ui.js"></script>
+<script src="js/i18n/en-filaments.js"></script>
 <script src="js/i18n/dom.js"></script>
 <script src="js/data.js"></script>
+<script src="js/filaments.js"></script>
 <script src="js/config.js"></script>
 <script src="js/stl.js"></script>
 <script src="js/paint.js"></script>
@@ -647,6 +664,7 @@
 <script src="js/size-ui.js"></script>
 <script src="js/sections-ui.js"></script>
 <script src="js/toolbar-ui.js"></script>
+<script src="js/paint-ui.js"></script>
 <script src="js/undo.js"></script>
 <script src="js/preview-ui.js"></script>
 <script src="vendor/flv.min.js"></script>

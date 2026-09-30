@@ -46,7 +46,11 @@ function partsFromImport(imp){
       // Geometrie der Farb-Modifikatoren (nur Anzeige; Slot des Designers, umgelegt über designMap)
       modVols:(p.modVols||[]).map(m=>({dSlot:m.extruder-1,pos:m.pos})),
       // Bemalung je Dreieck (Filament des Designers, 1-basiert) – Anzeige und Zuordnung zu Slots (designMap)
-      paintState:p.paintState||null,paintSlots:(p.paintSlots||[]).map(e=>e-1)}));
+      paintState:p.paintState||null,paintSlots:(p.paintSlots||[]).map(e=>e-1),
+      // geteilte Dreiecke des Designers (Index → Code) und Herkunft der Dreiecke in der 3MF (eigene Bemalung, js/paint-ui.js)
+      paintCodes:p.paintCodes||null,paintSrc:p.paintSrc||null,
+      // gemalte Stützen und Naht des Designers (Index → Code)
+      supCodes:p.supCodes||null,seamCodes:p.seamCodes||null}));
     parts.forEach((q,i)=>{if(q.bodies)q.bodies.forEach((b,j)=>{const e=imp.parts[i].bodies[j].extruder;b.dSlot=e?e-1:q.dSlot})});
     if(imp.threemf)imp.threemf.designMap={};
     return parts;
@@ -68,7 +72,7 @@ function addParts(imp){
   initPartInputs(add);
   if(tm){
     // einfache Teile: kein Objekt der 3MF, Farben/Bemalung der Quelldatei gelten nicht
-    add.forEach(p=>{Object.assign(p,{extra:true,objectId:null,instance:0,painted:false,paintTris:false,modSlots:[],modVols:[],dSlot:null});(p.bodies||[]).forEach(b=>{b.dSlot=null;b.partId=null})});
+    add.forEach(p=>{Object.assign(p,{extra:true,objectId:null,instance:0,painted:false,paintTris:false,modSlots:[],modVols:[],dSlot:null,paintState:null,paintSlots:[],paintCodes:null,paintSrc:null,supCodes:null,seamCodes:null});(p.bodies||[]).forEach(b=>{b.dSlot=null;b.partId=null})});
     if(tm.layout!=='auto'){
       if(tpl)normalizePlates(tpl);   // Plattennummern wie in der Übersicht
       const last=Math.max(1,...project.parts.map(p=>p.plate||1)),next=tm.layout==='plates'?last:last+1;
@@ -142,8 +146,11 @@ function partColours(p){
   // Bemalung je Dreieck: jede Farbe des Designers (Zuordnung gilt projektweit wie bei Modifikatoren)
   // Bemalung je Dreieck: Zuordnung oben unter „Filamente des Modells“ (wie in OrcaSlicer) – hier nur die Farbpunkte
   if((p.paintSlots||[]).length)out.push({kind:'info',key:0,label:t('bemalt mit {n} Farben',{n:p.paintSlots.length}),sub:t('Zuordnung oben unter Filamente'),effs:p.paintSlots.map(d=>map[d]??d)});
-  // Teil ohne eigene Körper, aber mit Modifikator oder Beschriftung: der Grundkörper ist die erste Farbe (Slot des Teils)
-  if(!p.bodies&&!(p.paintSlots||[]).length&&((p.modSlots||[]).length||(p.texts||[]).some(x=>x.mode!=='engraved')))out.push({kind:'base',key:0,slot:p.slot??null,eff:own,label:t('Grundkörper'),sub:t('Slot des Teils')});
+  // eigene Bemalung (Werkzeugleiste „Bemalen“, js/paint-ui.js): Slots direkt
+  const ownPaint=typeof paintUserSlots==='function'?paintUserSlots(p):[];
+  if(ownPaint.length)out.push({kind:'info',key:1,label:t('selbst bemalt ({n} Farben)',{n:ownPaint.length}),sub:t('Bemalen in der Werkzeugleiste'),effs:ownPaint});
+  // Teil ohne eigene Körper, aber mit Modifikator, Beschriftung oder eigener Bemalung: der Grundkörper ist die erste Farbe (Slot des Teils)
+  if(!p.bodies&&!(p.paintSlots||[]).length&&((p.modSlots||[]).length||ownPaint.length||(p.texts||[]).some(x=>x.mode!=='engraved')))out.push({kind:'base',key:0,slot:p.slot??null,eff:own,label:t('Grundkörper'),sub:t('Slot des Teils')});
   if(out.length&&out[out.length-1].kind==='base')out.unshift(out.pop());
   [...new Set(p.modSlots||[])].forEach(d=>out.push({kind:'mod',key:d,dcol:dcol(d),slot:map[d]??d,eff:map[d]??d,label:t('Farbe {n} des Designers',{n:d+1}),sub:(lc.mods[d]?lowTxt+' · ':'')+t('Modifikator, gilt für alle Teile mit dieser Farbe')}));
   (p.texts||[]).filter(x=>x.mode!=='engraved').forEach(x=>out.push({kind:'text',key:x.id,slot:x.slot??null,eff:x.slot??own,label:'„'+x.text+'“',sub:t('Beschriftung')}));

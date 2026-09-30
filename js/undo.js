@@ -5,14 +5,19 @@
    Druckreihenfolge, gewähltes Teil. Große, unveränderliche Daten (Netze, Bemalung, Modifikatoren) bleiben Verweise –
    ein Schritt kostet nur ein paar Kilobyte. Bis UNDO_MAX Schritte; ein neu geladenes Modell beginnt von vorn. */
 const UNDO_MAX = 60, UNDO_DELAY_MS = 350;
-const UNDO_HEAVY = new Set(['origPos', 'geom', 'holeGeom', 'holeCands', 'paintState', 'modVols']);
+const UNDO_HEAVY = new Set(['origPos', 'geom', 'holeGeom', 'holeCands', 'paintState', 'modVols', 'paintCodes', 'paintSrc', 'supCodes', 'seamCodes']);
+// unveränderlich, aber je Schritt anders (eigene Bemalung, js/paint-ui.js): als Verweis merken, verglichen über rev
+const UNDO_REF = new Set(['paintUser', 'paintSup', 'paintSeam']);
 const undo = { past: [], future: [], cur: null, key: null, project: null, timer: 0, applying: false };
 
 function undoCapture() {
   const parts = project.parts.map(p => {
-    const f = {};
-    for (const [k, v] of Object.entries(p)) if (!UNDO_HEAVY.has(k)) f[k] = v;
-    return { ref: p, f: JSON.parse(JSON.stringify(f)) };
+    const f = {}, refs = {};
+    for (const [k, v] of Object.entries(p)) {
+      if (UNDO_REF.has(k)) { refs[k] = v; f[k + '@'] = v ? v.rev : null; }
+      else if (!UNDO_HEAVY.has(k)) f[k] = v;
+    }
+    return { ref: p, f: JSON.parse(JSON.stringify(f)), refs };
   });
   const tm = project.threemf;
   const extra = JSON.parse(JSON.stringify({ designMap: tm ? tm.designMap || {} : null, layout: tm ? tm.layout || null : null, removed: tm ? !!tm.removed : null,
@@ -41,10 +46,12 @@ function undoApply(s) {
   undo.applying = true;
   try {
     const sameGeom = (p, f) => JSON.stringify([p.R || null, p.scale || null]) === JSON.stringify([f.R || null, f.scale || null]);
-    project.parts = s.parts.map(({ ref, f }) => {
+    project.parts = s.parts.map(({ ref, f, refs }) => {
       const geomOk = sameGeom(ref, f), holes = f.holes;
       for (const k of Object.keys(ref)) if (!UNDO_HEAVY.has(k)) delete ref[k];
       Object.assign(ref, JSON.parse(JSON.stringify(f)));
+      for (const k of Object.keys(ref)) if (k.endsWith('@')) delete ref[k];
+      for (const [k, v] of Object.entries(refs || {})) if (v != null) ref[k] = v;
       if (!geomOk) {
         ref.geom = partGeom(ref);
         if (typeof findHoles === 'function' && holes && holes.length) { ref.holeCands = findHoles(ref.geom); ref.holeGeom = ref.geom; }

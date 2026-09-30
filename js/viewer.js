@@ -47,6 +47,7 @@ const Viewer = (() => {
     setBedGrid(100);
 
     initPicking();
+    initBrush();
     new ResizeObserver(resize).observe(stage);
     resize();
     (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
@@ -99,7 +100,7 @@ const Viewer = (() => {
     const g = new THREE.BufferGeometry();
     const cx = opts.center ? opts.center[0] : (geom.mn[0] + geom.mx[0]) / 2, cy = opts.center ? opts.center[1] : (geom.mn[1] + geom.mx[1]) / 2, cz = geom.mn[2];
     offset = [cx, cy, cz];
-    setExtras([]); setOverlay([]);
+    setExtras([]); setOverlay([]); setPaintLayer(null); setPaintLayer(null, null, 'stroke'); setPreview(null); brushCursor(null);
     const p = new Float32Array(geom.pos.length);
     for (let i = 0; i < p.length; i += 3) { p[i] = geom.pos[i] - cx; p[i + 1] = geom.pos[i + 1] - cy; p[i + 2] = geom.pos[i + 2] - cz; }
     g.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -136,7 +137,7 @@ const Viewer = (() => {
 
   function clear() {
     disposeMesh();
-    setExtras([]);
+    setExtras([]); setOverlay([]); setPaintLayer(null); setPaintLayer(null, null, 'stroke'); setPreview(null); brushCursor(null);
     geomRef = null;
     clearMeasurement();
   }
@@ -160,7 +161,7 @@ const Viewer = (() => {
   }
   function setPaint(p) { paint = p && p.length ? p : null; colorize(lastTh); }
 
-  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; extras.forEach(m => { m.material.wireframe = on; }); }
+  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; extras.concat(overlays, paintLayer ? [paintLayer] : []).forEach(m => { m.material.wireframe = on; }); }
 
   /* Zusatznetze zum Teil (z. B. Beschriftung): list = [{pos (geom-Koordinaten wie geom.pos), color (0xRRGGBB), opacity?}].
      Werden bei show()/clear() entfernt. */
@@ -202,6 +203,120 @@ const Viewer = (() => {
       overlays.push(m);
     }
   }
+  /* Bemalung als eigene Schicht (js/paint-ui.js): Teilstücke geteilter Dreiecke genau in ihrer Farbe.
+     pos = Koordinaten wie geom, col = Farbe je Ecke (r, g, b 0–1); leer = keine Schicht. */
+  // name 'paint' (Bemalung) oder 'stroke' (laufender Pinselstrich, liegt darüber)
+  const paintLayers = {};
+  let paintLayer = null;
+  function setPaintLayer(pos, col, name = 'paint') {
+    if (!renderer) return;
+    const old = paintLayers[name];
+    if (old) { scene.remove(old); old.geometry.dispose(); old.material.dispose(); paintLayers[name] = null; }
+    paintLayer = paintLayers.paint || null;
+    if (!pos || !pos.length) return;
+    const p = new Float32Array(pos.length);
+    for (let i = 0; i < p.length; i += 3) { p[i] = pos[i] - offset[0]; p[i + 1] = pos[i + 1] - offset[1]; p[i + 2] = pos[i + 2] - offset[2]; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    paintLayer = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .6, metalness: .05, flatShading: true, side: THREE.DoubleSide,
+      wireframe: wireframeOn, clippingPlanes: clip.on ? [clip.plane] : [], polygonOffset: true, polygonOffsetFactor: name === 'stroke' ? -2 : -1, polygonOffsetUnits: name === 'stroke' ? -2 : -1 }));
+    paintLayer.raycast = () => {};   // Treffer zählen nur auf dem Teil selbst
+    scene.add(paintLayer);
+    paintLayers[name] = paintLayer;
+    paintLayer = paintLayers.paint || null;
+  }
+  // Vorschau (Füllen): Fläche halb durchsichtig hell über dem Teil; null = aus
+  let preview = null;
+  function setPreview(pos) {
+    if (!renderer) return;
+    if (preview) { scene.remove(preview); preview.geometry.dispose(); preview.material.dispose(); preview = null; }
+    if (!pos || !pos.length) return;
+    const p = new Float32Array(pos.length);
+    for (let i = 0; i < p.length; i += 3) { p[i] = pos[i] - offset[0]; p[i + 1] = pos[i + 1] - offset[1]; p[i + 2] = pos[i + 2] - offset[2]; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    preview = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide,
+      clippingPlanes: clip.on ? [clip.plane] : [], polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    preview.raycast = () => {};
+    scene.add(preview);
+  }
+  // aktuelle Farbe eines Dreiecks im Teil (für den Pinselstrich: unbemalte Teilstücke wie das Teil darunter)
+  function triColor(i) { if (!mesh) return [0.5, 0.5, 0.5]; const c = mesh.geometry.attributes.color.array, k = i * 9; return [c[k], c[k + 1], c[k + 2]]; }
+
+  /* ---------- Pinsel (js/paint-ui.js) ----------
+     setBrush({cursor: 'circle'|'sphere'|'height'|'none', radius, onStroke(phase, hit, ev)}) oder null.
+     Linke Maustaste bzw. ein Finger auf dem Teil malt (phase 'start' → 'move' … → 'end'), daneben dreht die Ansicht wie
+     sonst; mit zwei Fingern wird der Strich beendet und gezoomt. hit = {tri, point (geom-Koordinaten), normal, dir}. */
+  const brush = { opts: null, active: false, cursor: null, hoverQueued: false, lastEv: null };
+  function brushRay(ev) {
+    const rect = renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(ndc, camera);
+    const hit = mesh && rc.intersectObject(mesh).find(h => !clip.on || clip.plane.distanceToPoint(h.point) >= 0);
+    if (!hit) return null;
+    const d = rc.ray.direction;
+    return { tri: hit.faceIndex, point: [hit.point.x + offset[0], hit.point.y + offset[1], hit.point.z + offset[2]], normal: [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z], dir: [d.x, d.y, d.z] };
+  }
+  function brushCursor(hit) {
+    if (brush.cursor) { scene.remove(brush.cursor); brush.cursor.geometry.dispose(); brush.cursor.material.dispose(); brush.cursor = null; }
+    const o = brush.opts;
+    if (o && o.onHover && !brush.active) o.onHover(hit);
+    if (!o || !hit || o.cursor === 'none') return;
+    const r = Math.max(0.05, o.radius || 1), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+    let m;
+    if (o.cursor === 'sphere') m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), mat);
+    else if (o.cursor === 'height') {
+      const s = Math.max(geomRef ? Math.max(geomRef.x, geomRef.y) : maxDim, 10) * 1.3;
+      m = new THREE.Mesh(new THREE.BoxGeometry(s, s, Math.max(0.05, 2 * r)), mat); mat.opacity = 0.18;
+      m.position.set(0, 0, hit.point[2] - offset[2]); scene.add(m); brush.cursor = m; return;
+    } else {
+      m = new THREE.Mesh(new THREE.RingGeometry(r * 0.9, r, 40), mat); mat.opacity = 0.8; mat.color.set(MARKER_COLOR);
+      m.lookAt(new THREE.Vector3(...hit.normal));
+    }
+    m.position.set(hit.point[0] - offset[0] + hit.normal[0] * 0.02, hit.point[1] - offset[1] + hit.normal[1] * 0.02, hit.point[2] - offset[2] + hit.normal[2] * 0.02);
+    scene.add(m); brush.cursor = m;
+  }
+  function brushEnd(ev) {
+    if (!brush.active) return;
+    brush.active = false; controls.enabled = true;
+    if (brush.opts) brush.opts.onStroke('end', null, ev);
+  }
+  function setBrush(opts) {
+    if (!opts) brushEnd();
+    brush.opts = opts || null;
+    if (renderer) renderer.domElement.style.cursor = opts ? 'crosshair' : '';
+    brushCursor(null);
+  }
+  function setBrushRadius(r) { if (brush.opts) { brush.opts.radius = r; if (brush.lastEv) brushCursor(brushRay(brush.lastEv)); } }
+  function initBrush() {
+    const el = renderer.domElement;
+    // Erfassen vor OrbitControls (die hören am Canvas selbst): trifft der Pinsel das Teil, dreht sich die Ansicht nicht
+    stage.addEventListener('pointerdown', e => {
+      if (!brush.opts || e.button !== 0 || !e.isPrimary || e.target !== el) return;
+      const hit = brushRay(e);
+      if (!hit) return;
+      e.stopPropagation(); e.preventDefault();
+      brush.active = true; controls.enabled = false;
+      try { el.setPointerCapture(e.pointerId); } catch (x) { /* ohne Erfassung geht es auch */ }
+      brush.opts.onStroke('start', hit, e);
+      brushCursor(hit);
+    }, true);
+    const touchGuard = e => { if (!brush.active) return; if (e.touches && e.touches.length > 1) { brushEnd(e); return; } e.stopPropagation(); };
+    stage.addEventListener('touchstart', touchGuard, true);
+    stage.addEventListener('touchmove', touchGuard, true);
+    el.addEventListener('pointermove', e => {
+      if (!brush.opts) return;
+      brush.lastEv = e;
+      if (brush.active) { const hit = brushRay(e); if (hit) brush.opts.onStroke('move', hit, e); brushCursor(hit); return; }
+      if (brush.hoverQueued || e.pointerType === 'touch') return;
+      brush.hoverQueued = true;
+      requestAnimationFrame(() => { brush.hoverQueued = false; if (brush.opts && !brush.active && brush.lastEv) brushCursor(brushRay(brush.lastEv)); });
+    });
+    el.addEventListener('pointerup', e => brushEnd(e));
+    el.addEventListener('pointercancel', e => brushEnd(e));
+    el.addEventListener('pointerleave', () => { if (!brush.active) { brushCursor(null); if (brush.opts && brush.opts.onHover) brush.opts.onHover(null); } });
+  }
   function setAxes(on) { if (axes) axes.visible = on; }
 
   /* ---------- Schnitt ---------- */
@@ -210,7 +325,7 @@ const Viewer = (() => {
     if (!renderer) return;
     clip.helper.visible = on;
     if (mesh) mesh.material.clippingPlanes = on ? [clip.plane] : [];
-    extras.forEach(m => { m.material.clippingPlanes = on ? [clip.plane] : []; });
+    extras.concat(overlays, paintLayer ? [paintLayer] : []).forEach(m => { m.material.clippingPlanes = on ? [clip.plane] : []; });
   }
   function setClipAxis(axis) {
     clip.axis = axis;
@@ -281,5 +396,5 @@ const Viewer = (() => {
     });
   }
 
-  return { available, init, show, fit, clear, setOverlay, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
+  return { available, init, show, fit, clear, setOverlay, setPaintLayer, setPreview, triColor, setBrush, setBrushRadius, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
 })();

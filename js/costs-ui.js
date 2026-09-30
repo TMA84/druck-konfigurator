@@ -35,7 +35,7 @@ function slotMaterials(plan) {
     const s = j.slot ?? plan.slot;
     if (!m[s]) m[s] = j.r.m;
     for (const b of j.bodies || []) if (b.slot != null && !m[b.slot]) m[b.slot] = j.r.m;
-    if (typeof textSlots === 'function') for (const s of textSlots(j.part)) if (!m[s]) m[s] = j.r.m;   // Beschriftung
+    if (typeof extraSlots === 'function') for (const s of extraSlots(j.part)) if (!m[s]) m[s] = j.r.m;   // Beschriftung, eigene Bemalung
   }
   return m;
 }
@@ -51,9 +51,11 @@ function sliceSigs() {
   const global = JSON.stringify([project.printSeq || 'layer', lastResult.printer.id, lastResult.dSel, $('nozM').value, aceFlush(), acePurgeOwn(), exportSlots(tpl), plan.slot,
     src.part.input, src.part.overrides || null, project.threemf ? project.threemf.designMap || null : null,
     // welche Filamente in welchen Slots landen – als Menge, damit eine weitere Kopie nicht alle Platten ändert
-    [...new Set(plan.jobs.map(j => JSON.stringify([j.part.input && j.part.input.material, j.slot, (j.bodies || []).map(b => b.slot), typeof textSlots === 'function' ? textSlots(j.part) : []])))].sort()]);
+    [...new Set(plan.jobs.map(j => JSON.stringify([j.part.input && j.part.input.material, j.slot, (j.bodies || []).map(b => b.slot), typeof extraSlots === 'function' ? extraSlots(j.part) : []])))].sort()]);
   const plates = Array.from({ length: lay.count }, (_, k) => JSON.stringify(plan.jobs.filter((j, i) => lay.plateOf[i] === k + 1)
-    .map(j => [j.part.name, j.part.input, j.part.overrides || null, j.slot, (j.bodies || []).map(b => b.slot), j.part.R, (j.holes || []).length, j.geom.x, j.geom.y, j.geom.z, j.part.texts || null])));
+    .map(j => [j.part.name, j.part.input, j.part.overrides || null, j.slot, (j.bodies || []).map(b => b.slot), j.part.R, (j.holes || []).length, j.geom.x, j.geom.y, j.geom.z, j.part.texts || null,
+      // eigene Bemalung (Farbe, Stützen, Naht – js/paint-ui.js): jeder Strich ändert rev
+      ['paintUser', 'paintSup', 'paintSeam'].map(k => j.part[k] ? j.part[k].rev : 0)])));
   return { global, plates };
 }
 function costSignature() { const s = sliceSigs(); return s && JSON.stringify(s); }

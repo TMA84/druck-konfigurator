@@ -269,8 +269,21 @@ const OBJECT_KEYS = new Set(['wall_loops', 'sparse_infill_density', 'sparse_infi
 const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(k);
 
 // Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config
-function objectOverrides(settings, pr) {
-  return plannedChanges(pr, 0, null).filter(c => !c.perSlot && isObjectKey(c.key) && c.key in settings && String(settings[c.key]) !== c.value);
+function objectOverrides(settings, pr, part) {
+  const own = plannedChanges(pr, 0, null).filter(c => !c.perSlot && isObjectKey(c.key) && c.key in settings && String(settings[c.key]) !== c.value);
+  return part ? supportPaintOverrides(settings, pr, part, own) : own;
+}
+/* Gemalte Stützen (js/paint-ui.js, Ebene „Stützen“): Erzwingen wirkt in Orca nur mit eingeschalteten Stützen. Ist das Teil
+   sonst ohne Stützen, stützt „tree(manual)“ genau die gemalten Stellen (mit der Orca-CLI geprüft 2026-09-30). */
+function supportPaintOverrides(settings, pr, part, own) {
+  if (pr.supOn || typeof paintHasEnforcers !== 'function' || !paintHasEnforcers(part)) return own;
+  const set = (key, value, label) => {
+    const out = own.filter(c => c.key !== key);
+    if (String(settings[key]) !== value) out.push({ label, key, value, perSlot: false });
+    return out;
+  };
+  own = set('enable_support', '1', t('Stützen (nur gemalte Stellen)'));
+  return set('support_type', 'tree(manual)', t('Stützentyp'));
 }
 
 const xmlEsc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
@@ -279,7 +292,8 @@ const coord = v => String(Math.round(v * 1e5) / 1e5);
 
 // Netz als 3MF-Objekt: gemeinsame Eckpunkte, lokal um den Mittelpunkt zentriert (wie Orca es speichert).
 // Ein Netz als <object>; center = Mittelpunkt des Teils, damit Modifikatoren relativ dazu passen
-function meshObjectXML(pos, center, id) {
+// paint: Dreieck → Attribute der Bemalung (' paint_color="…" …', '' = keine) oder null (js/paint.js paintAttrsFn)
+function meshObjectXML(pos, center, id, paint) {
   const [cx, cy, cz] = center, n = pos.length / 9;
   const index = new Map(), verts = [], tris = [];
   for (let i = 0; i < n; i++) {
@@ -292,7 +306,8 @@ function meshObjectXML(pos, center, id) {
       if (vid === undefined) { vid = verts.length; index.set(key, vid); verts.push('     <vertex x="' + x + '" y="' + y + '" z="' + z + '"/>'); }
       t.push(vid);
     }
-    if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push('     <triangle v1="' + t[0] + '" v2="' + t[1] + '" v3="' + t[2] + '"/>');
+    const pc = paint ? paint(i) : '';
+    if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push('     <triangle v1="' + t[0] + '" v2="' + t[1] + '" v3="' + t[2] + '"' + pc + '/>');
   }
   return '  <object id="' + id + '" p:UUID="' + uuid(id, '81cb-4c03-9d28-80fed5dfa1dc') + '" type="model">\n   <mesh>\n    <vertices>\n' +
     verts.join('\n') + '\n    </vertices>\n    <triangles>\n' + tris.join('\n') + '\n    </triangles>\n   </mesh>\n  </object>\n';
@@ -302,16 +317,18 @@ function meshObjectXML(pos, center, id) {
    Jeder Körper wird ein eigenes Orca-Bauteil; slot null = Slot des Teils. Der erste Körper behält die
    Id des Teils, weitere liegen weit über denen der Teile und Modifikatoren. */
 const BODY_ID_BASE = 1000000;
-function bodyVolumes(geom, bodies, k) {
-  if (!bodies || bodies.length < 2) return [{ id: k, name: geom.name, pos: geom.pos, slot: null }];
-  return bodies.map((b, j) => ({ id: j ? BODY_ID_BASE + k * 1000 + j : k, name: b.name, pos: geom.pos.subarray(b.start * 9, (b.start + b.count) * 9), slot: b.slot ?? null }));
+// paint: Bemalung des Teils (Dreieck im ganzen Teil → Attribute, js/paint.js paintAttrsFn) oder null
+function bodyVolumes(geom, bodies, k, paint) {
+  if (!bodies || bodies.length < 2) return [{ id: k, name: geom.name, pos: geom.pos, slot: null, paint: paint || null }];
+  return bodies.map((b, j) => ({ id: j ? BODY_ID_BASE + k * 1000 + j : k, name: b.name, pos: geom.pos.subarray(b.start * 9, (b.start + b.count) * 9), slot: b.slot ?? null,
+    paint: paint ? i => paint(b.start + i) : null }));
 }
 
 // Netz-Datei eines Teils: seine Körper (vols: [{id, pos}]) und Modifikatoren (mods: [{id, pos}])
 function meshModelXML(geom, vols, mods = []) {
   const center = [(geom.mn[0] + geom.mx[0]) / 2, (geom.mn[1] + geom.mx[1]) / 2, (geom.mn[2] + geom.mx[2]) / 2];
   return '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">\n' +
-    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n' + vols.map(v => meshObjectXML(v.pos, center, v.id)).join('') +
+    ' <metadata name="BambuStudio:3mfVersion">1</metadata>\n <resources>\n' + vols.map(v => meshObjectXML(v.pos, center, v.id, v.paint)).join('') +
     mods.map(m => meshObjectXML(m.pos, center, m.id)).join('') + ' </resources>\n <build/>\n</model>\n';
 }
 
@@ -335,6 +352,9 @@ function textVolumes(k, p) {
 }
 // Slots erhabener Beschriftungen eines Teils
 const textSlots = p => itemTexts(p).filter(x => x.mode !== 'engraved' && x.slot != null).map(x => x.slot);
+// weitere Slots eines Teils neben Teil und Körpern: erhabene Beschriftung und eigene Bemalung (js/paint.js)
+const paintSlotsOf = p => typeof paintUserSlots === 'function' ? paintUserSlots(p.part || p) : [];
+const extraSlots = p => textSlots(p).concat(paintSlotsOf(p));
 function holeMods(k, holes) {
   return (holes || []).map((h, j) => ({ id: HOLE_MOD_ID_BASE + k * 1000 + j + 1, pos: holeModifierMesh(h), name: 'Verstärkung Loch ' + h.id + ' (Ø ' + de(2 * h.r, 1) + ' mm)' }));
 }
@@ -551,7 +571,8 @@ function slotPlan(items, r, slot) {
   // Körper mit eigenem Slot belegen diesen Slot mit dem Filament ihres Teils
   const users = items.flatMap(p => [p, ...(p.bodies || []).filter(b => b.slot !== null && b.slot !== undefined)
     .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot })),
-    ...textSlots(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Beschriftung') }, r: p.r, slot: s }))]);
+    ...textSlots(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Beschriftung') }, r: p.r, slot: s })),
+    ...paintSlotsOf(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Bemalung') }, r: p.r, slot: s }))]);
   for (const p of users) {
     const ps = partSlot(p), pr = p.r || r;
     if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(t('{part}: {material} im selben Slot wie {main} – es gelten die Filamentwerte von {main}.', { part: p.geom.name, material: pr.m.name, main: r.m.name })); continue; }
@@ -637,7 +658,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
     items.forEach((p, i) => {
       const pl = places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(p.geom, pl);
       q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
-      q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); }); textSlots(p).forEach(s => q.slots.add(s));
+      q.slots.add(partSlot(p)); (p.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(b.slot); }); extraSlots(p).forEach(s => q.slots.add(s));
       q.idx.push(i);
     });
     const tp = planTowers(settings, tpl, plates);
@@ -647,8 +668,9 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   }
   const n = list.length, title = xmlEsc(n === 1 ? list[0].name : n + ' Teile');
   // Netz k (1..n) liegt in object_k.model mit id k; das Objekt im Hauptmodell hat id n+k.
-  const objs = items.map((p, i) => { const tv = textVolumes(i + 1, p); return { g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
-    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r) : [], mods: tv.negs.concat(holeMods(i + 1, p.holes)), vols: bodyVolumes(p.geom, p.bodies, i + 1).concat(tv.vols) }; });
+  const nFil = settings.filament_settings_id.length;
+  const objs = items.map((p, i) => { const tv = textVolumes(i + 1, p), paint = typeof paintAttrsFn === 'function' && p.part ? paintAttrsFn(p.part, {}, nFil) : null; return { g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
+    extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r, p.part) : [], mods: tv.negs.concat(holeMods(i + 1, p.holes)), vols: bodyVolumes(p.geom, p.bodies, i + 1, paint).concat(tv.vols) }; });
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
@@ -879,15 +901,16 @@ function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, 
     }
     // Hinzugefügtes Teil: Körper und Loch-Modifikatoren als Netze, lokal um die Mitte (wie build3mfFiles)
     const tv = textVolumes(1, j);
-    const vols = bodyVolumes(g, j.bodies, 1).concat(tv.vols).map(v => ({ ...v, id: nextId++ })), mods = tv.negs.concat(holeMods(1, j.holes)).map(m => ({ ...m, id: nextId++ }));
+    const paint = typeof paintAttrsFn === 'function' && j.part ? paintAttrsFn(j.part, dmap, nFil) : null;
+    const vols = bodyVolumes(g, j.bodies, 1, paint).concat(tv.vols).map(v => ({ ...v, id: nextId++ })), mods = tv.negs.concat(holeMods(1, j.holes)).map(m => ({ ...m, id: nextId++ }));
     const oid = nextId++, center = [c[0], c[1], (g.mn[2] + g.mx[2]) / 2];
-    const mesh = (pos, id) => { const x = meshObjectXML(pos, center, id); return hasP ? x : x.replace(/ p:UUID="[^"]*"/, ''); };
-    resources.push(...vols.map(v => mesh(v.pos, v.id)), ...mods.map(m => mesh(m.pos, m.id)),
+    const mesh = (pos, id, pt) => { const x = meshObjectXML(pos, center, id, pt); return hasP ? x : x.replace(/ p:UUID="[^"]*"/, ''); };
+    resources.push(...vols.map(v => mesh(v.pos, v.id, v.paint)), ...mods.map(m => mesh(m.pos, m.id)),
       '  <object id="' + oid + '"' + uuidAttr(oid, '61cb-4c03-9d28-80fed5dfa1dc') + ' type="model">\n   <components>\n' +
       vols.concat(mods).map(v => '    <component objectid="' + v.id + '"' + uuidAttr(v.id, 'b206-40ff-9872-83e8017abed1') + ' transform="1 0 0 0 1 0 0 0 1 0 0 0"/>\n').join('') + '   </components>\n  </object>\n');
     const tr = placeTransform(pl, coord(g.z / 2));
     buildXml.push('  <item objectid="' + oid + '"' + uuidAttr(oid, 'b1ec-4553-aec9-835e5b724bb4') + ' transform="' + tr + '" printable="1" />');
-    const own = j.r ? objectOverrides(settings, j.r) : [];
+    const own = j.r ? objectOverrides(settings, j.r, j.part) : [];
     if (own.length) objectChanges.push({ name: g.name, changes: own });
     extraObjs.push({ id: oid, name: xmlEsc(g.name), extruder: Math.min(partSlot(j), nFil - 1) + 1, overrides: own, mods,
       vols: vols.map(v => ({ ...v, slot: v.slot == null ? null : Math.min(v.slot, nFil - 1) })) });
@@ -942,7 +965,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     items.forEach((j, i) => {
       const pl = lay.places[i], [ox, oy] = origin(pl.plate), q = plates[pl.plate], [fw, fd] = footprint(j.geom, pl);
       q.rects.push([pl.x - ox - fw / 2, pl.y - oy - fd / 2, pl.x - ox + fw / 2, pl.y - oy + fd / 2]);
-      q.slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(Math.min(b.slot, nFil - 1)); }); textSlots(j).forEach(s => q.slots.add(Math.min(s, nFil - 1)));
+      q.slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) q.slots.add(Math.min(b.slot, nFil - 1)); }); extraSlots(j).forEach(s => q.slots.add(Math.min(s, nFil - 1)));
       if (j.part && (j.part.painted || (j.part.modSlots || []).length)) q.slots.add('bemalt');
       q.idx.push(i);
     });
@@ -960,7 +983,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     for (const j of items) {
       const id = j.plate || 1, [sx, sy] = shifts.get(id) || [0, 0], pi = id - 1, ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
       plates[pi].rects.push([j.geom.mn[0] + sx - ox, j.geom.mn[1] + sy - oy, j.geom.mx[0] + sx - ox, j.geom.mx[1] + sy - oy]);
-      plates[pi].slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) plates[pi].slots.add(Math.min(b.slot, nFil - 1)); }); textSlots(j).forEach(s => plates[pi].slots.add(Math.min(s, nFil - 1)));
+      plates[pi].slots.add(Math.min(partSlot(j), nFil - 1)); (j.bodies || []).forEach(b => { if (b.slot != null) plates[pi].slots.add(Math.min(b.slot, nFil - 1)); }); extraSlots(j).forEach(s => plates[pi].slots.add(Math.min(s, nFil - 1)));
       if (j.part && j.part.painted) plates[pi].slots.add('bemalt'); // Farben des Designers → mehrfarbig, Turm nötig
     }
     const tp = planTowers(settings, tpl, plates);
@@ -1013,7 +1036,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   for (const j of items) {
     if (j.part.objectId == null || j.part.extra || done.has(j.part.objectId)) continue;   // hinzugefügte Teile: relayout3mf
     done.add(j.part.objectId);
-    const own = objectOverrides(settings, j.r);
+    const own = objectOverrides(settings, j.r, j.part);
     if (own.length) objectChanges.push({ name: j.geom.name, changes: own });
     const esc = String(j.part.objectId).replace(/[^\w-]/g, '');
     if (!new RegExp('<object id="' + esc + '">').test(ms)) { notes.push(t('{part}: keine Objekt-Einstellungen in der 3MF – Slot und eigene Werte bitte in Orca prüfen.', { part: j.geom.name })); continue; }
@@ -1037,7 +1060,51 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
       if (!txt.includes('paint_color="')) continue;
       out[name] = zipLib.strToU8(txt.replace(/paint_color="([0-9A-Fa-f]+)"/g, (all, code) => { try { return 'paint_color="' + paintRemap(code, remap) + '"'; } catch (e) { return all; } }));
     }
+  // eigene Bemalung (js/paint-ui.js) in die Dreiecke des Designers schreiben – nach dem Umschreiben oben, sie hat schon Slot-Nummern
+  writeUserPaint(out, items, zipLib, nFil);
   return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: relayout ? lay.count : shifts.size };
+}
+
+/* Eigene Bemalung auf Objekten des Designers: part.paintSrc sagt, aus welcher Datei und welchem Netz die Dreiecke des Teils
+   stammen (js/import.js). Die Dreiecke dort bekommen je Ebene (Farbe, Stützen, Naht) den eigenen Code (Farbe: Filament =
+   Slot + 1, höchstens nFil) bzw. verlieren die Bemalung („0“ = ausradiert). Mehrere Platzierungen desselben Objekts teilen
+   die Bemalung (wie in OrcaSlicer). */
+function writeUserPaint(out, items, zipLib, nFil) {
+  if (typeof paintRemap !== 'function') return;
+  const byFile = new Map(), done = new Set(), fil = s => Math.min(s - 1, nFil - 1) + 1;
+  for (const j of items) {
+    const p = j.part;
+    if (!p || p.extra || p.objectId == null || !p.paintSrc || done.has(String(p.objectId))) continue;
+    const layers = Object.keys(PAINT_LAYERS).map(l => ({ attr: PAINT_LAYERS[l].attr, codes: paintUserCodes(p, l), map: l === 'color' ? fil : null })).filter(x => x.codes && Object.keys(x.codes).length);
+    if (!layers.length) continue;
+    done.add(String(p.objectId));
+    for (const s of p.paintSrc) {
+      const f = byFile.get(s.path) || byFile.set(s.path, new Map()).get(s.path);
+      if (!f.has(String(s.id))) f.set(String(s.id), { start: s.start, layers });
+    }
+  }
+  for (const [path, objs] of byFile) {
+    const name = Object.keys(out).find(k => k.toLowerCase() === path.replace(/^\//, '').toLowerCase());
+    if (!name) continue;
+    const txt = zipLib.strFromU8(out[name]);
+    out[name] = zipLib.strToU8(txt.replace(/<((?:\w+:)?object)\b([^>]*)>([\s\S]*?)<\/\1>/g, (all, tag, attrs, body) => {
+      const e = objs.get((/\bid="([^"]+)"/.exec(attrs) || [])[1]);
+      if (!e) return all;
+      let i = 0;
+      return '<' + tag + attrs + '>' + body.replace(/<((?:\w+:)?triangle)\b([^>]*?)\s*(\/?)>/g, (tri, ttag, tattrs, close) => {
+        const g = e.start + i++;
+        let a = tattrs, changed = false;
+        for (const L of e.layers) {
+          const code = L.codes[g];
+          if (code == null) continue;
+          changed = true;
+          a = a.replace(new RegExp('\\s*' + L.attr + '="[^"]*"'), '');
+          if (code && code !== '0') a += ' ' + L.attr + '="' + (L.map ? paintRemap(code, L.map) : code) + '"';
+        }
+        return changed ? '<' + ttag + a + (close ? '/' : '') + '>' : tri;
+      }) + '</' + tag + '>';
+    }));
+  }
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.

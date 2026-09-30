@@ -52,6 +52,7 @@ function update(){
   $('orderedIntro').innerHTML=t('Die Bezeichnungen orientieren sich an {slicer}. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.',{slicer:esc(r.printer.slicer)});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
+  renderMatColours(r.m);
   document.body.dataset.printer=r.printer.id;
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
@@ -101,15 +102,46 @@ function update(){
 }
 
 /* ================= AUSWAHLLISTE & MEINE WERTE ================= */
+// Gruppen: eigene Filamente, je Hersteller (js/filaments.js – Anycubic, SUNLU, ELEGOO), allgemeine Profile
+const MAT_BRANDS=['Anycubic','SUNLU','ELEGOO'];
 function fillMaterialSelect(sel){
   const list=allMats(),cur=sel||$('material').value;
   const std=list.filter(m=>m.builtin),own=list.filter(m=>!m.builtin);
   const opt=m=>'<option value="'+esc(m.id)+'">'+(m.overridden?'★ ':'')+esc(m.name)+'</option>';
-  $('material').innerHTML=(own.length?'<optgroup label="'+t('Eigene Filamente')+'">'+own.map(opt).join('')+'</optgroup>':'')+
-    '<optgroup label="'+t('Standardprofile (★ = mit eigenen Werten)')+'">'+std.map(opt).join('')+'</optgroup>';
+  const grp=(label,ms)=>ms.length?'<optgroup label="'+esc(label)+'">'+ms.map(opt).join('')+'</optgroup>':'';
+  $('material').innerHTML=grp(t('Eigene Filamente'),own)+
+    MAT_BRANDS.map(b=>grp(t('{brand} (Herstellerwerte)',{brand:b}),std.filter(m=>m.brand===b))).join('')+
+    grp(t('Allgemeine Profile (★ = mit eigenen Werten)'),std.filter(m=>!m.brand));
   $('material').value=list.some(m=>m.id===cur)?cur:'pla_hs';
   renderMyList();
 }
+/* Farben des Herstellers unter der Filament-Auswahl: Klick trägt Typ und Farbe für den Slot des gewählten Teils ein (wie
+   im Dialog Filament-Slots; mit Drucker-Verbindung als „überschrieben“). Anycubic: Farbcodes aus dem Shop, SUNLU: nach
+   dem Farbnamen (≈). */
+function matSlotTarget(){
+  const p=project&&project.parts[project.selected];
+  return p&&p.slot!=null?p.slot:(typeof defaultSlot==='function'?defaultSlot():0);
+}
+function renderMatColours(m){
+  const box=$('matColours'),c=m&&m.colours;
+  box.classList.toggle('hidden',!c||!c.length);
+  if(!c||!c.length){box.innerHTML='';return}
+  const approx=c.some(x=>x[2]),slot=matSlotTarget();
+  box.innerHTML='<div class="mc-head"><b>'+esc(t('Farben von {brand}',{brand:m.brand||''}))+'</b> <span class="muted">'+esc(t('{n} Farben – Klick trägt sie für Slot {slot} ein',{n:c.length,slot:slot+1}))+'</span></div>'+
+    '<div class="mc-list">'+c.map((x,i)=>'<button type="button" class="mc-swatch" data-mat-colour="'+i+'" style="--sw:'+esc(x[1])+'" title="'+esc(x[0]+' · '+x[1]+(x[2]?' ('+t('ungefähr')+')':''))+'" aria-label="'+esc(x[0])+'"></button>').join('')+'</div>'+
+    '<div class="mc-foot muted">'+(approx?esc(t('≈ SUNLU nennt keine Farbcodes – Farben nach dem Namen gewählt.'))+' ':'')+(m.url?'<a href="'+esc(m.url)+'" target="_blank" rel="noopener">'+esc(t('Produktseite'))+'</a>':'')+'</div>';
+}
+$('matColours').addEventListener('click',e=>{
+  const b=e.target.closest('[data-mat-colour]');if(!b||!lastResult)return;
+  const m=getMat($('material').value),c=m.colours&&m.colours[+b.dataset.matColour];if(!c)return;
+  const id=lastResult.printer.id,slot=matSlotTarget(),rows=((store.settings.manualSlots||{})[id]||[]).slice();
+  const live=typeof slotState!=='undefined'&&slotState.live&&slotState.printer===id;
+  rows[slot]={type:KIND_LABEL[m.kind]&&m.kind!=='tpu'?KIND_LABEL[m.kind]:'TPU',colour:c[1].toUpperCase(),override:!!live};
+  for(let i=0;i<rows.length;i++)if(!rows[i])rows[i]=null;
+  store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:rows};persist();
+  toast(t('Slot {n}: {name} {colour}',{n:slot+1,name:m.name,colour:c[0]})+(live?' '+t('(überschreibt die Angabe des Druckers)'):''));
+  update();
+});
 function renderMyList(){
   const list=allMats().filter(m=>m.overridden||!m.builtin);
   $('myList').innerHTML=list.length?list.map(m=>'<div class="mylist-item"><span>'+esc(m.name)+'<br><span class="muted" style="font-size:12px">'+(m.builtin?t('Standardprofil, eigene Werte'):t('Eigenes Filament'))+' · '+de(m.refD,m.refD===0.25?2:1)+' mm '+(NOZZLE_MATERIALS[m.refMat||'steel_hardened']||NOZZLE_MATERIALS.steel_hardened).label+'</span></span><button class="linkbtn" data-sel="'+esc(m.id)+'" type="button">'+t('Auswählen')+'</button></div>').join('')

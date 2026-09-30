@@ -5,10 +5,20 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Neu
+- **Filamente von Anycubic und SUNLU** in ② Druckwerte, nach Hersteller gruppiert (16 Anycubic, 18 SUNLU) mit den **Druckwerten der Hersteller** (Anycubic: eigene Kobra-S1-Profile aus OrcaSlicer bzw. Produktseite; SUNLU: Produktseiten und SUNLUs Slicer-Profile) und ihren **Farben** (Anycubic mit den offiziellen Farbcodes aus dem Shop, SUNLU nach Farbnamen). Farbe anklicken trägt sie für den Slot des Teils ein. Alle 34 Profile mit der Orca-CLI geslict.
+- **Stützen und Naht malen** (Bemalen → Stützen / Naht): erzwingen/verhindern wie in OrcaSlicer; erzwungene Stützen an einem Teil ohne Stützen werden als „nur gemalte Stellen“ (tree(manual)) exportiert – mit der Orca-CLI geprüft.
+- **Lücken füllen** und **Vorschau beim Füllen** im Bemalen-Feld; Hinweis, wenn die Farbzuordnung selbst übermalte Stellen nicht mehr betrifft.
+- **Bemalen wie in OrcaSlicer** (Werkzeugleiste, Pinsel): Farbe je Fläche mit Kreis, Kugel, Dreieck, Füllen (nach Flächenwinkel) und Höhenbereich; Radierer (auch Umschalt), alles entfernen; Größe per Regler oder Alt+Mausrad, Slot per Klick oder Taste 1–9. Kreis und Kugel teilen Dreiecke am Pinselrand fein auf – gespeichert im Orca-Format (paint_color). Die Lage der Teilstücke ist mit der Orca-CLI nachgemessen, der G-Code druckt genau die bemalte Fläche. Geht auf eigenen Modellen und auf Makerworld-Objekten (die Bemalung des Designers bleibt daneben erhalten), gilt für alle Kopien, mit Rückgängig, übersteht Neuladen, auf dem Handy mit dem Finger.
+- Bemalung des Designers wird in der 3D-Ansicht jetzt genau gezeigt (auch geteilte Dreiecke), getrennte Teile einer Makerworld-3MF behalten ihre Bemalung beim Export.
 - **Rückgängig / Wiederholen** für das ganze Projekt: Strg/⌘+Z, Strg/⌘+Umschalt+Z (oder Strg+Y) und zwei Knöpfe vorn in der Werkzeugleiste – Slot, Größe, Drehung, Platte, Kopien, Entfernen, Farbzuordnung, Druckreihenfolge, Beschriftung, Bohrlöcher (bis 60 Schritte).
 - **Beschriftung auf Objekten des Designers** (Makerworld-/Orca-3MF): erhaben mit eigenem Slot oder vertieft; kommt als weiteres Bauteil ins Objekt, wie OrcaSlicer es speichert (mit Orca-CLI geprüft).
 
+### Behoben
+- Gemalte Stützen und Naht lösten im Tab ③ kein neues Slicen aus – die Vorschau zeigte die alten Stützen.
+
 ### Verbessert
+- Pinselstriche werden auch bei großen bemalten Flächen flüssig angezeigt (nur die geänderten Dreiecke).
+- Test `tests/paint-orca.js` (auf GitHub): Farbe, Stützen und Naht landen im Orca-G-Code genau dort, wo gemalt wurde; `tests/filaments.js` prüft die Herstellerprofile.
 - **Bohrlöcher bleiben gewählt**, wenn ein Teil gedreht oder in der Größe geändert wird (das Loch wird im neuen Netz wiedergefunden).
 - Test `tests/designer-3mf.js`: Makerworld-Aufbau ohne echte Datei – Bemalung, Farb-Modifikator, Drehen und Größe, Text am Objekt, Objekt für Objekt; mit Orca-CLI geslict (auch auf GitHub). Bedientest prüft zusätzlich Rückgängig, Bohrlöcher nach Größe/Drehung und das Wiederherstellen nach Neuladen.
 - Aufgeräumt: alter Abschnitt „Farben des Designers“ und die alte Körperliste (beides steckt seit 10.6 in der Filamentliste und der Teileliste).

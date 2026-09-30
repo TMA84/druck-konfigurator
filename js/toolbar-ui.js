@@ -21,6 +21,8 @@ function updateToolbar() {
   dis('tbScale', noPart);
   dis('tbRotate', noPart);
   dis('tbText', noPart);
+  dis('tbPaint', noPart);
+  if (typeof PT !== 'undefined' && PT.on && !p) paintMode(false);
   dis('btnPlate', noPart || (!many && t('nur bei mehreren Teilen')));
 }
 

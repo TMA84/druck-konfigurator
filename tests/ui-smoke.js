@@ -414,6 +414,39 @@ async function runSmoke(opts={}){
       const got=project&&JSON.stringify(project.parts.map(q=>[q.name,q.slot,q.scale,q.R,+q.geom.x.toFixed(2),+q.geom.z.toFixed(2)]));
       ok(okR&&got===want,'Projekt wiederhergestellt: Teile, Slot, Größe, Drehung wie vorher',got);
       setPartScale(project.parts[0],[1,1,1]);setPartRotation(project.parts[0],IDENTITY3);update();await wait(100); }
+    // Filamente der Hersteller (Tab ②): Gruppen je Marke, Farben, Klick trägt die Farbe für den Slot ein
+    { const groups=[...$('material').querySelectorAll('optgroup')].map(g=>g.label);
+      ok(groups.some(g=>/^Anycubic/.test(g))&&groups.some(g=>/^SUNLU/.test(g)),'Filament: Gruppen Anycubic und SUNLU');
+      const before=$('material').value;$('material').value='sl_pla_plus2';$('material').dispatchEvent(new Event('change',{bubbles:true}));await wait(200);
+      ok(/Herstellerwerte/.test($('matBadge').textContent)&&$('matColours').querySelectorAll('[data-mat-colour]').length>20,'SUNLU PLA+ 2.0: Herstellerwerte und Farben');
+      const saved=JSON.stringify(store.settings.manualSlots||null);
+      $('matColours').querySelector('[data-mat-colour="5"]').click();await wait(200);
+      const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),sl=dialogSlots(tpl)[project.parts[project.selected].slot??defaultSlot()];
+      ok(sl&&sl.colour==='#002FA7'&&sl.type==='PLA','Farbe angeklickt: Slot bekommt PLA Klein Blue');
+      store.settings.manualSlots=JSON.parse(saved)||undefined;if(!store.settings.manualSlots)delete store.settings.manualSlots;persist();
+      $('material').value=before;$('material').dispatchEvent(new Event('change',{bubbles:true}));await wait(150); }
+    // Bemalen (Werkzeugleiste): Strich mit der Maus auf dem Teil, Umschalt radiert, Rückgängig, Export mit paint_color, übersteht Neuladen
+    { selectPart(0);setTab('3d');await wait(300);const p=project.parts[0];p.paintUser=null;
+      ok(!$('tbPaint').disabled,'Werkzeugleiste: Bemalen verfügbar');
+      $('tbPaint').click();await wait(150);
+      ok(!$('paintPanel').classList.contains('hidden')&&$('ptTools').children.length===6&&$('ptSlots').querySelectorAll('[data-pt-slot]').length>1,'Bemalen: Feld mit 6 Werkzeugen und Slots');
+      $('ptSlots').querySelector('[data-pt-slot="1"]').click();await wait(30);
+      const cv=document.querySelector('#stage canvas'),r=cv.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+      const pe=(type,x,y,extra={})=>cv.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y,button:0,buttons:type==='pointerup'?0:1,pointerId:7,pointerType:'mouse',isPrimary:true,...extra}));
+      pe('pointerdown',cx,cy);for(let k=1;k<=6;k++){pe('pointermove',cx+k*5,cy);await wait(16)}pe('pointerup',cx+30,cy);await wait(500);
+      const pu=p.paintUser;
+      ok(!!pu&&Object.keys(pu.codes).length>0&&JSON.stringify(pu.slots)==='[1]','Strich auf dem Teil: bemalt mit Slot 2 ('+(pu?Object.keys(pu.codes).length:0)+' Dreiecke)');
+      menuClick('export3mf');await wait(50);$('export3mfSave').click();await wait(150);
+      const z=fflate.unzipSync(await blobBytes(downloads.filter(d=>d.name.endsWith('.3mf')).pop())),mesh=Object.keys(z).filter(k=>/3D\/Objects\/.*\.model$/.test(k)).map(k=>fflate.strFromU8(z[k])).join('');
+      ok(/paint_color="[0-9A-F]+"/.test(mesh),'Export: Bemalung als paint_color im Netz');
+      pe('pointerdown',cx+15,cy,{shiftKey:true});pe('pointerup',cx+15,cy,{shiftKey:true});await wait(500);
+      ok(p.paintUser!==pu,'Umschalt + Klick radiert');
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true}));await wait(600);
+      ok(project.parts[0].paintUser&&project.parts[0].paintUser.rev===pu.rev,'Strg+Z stellt die Bemalung vor dem Radieren wieder her');
+      update();await wait(1600);project=null;await restoreProject();await wait(300);
+      ok(project&&project.parts[0].paintUser&&JSON.stringify(project.parts[0].paintUser.codes)===JSON.stringify(pu.codes),'Bemalung übersteht Neuladen');
+      paintMode(false);await wait(50);ok($('paintPanel').classList.contains('hidden')&&!$('tbPaint').classList.contains('active'),'Fertig schließt das Feld');
+      project.parts[0].paintUser=null;update();await wait(100); }
     // Modell hinzufügen statt ersetzen
     addMode=true;await dropFile(mk('deckel.stl',50,30,4));await wait(300);
     ok(project.parts.length===4&&/ \+ /.test(project.name),'Modell hinzufügen erweitert das Projekt ('+project.name+')');
