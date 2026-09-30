@@ -448,6 +448,8 @@ function liveMode(mode) {
   document.querySelector('.wb-video').classList.toggle('hidden', live);
   document.querySelectorAll('[data-wb-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.wbView === mode)));
   if (live) { if (lv.renderer) setTimeout(lvResize); if (wb.st) liveUpdate(wb.st); }
+  // Kamera nur, wenn sie zu sehen ist (js/workbench-ui.js wbCamAuto)
+  if (live) { if (wb.player) wbCamOff(); } else if (typeof wbCamAuto === 'function') wbCamAuto();
 }
 document.querySelectorAll('[data-wb-view]').forEach(b => b.addEventListener('click', () => liveMode(b.dataset.wbView)));
 $('wbLiveGhost').value = lvGhostMode();

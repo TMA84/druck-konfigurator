@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **Kamera startet von selbst**, sobald sie im Tab ④ zu sehen ist (Ansicht „Kamera“, Drucker verbunden); in der 3D-Ansicht läuft kein Kamerastrom im Hintergrund. Von Hand gestoppt bleibt sie aus, bis der Tab wieder geöffnet wird.
+
 ## [10.8.2] – 2026-09-30
 
 ### Behoben

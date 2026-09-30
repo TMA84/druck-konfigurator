@@ -16,8 +16,17 @@ const wbMin = m => m == null ? '–' : m >= 60 ? Math.floor(m / 60) + ' h ' + (m
 const wbDeg = v => v == null ? '–' : Math.round(v) + ' °C';
 
 function onWorkbenchTab(active) {
-  if (active) wbPoll();
+  if (active) { wb.camUserOff = false; wbPoll(); }
   else { clearTimeout(wb.timer); wbCamOff(); }
+}
+/* Kamera startet von selbst, sobald sie zu sehen ist: Tab ④ offen, Ansicht „Kamera“, Drucker verbunden und mit Kamera.
+   Von Hand gestoppt bleibt sie aus, bis der Tab wieder geöffnet wird; in der 3D-Ansicht läuft kein Strom im Hintergrund. */
+function wbCamAuto() {
+  if (wb.player || wb.camUserOff || document.hidden || document.body.dataset.tab !== 'printer') return;
+  if (typeof lv !== 'undefined' && lv.mode !== 'cam') return;
+  const st = wb.st;
+  if (!st || wb.err || !st.connected || st.camera === false || !wbHost()) return;
+  wb.camRetries = 0; wbCamStart(false);
 }
 
 async function wbPoll() {
@@ -31,7 +40,8 @@ async function wbPoll() {
   catch (e) { wb.err = t(e.message); }
   wbRender();
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
-  if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)   // Warteschlange (js/queue-ui.js)
+  if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)
+  wbCamAuto();   // Warteschlange (js/queue-ui.js)
   wb.timer = setTimeout(wbPoll, WB_POLL_MS);
 }
 
@@ -265,7 +275,7 @@ function wbCamStart(reconnect) {
     }
   }, 1000);
 }
-$('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); return; } wb.camRetries = 0; wbCamStart(false); });
+$('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); wb.camUserOff = true; return; } wb.camUserOff = false; wb.camRetries = 0; wbCamStart(false); });
 // Fenster/Tab wieder vorn: frisch verbinden (im Hintergrund drosselt der Browser, danach käme ein altes Bild)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && wb.camOn && wb.player) { wb.camRetries = 0; wbCamStart(true); } });
 
