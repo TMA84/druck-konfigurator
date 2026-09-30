@@ -41,52 +41,113 @@ function slotColour(i, slots) {
   return s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : BODY_PALETTE[i % BODY_PALETTE.length];
 }
 const bodySlot = (part, b) => b.slot ?? part.slot ?? defaultSlot();
+// Anzeige-Farbe: sehr dunkle Filamente (schwarzes ASA …) etwas anheben, sonst verschwinden sie auf dem dunklen Hintergrund
+function viewRgb(hex) {
+  const c = hexRgb(hex), l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], min = 0.22;
+  if (l >= min) return c;
+  const k = (min - l) / (1 - l);
+  return c.map(v => v + (1 - v) * k);
+}
+// Farbe des Designers für eine Filamentnummer (0-basiert) – für die Ansicht „Designer“
+function designerHex(d) {
+  const c = project && project.threemf && project.threemf.settings && (project.threemf.settings.filament_colour || [])[d];
+  return /^#[0-9a-f]{6}$/i.test(c || '') ? c : null;
+}
+const dView = () => typeof colourView === 'function' && colourView() === 'designer';
+// Anzeigefarbe: Slot s oder – in der Ansicht „Designer“ – Farbe d des Designers (wenn bekannt)
+const showHex = (s, d, slots) => (dView() && d != null && designerHex(d)) || slotColour(s, slots);
+const rgbHex = c => '#' + c.map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('');
+/* Bemalung je Dreieck (part.paintState, Filament des Designers 1-basiert, 0 = Slot des Teils) als Farbbereiche für
+   Viewer.setPaint: zusammenhängende Dreiecke gleicher Farbe als ein Bereich (einmal je Netz), Farbe nach designMap. */
+const paintRunCache = new WeakMap();
+function paintRuns(part) {
+  let r = paintRunCache.get(part.geom);
+  if (r) return r;
+  const ps = part.paintState; r = [];
+  for (let i = 0; i < ps.length;) { let j = i + 1; while (j < ps.length && ps[j] === ps[i]) j++; r.push({ start: i, count: j - i, st: ps[i] }); i = j; }
+  paintRunCache.set(part.geom, r);
+  return r;
+}
+function paintedColours(part, slots, offset = 0) {
+  const map = (project.threemf && project.threemf.designMap) || {}, own = part.slot ?? defaultSlot(), cache = {};
+  return paintRuns(part).map(r => { const d = r.st ? r.st - 1 : part.dSlot, s = r.st ? map[d] ?? d : own, key = s + '/' + d;
+    return { start: offset + r.start, count: r.count, rgb: cache[key] || (cache[key] = viewRgb(showHex(s, d, slots))) }; });
+}
+// Farb-Modifikatoren eines Teils als farbige Schicht; xf = Umrechnung der Koordinaten (ganze Platte) oder null
+function modOverlayFor(part, slots, xf) {
+  if (typeof modifierOverlay !== 'function') return [];
+  const map = (project.threemf && project.threemf.designMap) || {};
+  return modifierOverlay(part).map(o => {
+    let pos = o.pos;
+    if (xf) { pos = new Float32Array(o.pos.length); for (let i = 0; i < pos.length; i += 3) { const q = xf(o.pos[i], o.pos[i + 1], o.pos[i + 2]); pos[i] = q[0]; pos[i + 1] = q[1]; pos[i + 2] = q[2]; } }
+    return { pos, color: rgbHex(viewRgb(showHex(map[o.dSlot] ?? o.dSlot, o.dSlot, slots))) };
+  });
+}
 
 // Vorschau: alle Körper in ihrer Slotfarbe (Häkchen) oder ein Körper hervorgehoben (Zeile unter der Maus)
 function paintBodies(part, highlight) {
   let paint = null;
+  if (typeof plateView !== 'undefined' && plateView && shownPlate) {
+    // ganze Platte: jedes Teil (und seine Körper) in seiner Slotfarbe, das gewählte Teil beim Überfahren hervorgehoben
+    let over = [];
+    if ($('bodyShow').checked) {
+      const slots = slotChoices();
+      paint = shownPlate.ranges.flatMap(r => { const q = project.parts[r.i];
+        if (q && q.paintState && q.paintState.length === r.count) return paintedColours(q, slots, r.start);
+        return q && q.bodies ? q.bodies.map(b => ({ start: r.start + b.start, count: b.count, rgb: viewRgb(showHex(bodySlot(q, b), b.dSlot, slots)) }))
+          : [{ start: r.start, count: r.count, rgb: viewRgb(showHex(q ? q.slot ?? defaultSlot() : 0, q && q.dSlot, slots)) }]; });
+      over = shownPlate.ranges.flatMap(r => project.parts[r.i] ? modOverlayFor(project.parts[r.i], slots, r.xf) : []);
+    }
+    Viewer.setPaint(paint);
+    if (Viewer.setOverlay) Viewer.setOverlay(over);
+    return;
+  }
+  const slots = slotChoices();
   if (part && part.bodies) {
-    const slots = slotChoices();
     if (highlight != null) paint = part.bodies.map((b, j) => ({ start: b.start, count: b.count, rgb: j === highlight ? [1, .8, 0] : [.35, .37, .4] }));
-    else if ($('bodyShow').checked) paint = part.bodies.map(b => ({ start: b.start, count: b.count, rgb: hexRgb(slotColour(bodySlot(part, b), slots)) }));
+    else if ($('bodyShow').checked) paint = part.bodies.map(b => ({ start: b.start, count: b.count, rgb: viewRgb(showHex(bodySlot(part, b), b.dSlot, slots)) }));
+  } else if (part && part.paintState && part.paintState.length === part.geom.n && $('bodyShow').checked) {
+    paint = paintedColours(part, slots);
+  } else if (part && part.modVols && $('bodyShow').checked) {
+    // nur Modifikatoren: das Teil selbst in seiner Slotfarbe, damit die Farben zusammenpassen
+    paint = [{ start: 0, count: part.geom.n, rgb: viewRgb(showHex(part.slot ?? defaultSlot(), part.dSlot, slots)) }];
   }
   Viewer.setPaint(paint);
+  if (Viewer.setOverlay) Viewer.setOverlay(part && $('bodyShow').checked && highlight == null ? modOverlayFor(part, slots, null) : []);
   if (miniReady) MiniView.setPaint(paint);
 }
 
 function renderBodies() {
   const box = $('bodyBox'), part = project && project.parts[project.selected];
   const joinable = !!part && !project.threemf && project.parts.length > 1;
-  const multi = !!part && !!part.bodies;
-  box.classList.toggle('hidden', !multi && !joinable);
+  const multi = !!part && !!part.bodies, modColours = !!part && !!((part.modVols && part.modVols.length) || part.paintState);
+  box.classList.toggle('hidden', !multi && !joinable && !modColours);
   if (!part) { paintBodies(null); return; }
+  if (typeof secSum === 'function') secSum('bodies', multi ? t('{n} Körper', { n: part.bodies.length }) : '');
   const slots = slotChoices(), own = part.slot ?? null;
   const places = samePlacements(part), plates = [...new Set(places.map(p => p.plate || 1))].sort((a, b) => a - b);
   $('bodyInfo').innerHTML = multi
-    ? t('{n} Körper – jeder kann einen eigenen Slot und damit eine eigene Farbe bekommen. „wie Teil“ = {slot}.', { n: part.bodies.length, slot: own === null ? t('Slot aus dem Export-Dialog') : 'Slot ' + (own + 1) }) +
+    ? t('{n} Körper – jeder kann einen eigenen Slot bekommen: oben in der Teileliste unter dem Teil. „wie Teil“ = {slot}.', { n: part.bodies.length, slot: own === null ? t('Slot aus dem Export-Dialog') : 'Slot ' + (own + 1) }) +
       (places.length > 1 ? t(' Gilt für alle {n} Platzierungen dieses Objekts (Platte {plates}).', { n: places.length, plates: plates.join(', ') }) : '')
     : t('Gehören mehrere Dateien zu <b>einem</b> mehrfarbigen Modell (z. B. je Farbe eine STL), hier zu einem Teil vereinen – die Lage aus den Dateien bleibt.');
   if (multi) {
     const dims = bodyDims(part);
-    $('bodyList').innerHTML = part.bodies.map((b, j) => {
-      const note = typeof slotOriginNote === 'function' ? slotOriginNote() : '';
-      const opts = '<option value="">' + t('wie Teil') + '</option>' + slots.map(s => '<option value="' + s.idx + '"' + (b.slot === s.idx ? ' selected' : '') + '>Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) + note : '') + '</option>').join('');
-      return '<li data-body="' + j + '"><span class="pslot" style="background:' + slotColour(bodySlot(part, b), slots) + '"></span>' +
-        '<span class="bname" title="' + esc(t(b.name)) + '">' + esc(t(b.name)) + '<small>' + dims[j].map(v => de(v, v < 10 ? 1 : 0)).join('×') + ' mm</small></span>' +
-        '<select data-body-slot="' + j + '" aria-label="' + t('Slot für {name}', { name: esc(t(b.name)) }) + '">' + opts + '</select></li>';
-    }).join('');
+    // Slot je Körper: in der Teileliste (Zeile des gewählten Teils, wie die Unterobjekte in OrcaSlicer)
+    $('bodyList').innerHTML = '';
   } else $('bodyList').innerHTML = '';
   $('bodyJoin').classList.toggle('hidden', !joinable);
   if (joinable) $('bodyJoinSel').innerHTML = project.parts.map((p, i) => i === project.selected ? '' : '<option value="' + i + '">' + esc(p.name) + '</option>').join('');
-  $('bodySplit').classList.toggle('hidden', !multi || !!project.threemf);
+  $('bodySplit').classList.toggle('hidden', !multi);
   paintBodies(part);
 }
 
-$('bodyList').addEventListener('change', e => {
-  const sel = e.target.closest('[data-body-slot]'); if (!sel) return;
-  const part = project.parts[project.selected], j = +sel.dataset.bodySlot, v = sel.value === '' ? null : +sel.value;
-  samePlacements(part).forEach(p => { if (p.bodies && p.bodies[j]) p.bodies[j].slot = v; });
-  update();
+$('bodyList').addEventListener('click', e => {
+  const c = e.target.closest('[data-body-slot]'); if (!c) return;
+  const part = project.parts[project.selected], j = +c.dataset.bodySlot, b = part.bodies[j];
+  openSlotPicker(c, b.slot ?? null, { title: t('Slot für {name}', { name: t(b.name) }), std: t('wie Teil'), stdSlot: part.slot ?? defaultSlot() }, v => {
+    samePlacements(part).forEach(p => { if (p.bodies && p.bodies[j]) p.bodies[j].slot = v; });
+    update();
+  });
 });
 $('bodyList').addEventListener('mouseover', e => { const li = e.target.closest('[data-body]'); if (li) paintBodies(project.parts[project.selected], +li.dataset.body); });
 $('bodyList').addEventListener('mouseleave', () => paintBodies(project.parts[project.selected]));
@@ -96,7 +157,7 @@ function replaceParts(parts, selected) {
   project.parts = parts;
   if (!project.threemf) project.platesFixed = false;
   parts.forEach((p, i) => { p.id = i; });
-  $('partList').classList.toggle('hidden', parts.length < 2);
+  $('partList').classList.remove('hidden');
   selectPart(selected);
 }
 
@@ -115,11 +176,16 @@ $('bodyJoinBtn').addEventListener('click', () => { const j = +$('bodyJoinSel').v
 
 // Jeder Körper wird ein eigenes Teil (Lage wie bisher, Slot vom Körper oder Teil)
 $('bodySplit').addEventListener('click', () => {
-  const part = project.parts[project.selected], i = project.selected;
+  const part = project.parts[project.selected], i = project.selected, tm = project.threemf;
   const pieces = part.bodies.map(b => {
     const name = b.fromPart ? b.name : part.name + ' · ' + b.name, origPos = part.origPos.slice(b.start * 9, (b.start + b.count) * 9);
-    return { ...part, name, origPos, geom: makeGeom(name, rotatePositions(origPos, part.R)), slot: b.slot ?? part.slot ?? null, input: part.input && { ...part.input }, bodies: null, holes: [], holeGeom: null, holeCands: null };
+    const piece = { ...part, name, origPos, geom: partGeom({ ...part, name, origPos }), slot: b.slot ?? part.slot ?? null, input: part.input && { ...part.input }, bodies: null, holes: [], holeGeom: null, holeCands: null, copyGroup: null };
+    // aus einer Makerworld-3MF: eigene Teile mit eigenem Netz (das Objekt des Designers entfällt); Bemalung des Körpers bleibt
+    if (tm) Object.assign(piece, { extra: true, objectId: null, instance: 0, modSlots: [], modVols: [], painted: false, dSlot: null,
+      paintState: part.paintState ? part.paintState.slice(b.start, b.start + b.count) : null, paintSlots: part.paintState ? part.paintSlots : [] });
+    return piece;
   });
+  if (tm) tm.removed = true;
   replaceParts([...project.parts.slice(0, i), ...pieces, ...project.parts.slice(i + 1)], i);
   toast(t('{name} in {n} Teile getrennt', { name: part.name, n: pieces.length }));
 });

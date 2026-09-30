@@ -55,6 +55,30 @@ function renderPartScope() {
   sel.innerHTML = '<option value="">' + t('wie beim Export gewählt') + '</option>' +
     slots.map(s => '<option value="' + s.idx + '">Slot ' + (s.idx + 1) + (s.type ? ' · ' + esc(s.type) + (typeof slotOriginNote === 'function' ? slotOriginNote() : '') : '') + '</option>').join('');
   sel.value = p.slot === null || p.slot === undefined || p.slot >= slots.length ? '' : String(p.slot);
+  renderPartUses(p, slots);
+}
+/* „Druckt aus“: alle Slots, die das Teil nutzt – Grundkörper, Körper, Farb-Modifikatoren und Bemalung des Designers
+   (umgelegt über designMap), erhabene Beschriftung. Die Druckwerte gelten für alle diese Slots (die 3MF schreibt die
+   Filamentwerte des Teils auch dorthin); liegt in einem Slot eine andere Filamentart, warnt die Zeile. */
+function renderPartUses(p, slots) {
+  const def = typeof defaultSlot === 'function' ? defaultSlot() : 0, map = (project.threemf && project.threemf.designMap) || {}, uses = new Map();
+  const add = (s, why) => { if (s == null) return; if (!uses.has(s)) uses.set(s, new Set()); uses.get(s).add(why); };
+  add(p.slot ?? def, t('Grundkörper'));
+  (p.bodies || []).forEach(b => { if (b.slot != null) add(b.slot, t('Körper')); });
+  (p.modSlots || []).forEach(d => add(map[d] ?? d, t('Modifikator')));
+  (p.paintSlots || []).forEach(d => add(map[d] ?? d, t('Bemalung')));
+  (p.texts || []).filter(x => x.mode !== 'engraved').forEach(x => add(x.slot ?? p.slot ?? def, t('Beschriftung')));
+  const box = $('partUses');
+  if (uses.size < 2) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const mat = getMat($('material').value), grp = typeof TEMP_GROUP !== 'undefined' ? TEMP_GROUP[mat.kind] : null, odd = [];
+  const list = [...uses].sort((a, b) => a[0] - b[0]).map(([s, why]) => {
+    const x = slots[s] || {}, k = typeof kindOfType === 'function' && x.type ? kindOfType(x.type) : null;
+    if (grp && k && TEMP_GROUP[k] && TEMP_GROUP[k] !== grp) odd.push('Slot ' + (s + 1) + ' ' + x.type);
+    return '<span class="use">' + slotChipHTML(s, s, 'tabindex="-1" disabled', '') + '<span>' + (x.type ? esc(x.type) + ' · ' : '') + esc([...why].join(', ')) + '</span></span>';
+  }).join('');
+  box.innerHTML = '<span class="use-head">' + t('Druckt aus') + '</span>' + list +
+    (odd.length ? '<p class="note bad small">' + t('{slots}: andere Filamentart als „{mat}“ – die Druckwerte gelten für alle Slots des Teils, so slict OrcaSlicer nicht. Slot mit passendem Filament wählen.', { slots: odd.join(', '), mat: esc(mat.name) }) + '</p>' : '');
 }
 $('partSlotAll').addEventListener('click', () => {
   const v = $('partSlot').value;
@@ -63,8 +87,7 @@ $('partSlotAll').addEventListener('click', () => {
 $('partPick').addEventListener('change', () => { const i = +$('partPick').value; if (i !== project.selected) selectPart(i); });
 $('partSlot').addEventListener('change', () => {
   const p = project.parts[project.selected], v = $('partSlot').value;
-  samePlacements(p).forEach(x => { x.slot = v === '' ? null : +v; });
-  update();
+  setPartSlot(p, v === '' ? null : +v);     // stellt auch das Filament passend zum Slot um (js/slot-picker.js)
 });
 
 // Je Teil ein eigenes Ergebnis; Drucker, Düse und Überhangwinkel gelten für alle
@@ -90,3 +113,9 @@ function materialForSlotType(type, current) {
   const m = mats.find(x => slotMatchesKind(type, x.kind));
   return m ? m.id : current;
 }
+
+// Filament von Hand gewählt: dann folgt es dem Slot nicht mehr automatisch (js/slot-picker.js adoptSlotMaterialFor)
+$('material').addEventListener('change', () => {
+  const p = project && project.parts[project.selected];
+  if (p) samePlacements(p).forEach(x => { x.matManual = true; });
+});

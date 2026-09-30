@@ -220,6 +220,22 @@ function faceAnchor(geom, tri, point, region) {
 // Anker (geom) → Anker in origPos-Koordinaten des Teils
 function anchorToOrig(a, R) { R = R || TEXT_ID3; return { p: matTVec(R, a.p), n: matTVec(R, a.n), u: matTVec(R, a.u) }; }
 
+/* Skaliertes Teil (part.scale, js/orient.js): der Anker wandert mit der Oberfläche mit (Mitte der Grundfläche als Bezug),
+   die Schrift behält ihre Höhe. textScaled: gespeicherter Text → für das aktuelle (skalierte) Netz; anchorUnscaled: auf dem
+   skalierten Netz gewählter Punkt → wie ohne Skalierung (so wird er gespeichert). */
+const txPivot = g => [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]];
+const txIsScaled = part => !!(part && part.scale && (part.scale[0] !== 1 || part.scale[1] !== 1 || part.scale[2] !== 1));
+function textScaled(tx, part) {
+  if (!txIsScaled(part) || !tx || !tx.anchor) return tx;
+  const R = part.R || TEXT_ID3, pv = txPivot(part.geom), s = part.scale, pr = matVec(R, tx.anchor.p);
+  return { ...tx, anchor: { ...tx.anchor, p: matTVec(R, [0, 1, 2].map(k => pv[k] + (pr[k] - pv[k]) * s[k])) } };
+}
+function anchorUnscaled(a, part) {
+  if (!txIsScaled(part) || !a) return a;
+  const pv = txPivot(part.geom), s = part.scale;
+  return { ...a, p: [0, 1, 2].map(k => pv[k] + (a.p[k] - pv[k]) / s[k]) };
+}
+
 /* Rahmen des Textes in geom-Koordinaten: {o, u, v, n} (Drehung tx.rot in 90°-Schritten eingerechnet) */
 function textFrame(tx, R) {
   R = R || TEXT_ID3;

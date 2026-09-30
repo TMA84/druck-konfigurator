@@ -48,6 +48,27 @@ function rotatePositions(pos, R) {
   return out;
 }
 
+/* Größe: part.scale = [sx, sy, sz] (1 = Originalgröße), angewandt nach der Drehung um die Mitte der Grundfläche
+   (Mitte in X/Y, Unterkante in Z) – das Teil bleibt so auf dem Bett stehen und an seinem Platz. */
+const isScaled = s => !!s && (s[0] !== 1 || s[1] !== 1 || s[2] !== 1);
+function scalePivot(pos) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i++) { const k = i % 3; if (pos[i] < mn[k]) mn[k] = pos[i]; if (pos[i] > mx[k]) mx[k] = pos[i]; }
+  return [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, mn[2]];
+}
+function scalePositions(pos, s, pivot) {
+  if (!isScaled(s)) return pos;
+  const pv = pivot || scalePivot(pos), out = new Float32Array(pos.length);
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) out[i + k] = pv[k] + (pos[i + k] - pv[k]) * s[k];
+  return out;
+}
+// Netz eines Teils aus Originalpunkten, Drehung und Größe – überall, wo part.geom neu entsteht
+function partPositions(part) {
+  const R = part.R, rotated = R && R.some((v, i) => v !== IDENTITY3[i]) ? rotatePositions(part.origPos, R) : part.origPos;
+  return scalePositions(rotated, part.scale);
+}
+const partGeom = part => makeGeom(part.name, partPositions(part));
+
 // Flächenrichtungen nach Gesamtfläche; dazu die sechs Achsrichtungen (für Teile ohne große Ebenen).
 function candidateDirections(pos) {
   const n = pos.length / 9, groups = new Map();

@@ -12,7 +12,7 @@ document.addEventListener('drop',e=>{
   const files=e.dataTransfer&&e.dataTransfer.files;if(files&&files.length)loadFiles([...files]);
 });
 input.addEventListener('change',()=>{if(input.files.length)loadFiles([...input.files])});
-$('clear').addEventListener('click',()=>{input.value='';project=null;geom=null;$('fileinfo').textContent=t('Noch keine Datei geladen.');clearModel();update()});
+$('clear').addEventListener('click',()=>{input.value='';project=null;if(typeof setPrintSequence==='function')setPrintSequence(false);geom=null;$('fileinfo').textContent=t('Noch keine Datei geladen.');clearModel();update()});
 
 const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error(t('Lesefehler')));r.readAsArrayBuffer(file)});
 
@@ -25,16 +25,28 @@ async function loadFiles(files){
     if(addMode&&project){addMode=false;return addParts(imp)}
     addMode=false;
     showProject({name:imp.name,parts:partsFromImport(imp),threemf:imp.threemf,notes:imp.notes});
+    // mehr Farben des Designers als Slots: überzählige auf ähnliche Slots legen (js/design-ui.js)
+    const moved=typeof autoMapDesignColours==='function'?autoMapDesignColours():0;
+    // Filament in den Druckwerten passend zum Slot jedes Teils (Slot aus der 3MF bzw. Standard-Slot)
+    if(typeof adoptSlotMaterialFor==='function'&&adoptSlotMaterialFor(project.parts)&&!moved)update();
+    if(moved){update();toast(t('{n} Farben des Designers auf ähnliche Slots gelegt – unter „Farben des Designers“ anpassen',{n:moved}))}
   }catch(e){
     addMode=false;
     $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg:t(e.message)});
   }
 }
 // slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers
+// Jede Datei-Auswahl (Laden oder Hinzufügen) ist eine Quelle – so lässt sich ein hinzugefügtes Modell wieder ganz entfernen
+let srcSeq=0;
 function partsFromImport(imp){
-    const parts=imp.parts.map((p,i)=>({id:i,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
+    const src='s'+Date.now().toString(36)+(srcSeq++),srcName=imp.name;
+    const parts=imp.parts.map((p,i)=>({id:i,src,srcName,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
       // Farben des Designers (0-basiert): Slot des Objekts, der Körper und der Farb-Modifikatoren – für „Farben des Designers → Slot“ (js/design-ui.js)
-      dSlot:p.extruder?p.extruder-1:null,modSlots:(p.modifiers||[]).map(e=>e-1),paintTris:!!p.paintTris}));
+      dSlot:p.extruder?p.extruder-1:null,modSlots:(p.modifiers||[]).map(e=>e-1),paintTris:!!p.paintTris,
+      // Geometrie der Farb-Modifikatoren (nur Anzeige; Slot des Designers, umgelegt über designMap)
+      modVols:(p.modVols||[]).map(m=>({dSlot:m.extruder-1,pos:m.pos})),
+      // Bemalung je Dreieck (Filament des Designers, 1-basiert) – Anzeige und Zuordnung zu Slots (designMap)
+      paintState:p.paintState||null,paintSlots:(p.paintSlots||[]).map(e=>e-1)}));
     parts.forEach((q,i)=>{if(q.bodies)q.bodies.forEach((b,j)=>{const e=imp.parts[i].bodies[j].extruder;b.dSlot=e?e-1:q.dSlot})});
     if(imp.threemf)imp.threemf.designMap={};
     return parts;
@@ -56,7 +68,7 @@ function addParts(imp){
   initPartInputs(add);
   if(tm){
     // einfache Teile: kein Objekt der 3MF, Farben/Bemalung der Quelldatei gelten nicht
-    add.forEach(p=>{Object.assign(p,{extra:true,objectId:null,instance:0,painted:false,paintTris:false,modSlots:[],dSlot:null});(p.bodies||[]).forEach(b=>{b.dSlot=null;b.partId=null})});
+    add.forEach(p=>{Object.assign(p,{extra:true,objectId:null,instance:0,painted:false,paintTris:false,modSlots:[],modVols:[],dSlot:null});(p.bodies||[]).forEach(b=>{b.dSlot=null;b.partId=null})});
     if(tm.layout!=='auto'){
       if(tpl)normalizePlates(tpl);   // Plattennummern wie in der Übersicht
       const last=Math.max(1,...project.parts.map(p=>p.plate||1)),next=tm.layout==='plates'?last:last+1;
@@ -78,24 +90,27 @@ function addParts(imp){
   project.name=/ \+ /.test(project.name)?project.name:project.name.replace(/\.(stl|3mf|zip)$/i,'')+' + '+imp.name.replace(/\.(stl|3mf|zip)$/i,'');
   project.notes=notes.concat(imp.notes||[]);
   if(typeof normalizePlates==='function'&&tpl)normalizePlates(tpl);
-  const n=project.parts.reduce((s,x)=>s+x.geom.n,0);
-  $('fileinfo').innerHTML='<b>'+esc(project.name)+'</b><br>'+t('{n} Teile · {tri} Dreiecke',{n:project.parts.length,tri:n.toLocaleString(LOCALE())});
+  renderFileinfo();
   const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.toggle('hidden',!project.notes.length);
-  $('partList').classList.toggle('hidden',project.parts.length<2);
+  $('partList').classList.remove('hidden');
   toast(t('{n} Teil(e) hinzugefügt – jetzt {total} Teile',{n:add.length,total:project.parts.length}));
   selectPart(first);
 }
 
+// Kopf der Modellkarte: Name, Dreiecke, Platten, Herkunft – die Anzahl der Teile steht schon in der Teileliste
+function renderFileinfo(){
+  const p=project,n=p.parts.reduce((s,x)=>s+x.geom.n,0),plates=p.threemf&&p.threemf.plates.length>1?' · '+t('{n} Platten',{n:p.threemf.plates.length}):'';
+  $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())})+plates+
+    (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>'+t('Ursprünglich für: {name}',{name:esc(p.threemf.settings.printer_settings_id)})+'</small>':'');
+}
 function showProject(p){
   project=p;
+  if(typeof setPrintSequence==='function')setPrintSequence(p.printSeq==='object');   // Druckreihenfolge des Projekts
   initPartInputs(p.parts);
-  const n=p.parts.reduce((s,x)=>s+x.geom.n,0);
-  $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+(p.parts.length>1?t('{n} Teile',{n:p.parts.length})+' · ':'')+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())})+
-    (p.threemf&&p.threemf.plates.length>1?' · '+t('{n} Platten',{n:p.threemf.plates.length}):'')+
-    (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>'+t('Ursprünglich für: {name}',{name:esc(p.threemf.settings.printer_settings_id)})+'</small>':'');
+  renderFileinfo();
   const notes=$('importNotes');notes.textContent=p.notes.join(' ');notes.classList.toggle('hidden',!p.notes.length);
-  $('partList').classList.toggle('hidden',p.parts.length<2);
-  $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');
+  $('partList').classList.remove('hidden');
+  $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');$('removeModelWrap').classList.remove('hidden');
   selectPart(0);
 }
 
@@ -106,25 +121,89 @@ function selectPart(i){
   showModel(project.parts[i].geom);
 }
 
+/* Farben innerhalb eines Teils (wie die Unterobjekte in OrcaSlicer): Körper, Farb-Modifikatoren des Designers (z. B. ein
+   Schriftzug in der 3MF – gelten projektweit über designMap) und erhabene Beschriftung. eff = Slot, der tatsächlich gilt. */
+// Höchster Punkt eines Dreiecksbereichs über der Unterkante des Teils – Farben nur in den ersten Schichten sieht man nur von unten
+const lowCache=new WeakMap();
+function zTop(pos,from,to,base){let m=-Infinity;for(let i=from*9+2;i<to*9;i+=3)if(pos[i]>m)m=pos[i];return m-base}
+function lowColours(p){
+  let c=lowCache.get(p.geom);if(c)return c;
+  const g=p.geom,low=h=>h<=1.0;
+  c={bodies:(p.bodies||[]).map(b=>low(zTop(g.pos,b.start,b.start+b.count,g.mn[2]))),mods:{}};
+  (p.modVols||[]).forEach(m=>{const h=zTop(m.pos,0,m.pos.length/9,g.mn[2]);c.mods[m.dSlot]=(c.mods[m.dSlot]??true)&&low(h)});
+  lowCache.set(p.geom,c);return c;
+}
+function partColours(p){
+  const st=(project.threemf&&project.threemf.settings)||{},dcol=d=>{const c=(st.filament_colour||[])[d];return /^#[0-9a-f]{6}$/i.test(c||'')?c:null};
+  const own=p.slot??(typeof defaultSlot==='function'?defaultSlot():0),map=(project.threemf&&project.threemf.designMap)||{},out=[],lc=lowColours(p);
+  const lowTxt=t('in den ersten Schichten – von unten sichtbar');
+  const base0=out.length;
+  (p.bodies||[]).forEach((b,j)=>out.push({kind:'body',key:j,slot:b.slot??null,eff:b.slot??own,label:t(b.name),sub:lc.bodies[j]&&b.count<p.geom.n/2?lowTxt:''}));
+  // Bemalung je Dreieck: jede Farbe des Designers (Zuordnung gilt projektweit wie bei Modifikatoren)
+  // Bemalung je Dreieck: Zuordnung oben unter „Filamente des Modells“ (wie in OrcaSlicer) – hier nur die Farbpunkte
+  if((p.paintSlots||[]).length)out.push({kind:'info',key:0,label:t('bemalt mit {n} Farben',{n:p.paintSlots.length}),sub:t('Zuordnung oben unter Filamente'),effs:p.paintSlots.map(d=>map[d]??d)});
+  // Teil ohne eigene Körper, aber mit Modifikator oder Beschriftung: der Grundkörper ist die erste Farbe (Slot des Teils)
+  if(!p.bodies&&!(p.paintSlots||[]).length&&((p.modSlots||[]).length||(p.texts||[]).some(x=>x.mode!=='engraved')))out.push({kind:'base',key:0,slot:p.slot??null,eff:own,label:t('Grundkörper'),sub:t('Slot des Teils')});
+  if(out.length&&out[out.length-1].kind==='base')out.unshift(out.pop());
+  [...new Set(p.modSlots||[])].forEach(d=>out.push({kind:'mod',key:d,dcol:dcol(d),slot:map[d]??d,eff:map[d]??d,label:t('Farbe {n} des Designers',{n:d+1}),sub:(lc.mods[d]?lowTxt+' · ':'')+t('Modifikator, gilt für alle Teile mit dieser Farbe')}));
+  (p.texts||[]).filter(x=>x.mode!=='engraved').forEach(x=>out.push({kind:'text',key:x.id,slot:x.slot??null,eff:x.slot??own,label:'„'+x.text+'“',sub:t('Beschriftung')}));
+  return out;
+}
+/* Teileliste wie in OrcaSlicer: je Teil ein farbiger Slot-Chip (Klick → Slot wählen), Name, Maße, Stützenbedarf, ✕.
+   Die gewählte Zeile zeigt darunter Platte und Anzahl (Kopien) – ohne Umweg über die Plattenübersicht. */
 function renderPartList(){
   const list=$('partList');
-  if(!project||project.parts.length<2){list.innerHTML='';return}
+  if(!project){list.innerHTML='';return}
   const th=+$('thresh').value,label={none:t('ohne Stützen'),few:t('wenig Stützen'),needed:t('Stützen')};
-  const slots=typeof slotChoices==='function'?slotChoices():[];
+  const def=typeof defaultSlot==='function'?defaultSlot():0,many=project.parts.length>1;
+  const tpl=typeof plTpl==='function'?plTpl():null,lay=tpl&&typeof projectLayout==='function'?projectLayout(tpl):null;
   list.innerHTML=project.parts.map((p,i)=>{
     const g=p.geom,lv=analyze(g,th).level,sel=i===project.selected;
-    const sc=p.slot!=null&&slots[p.slot],col=sc&&/^#[0-9a-f]{6}$/i.test(sc.colour)?sc.colour:'#999999';
-    const slot=p.slot!=null?'<span class="pslot" style="background:'+col+'"></span>Slot '+(p.slot+1)+' · ':'';
-    const plate=project.threemf&&(project.threemf.plates.length>1||project.parts.some(x=>(x.plate||1)>1))?t('Platte {n}',{n:p.plate})+' · ':'';
-    return '<li><button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
-      '<span class="pmeta">'+slot+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+(p.painted?t('Farben vom Designer')+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button>'+
-      '<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button></li>';
+    const plate=lay&&lay.count>1?t('Platte {n}',{n:lay.plateOf[i]})+' · ':'';
+    let tools='';
+    const cols=partColours(p),dots=[...new Set(cols.flatMap(c=>c.effs||[c.eff]))].filter(s=>s!=null&&s!==(p.slot??def));
+    const slots=typeof slotChoices==='function'?slotChoices():[],dot=s=>'<span class="pdot" style="background:'+(slots[s]&&/^#[0-9a-f]{6}$/i.test(slots[s].colour)?slots[s].colour:'#c7ccd4')+'" title="Slot '+(s+1)+'"></span>';
+    if(sel&&cols.length)tools+='<ul class="pcols" aria-label="'+esc(t('Farben im Teil'))+'">'+cols.map(c=>c.kind==='info'?'<li><span class="pdots">'+[...new Set(c.effs)].map(dot).join('')+'</span><span class="pcol-name">'+esc(c.label)+'<small>'+esc(c.sub)+'</small></span></li>':'<li data-pcol-row="'+c.kind+':'+c.key+'">'+
+      (c.dcol?'<span class="dsw" style="background:'+esc(c.dcol)+'" title="'+esc(t('Farbe des Designers: {c}',{c:c.dcol}))+'"></span><span class="dc-arrow">→</span>':'')+
+      slotChipHTML(c.slot,c.kind==='mod'?c.key:c.kind==='base'?def:(p.slot??def),'data-pcol="'+c.kind+':'+c.key+'"',c.label)+'<span class="pcol-name">'+esc(c.label)+(c.sub?'<small>'+esc(c.sub)+'</small>':c.slot==null?'<small>'+t('wie Teil')+'</small>':'')+'</span></li>').join('')+
+      (p.paintTris&&!p.paintState?'<li class="muted small">'+t('Bemalung des Designers bleibt wie in der 3MF')+'</li>':'')+'</ul>';
+    if(sel&&lay){
+      const n=typeof copyGroupOf==='function'?copyGroupOf(p).length:1,cur=lay.plateOf[i];
+      const opts=Array.from({length:lay.count},(_,k)=>'<option value="'+(k+1)+'"'+(k+1===cur?' selected':'')+'>'+t('Platte {n}',{n:k+1})+'</option>').join('')+'<option value="'+(lay.count+1)+'">'+t('Neue Platte')+'</option>';
+      tools+='<div class="ptools">'+(lay.fixed3mf?'':'<label>'+t('Platte')+' <select data-part-move="'+i+'" aria-label="'+esc(t('Auf Platte verschieben'))+'">'+opts+'</select></label>')+
+        '<span class="pcount">'+t('Anzahl')+' <span class="stepper"><button type="button" data-copies="-1" aria-label="'+esc(t('Eine Kopie weniger'))+'">−</button>'+
+        '<input data-copies-n type="number" min="1" max="50" step="1" inputmode="numeric" value="'+n+'" aria-label="'+esc(t('Anzahl des gewählten Teils'))+'">'+
+        '<button type="button" data-copies="1" aria-label="'+esc(t('Eine Kopie mehr'))+'">+</button></span></span></div>';
+    }
+    return '<li'+(sel?' class="sel"':'')+'>'+slotChipHTML(p.slot??null,def,'data-part-slot="'+i+'"',p.name)+
+      '<button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
+      '<span class="pmeta">'+(dots.length?'<span class="pdots">'+dots.map(dot).join('')+'</span>':'')+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button>'+
+      (many?'<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button>':'')+tools+'</li>';
   }).join('');
+  if(typeof renderFilamentBar==='function')renderFilamentBar();
 }
 $('partList').addEventListener('click',e=>{
   const d=e.target.closest('[data-del-part]');if(d){removePart(+d.dataset.delPart);return}
+  const c=e.target.closest('[data-part-slot]');
+  if(c){const p=project.parts[+c.dataset.partSlot],def=defaultSlot();
+    openSlotPicker(c,p.slot??null,{title:t('Slot für {name}',{name:p.name}),std:t('Standard (Slot aus dem Export-Dialog)'),stdSlot:def},v=>setPartSlot(p,v));return}
+  const pc=e.target.closest('[data-pcol]');
+  if(pc){const p=project.parts[project.selected],[kind,key]=pc.dataset.pcol.split(':'),k=+key,def=defaultSlot();
+    if(kind==='base'){openSlotPicker(pc,p.slot??null,{title:t('Slot für {name}',{name:p.name}),std:t('Standard (Slot aus dem Export-Dialog)'),stdSlot:def},v=>setPartSlot(p,v))}
+    else if(kind==='body'){const b=p.bodies[k];openSlotPicker(pc,b.slot??null,{title:t('Slot für {name}',{name:t(b.name)}),std:t('wie Teil'),stdSlot:p.slot??def},v=>{samePlacements(p).forEach(x=>{if(x.bodies&&x.bodies[k])x.bodies[k].slot=v});update()})}
+    else if(kind==='mod'){const map=project.threemf.designMap;openSlotPicker(pc,map[k]??k,{title:t('Slot für Farbe {n} des Designers',{n:k+1}),std:t('wie vom Designer (Slot {n})',{n:k+1}),stdSlot:k},v=>setDesignSlot(k,v??k))}
+    else if(kind==='text'){const x=(p.texts||[]).find(y=>String(y.id)===key);if(x)openSlotPicker(pc,x.slot??null,{title:t('Slot für {name}',{name:x.text}),std:t('wie Teil'),stdSlot:p.slot??def},v=>{x.slot=v;update()})}
+    return}
+  const k=e.target.closest('[data-copies]');if(k){const p=project.parts[project.selected];setCopies(p,copyGroupOf(p).length+ +k.dataset.copies);return}
   const b=e.target.closest('[data-part]');if(b&&+b.dataset.part!==project.selected){selectPart(+b.dataset.part);const nb=$('partList').querySelector('[data-part="'+b.dataset.part+'"]');if(nb)nb.focus()}});
-// Entf im Teileliste: gewähltes Teil entfernen
+$('partList').addEventListener('change',e=>{
+  const m=e.target.closest('[data-part-move]');if(m){movePart(+m.dataset.partMove,+m.value);return}
+  const n=e.target.closest('[data-copies-n]');if(n)setCopies(project.parts[project.selected],num(n.value)||1);
+});
+// Körper beim Überfahren in der 3D-Ansicht hervorheben (wie bisher in „Mehrfarbig“)
+$('partList').addEventListener('mouseover',e=>{const r=e.target.closest('[data-pcol-row^="body:"]');if(r&&typeof paintBodies==='function')paintBodies(project.parts[project.selected],+r.dataset.pcolRow.split(':')[1])});
+$('partList').addEventListener('mouseout',e=>{if(e.target.closest('[data-pcol-row^="body:"]')&&!e.relatedTarget?.closest?.('[data-pcol-row^="body:"]')&&typeof paintBodies==='function')paintBodies(project.parts[project.selected])});
+// Entf in der Teileliste: gewähltes Teil entfernen
 $('partList').addEventListener('keydown',e=>{const b=e.target.closest('[data-part]');if(b&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();removePart(+b.dataset.part)}});
 
 /* Einzelnes Teil aus dem Projekt entfernen (mindestens eins bleibt). Teile aus einer 3MF fehlen danach im Export:
@@ -148,21 +227,56 @@ function removePart(i){
   }});
 }
 function afterPartsChanged(sel){
-  const n=project.parts.reduce((s,x)=>s+x.geom.n,0);
-  $('fileinfo').innerHTML='<b>'+esc(project.name)+'</b><br>'+(project.parts.length>1?t('{n} Teile',{n:project.parts.length})+' · ':'')+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())});
-  $('partList').classList.toggle('hidden',project.parts.length<2);
+  renderFileinfo();
+  $('partList').classList.remove('hidden');
   selectPart(Math.max(0,Math.min(sel,project.parts.length-1)));
   const f=$('partList').querySelector('[data-part="'+project.selected+'"]');if(f&&$('partList').contains(document.activeElement))f.focus();
 }
 
+/* „Ganze Platte“: alle Teile der Platte des gewählten Teils so, wie sie auf dem Bett stehen (Anordnung wie in der
+   Plattenübersicht, js/plates-ui.js projectLayout). Nur Ansicht – Auswahl, Datenblatt und Überhangwerte bleiben beim
+   gewählten Teil; zum Anklicken von Flächen (Lage, Beschriftung) schaltet die Ansicht zurück aufs Teil. */
+let plateView=false,shownPlate=null;
+function plateGeom(){
+  const tpl=typeof plTpl==='function'&&plTpl(),lay=tpl&&projectLayout(tpl);
+  if(!lay||!project)return null;
+  const k=lay.plateOf[project.selected],idx=project.parts.map((p,i)=>i).filter(i=>lay.plateOf[i]===k);
+  let n=0;idx.forEach(i=>{n+=project.parts[i].geom.pos.length});
+  // 3MF in Designer-Lage: die Platten liegen nebeneinander – wie beim Export (plateShifts) auf die Bettmitte rücken
+  let sx=0,sy=0;
+  if(!lay.places){const G=idx.map(i=>project.parts[i].geom),[bx,by]=tpl.bedCenter;
+    sx=bx-(Math.min(...G.map(g=>g.mn[0]))+Math.max(...G.map(g=>g.mx[0])))/2;sy=by-(Math.min(...G.map(g=>g.mn[1]))+Math.max(...G.map(g=>g.mx[1])))/2}
+  const pos=new Float32Array(n),ranges=[];let o=0;
+  for(const i of idx){
+    const g=project.parts[i].geom,pl=lay.places&&lay.places[i],cx=(g.mn[0]+g.mx[0])/2,cy=(g.mn[1]+g.mx[1])/2,P=g.pos,z0=g.mn[2];
+    // dieselbe Umrechnung auch für Farb-Modifikatoren (js/bodies-ui.js modOverlayFor)
+    const xf=pl?(x,y,z)=>{const a=x-cx,b=y-cy;return[(pl.rot?-b:a)+pl.lx,(pl.rot?a:b)+pl.ly,z-z0]}:(x,y,z)=>[x+sx,y+sy,z-z0];
+    ranges.push({i,start:o/9,count:P.length/9,xf});
+    for(let v=0;v<P.length;v+=3){
+      if(pl){const x=P[v]-cx,y=P[v+1]-cy;pos[o]=(pl.rot?-y:x)+pl.lx;pos[o+1]=(pl.rot?x:y)+pl.ly}   // wie placeTransform (+90° um Z)
+      else{pos[o]=P[v]+sx;pos[o+1]=P[v+1]+sy}                                                     // 3MF: Lage des Designers
+      pos[o+2]=P[v+2]-g.mn[2];o+=3;
+    }
+  }
+  const pg=makeGeom(t('Platte {n}',{n:k}),pos),c=tpl.bedCenter;
+  // Kamera auf die Teile (um die Bettmitte, damit der Bauraum passt), nicht aufs ganze Bett
+  const frame=2.1*Math.max(...[0,1].map(a=>Math.max(Math.abs(pg.mn[a]-c[a]),Math.abs(pg.mx[a]-c[a]))));
+  return{geom:pg,plate:k,count:idx.length,center:c,frame,ranges};
+}
 function showModel(g){
   geom=g;
   const n=g.n;
   $('sx').textContent=de(g.x,1)+' mm';$('sy').textContent=de(g.y,1)+' mm';$('sz').textContent=de(g.z,1)+' mm';$('sv').textContent=de(g.vol/1000,1)+' cm³';
-  $('info').textContent=g.name+'  —  '+de(g.x,1)+' × '+de(g.y,1)+' × '+de(g.z,1)+' mm  —  '+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())});
+  // Kopf der 3D-Ansicht: Name fett, darunter Maße, Dreiecke und – falls geändert – die Größe
+  const part=project&&project.parts[project.selected],sc=part&&part.scale;
+  const info=(title,meta)=>{$('info').innerHTML='<b class="i-name" title="'+esc(title)+'">'+esc(title)+'</b><span class="i-meta">'+meta.map(esc).join('<span class="i-dot">·</span>')+'</span>'};
+  info(g.name,[t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())})].concat(sc?[t('Größe {p}',{p:sc[0]===sc[1]&&sc[1]===sc[2]?de(sc[0]*100,0)+' %':sc.map(v=>de(v*100,0)).join(' / ')+' %'})]:[]));
   $('ohBar').classList.remove('hidden');
   // Ohne Renderer bleibt der Hinweis „3D-Ansicht nicht verfügbar“ sichtbar (wie in v4).
-  if(Viewer.show(g))$('viewerEmpty').classList.add('hidden');
+  const pg=plateView&&project&&project.parts.length>1?plateGeom():null;
+  shownPlate=pg;
+  if(pg?Viewer.show(pg.geom,{center:pg.center,frame:pg.frame}):Viewer.show(g))$('viewerEmpty').classList.add('hidden');
+  if(pg)info(t('Platte {n}',{n:pg.plate}),[t('{n} Teile',{n:pg.count}),t('gewählt: {name}',{name:g.name})]);
   Viewer.colorize(+$('thresh').value);
   showVolume();
   if(miniReady){$('miniView').classList.remove('hidden');MiniView.show(g);MiniView.colorize(+$('thresh').value)}
@@ -182,7 +296,7 @@ function clearModel(){
   if(miniReady){MiniView.clear();$('miniView').classList.add('hidden')}
   $('ohBar').classList.add('hidden');$('info').textContent='';
   document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=''});
-  $('modelCard').classList.remove('loaded');$('modelBadge').classList.add('hidden');
+  $('modelCard').classList.remove('loaded');$('modelBadge').classList.add('hidden');$('removeModelWrap').classList.add('hidden');
   $('partList').classList.add('hidden');$('partList').innerHTML='';$('importNotes').classList.add('hidden');
   $('viewerEmpty').classList.remove('hidden');
 }
@@ -323,6 +437,9 @@ toggleButton('btnWireframe',on=>Viewer.setWireframe(on));
 toggleButton('btnAxes',on=>Viewer.setAxes(on));
 toggleButton('btnClip',on=>{Viewer.setClip(on);$('clipPanel').classList.toggle('hidden',!on)});
 toggleButton('btnMeasure',on=>Viewer.setMeasure(on,text=>{$('measureLabel').textContent=text}));
+toggleButton('btnPlate',on=>{plateView=on;if(geom)showModel(geom)});
+// Flächen anklicken (Lage aufs Bett, Beschriftung) braucht die Dreiecke des Teils – dafür zurück zur Teilansicht
+{const setPick=Viewer.setPick;Viewer.setPick=(on,...a)=>{if(on&&plateView){plateView=false;$('btnPlate').classList.remove('active');if(geom)showModel(geom)}return setPick(on,...a)}}
 ['x','y','z'].forEach(axis=>{
   $('clipAxis'+axis.toUpperCase()).addEventListener('click',()=>{
     ['X','Y','Z'].forEach(k=>$('clipAxis'+k).classList.toggle('active',k===axis.toUpperCase()));
@@ -356,3 +473,45 @@ $('disclaimerOk').addEventListener('click',()=>{try{localStorage.setItem(DISCLAI
 {let seen=null;try{seen=localStorage.getItem(DISCLAIMER_KEY)}catch(e){/* nicht lesbar */}
  if(seen!==DISCLAIMER_VERSION)$('disclaimerDlg').showModal()}
 update();
+
+/* Modell entfernen (Knopf in der Modellkarte): alles – oder, wenn mehrere Modelle hinzugefügt wurden, nur eines davon
+   (alle Teile dieser Datei-Auswahl samt Kopien). „Rückgängig“ in der Meldung holt es zurück. */
+function projectSources(){
+  const m=new Map();
+  (project?project.parts:[]).forEach(p=>{const k=p.src||'-';if(!m.has(k))m.set(k,{src:k,name:p.srcName||project.name,count:0});m.get(k).count++});
+  return[...m.values()];
+}
+function clearProjectWithUndo(){
+  const before=project;
+  $('clear').click();
+  if(before)toast(t('Modell entfernt'),{label:t('Rückgängig'),fn:()=>{showProject(before);update()}});
+}
+function removeSource(src){
+  const keep=project.parts.filter(p=>(p.src||'-')!==src);
+  if(!keep.length){clearProjectWithUndo();return}
+  const before={parts:project.parts.slice(),selected:project.selected,removed:project.threemf&&project.threemf.removed,name:project.name};
+  const gone=project.parts.find(p=>(p.src||'-')===src),tpl=lastResult&&exportTemplate(lastResult.printer.id,lastResult.dSel);
+  // war es die 3MF selbst, bleibt nur noch das Hinzugefügte – als einfache Teile
+  if(project.threemf&&project.parts.some(p=>(p.src||'-')===src&&p.objectId!=null&&!p.extra))project.threemf.removed=true;
+  project.parts=keep;project.parts.forEach((x,k)=>{x.id=k});
+  if(tpl&&typeof normalizePlates==='function')normalizePlates(tpl);
+  afterPartsChanged(0);
+  toast(t('„{name}“ entfernt',{name:gone.srcName||gone.name}),{label:t('Rückgängig'),fn:()=>{
+    project.parts=before.parts;project.parts.forEach((x,k)=>{x.id=k});if(project.threemf)project.threemf.removed=before.removed;afterPartsChanged(before.selected)}});
+}
+$('removeModelBtn').addEventListener('click',e=>{
+  if(!project)return;
+  const srcs=projectSources();
+  if(srcs.length<2){clearProjectWithUndo();return}
+  // Auswahl wie beim Slot-Chip: alles oder ein einzelnes Modell
+  const el=slotPop.el||(slotPop.el=document.createElement('div'));
+  closeSlotPicker();
+  el.className='slot-pop';el.setAttribute('role','menu');el.setAttribute('aria-label',t('Modell entfernen'));
+  el.innerHTML='<button type="button" data-rm="*"><span class="sp-main">'+t('Alles entfernen')+'</span><span class="sp-sub">'+t('{n} Teile',{n:project.parts.length})+'</span></button>'+
+    srcs.map(s=>'<button type="button" data-rm="'+esc(s.src)+'"><span class="sp-main">'+esc(t('Nur „{name}“',{name:s.name}))+'</span><span class="sp-sub">'+t(s.count>1?'{n} Teile':'{n} Teil',{n:s.count})+'</span></button>').join('');
+  el.querySelectorAll('button').forEach(b=>{b.style.gridTemplateColumns='1fr'});
+  document.body.appendChild(el);
+  const r=e.currentTarget.getBoundingClientRect();el.style.left=Math.max(8,Math.min(innerWidth-el.offsetWidth-8,r.right-el.offsetWidth))+'px';el.style.top=(r.bottom+6)+'px';
+  slotPop.anchor=e.currentTarget;slotPop.onPick=null;
+  el.onclick=ev=>{const b=ev.target.closest('[data-rm]');if(!b)return;ev.stopPropagation();closeSlotPicker();el.onclick=null;b.dataset.rm==='*'?clearProjectWithUndo():removeSource(b.dataset.rm)};
+});

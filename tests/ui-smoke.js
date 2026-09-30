@@ -93,7 +93,7 @@ async function runSmoke(opts={}){
   ok($('material').value==='pla_hs'&&$('object').value==='general','Teil 1 behält eigene Auswahl ('+$('material').value+'/'+$('object').value+')');
   $('partList').querySelector('[data-part="1"]').click();await wait(50);
   ok($('material').value==='petg'&&$('object').value==='holder'&&$('partSlot').value==='1','Teil 2: PETG, Halterung, Slot 2 gemerkt');
-  ok($('partList').querySelector('[data-part="1"]').textContent.includes('Slot 2'),'Teileliste zeigt Slot von Teil 2');
+  { const c=$('partList').querySelector('[data-part-slot="1"]');ok(c&&c.textContent==='2'&&!c.classList.contains('std'),'Teileliste zeigt Slot von Teil 2 als Chip'); }
   const lastBefore=JSON.parse(JSON.stringify(store.last));
   menuClick('export3mf');await wait(50);
   ok(!$('partPlan').classList.contains('hidden')&&$('partPlanTable').querySelectorAll('tbody tr').length===4,'Export-Dialog: Tabelle mit 4 Teilen');
@@ -119,7 +119,12 @@ async function runSmoke(opts={}){
       'Metadata/project_settings.config':u8('{"printer_settings_id":"Bambu Lab X1 Carbon 0.4 nozzle"}'),'Metadata/plate_1.gcode':u8('; alt')});
     await dropFile(new File([zipBytes2],'makerworld.3mf'));await wait(300);
     ok(project&&project.threemf&&project.parts.length===2&&project.parts[0].slot===1,'Makerworld-3MF geladen: 2 Teile, Slot des Designers übernommen');
-    ok($('orientInfo').textContent.includes('bleibt erhalten')&&document.querySelector('.orient-tools [data-orient="x"]').disabled,'3MF: Lage bleibt, Drehen gesperrt');
+    // seit 10.6: auch 3MF-Teile lassen sich drehen (Transformation des Objekts); ohne Zutun bleibt die Lage des Designers
+    { const p0=project.parts[0],R0=p0.R;ok(!document.querySelector('.orient-tools [data-orient="x"]').disabled&&R0.every((v,i)=>v===IDENTITY3[i]),'3MF: Lage des Designers bleibt, Drehen möglich');
+      document.querySelector('.orient-tools [data-orient="x"]').click();await wait(100);
+      const z=fflate.strFromU8(fflate.unzipSync(exportBytes(0).bytes)['3D/3dmodel.model']);
+      ok(!p0.R.every((v,i)=>v===IDENTITY3[i])&&/<item [^>]*transform="1 0 0 0 0 1 0 -1 0 /.test(z),'3MF gedreht: Drehung in der Transformation des Objekts');
+      document.querySelector('.orient-tools [data-orient="reset"]').click();await wait(100); }
     menuClick('export3mf');await wait(50);
     ok($('exportSub').textContent.includes('Bambu Lab X1 Carbon')&&document.querySelector('#exportDlg fieldset.slots').classList.contains('hidden'),'Dialog: Bambu-Einstellungen werden ersetzt, kein Standard-Slot nötig');
     $('export3mfSave').click();await wait(150);
@@ -182,7 +187,7 @@ async function runSmoke(opts={}){
   /* 6) 3D-Ansicht */
   $('tab3d').click();await wait(80);
   ok(!$('view3d').hidden&&$('viewSettings').hidden,'Tab 3D-Ansicht zeigt Viewer');
-  ok($('info').textContent.includes('40,0 × 40,0 × 25,0'),'Viewer-Info mit Maßen');
+  ok($('info').textContent.includes('pilz.stl')&&$('sx').textContent==='40,0 mm'&&$('sz').textContent==='25,0 mm','Untere Leiste: Name und Maße');
   ['btnWireframe','btnAxes','btnClip','btnMeasure'].forEach(id=>$(id).click());
   ok(!$('clipPanel').classList.contains('hidden'),'Schnitt-Panel sichtbar');
   $('clipAxisZ').click();$('clipSlider').value=40;$('clipSlider').dispatchEvent(new Event('input'));
@@ -377,12 +382,21 @@ async function runSmoke(opts={}){
     await dropFile(mk('gross.stl',150,120,20),mk('klein.stl',60,60,30));await wait(300);
     ok(project.parts.length===2&&!$('plateBox').classList.contains('hidden'),'Platten-Übersicht bei zwei Teilen');
     ok(projectLayout(plTpl()).count===1&&document.querySelectorAll('#plateList .plate-svg rect[data-pick]').length===2,'beide Teile auf einer Platte mit Draufsicht');
-    selectPart(1);$('plateCopyPlus').click();await wait(100);
+    selectPart(1);$('partList').querySelector('[data-copies="1"]').click();await wait(100);
     ok(project.parts.length===3&&samePlacements(project.parts[1]).length===2,'Anzahl + legt eine Kopie an (gleiche Einstellungen)');
-    const mv=document.querySelector('#plateList [data-move="0"]');mv.value=String(projectLayout(plTpl()).count+1);mv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+    selectPart(0);await wait(50);const mv=document.querySelector('#partList [data-part-move="0"]');mv.value=String(projectLayout(plTpl()).count+1);mv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
     ok(projectLayout(plTpl()).count===2&&!$('plateAuto').classList.contains('hidden'),'Teil auf neue Platte verschoben, „Platzsparend anordnen“ erscheint');
     $('plateAuto').click();await wait(100);
     ok(projectLayout(plTpl()).count===1,'Platzsparend anordnen: wieder eine Platte');
+    // Größe (① Modell → Größe / Werkzeugleiste) und Werkzeugleiste
+    { selectPart(0);await wait(50);const x0=project.parts[0].geom.x;
+      document.querySelector('[data-sz="50"]').click();await wait(80);
+      ok(Math.abs(project.parts[0].geom.x-x0/2)<0.01&&/50 %/.test($('sizeBox').querySelector('.sec-sum').textContent),'Größe 50 %: Teil halb so breit');
+      $('szX').value=String(x0*1.5);$('szX').dispatchEvent(new Event('change'));await wait(80);
+      ok(Math.abs(project.parts[0].geom.x-x0*1.5)<0.05&&Math.abs(project.parts[0].scale[1]-1.5)<1e-3,'Zielmaß X: gleichmäßig auf 150 %');
+      $('szReset').click();await wait(80);ok(!project.parts[0].scale&&Math.abs(project.parts[0].geom.x-x0)<0.01,'Original stellt die Größe wieder her');
+      const n=project.parts.length;$('tbCopyPlus').click();await wait(100);ok(project.parts.length===n+1&&!$('tbCopyMinus').disabled,'Werkzeugleiste: Kopie +');
+      $('tbCopyMinus').click();await wait(100);ok(project.parts.length===n,'Werkzeugleiste: Kopie −'); }
     // Modell hinzufügen statt ersetzen
     addMode=true;await dropFile(mk('deckel.stl',50,30,4));await wait(300);
     ok(project.parts.length===4&&/ \+ /.test(project.name),'Modell hinzufügen erweitert das Projekt ('+project.name+')');

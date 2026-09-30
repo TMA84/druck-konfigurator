@@ -224,16 +224,17 @@ table.changes td.warn { color: var(--bad); }
 body.dragging .model-card { border-color: var(--accent); background: var(--accent-soft); }
 
 /* Teileliste: ein Eintrag je Teil, das gewählte bestimmt Datenblatt und 3D-Ansicht */
-.part-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(260px, 40vh); overflow-y: auto; border-top: 1px solid var(--rule); }
-.part-list li { border-bottom: 1px solid var(--rule); display: flex; align-items: stretch; }
+.part-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(560px, 62vh); overflow-y: auto; border-top: 1px solid var(--rule); }
+.part-list li { border-bottom: 1px solid var(--rule); display: flex; align-items: stretch; flex-wrap: wrap; }
+.part-list li > .slot-chip { align-self: center; margin: 0 2px 0 8px; }
 .part-list li > button[data-part] { flex: 1; min-width: 0; }
 .part-list button.pdel { display: block; flex: none; width: 30px; padding: 0; border-left: 0; border: 0; background: none; color: var(--ink-3); font-size: 13px; cursor: pointer; opacity: .55; }
 .part-list li:hover .pdel, .part-list .pdel:focus-visible { opacity: 1; }
 .part-list button.pdel:hover { color: var(--bad, #c0392b); background: var(--paper); }
-.part-list button { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; background: none; border: 0; border-left: 3px solid transparent; padding: 6px 6px 6px 8px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
-.part-list button:hover { background: var(--paper); }
-.part-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.part-list button[aria-current="true"] { border-left-color: var(--accent); background: var(--accent-soft); }
+.part-list button[data-part] { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; background: none; border: 0; border-left: 3px solid transparent; padding: 6px 6px 6px 8px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+.part-list button[data-part]:hover { background: var(--paper); }
+.part-list button[data-part]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.part-list button[data-part][aria-current="true"] { border-left-color: var(--accent); background: var(--accent-soft); }
 .part-list .pname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .part-list .pmeta { grid-column: 1; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); }
 .part-list .plevel { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
@@ -409,7 +410,7 @@ body.dragging #stage { outline: 3px dashed var(--accent); outline-offset: -8px; 
 .hud button { background: var(--hud-bg); color: var(--hud-ink); border: 1px solid var(--hud-border); border-radius: var(--r-s); padding: 6px 10px; font-size: 13px; cursor: pointer; }
 .hud button:hover { background: rgba(255,255,255,.1); }
 .hud button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-#info { top: 10px; left: 10px; padding: 6px 10px; pointer-events: none; }
+#info { padding: 0; }
 #info:empty { display: none; }
 #controls { top: 10px; right: 10px; left: 10px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; background: none; pointer-events: none; }
 #controls button { pointer-events: auto; }
@@ -426,7 +427,7 @@ body.dragging #stage { outline: 3px dashed var(--accent); outline-offset: -8px; 
 #ohBar label { font-weight: 700; }
 #ohBar input[type=range] { flex: 1; min-width: 140px; accent-color: var(--accent); }
 #ohBar .val { font-weight: 800; width: 38px; text-align: right; }
-#ohBar .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+#ohBar .stats { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; opacity: .9; font-variant-numeric: tabular-nums; }
 #ohBar .stats b { color: #fff; }
 #ohBar .legend { display: flex; gap: 14px; flex-wrap: wrap; }
 #ohBar .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
@@ -857,3 +858,139 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-acetabs button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--ink); cursor: pointer; }
 .wb-acetabs button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .wb-acetabs small { opacity: .75; margin-left: 4px; }
+
+/* ---------- Slot-Auswahl wie in OrcaSlicer (js/slot-picker.js) ---------- */
+.slot-chip { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid rgba(0,0,0,.28);
+  background: var(--chip, #c7ccd4); color: var(--chip-ink, #1d2129); font: 700 12px/1 var(--f-mono); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+button.slot-chip:hover { transform: scale(1.08); }
+button.slot-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.slot-chip.std { border: 2px dashed rgba(0,0,0,.45); }
+.slot-pop { position: fixed; z-index: 80; min-width: 210px; max-width: 300px; max-height: min(420px, 70vh); overflow-y: auto; padding: 4px; background: var(--sheet); border: 1px solid var(--rule-strong);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+.slot-pop button { display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; width: 100%; padding: 6px 8px; border: 0; border-radius: 7px;
+  background: none; color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.slot-pop button .slot-chip { grid-row: 1 / span 2; cursor: inherit; }
+.slot-pop button:hover, .slot-pop button:focus-visible { background: var(--paper); outline: none; }
+.slot-pop button.sel { background: var(--accent-soft); }
+.slot-pop .sp-main { font-weight: 600; }
+.slot-pop .sp-sub { font-size: 12px; color: var(--ink-3); }
+.slot-pop .sp-sub:empty { display: none; }
+/* Filamentleiste */
+.fil-bar { margin: 10px 0 2px; }
+.fil-bar.hidden { display: none; }
+.fil-head { display: flex; justify-content: space-between; align-items: baseline; }
+.fil-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
+.fil-list .fil { position: relative; display: grid; grid-template-rows: 28px auto; width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--rule-strong); border-radius: 8px;
+  background: var(--sheet); color: var(--ink); font: inherit; cursor: pointer; }
+.fil-list .fil-n { display: grid; place-items: center; background: var(--chip); color: var(--chip-ink, #1d2129); font: 700 13px var(--f-mono); }
+.fil-list .fil-t { font-size: 11px; padding: 2px 2px 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2, var(--ink)); }
+.fil-list .fil.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.fil-list .fil.empty .fil-n { background: repeating-linear-gradient(45deg, var(--paper), var(--paper) 4px, var(--sheet) 4px, var(--sheet) 8px); }
+.fil-list .fil-u { position: absolute; right: 3px; top: 3px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; font: 600 10px/15px var(--f-mono); }
+.fil-list .fil-std { position: absolute; left: 4px; top: 2px; font-size: 10px; color: rgba(0,0,0,.6); }
+.fil-list .fil:hover { border-color: var(--accent); }
+/* Zeile des gewählten Teils: Platte und Anzahl */
+.part-list .ptools { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 4px 8px 8px 42px; font-size: 12.5px; background: var(--accent-soft); }
+.part-list .ptools select { font: inherit; padding: 2px 4px; }
+.part-list .pcount { display: inline-flex; gap: 6px; align-items: center; }
+.part-list .stepper button { height: 24px; }
+/* Aufklappbare Abschnitte (js/sections-ui.js) */
+.sec-toggle { display: inline-flex; align-items: baseline; gap: 0; padding: 0; border: 0; background: none; font: inherit; cursor: pointer; color: inherit; text-align: left; }
+.sec-toggle::before { content: "▾"; font-size: 11px; color: var(--ink-3); margin-right: 6px; transition: transform var(--t-fast); }
+.sec.collapsed .sec-toggle::before { transform: rotate(-90deg); }
+.sec-toggle .sec-sum { font-size: 11.5px; color: var(--ink-3); letter-spacing: 0; text-transform: none; }
+.sec-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sec.collapsed > :not(.orient-head) { display: none !important; }
+.sec.collapsed .orient-head > :not(.sec-toggle) { display: none; }
+/* Farben im Teil (Körper, Modifikatoren des Designers, Beschriftung) – unter der gewählten Zeile */
+.part-list .pcols { flex-basis: 100%; list-style: none; margin: 0; padding: 2px 8px 4px 42px; background: var(--accent-soft); }
+.part-list .pcols li { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; padding: 3px 0; border: 0; font-size: 12.5px; min-width: 0; }
+.part-list .pcols li::before { content: ""; width: 10px; height: 14px; margin-left: -18px; margin-right: -2px; border-left: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); border-bottom-left-radius: 4px; transform: translateY(-6px); }
+.part-list .pcols .slot-chip { width: 20px; height: 20px; font-size: 11px; }
+.part-list .pcol-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.part-list .pcol-name small { margin-left: 6px; color: var(--ink-3); }
+.part-list .pdots { display: inline-flex; gap: 2px; margin-right: 5px; vertical-align: -1px; }
+.part-list .pdot { width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(0,0,0,.3); }
+.sec-toggle::before { font-size: 13px; }
+/* Druckwerte: Slicer-Reihenfolge aufklappbar, angepasste Werte markiert, „nur angepasste“ */
+details.order-group > summary.order-title { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.order-group > summary.order-title::-webkit-details-marker { display: none; }
+details.order-group > summary.order-title::before { content: "▾"; font-size: 12px; color: var(--ink-3); transition: transform var(--t-fast); }
+details.order-group:not([open]) > summary.order-title::before { transform: rotate(-90deg); }
+.order-title .ov-count { margin-left: auto; font-family: var(--f-body); font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.setting.ov { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); padding-left: 8px; margin-left: -8px; }
+.setting.ov .value::after { content: " ✎"; font-size: .7em; color: var(--accent); }
+.only-ov-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; margin: 4px 0 6px; cursor: pointer; }
+.only-ov-toggle:has(input:disabled) { opacity: .5; cursor: default; }
+#orderedSettings.only-ov .order-group:not(.has-ov) { display: none; }
+#orderedSettings.only-ov .setting:not(.ov) { display: none; }
+.sup-howto { margin-top: 8px; }
+.sup-howto > summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+.sup-howto p { margin: 6px 0 0; }
+.menu-note { margin: 2px 14px 6px; font-size: 11.5px; line-height: 1.35; color: var(--ink-3); max-width: 300px; }
+.menu-note.warn:empty { display: none; }
+.menu-note.warn { color: var(--warn); }
+.menu-note .note, .menu-note div { padding: 0; margin: 0; border: 0; background: none; }
+.mini-view { height: 170px; }
+.part-list .pcols .dsw { flex: none; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.35); }
+.part-list .pcols .dc-arrow { color: var(--ink-3); font-size: 11px; margin: 0 -3px; }
+/* Filamente des Modells (wie OrcaSlicer) und Umschalter Slot-/Designerfarben */
+.fil-head .fil-view button { font-size: 11.5px; padding: 2px 8px; }
+.fil-sub { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 8px 0 0; font-size: 11.5px; color: var(--ink-3); }
+.fil-design.hidden { display: none; }
+.fil-dlist { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.fil-dlist li { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; padding: 2px 0; }
+.fil-dlist li.bad .dnum { outline: 2px solid var(--bad); }
+.fil-dlist .dnum { cursor: default; box-shadow: none; }
+.fil-dlist .fd-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2, var(--ink)); }
+.fil-dlist .fd-slot { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.fil-dlist .dc-arrow { color: var(--ink-3); font-size: 11px; }
+#designBox.in-bar { display: none !important; }
+.model-head { flex-wrap: wrap; row-gap: 2px; }
+.model-head > span:last-child { white-space: nowrap; }
+.fil-sub > span { white-space: nowrap; }
+.seq-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; margin: 4px 0 2px; cursor: pointer; }
+#plateSeqNote:empty { display: none; }
+/* „Druckt aus“ in den Einstellungen für Teil */
+.part-uses { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 12.5px; margin-top: 4px; }
+.part-uses.hidden { display: none; }
+.part-uses .use-head { flex-basis: 100%; font-size: 11.5px; color: var(--ink-3); }
+.part-uses .use { display: inline-flex; gap: 5px; align-items: center; }
+.part-uses .slot-chip { width: 20px; height: 20px; font-size: 11px; cursor: default; }
+.part-uses .note { flex-basis: 100%; margin: 4px 0 0; }
+/* Größe (js/size-ui.js) */
+.size-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin: 6px 0; font-size: 12.5px; }
+.size-form label { display: grid; gap: 2px; }
+.size-form .unit { display: flex; align-items: center; gap: 4px; }
+.size-form input[type=number] { width: 100%; min-width: 0; padding: 4px 6px; font: inherit; }
+.size-form .size-lock { display: flex; gap: 6px; align-items: center; grid-column: span 2; align-self: end; padding-bottom: 5px; }
+#szNote:empty { display: none; }
+#szNote.bad { color: var(--bad); }
+/* Werkzeugleiste der 3D-Ansicht (js/toolbar-ui.js) */
+#controls.toolbar { left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100% - 20px); flex-wrap: nowrap; justify-content: center; gap: 2px;
+  padding: 4px 6px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 10px; pointer-events: auto; overflow-x: auto; scrollbar-width: none; }
+#controls.toolbar::-webkit-scrollbar { display: none; }
+.toolbar .tb-group { display: inline-flex; gap: 2px; }
+.toolbar button { display: inline-grid; place-items: center; width: 36px; height: 34px; padding: 0; border: 1px solid transparent; background: none; }
+.toolbar button:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toolbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.toolbar svg .plus { stroke-width: 2; }
+.toolbar svg .thick { stroke-width: 3; }
+.toolbar .tb-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.toolbar .hud-sep { margin: 4px 3px; }
+.tb-pop { position: absolute; z-index: 5; display: grid; gap: 6px; padding: 8px 10px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 10px; color: var(--hud-ink); font-size: 12.5px; }
+.tb-pop.hidden { display: none; }
+.tb-pop-title { font-weight: 600; }
+.tb-pop-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tb-pop input { width: 64px; padding: 4px 6px; font: inherit; }
+.tb-pop .linkbtn { justify-self: start; color: #f0a371; }
+#volWarn.hud { top: 58px; }
+.tb-pop input { background: #2c3138; color: #f1eee8; border: 1px solid #4a515b; border-radius: 6px; }
+.tb-pop button:not(.linkbtn) { background: rgba(255,255,255,.06); color: var(--hud-ink); border: 1px solid var(--hud-border); border-radius: 6px; padding: 4px 8px; font: inherit; cursor: pointer; }
+/* Untere Leiste der 3D-Ansicht: Kopf mit Name/Dreiecke links, Maße rechts; darunter Überhang */
+#ohBar .ob-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; padding-bottom: 6px; border-bottom: 1px solid var(--hud-border); }
+#info { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1 1 260px; }
+#info .i-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#info .i-meta { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#info .i-dot { margin: 0 6px; opacity: .6; }

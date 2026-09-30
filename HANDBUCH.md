@@ -98,6 +98,22 @@ Körper, die sich berühren oder überlappen, bleiben ein Teil – z. B. Hohlkö
 
 ## 4. Mehrere Teile
 
+**Filamente (wie in OrcaSlicer):** Oben in der Modellkarte stehen die **Slots am Drucker** als Farbfelder (Nummer, Material, wie viele Teile ihn nutzen; ★ = Standard-Slot). Ein Klick legt den Slot auf das gewählte Teil. Bei Makerworld-/Orca-3MF steht darüber **Modell → Slot**: jedes Filament des Designers mit Farbe, Nummer und Material und der Slot deiner ACE, auf den es gedruckt wird – anklicken zum Umlegen, **Automatisch** legt jede Farbe auf den ähnlichsten Slot mit passendem Material (PLA nicht neben ASA/ABS), **Wie vom Designer** nimmt das zurück. Hat das Modell mehr Farben als du Slots hast (z. B. Mario mit 7 Farben), legt das Tool die überzähligen beim Laden gleich auf passende Slots. **Slotfarben / Designer** schaltet die 3D-Ansicht zwischen „so wird gedruckt“ und den Farben des Designers um.
+
+**Teileliste:** Jede Zeile hat vorne einen farbigen **Slot-Chip** (gestrichelt = Standard-Slot aus dem Export-Dialog); Klick → Slot wählen. Das **Filament in ② Druckwerte folgt dem Slot** (Material aus der ACE, bei verknüpfter Spule deren Profil) – außer du wählst dort selbst eines. Die gewählte Zeile zeigt darunter **Platte** und **Anzahl** und die **Farben im Teil**: Grundkörper, Körper, Farb-Modifikatoren des Designers (z. B. ein Schriftzug), erhabene Beschriftung – jeweils mit eigenem Chip. Liegt eine Farbe nur in den ersten Schichten, steht „von unten sichtbar“ dabei.
+
+**Werkzeugleiste (3D-Ansicht, wie in OrcaSlicer):** Modell hinzufügen, gewähltes Teil auf eine neue Platte, alle Teile ausrichten, platzsparend anordnen · Kopie + / −, in Teile trennen, entfernen · Fläche aufs Bett, drehen (90° um X/Y/Z), Größe, Schnitt, Text, messen · ganze Platte, Drahtgitter, Achsen. Ausgegraut ist, was für das gewählte Teil nicht geht – der Tooltip nennt den Grund. Auch Teile einer Makerworld-3MF lassen sich drehen, auf eine neue Platte legen und in ihre Körper trennen (die Datei des Designers bleibt, Drehung und Größe stehen in der Transformation des Objekts); ohne Zutun bleibt die Lage des Designers. Nur Beschriftung geht bei Objekten des Designers noch nicht.
+
+**Größe** (Abschnitt in der Modellkarte oder Werkzeugleiste): Skalierung in Prozent oder Zielmaß je Achse in mm; **gleichmäßig** aus = jede Achse einzeln. **Bauraum füllen** macht das Teil so groß wie möglich, **Original** stellt die Größe aus der Datei wieder her. Skaliert wird um die Mitte der Grundfläche – das Teil bleibt auf dem Bett. Kopien ändern sich mit. Bei Makerworld-3MF bleibt die Datei des Designers, die Größe steht in der Transformation des Objekts (Modifikatoren und Bemalung wachsen mit). Beschriftungen bleiben an ihrer Stelle und behalten ihre Schrifthöhe; gewählte Bohrlöcher bitte nach dem Ändern neu wählen.
+
+**Objekt für Objekt drucken** (unter **Platten**): Der Drucker druckt jedes Teil ganz fertig, bevor er das nächste beginnt (Orca: Druckreihenfolge „nach Objekt“) – weniger Fahrwege und Fäden zwischen Teilen, ein Fehldruck betrifft nur ein Teil. Die Teile bekommen dafür den Freiraum des Druckkopfs als Abstand (Kobra S1: 60 mm), Platten einer Makerworld-3MF werden dafür neu angeordnet. Höchstens ein Teil je Platte darf höher sein als der Abstand bis zur X-Achse (S1: 48 mm) – sonst warnt die Plattenübersicht.
+
+**Druckt aus** (② Druckwerte, unter „Einstellungen für Teil“): alle Slots, aus denen das gewählte Teil druckt – Grundkörper, Körper, Bemalung, Modifikatoren, Beschriftung. Die Druckwerte des Teils gelten für alle diese Slots; liegt in einem davon eine andere Filamentart, erscheint eine Warnung.
+
+**Modell entfernen:** In der Modellkarte **Entfernen** – bei mehreren hinzugefügten Modellen auch nur eines davon; **Rückgängig** in der Meldung holt es zurück. **Neuladen der Seite:** Das geladene Projekt samt allen Einstellungen bleibt erhalten (im Browser gespeichert).
+
+**3D-Ansicht:** **Ganze Platte** zeigt alle Teile der Platte des gewählten Teils an ihrem Platz (auch die Platten einer Makerworld-3MF). Bemalung und Farb-Modifikatoren des Designers erscheinen in ihren Farben, sehr dunkle Filamente etwas aufgehellt. Die Abschnitte der Modellkarte (Platten, Lage, Mehrfarbig, Bohrlöcher, Beschriftung) lassen sich auf- und zuklappen und zeigen eine Kurzinfo im Titel.
+
 Bei mehreren Teilen erscheint im Schritt **① Modell** eine **Teileliste**. Jede Zeile zeigt Name, Maße, Slot und ob das Teil Stützen braucht.
 
 - **Anklicken wählt ein Teil.** Die Druckwerte, das Datenblatt und die 3D-Ansicht gelten dann für dieses Teil. In **② Druckwerte** steht oben **„Einstellungen für Teil“** – dort wählst du das Teil auch direkt über **Teil**, ohne zurück zum Modell zu wechseln.
@@ -219,6 +235,10 @@ Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **S
 **Düsen-Umrechnung:** Für 0,25/0,6/0,8 mm und andere Düsenmaterialien rechnet das Tool die Werte um. Der 3MF-Export ist derzeit nur mit der **0,4-mm-Düse** möglich.
 
 ---
+
+**Einstellungen in Slicer-Reihenfolge:** Abschnitte einzeln aufklappbar; für diesen Auftrag angepasste Werte sind markiert (✎), **Nur angepasste Werte zeigen** blendet den Rest aus. Alle Stützwerte stehen im Abschnitt **Stützen**. Die Schritt-für-Schritt-Anleitung für den Slicer steht eingeklappt unter der Stützen-Empfehlung – beim 3MF-Export und Slicen im Tool sind die Werte schon eingetragen. Hinweise zum JSON-Export: unter **Datei → Weitere Exporte**.
+
+**Handy:** Unter 640 px Breite ist die Kopfzeile kompakt, im Tab ① steht die 3D-Ansicht oben, Dialoge und Auswahllisten nutzen die ganze Breite.
 
 ### Werte für diesen Auftrag anpassen
 

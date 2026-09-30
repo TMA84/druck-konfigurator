@@ -56,7 +56,13 @@ function update(){
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
   $('settings').innerHTML=r.rows.map(specCell).join('');
-  $('orderedSettings').innerHTML=r.ordered.map(g=>'<div class="order-group"><div class="order-title">'+t(g[0])+'</div><div class="order-body">'+g[1].map(row).join('')+'</div></div>').join('');
+  // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
+  const oo=store.settings.orderOpen||{};
+  $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
+    return '<details class="order-group'+(nOv?' has-ov':'')+'" data-order="'+esc(g[0])+'"'+(oo[g[0]]===false?'':' open')+'><summary class="order-title">'+t(g[0])+(nOv?' <span class="ov-count">'+t('{n} angepasst',{n:nOv})+'</span>':'')+'</summary><div class="order-body">'+g[1].map(row).join('')+'</div></details>'}).join('');
+  const nOvAll=r.ordered.reduce((s,g)=>s+g[1].filter(x=>x[3]).length,0);
+  $('orderedOnlyOv').disabled=!nOvAll;if(!nOvAll)$('orderedOnlyOv').checked=false;
+  $('orderedSettings').classList.toggle('only-ov',$('orderedOnlyOv').checked);
   $('title').textContent=r.m.name+' – '+t(r.ob.label)+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
     esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src))+' '+t('Düse: {noz}.',{noz:esc(r.nozLabel)});
@@ -66,21 +72,20 @@ function update(){
   $('danger').innerHTML=r.danger.length?t('<b>Achtung:</b>')+'<br>'+r.danger.map(esc).join('<br>'):'';
   $('warning').innerHTML=r.warn.join('<br><br>');
   $('checks').innerHTML=t('<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse {noz} · Bett reinigen · erste Schicht beobachten',{noz:esc(r.nozLabel)})+(r.dryNeed&&r.m.dry?' · '+esc(t(r.m.dry)):'')+(geom?'<br>'+t('STL-Maße und Überhanganalyse ({th}°) wurden berücksichtigt.',{th:r.a.th}):'');
-  $('supportGuide').innerHTML='<h3>'+t('Stützen-Empfehlung')+'</h3><b>'+esc(t(r.sup))+'</b><br>'+esc(r.supNeed)+'<br><br>'+
+  // Die Anleitung für den Slicer braucht nur, wer von Hand einstellt – der 3MF-Export trägt die Werte selbst ein
+  $('supportGuide').innerHTML='<h3>'+t('Stützen-Empfehlung')+'</h3><b>'+esc(t(r.sup))+'</b><br>'+esc(r.supNeed)+
+    '<details class="sup-howto"><summary>'+t('In {slicer} von Hand einstellen',{slicer:esc(r.printer.slicer)})+'</summary><p>'+
     (r.supOn?t('<b>So stellst du es in {slicer} ein:</b><br>1. <i>Stützstrukturen aktivieren</i> einschalten.<br>2. <i>Typ: Baum (automatisch)</i>; {crit}<br>3. <i>Schwellenwinkel: {angle}°</i>.<br>4. <i>Nur auf Druckplatte</i> zuerst testen; bei unerreichbaren Innenflächen deaktivieren.<br>5. Raft aus. Immer die Schichtvorschau prüfen.',{slicer:esc(r.printer.slicer),angle:r.sp.angle,
       crit:r.supCritical?t('<i>nur kritische Bereiche</i> einschalten – stützt nur Spitzen und Auskragungen. Fehlen in der Vorschau Stützen unter normalen Überhängen, unter <b>Werte für diesen Auftrag anpassen</b> ausschalten.')
-        :t('<i>nur kritische Bereiche</i> ausgeschaltet lassen – so stützt der Slicer auch normale Überhänge.')}):t('Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.'));
+        :t('<i>nur kritische Bereiche</i> ausgeschaltet lassen – so stützt der Slicer auch normale Überhänge.')}):t('Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.'))+
+    '</p><p class="muted small">'+t('Beim 3MF-Export und beim Slicen im Tool sind diese Werte schon eingetragen.')+'</p></details>';
   if(r.a){const txt=r.a.level==='none'?t('Keine relevanten Überhänge über {th}° (Bodenfläche ausgenommen).',{th:r.a.th}):t('Über {th}°: ca. {area} mm² ({pct} % der Oberfläche, Bodenfläche ausgenommen).',{th:r.a.th,area:de(r.a.flagged,0),pct:de(r.a.ratio*100,1)});document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=txt})}
-  const tpu=r.tpu,sp=r.sp;
-  if(r.supOn){
-    const p=[['Stützstrukturen',t('Aktivieren')],['Nur kritische Bereiche',t(r.supCritical?'Ein':'Aus')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],['Nur auf Druckplatte',t('zunächst aktivieren')],['Kleine Überhänge entfernen',t(sp.small)],['Druckbasis/Raft',t('0 Schichten')],['Oberer Z-Abstand',de(r.supZ.top,2)+' mm'],['Unterer Z-Abstand',de(r.supZ.bottom,2)+' mm'],['Wände um Stützstrukturen','0'],['Abstand Grundmuster',tpu?de(3,1)+' mm':de(2.5,1)+'–'+de(3,1)+' mm'],['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Oberer Schnittstellenabstand',sp.gap],['Stützen/Objekt XY-Abstand',sp.xy],['Stützen/Objekt Abstand erste Schicht',tpu?de(0.25,2)+' mm':de(0.2,2)+' mm'],['Stützspitze',de(0.8,1)+' mm'],['Ast-Dichte',sp.density],['Astabstand',sp.branch],['Stützast-Durchmesser',de(2,1)+' mm']];
-    $('supportParams').innerHTML='<div class="grid">'+p.map(x=>'<div><b>'+t(x[0])+'</b><br><span class="muted">'+x[1]+'</span></div>').join('')+'</div>';
-  }else{
-    $('supportParams').innerHTML='<p class="muted" style="margin:0">'+(geom?t('Für die aktuelle Auswahl und dieses Modell werden keine Stützen empfohlen.'):t('Für die aktuelle Auswahl werden keine Stützen empfohlen.'))+' '+t('Die Stützparameter erscheinen hier, sobald Stützen nötig sind oder du bei „Support“ „Support erlaubt“ wählst und das Modell Überhänge hat.')+'</p>';
-  }
   lastResult=r;
   if(typeof renderPartList==='function')renderPartList();
+  if(typeof scheduleProjectSave==='function')scheduleProjectSave();   // Projekt übersteht Neuladen (js/project-store.js)
   if(typeof renderOrient==='function')renderOrient();
+  if(typeof renderSize==='function')renderSize();
+  if(typeof updateToolbar==='function')updateToolbar();
   if(typeof renderPartScope==='function')renderPartScope();
   if(typeof renderHoles==='function')renderHoles();
   if(typeof renderBodies==='function')renderBodies();
@@ -297,4 +302,15 @@ $('orcaFilBtn').addEventListener('click',()=>{
 $('orcaProcBtn').addEventListener('click',()=>{
   const label=t('Process-JSON speichern');
   downloadJSON(orcaProcessJson,'druck-konfigurator-'+currentPrinter().id+'-process.json',$('orcaProcBtn'),label);
+});
+
+// Slicer-Reihenfolge: auf-/zugeklappte Abschnitte merken; „nur angepasste Werte“ blendet den Rest aus
+$('orderedSettings').addEventListener('toggle',e=>{
+  const d=e.target.closest&&e.target.closest('[data-order]');if(!d)return;
+  store.settings.orderOpen={...(store.settings.orderOpen||{}),[d.dataset.order]:d.open};persist();
+},true);
+$('orderedOnlyOv').addEventListener('change',()=>{
+  const on=$('orderedOnlyOv').checked;
+  $('orderedSettings').classList.toggle('only-ov',on);
+  if(on)$('orderedSettings').querySelectorAll('.has-ov').forEach(d=>{d.open=true});
 });

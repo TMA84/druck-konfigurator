@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.6.0] – 2026-09-30
+
+### Neu
+- **Slot-Zuordnung wie in OrcaSlicer:** Slot-Chips in der Teileliste (Auswahl mit Farbe, Nummer, Material), Filamentleiste „Slots am Drucker“, bei 3MF „Modell → Slot“ mit den Filamenten des Designers; automatische Zuordnung nach Farbe und Material, Ansicht Slot- oder Designerfarben.
+- **Filament folgt dem Slot:** In ② wird das Filament passend zum Slot gewählt (verknüpftes Spulenprofil zuerst), außer es wurde von Hand gewählt.
+- **Mehrfarbige Teile:** Farben im Teil (Grundkörper, Körper, Modifikatoren, Beschriftung) mit eigenem Chip; **Bemalung je Dreieck** (Bambu/Orca paint_color, z. B. Mario mit 7 Farben) wird gelesen, angezeigt und beim Export auf die eigenen Slots umgeschrieben (mit Orca-CLI geprüft); **Farb-Modifikatoren** des Designers (z. B. Schriftzug) in der 3D-Ansicht eingefärbt.
+- **Ganze Platte** in der 3D-Ansicht; Kamera passt das Teil mit Rand ein (auch hochkant).
+- **Projekt übersteht Neuladen** (IndexedDB; große Daten nur einmal gespeichert). **Modell entfernen** – alles oder ein einzelnes hinzugefügtes Modell, mit Rückgängig.
+- **Modellkarte aufgeräumt:** aufklappbare Abschnitte mit Kurzinfo, Platte und Anzahl in der Teilezeile, Bohrlöcher nur bei erkannten Löchern.
+- **Druckwerte:** Stützwerte an einer Stelle, Slicer-Abschnitte aufklappbar, angepasste Werte markiert und filterbar, Slicer-Anleitung eingeklappt, JSON-Hinweise im Menü.
+- **Handy-Ansicht** (bis 640 px).
+- **Objekt für Objekt drucken:** Orca-Druckreihenfolge „nach Objekt“; Teile mit dem Freiraum des Druckkopfs angeordnet (S1: 60 mm), Warnung bei mehr als einem Teil über der X-Achsen-Höhe (mit Orca-CLI geprüft).
+- **Werkzeugleiste in der 3D-Ansicht** wie in OrcaSlicer (Symbole: hinzufügen, neue Platte, ausrichten, anordnen, Kopie ±, trennen, entfernen, Fläche aufs Bett, drehen, Größe, Schnitt, Text, messen, ganze Platte, Drahtgitter, Achsen).
+- **Makerworld-3MF bearbeiten:** Drehen, Fläche aufs Bett, Ausrichten, neue Platte und Trennen jetzt auch für Objekte des Designers (Drehung in der Objekt-Transformation, Modifikatoren drehen mit; mit Orca-CLI geprüft). Ausgegraute Werkzeuge nennen den Grund.
+- **Größe ändern:** Prozent oder Zielmaß je Achse, gleichmäßig oder einzeln, „Bauraum füllen“; auch für Makerworld-3MF (Skalierung in der Objekt-Transformation, mit Orca-CLI geprüft).
+- **Druckt aus** in ②: alle Slots des Teils (Grundkörper, Körper, Bemalung, Modifikatoren, Beschriftung), Warnung bei anderer Filamentart.
+
+### Behoben
+- Farben des Designers umlegen setzte eigene Slots anderer Teile zurück.
+- Slots, die nur die Bemalung nutzt, bekamen nicht die Filamentwerte des Teils (Orca: „nozzle temperatures are incompatible“).
+
 ## [10.5.0] – 2026-09-29
 
 ### Neu

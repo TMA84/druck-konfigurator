@@ -22,6 +22,7 @@ function usedSlots(plan, idx) {
     used.add(j.slot ?? plan.slot);
     for (const b of j.bodies || []) if (b.slot != null) used.add(b.slot);
     for (const d of j.part.modSlots || []) used.add(map[d] ?? d);
+    for (const d of j.part.paintSlots || []) used.add(map[d] ?? d);   // Bemalung je Dreieck (js/paint.js)
     if (typeof textSlots === 'function') textSlots(j.part).forEach(s => used.add(s));   // erhabene Beschriftung (js/engrave.js)
   }
   return [...used].filter(s => s != null).sort((a, b) => a - b);
@@ -55,6 +56,7 @@ function designColours() {
     add(p.dSlot, p.name);
     (p.bodies || []).forEach(b => add(b.dSlot, p.name + ' · ' + b.name));
     (p.modSlots || []).forEach(d => add(d, t('{name} (Modifikator)', { name: p.name })));
+    (p.paintSlots || []).forEach(d => add(d, t('{name} (bemalt)', { name: p.name })));
   }
   return [...out.values()].sort((a, b) => a.d - b.d);
 }
@@ -65,6 +67,7 @@ function renderDesignColours() {
   const cols = designColours();
   if (cols.length < 2) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
+  if (typeof secSum === 'function') secSum('design', t('{n} Farben', { n: cols.length }));
   const map = project.threemf.designMap || (project.threemf.designMap = {});
   const slots = typeof slotChoices === 'function' ? slotChoices() : [], n = Math.max(4, slots.length);
   const sw = c => '<span class="pslot" style="background:' + (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '#dddddd') + '"></span>';
@@ -81,14 +84,17 @@ function renderDesignColours() {
 }
 
 // Objekt und Körper mit Farbe des Designers folgen der Zuordnung (eigene Slot-Änderungen an ihnen werden dabei ersetzt)
+// Nur Teile/Körper, die genau diese Farbe des Designers haben, bekommen den neuen Slot – eigene Slotwahl für andere
+// Teile oder den Grundkörper bleibt (vorher wurden alle aus der Zuordnung neu gesetzt und so zurückgestellt)
 function setDesignSlot(d, s) {
   const map = project.threemf.designMap;
   if (s === d) delete map[d]; else map[d] = s;
-  const to = x => map[x] ?? x;
+  const moved = [];
   for (const p of project.parts) {
-    if (p.dSlot != null) p.slot = to(p.dSlot);
-    for (const b of p.bodies || []) if (b.dSlot != null) { const s = to(b.dSlot); b.slot = s === p.slot ? null : s; }
+    if (p.dSlot === d) { p.slot = s; p.matManual = false; moved.push(p); }
+    for (const b of p.bodies || []) if (b.dSlot === d) b.slot = s === p.slot ? null : s;
   }
+  if (typeof adoptSlotMaterialFor === 'function') adoptSlotMaterialFor(moved);
   update();
 }
 $('designList').addEventListener('change', e => { const s = e.target.closest('[data-design]'); if (s) setDesignSlot(+s.dataset.design, +s.value); });
@@ -113,3 +119,42 @@ function adoptSlotMaterials() {
   loadPartIntoForm(project.parts[project.selected]); update();
   toast(n ? t(n > 1 ? '{n} Teile auf das Filament im Slot umgestellt' : '{n} Teil auf das Filament im Slot umgestellt', { n }) : t('Filament passt schon zu den Slots'));
 }
+
+/* Mehr Farben des Designers als Slots (z. B. Mario mit 7 Farben, eine ACE mit 4 Slots): die überzähligen Farben gleich auf
+   den Slot mit der ähnlichsten Farbe legen (Slotfarbe vom Drucker/eigene Angabe, sonst die Farbe des Designers dort) –
+   anpassen lässt es sich danach wie jede andere Zuordnung. Rückgabe: Anzahl umgelegter Farben. */
+function autoMapDesignColours() {
+  if (!project || !project.threemf) return 0;
+  const cols = designColours(), slots = typeof slotChoices === 'function' ? slotChoices() : [], n = slots.length || 4;
+  const map = project.threemf.designMap || (project.threemf.designMap = {});
+  const rgb = h => /^#[0-9a-f]{6}$/i.test(h || '') ? [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)) : null;
+  const dist = (a, b) => (a[0] - b[0]) ** 2 * 0.3 + (a[1] - b[1]) ** 2 * 0.59 + (a[2] - b[2]) ** 2 * 0.11;
+  const slotRgb = i => rgb((slots[i] || {}).colour) || rgb((cols.find(c => c.d === i) || {}).colour);
+  // Belegung bekannt (vom Drucker oder eigene Angabe): jede Farbe auf den ähnlichsten Slot; sonst nur die überzähligen
+  const known = slots.some(s => rgb(s.colour)) && !(typeof slotSource === 'function' && lastResult && slotSource(exportTemplate(lastResult.printer.id, lastResult.dSel)).kind === 'template');
+  let moved = 0;
+  for (const c of cols) {
+    if ((!known && c.d < n) || map[c.d] != null) continue;
+    // nur Slots mit Filament derselben Temperaturgruppe (PLA zu PLA/TPU, PETG/ABS/ASA untereinander) – sonst slict Orca nicht
+    const grp = TEMP_GROUP[kindOfType(c.type || '')], ok = [...Array(n).keys()].filter(i => { const ty = (slots[i] || {}).type; return !grp || !ty || TEMP_GROUP[kindOfType(ty)] === grp; });
+    const cand = ok.length ? ok : [...Array(n).keys()];
+    const me = rgb(c.colour); let best = cand.includes(c.d % n) ? c.d % n : cand[0], bd = Infinity;
+    if (me) for (const i of cand) { const s = slotRgb(i); if (s && dist(me, s) < bd) { bd = dist(me, s); best = i; } }
+    if (best !== c.d) { map[c.d] = best; moved++; }
+  }
+  // Teile und Körper mit diesen Farben auf die neuen Slots (wie beim Umlegen von Hand)
+  for (const p of project.parts) {
+    if (p.dSlot != null && map[p.dSlot] != null) { p.slot = map[p.dSlot]; p.matManual = false; }
+    for (const b of p.bodies || []) if (b.dSlot != null && map[b.dSlot] != null) b.slot = map[b.dSlot] === p.slot ? null : map[b.dSlot];
+  }
+  return moved;
+}
+$('designAuto').addEventListener('click', () => {
+  const tm = project && project.threemf; if (!tm) return;
+  // neu zuordnen: bisherige Zuordnung verwerfen, Teile/Körper wieder auf die Farben des Designers, dann nach Ähnlichkeit
+  tm.designMap = {};
+  for (const p of project.parts) { if (p.dSlot != null) p.slot = p.dSlot; for (const b of p.bodies || []) if (b.dSlot != null) b.slot = b.dSlot === p.slot ? null : b.dSlot; }
+  const n = autoMapDesignColours();
+  update();
+  toast(n ? t('{n} Farben des Designers auf ähnliche Slots gelegt', { n }) : t('Farben passen schon zu den Slots'));
+});

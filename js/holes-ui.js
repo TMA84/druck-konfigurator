@@ -16,6 +16,10 @@ function renderHoles() {
   box.classList.toggle('hidden', !usable);
   if (!usable) return;
   const cands = partHoles(part), chosen = new Set((part.holes || []).map(h => h.id)), g = part.geom;
+  // ohne erkannte Löcher gibt es hier nichts zu tun – Abschnitt ausblenden
+  box.classList.toggle('hidden', !cands.length);
+  if (typeof secSum === 'function') secSum('holes', cands.length ? t('{n} erkannt', { n: cands.length }) + (chosen.size ? ', ' + t('{n} verstärkt', { n: chosen.size }) : '') : '');
+  if (!cands.length) return;
   $('holeInfo').textContent = cands.length
     ? t(cands.length === 1 ? '{n} rundes Loch erkannt.' : '{n} runde Löcher erkannt.', { n: cands.length }) + t(' Angehakte bekommen in Orca einen Ring von {ring} mm mit 100 % Füllung – die Last verteilt sich besser.', { ring: HOLE_RING_MM })
     : t('Keine runden Löcher erkannt.');

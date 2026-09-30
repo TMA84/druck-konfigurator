@@ -33,7 +33,7 @@ function txDraft(part) {
   const mode = $('txMode').value === 'engraved' ? 'engraved' : 'raised';
   return { id: txState.editing || Date.now(), text: $('txText').value.slice(0, 60), height: txNum('txHeight', 1, 200, TEXT_DEFAULTS.height), depth: txNum('txDepth', 0.2, 20, TEXT_DEFAULTS.depth),
     stroke: txNum('txStroke', 5, 40, TEXT_DEFAULTS.stroke * 100) / 100, rot: +$('txRot').value || 0, mode, slot: mode === 'raised' ? +$('txSlot').value : null,
-    anchor: anchorToOrig(txState.anchor, part.R) };
+    anchor: anchorToOrig(anchorUnscaled(txState.anchor, part), part.R) };
 }
 
 function txResetAnchor(part) {
@@ -50,14 +50,14 @@ function txPreview() {
   const add = (x, draft) => {
     if (!String(x.text || '').trim()) return;
     const col = x.mode === 'engraved' ? TEXT_ENGRAVED_COLOUR : txHex(slotColour(x.slot ?? txPartSlot(part), slots));
-    list.push({ pos: textMesh(x, part.R), color: col, opacity: x.mode === 'engraved' ? 0.55 : draft ? 0.85 : 1 });
+    list.push({ pos: textMesh(textScaled(x, part), part.R), color: col, opacity: x.mode === 'engraved' ? 0.55 : draft ? 0.85 : 1 });
   };
   (part.texts || []).forEach(x => { if (x.id !== txState.editing) add(x, false); });
   const d = txDraft(part);
   if (d) add(d, true);
   Viewer.setExtras(list);
   // Hinweise zum Entwurf
-  const warn = d && d.text.trim() ? textWarnings(part.geom, d, part.R, txState.anchor.region) : [];
+  const warn = d && d.text.trim() ? textWarnings(part.geom, textScaled(d, part), part.R, txState.anchor.region) : [];
   $('txWarn').innerHTML = warn.map(esc).join('<br>');
   $('txWarn').classList.toggle('hidden', !warn.length);
   const dims = d && d.text.trim() ? textStrokes(d.text, d.height, d.stroke) : null;
@@ -81,9 +81,10 @@ function renderEngrave() {
   $('txAdd').textContent = txState.editing ? t('Änderung übernehmen') : t('Text hinzufügen');
   $('txNew').classList.toggle('hidden', !txState.editing);
   const slots = slotChoices(), texts = part.texts || [];
+  if (typeof secSum === 'function') secSum('text', texts.length ? t(texts.length > 1 ? '{n} Texte' : '{n} Text', { n: texts.length }) : t('keine'));
   $('textInfo').textContent = texts.length ? '' : t('Erhaben wird der Text ein eigenes Bauteil mit eigenem Slot (andere Farbe), vertieft schneidet OrcaSlicer ihn aus dem Teil.');
   $('textList').innerHTML = texts.map(x => {
-    const warn = textWarnings(part.geom, x, part.R, null);
+    const warn = textWarnings(part.geom, textScaled(x, part), part.R, null);
     const col = x.mode === 'engraved' ? '#e5514f' : slotColour(x.slot ?? txPartSlot(part), slots);
     const what = x.mode === 'engraved' ? t('vertieft {d} mm', { d: de(x.depth, 1) }) : t('erhaben {d} mm · Slot {n}', { d: de(x.depth, 1), n: (x.slot ?? txPartSlot(part)) + 1 });
     return '<li data-text="' + x.id + '"' + (x.id === txState.editing ? ' class="editing"' : '') + '><span class="pslot" style="background:' + col + '"></span>' +
@@ -114,7 +115,7 @@ function txEdit(id) {
   if (!x) return;
   txState.editing = id; txState.picked = true;
   // Anker zurück in geom-Koordinaten; Fläche für die Hinweise neu suchen (Dreieck unter dem Mittelpunkt)
-  const f = textFrame({ ...x, rot: 0 }, part.R), tri = txTriangleAt(part.geom, f.o, f.n);
+  const f = textFrame(textScaled({ ...x, rot: 0 }, part), part.R), tri = txTriangleAt(part.geom, f.o, f.n);
   txState.anchor = tri >= 0 ? { ...faceAnchor(part.geom, tri, f.o), u: f.u, n: f.n, p: f.o } : { p: f.o, n: f.n, u: f.u, region: { tris: [] } };
   $('txText').value = x.text; $('txHeight').value = x.height; $('txDepth').value = x.depth; $('txStroke').value = Math.round(x.stroke * 100);
   $('txRot').value = String(x.rot || 0); $('txMode').value = x.mode;

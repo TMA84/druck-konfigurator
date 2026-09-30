@@ -129,8 +129,14 @@ function parseModelXML(text) {
       for (const v of meshXml[2].matchAll(tagRe('vertex'))) { const va = attrsOf(v[1]); vs.push(+va.x * unit, +va.y * unit, +va.z * unit); }
       const ts = [];
       let painted = false; // Bambu/Orca-Farbbemalung je Dreieck (paint_color) = Mehrfarbdruck ohne eigene Körper (painted: auch Farb-Modifikatoren)
-      for (const t of meshXml[2].matchAll(tagRe('triangle'))) { const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3); if (ta.paint_color) painted = true; }
-      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted };
+      // Bemalung: überwiegendes Filament je Dreieck (für die Anzeige) und alle vorkommenden Filamente (js/paint.js)
+      const ps = [], pstates = new Set(), canPaint = typeof paintMain === 'function';
+      for (const t of meshXml[2].matchAll(tagRe('triangle'))) {
+        const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3);
+        if (ta.paint_color) { painted = true; if (canPaint) { ps[ts.length / 3 - 1] = paintMain(ta.paint_color); if (ta.paint_color.length > 2) paintStates(ta.paint_color).forEach(s => pstates.add(s)); } }
+      }
+      if (painted && canPaint) for (let i = 0; i < ts.length / 3; i++) { ps[i] = ps[i] || 0; pstates.add(ps[i]); }
+      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted, ...(painted && canPaint ? { ps: Uint8Array.from(ps), pstates } : {}) };
     }
     for (const c of body.matchAll(tagRe('component'))) {
       const ca = attrsOf(c[1]);
@@ -180,20 +186,26 @@ function parse3MF(fileName, zip, zipLib) {
 
   // Alle Dreiecke eines Objekts (rekursiv über Komponenten) mit der Gesamttransformation sammeln
   // volumes (nur oberste Ebene): je Bauteil {partId, count} – das sind die Körper des Objekts
-  function collect(path, id, T, skipPart, out, depth, volumes, flags = {}) {
+  function collect(path, id, T, skipPart, out, depth, volumes, flags = {}, onSkip = null) {
     if (depth > 8) throw Error(t('verschachtelte Komponenten zu tief'));
     const obj = model(path).objects.get(id);
     if (!obj) throw Error(t('Objekt {id} fehlt in {file}', { id, file: path }));
     if (obj.mesh && obj.mesh.painted) flags.painted = flags.paintTris = true;
     if (obj.mesh) {
       const { v, t } = obj.mesh;
+      // Filament je Dreieck parallel zu out (0 = unbemalt); erst anlegen, wenn eine Bemalung vorkommt
+      if (obj.mesh.ps || flags.ps) {
+        if (!flags.ps) flags.ps = new Array(out.length / 9).fill(0);
+        for (let i = 0; i < t.length / 3; i++) flags.ps.push(obj.mesh.ps ? obj.mesh.ps[i] : 0);
+        if (obj.mesh.pstates) { flags.pstates = flags.pstates || new Set(); obj.mesh.pstates.forEach(s => flags.pstates.add(s)); }
+      }
       for (let i = 0; i < t.length; i++) {
         const k = t[i] * 3, x = v[k], y = v[k + 1], z = v[k + 2];
         out.push(x * T[0] + y * T[3] + z * T[6] + T[9], x * T[1] + y * T[4] + z * T[7] + T[10], x * T[2] + y * T[5] + z * T[8] + T[11]);
       }
     }
     for (const c of obj.components) {
-      if (skipPart(c.objectid)) continue;
+      if (skipPart(c.objectid)) { if (onSkip) onSkip(c, T, path); continue; }
       const before = out.length;
       collect(c.path ? c.path.replace(/^\//, '') : path, c.objectid, mulTransform(c.transform, T), () => false, out, depth + 1, null, flags);
       if (volumes && out.length > before) volumes.push({ partId: c.objectid, count: (out.length - before) / 9 });
@@ -210,8 +222,16 @@ function parse3MF(fileName, zip, zipLib) {
     const skipPart = pid => { const p = ms && ms.parts.get(pid); const skip = !!p && p.subtype !== 'normal_part'; if (skip) skipped++; return skip; };
     const instance = seen.get(item.objectid) || 0;
     seen.set(item.objectid, instance + 1);
-    const out = [], volumes = [], flags = {};
-    collect(rootPath, item.objectid, item.transform, skipPart, out, 0, volumes, flags);
+    const out = [], volumes = [], flags = {}, modVols = [];
+    // Farb-Modifikatoren (eigener Slot) nur zur Anzeige mitnehmen: die 3D-Ansicht färbt die Flächen darin ein (js/modpaint.js)
+    const onSkip = (c, T, path) => {
+      const p = ms && ms.parts.get(c.objectid);
+      if (!p || p.subtype !== 'modifier_part' || !p.extruder || p.extruder === ms.extruder) return;
+      const arr = [];
+      collect(c.path ? c.path.replace(/^\//, '') : path, c.objectid, mulTransform(c.transform, T), () => false, arr, 1, null, {});
+      if (arr.length) modVols.push({ extruder: +p.extruder, pos: Float32Array.from(arr) });
+    };
+    collect(rootPath, item.objectid, item.transform, skipPart, out, 0, volumes, flags, onSkip);
     // Modifikator mit eigenem Slot (z. B. Text/Logo des Designers) färbt das Teil – ebenfalls mehrfarbig
     const mods = ms ? [...new Set([...ms.parts.values()].filter(p => p.subtype === 'modifier_part' && p.extruder && p.extruder !== ms.extruder).map(p => +p.extruder))] : [];
     if (mods.length) flags.painted = true;
@@ -225,7 +245,10 @@ function parse3MF(fileName, zip, zipLib) {
       name: unxml((ms && ms.name) || obj.name || 'Objekt ' + item.objectid),
       pos: Float32Array.from(out), objectId: item.objectid, instance,
       extruder: ms && ms.extruder ? +ms.extruder : null, plate: plateOf.get(item.objectid + '#' + instance) || 1, printable: item.printable,
-      ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {}), ...(mods.length ? { modifiers: mods } : {}), ...(flags.paintTris ? { paintTris: true } : {})
+      ...(bodies ? { bodies } : {}), ...(flags.painted ? { painted: true } : {}), ...(mods.length ? { modifiers: mods } : {}), ...(flags.paintTris ? { paintTris: true } : {}),
+      ...(modVols.length ? { modVols } : {}),
+      // Bemalung: Filament je Dreieck (1-basiert, 0 = Slot des Teils) und die vorkommenden Filamente des Designers
+      ...(flags.ps && flags.ps.length === out.length / 9 ? { paintState: Uint8Array.from(flags.ps), paintSlots: [...flags.pstates].filter(s => s > 0).sort((a, b) => a - b) } : {})
     });
   });
   if (!parts.length) throw Error(t('keine druckbaren Objekte in {file}', { file: fileName }));

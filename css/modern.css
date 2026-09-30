@@ -158,9 +158,9 @@ b { font-weight: 600; }
 .plate-card, .slot, .slot-edit, .wb-ace li { border-radius: 12px; background: var(--sheet); border-color: var(--rule); }
 .slot { background: var(--field); }
 .wb-ace li.empty .wb-swatch { background: repeating-linear-gradient(45deg, var(--paper-2), var(--paper-2) 6px, var(--paper) 6px, var(--paper) 12px); }
-.part-list button[aria-current="true"], .pick-list button[aria-current="true"] { background: var(--accent-soft); }
-.part-list button[aria-current="true"] + .pdel { background: var(--accent-soft); }
-.part-list button:hover, .pick-list button:hover:not(:disabled) { background: var(--paper-2); }
+.part-list button[data-part][aria-current="true"], .pick-list button[aria-current="true"] { background: var(--accent-soft); }
+.part-list li.sel { background: var(--accent-soft); }
+.part-list button[data-part]:hover, .pick-list button:hover:not(:disabled) { background: var(--paper-2); }
 .part-list, .part-list li, .hole-list li, .body-list li, .design-list li, .plate-parts li, .pick-list, .pick-list li { border-color: var(--rule); }
 .plevel { font-weight: 600; }
 table.changes th { border-bottom: 1px solid var(--rule-strong); }
@@ -269,7 +269,7 @@ dialog::backdrop { background: rgba(10, 12, 16, .45); backdrop-filter: blur(2px)
   .stepper input { width: 48px; font-size: 16px; }
   .orient-tools button, .body-join button { min-height: 40px; padding: 8px 12px; }
   .hud button { min-height: 40px; padding: 8px 12px; }
-  .part-list button { padding: 10px 8px 10px 10px; }
+  .part-list button[data-part] { padding: 10px 8px 10px 10px; }
   .plate-parts select, .design-list select, .body-list select { min-height: 36px; font-size: 14px; }
   .pv-layer input { height: 36px; }
   .field-links .linkbtn, .orient-head .linkbtn, .model-head .linkbtn, .plate-parts .linkbtn, .side-panel > .linkbtn { min-height: 36px; }
@@ -302,4 +302,62 @@ dialog::backdrop { background: rgba(10, 12, 16, .45); backdrop-filter: blur(2px)
   #wbStep { min-height: 44px; font-size: 16px; padding: 6px 10px; }
   .wb-queue-list li { padding: 10px 0; }
   .wb-queue-list .q-act { gap: 12px; }
+}
+
+/* ================= Handy (bis 640 px) =================
+   Kopfzeile kompakt in zwei Zeilen (Drucker + Düse, darunter Menüs und Sprache), 3D-Ansicht im Tab ① oben, Dialoge und
+   Auswahllisten über die ganze Breite, Werkzeugleiste der 3D-Ansicht zum Wischen. */
+@media (max-width: 640px) {
+  :root { --topbar-h: 96px; }
+  .topbar { gap: 6px 10px; padding: 8px 10px; }
+  /* Reihenfolge: [Drucker | Sprache/Darstellung] / [Düse | Menüs] – die Gruppe .machine löst sich dafür auf */
+  .topbar { flex-wrap: wrap; align-items: center; }
+  .machine { display: contents; }
+  .printer-switch { order: 1; flex: 0 1 auto; min-width: 0; }
+  .top-prefs { order: 2; }
+  .nozzle { order: 3; }
+  .menus { order: 4; }
+  .printer-switch button { padding: 5px 9px; font-size: 14px; max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .printer-switch button small { display: none; }               /* „Anycubic“/„Snapmaker“ über dem Namen */
+  .printer-switch button .edit, .printer-switch button svg { display: none; }
+  .nozzle > span:first-child { display: none; }                 /* „Düse ?“ – die Auswahl spricht für sich */
+  .nozzle-row { display: flex; gap: 4px; }
+  .nozzle select { padding: 4px 2px; font-size: 12.5px; max-width: 96px; }
+  .nozzle select#nozD { max-width: 76px; }
+  .menus { margin-left: auto; gap: 0; }
+  .menu-btn { padding: 5px 6px; font-size: 12.5px; }
+  .help-btn { width: 32px; height: 32px; }
+  .top-prefs { margin-left: auto; gap: 4px; }
+  .top-prefs .seg button { min-width: 30px; padding: 4px 6px; }
+  .tabs { padding: 0 6px; }
+  .tabs button { padding: 0 10px; font-size: 14px; }
+  /* ① Modell: 3D-Ansicht zuerst (etwa die halbe Höhe), darunter Modellkarte */
+  #view3d.view-model:not([hidden]) { display: flex; flex-direction: column; }
+  .view-model > #stage { order: -1; height: 52vh; min-height: 280px; }
+  .view-model > .model-col { padding: 12px 10px 20px; max-height: none; }
+  #controls, #controls.toolbar { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; right: 6px; left: 6px; top: 6px; transform: none; max-width: none; }
+  #controls::-webkit-scrollbar { display: none; }
+  #controls button { flex: none; }
+  #info .i-meta { display: none; }
+  #ohBar { font-size: 12px; }
+  #ohBar .legend { display: none; }
+  #ohBar .stats { gap: 8px; }
+  /* Teileliste: Werkzeuge der gewählten Zeile ohne großen Einzug */
+  .part-list { max-height: none; }
+  .part-list .ptools, .part-list .pcols { padding-left: 14px; }
+  .fil-list { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); }
+  /* ② Druckwerte */
+  #viewSettings, #viewSlice { padding: 10px; }
+  .result { padding: 14px 12px; }
+  .result-head h2 { font-size: 20px; }
+  .spec { grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .setting { font-size: 13px; }
+  .mini-view { height: 150px; }
+  /* Dialoge und Auswahllisten */
+  dialog { width: calc(100% - 12px); max-height: calc(100dvh - 24px); }
+  .slot-pop { max-width: calc(100vw - 16px); }
+  /* ④ Drucker */
+  .workbench { padding: 8px; }
+  .wb-ace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wb-live, .wb-video { min-height: 240px; }
 }

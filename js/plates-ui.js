@@ -55,7 +55,7 @@ function geomId(g) {
 function layoutKey(tpl, packOnly) {
   const tm = project.threemf;
   const head = [geomId(project), bedSize(tpl).join('x'), (tpl.bedCenter || []).join(','), [].concat(tpl.settings && tpl.settings.printable_height || [])[0],
-    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length].join('|');
+    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer'].join('|');
   return head + '|' + project.parts.map(p => { const g = p.geom || {};
     return geomId(g) + ':' + g.x + ':' + g.y + ':' + g.z + (packOnly ? '' : ':' + (p.plate || '') + (ownPlaced(p) ? '*' : '')); }).join(';');
 }
@@ -112,7 +112,7 @@ function setCopies(part, n) {
   if (copyGroupOf(part).length === 1) part.copyGroup = null;
   project.parts.forEach((p, i) => { p.id = i; });
   normalizePlates(tpl);
-  $('partList').classList.toggle('hidden', project.parts.length < 2);
+  $('partList').classList.remove('hidden');
   update();
 }
 
@@ -143,8 +143,11 @@ function renderPlates() {
   const mats = slotMaterials(plan), kinds = slotKindsFor(tpl, plan), canAdopt = slotMaterialChanges().length > 0, sl = costState.slice && costState.sig === costSignature() ? costState.slice : null;
   const sel = project.parts[project.selected], fixed = lay.fixed3mf, tm = project.threemf;
   const plN = t(lay.count > 1 ? '{n} Platten' : '{n} Platte', { n: lay.count });
+  if (typeof secSum === 'function') secSum('plates', plN);
   // 3MF: Platten des Designers, bis angeordnet wird (layout); ohne layout packt das Tool nur Platten mit eigenen Teilen
   const auto = tm ? tm.layout === 'auto' : !project.platesFixed, designerLayout = tm && !tm.layout;
+  $('plateByObject').checked = project.printSeq === 'object';
+  $('plateSeqNote').textContent = project.printSeq === 'object' ? t('Jedes Teil wird ganz fertig gedruckt, bevor das nächste beginnt – dafür {r} mm Abstand für den Druckkopf.', { r: de(clearanceOf(tpl).radius, 0) }) : '';
   $('plateInfo').textContent = fixed ? t('{plates} aus der 3MF des Designers, Lage wie vom Designer.', { plates: plN })
     : plN + ' · ' + (designerLayout ? t('Platten des Designers wie angelegt, eigene Teile platzsparend') : auto ? t('automatisch platzsparend verteilt') : t('eigene Zuordnung'));
   // Platzsparend anordnen: bei eigener Zuordnung, bei Makerworld-3MF, wenn es Platten spart (Modifikatoren und Bemalung bleiben)
@@ -154,14 +157,20 @@ function renderPlates() {
     : t('Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen');
   $('plateSave').textContent = packed < lay.count ? t('Platzsparend angeordnet wären es {n} statt {m} Platten.', { n: packed, m: lay.count }) : '';
   $('plateSave').classList.toggle('hidden', !(packed < lay.count));
-  $('plateCopies').classList.toggle('hidden', !sel);
-  if (sel) { $('plateCopyName').textContent = sel.name.replace(/ \(\d+\)$/, ''); $('plateCopyN').value = copyGroupOf(sel).length; }
   const warn = [];
   const vol = buildVolume(tpl);
   if (lay.oversize.length) warn.push(t('Passt nicht in den Bauraum ({size} mm): {parts}.', { size: de(vol[0], 0) + ' × ' + de(vol[1], 0) + (isFinite(vol[2]) ? ' × ' + de(vol[2], 0) : ''),
     parts: lay.oversize.map(i => project.parts[i].name + ' – ' + volumeExcess(project.parts[i].geom, vol).join(', ')).join('; ') }));
   else if ((lay.oversizePlates || []).length) warn.push(t('Teile auf Platte {list} belegen mehr als das Bett.', { list: lay.oversizePlates.join(', ') }));
   if (lay.overflow) warn.push(t('Nicht alles passte auf die gewählte Platte – der Rest steht auf einer weiteren.'));
+  // Objekt für Objekt: höchstens ein Teil je Platte höher als der Freiraum bis zur X-Achse (sonst bricht Orca ab)
+  if (project.printSeq === 'object') {
+    const { rod } = clearanceOf(tpl);
+    for (let k = 1; k <= lay.count; k++) {
+      const tall = project.parts.filter((p, i) => lay.plateOf[i] === k && p.geom.z > rod);
+      if (tall.length > 1) warn.push(t('Platte {n}: {parts} sind höher als {h} mm – beim Druck Objekt für Objekt darf nur ein Teil so hoch sein. Auf eigene Platten verteilen oder Schicht für Schicht drucken.', { n: k, parts: tall.map(p => p.name).join(', '), h: de(rod, 0) }));
+    }
+  }
   $('plateWarn').textContent = warn.join(' '); $('plateWarn').classList.toggle('hidden', !warn.length);
   let html = '';
   for (let k = 1; k <= lay.count; k++) {
@@ -169,7 +178,6 @@ function renderPlates() {
     if (!idx.length && fixed) continue;
     const need = plateNeeds({ plate: k, grams: plateSlotUse(plan, idx) }, mats, slots.length ? slots : null, slotMatchesKind);
     const sp = sl && sl.plates.find(p => p.plate === k), conflict = tempConflict(kinds, usedSlots(plan, idx));
-    const moveOpts = i => Array.from({ length: lay.count }, (_, n) => '<option value="' + (n + 1) + '"' + (n + 1 === k ? ' selected' : '') + '>' + t('Platte {n}', { n: n + 1 }) + '</option>').join('') + '<option value="' + (lay.count + 1) + '">' + t('Neue Platte') + '</option>';
     html += '<li class="plate-card"><div class="plate-head"><b>' + t('Platte {n}', { n: k }) + '</b><span class="muted small">' + t(idx.length > 1 ? '{n} Teile' : '{n} Teil', { n: idx.length }) +
       (sp ? ' · ' + duration(sp.time_s) + ' · ' + de(sp.total_g, 1) + ' g' : '') + '</span>' +
       '<span class="plate-slots">' + need.tools.map(tl => { const s = slots[tl], c = s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : '#dddddd'; return '<span class="pslot" style="background:' + c + '" title="Slot ' + (tl + 1) + (s && s.type ? ' · ' + esc(s.type) : '') + '"></span>'; }).join('') + '</span></div>' +
@@ -179,10 +187,13 @@ function renderPlates() {
         (need.missing.some(m => m.have) && canAdopt ? ' <button type="button" class="linkbtn" data-adopt>' + t('Filament aus dem ACE übernehmen') + '</button>' : '') + '</p>' : '') +
       (conflict ? '<p class="note bad small">' + t(project.threemf ? '<b>Slict so nicht:</b> {text} Lösung: oben unter <b>Farben des Designers</b> auf Slots mit derselben Filamentart legen oder passendes Filament einlegen.'
         : '<b>Slict so nicht:</b> {text} Lösung: den Teilen/Körpern Slots mit derselben Filamentart geben oder passendes Filament einlegen.', { text: esc(conflictText(conflict, kinds)) }) + '</p>' : '') +
-      '<ul class="plate-parts">' + idx.map(i => '<li' + (i === project.selected ? ' class="sel"' : '') + '><button type="button" class="linkbtn" data-pick="' + i + '">' + esc(project.parts[i].name) + '</button>' +
-        ('<select data-move="' + i + '" aria-label="' + t('Auf Platte verschieben') + '">' + moveOpts(i) + '</select>') + '</li>').join('') + '</ul></li>';
+      // Teile der Platte (Platte und Anzahl ändern: in der Teileliste oben, Zeile des gewählten Teils)
+      '<ul class="plate-parts">' + idx.map(i => '<li' + (i === project.selected ? ' class="sel"' : '') + '><button type="button" class="linkbtn" data-pick="' + i + '">' + esc(project.parts[i].name) + '</button></li>').join('') + '</ul></li>';
   }
   $('plateList').innerHTML = html;
+  // „Ganze Platte“ in der 3D-Ansicht: nach Verschieben, Kopien, Anordnen neu zeichnen (einmal je neuer Anordnung)
+  const pk = plCache.lay && plCache.lay.key + '|' + project.selected;
+  if (typeof plateView !== 'undefined' && plateView && pk !== plCache.shownKey) { plCache.shownKey = pk; if (geom) setTimeout(() => showModel(geom)); }
 }
 
 $('plateList').addEventListener('click', e => {
@@ -190,13 +201,22 @@ $('plateList').addEventListener('click', e => {
   const b = e.target.closest('[data-pick]'); if (!b) return;
   const i = +b.dataset.pick; if (i !== project.selected) selectPart(i);
 });
-$('plateList').addEventListener('change', e => { const s = e.target.closest('[data-move]'); if (s) movePart(+s.dataset.move, +s.value); });
 $('plateAuto').addEventListener('click', () => {
   project.platesFixed = false;
   // 3MF des Designers bleibt: das Tool setzt nur Lage und Platte je Objekt neu (build3mfFromProject)
   if (project.threemf) { project.threemf.layout = 'auto'; const tpl = plTpl(); if (tpl) normalizePlates(tpl); }
   update(); toast(t('Teile automatisch platzsparend verteilt'));
 });
-$('plateCopyN').addEventListener('change', () => setCopies(project.parts[project.selected], num($('plateCopyN').value) || 1));
-$('plateCopyMinus').addEventListener('click', () => setCopies(project.parts[project.selected], copyGroupOf(project.parts[project.selected]).length - 1));
-$('plateCopyPlus').addEventListener('click', () => setCopies(project.parts[project.selected], copyGroupOf(project.parts[project.selected]).length + 1));
+
+
+/* Druckreihenfolge umschalten: Objekt für Objekt braucht Abstand – die Teile werden neu angeordnet (bei Makerworld-3MF die
+   Platten des Designers einzeln, die sind sonst meist zu eng). */
+$('plateByObject').addEventListener('change', () => {
+  if (!project) return;
+  project.printSeq = $('plateByObject').checked ? 'object' : 'layer';
+  setPrintSequence(project.printSeq === 'object');
+  if (project.printSeq === 'object' && project.threemf && !project.threemf.layout && project.parts.length > 1) project.threemf.layout = 'plates';
+  const tpl = plTpl(); if (tpl) normalizePlates(tpl);
+  update();
+  toast(project.printSeq === 'object' ? t('Druck Objekt für Objekt – Teile mit Abstand für den Druckkopf angeordnet') : t('Druck Schicht für Schicht'));
+});

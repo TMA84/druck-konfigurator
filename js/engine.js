@@ -29,7 +29,7 @@ function helpFor(label,kind){
   if(kind==='tpu'&&['Düse','Lüfter','Rückzug','Maximale Volumengeschwindigkeit','Außenwand','Innere Wand','Füllung','Travel','Beschleunigung'].includes(key))extra=' '+t('TPU reagiert deutlich empfindlicher auf hohe Geschwindigkeit als PLA.');
   return explanations[key]+extra;
 }
-function rowHTML(r,kind){const h=helpFor(r[0],kind);return '<div class="setting"><b>'+esc(t(r[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</b><span class="value">'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</span></div>'}
+function rowHTML(r,kind){const h=helpFor(r[0],kind);return '<div class="setting'+(r[3]?' ov':'')+'"><b>'+esc(t(r[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</b><span class="value">'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</span></div>'}
 
 function orcaFilamentInherits(printerId,kindUpper){
   return (ORCA_FILAMENT_BASE[printerId]||{})[kindUpper]||ORCA_SYSTEM_FILAMENT[kindUpper]||'Generic PLA @System';
@@ -240,7 +240,11 @@ function compute(I,geom,ctx){
       ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
       ['Nur auf Druckplatte',t('Ein, zuerst testen')],['Kleine Überhänge entfernen',t(sp.small)],['Raft',t('0 Schichten')],
       ['Oberer Z-Abstand',de(supZ.top,2)+' mm'],['Unterer Z-Abstand',de(supZ.bottom,2)+' mm'],['Stützen/Objekt XY-Abstand',sp.xy],
-      ['Obere Schnittstellenschichten',sp.iface],['Schnittstellenabstand',sp.gap]
+      ['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Schnittstellenabstand',sp.gap],
+      // bisher im eigenen Abschnitt „Stützparameter“ – jetzt alles an einer Stelle
+      ['Wände um Stützstrukturen','0'],['Abstand Grundmuster',tpu?de(3,1)+' mm':de(2.5,1)+'–'+de(3,1)+' mm'],
+      ['Stützen/Objekt Abstand erste Schicht',tpu?de(0.25,2)+' mm':de(0.2,2)+' mm'],['Stützspitze',de(0.8,1)+' mm'],
+      ['Ast-Dichte',sp.density],['Astabstand',sp.branch],['Stützast-Durchmesser',de(2,1)+' mm']
     ]:[['Stützstrukturen',t('Nicht aktivieren'),sup==='Nicht nötig'?'':t(sup)],['Raft',t('0 Schichten')]]],
   ];
   if(o==='multicolor'){
@@ -264,6 +268,10 @@ function compute(I,geom,ctx){
     ['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s'],['Durchflussverhältnis',de(m.flow,2)]]
     .concat(m.pa!=null&&m.pa!==''?[['Pressure Advance',de(m.pa,3)]]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
   ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],['Brim',t(brim),brimNote],['Z-Hop',de(m.zhop,1)+' mm'],['Erste Schicht beobachten',t('Ja')]]]);
+  // Für diesen Auftrag angepasste Werte auch in der Slicer-Reihenfolge markieren (wie in der Übersicht)
+  const ORDER_KEYS={'Schichthöhe':['layer'],'Wandlinien':['w'],'Obere Schichten':['t'],'Untere Schichten':['b'],'Fülldichte':['inf'],'Füllmuster':['pattern'],
+    'Außenwand':['sp_outer'],'Innere Wand':['sp_inner'],'Füllung':['sp_fill'],'Düse':['nozzle'],'Heizbett':['bed'],'Lüfter Folgeschichten':['fan'],'Brim':['brim'],'Stützstrukturen':['support']};
+  ordered.forEach(g=>{g[1]=g[1].map(row=>row[3]||!ORDER_KEYS[row[0]]?row:mark(ORDER_KEYS[row[0]],row))});
 
   // Warnungen / Hinweise
   if(m.abrasive&&!NOZZLE_MATERIALS[mSel].hardened)danger.push(t('Faserverstärktes Filament schleift nicht gehärtete Düsen ({mat}) schnell aus. Nur mit gehärteter Stahldüse drucken.',{mat:esc(NOZZLE_MATERIALS[mSel].label)}));

@@ -36,6 +36,7 @@ const Viewer = (() => {
     const d2 = new THREE.DirectionalLight(0xffffff, 0.25); d2.position.set(-1, 1, -1); scene.add(d2);
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .08;
+    controls.addEventListener('start', () => { userMoved = true; });
 
     axes = new THREE.AxesHelper(1);
     scene.add(axes);
@@ -57,6 +58,7 @@ const Viewer = (() => {
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (!userMoved && lastFit) fit();   // Fenster/Handy gedreht: neu einpassen, solange niemand die Ansicht bewegt hat
   }
 
   function setBedGrid(size) {
@@ -87,15 +89,17 @@ const Viewer = (() => {
     scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null;
   }
 
-  // Zeigt geom (aus parseSTL) an; Einfärbung folgt über colorize(). false = kein Renderer.
-  function show(geom) {
+  /* Zeigt geom (aus parseSTL) an; Einfärbung folgt über colorize(). false = kein Renderer.
+     opts.center = [x, y]: diese Stelle in die Mitte (ganze Platte: Bettmitte, damit der Bauraum passt), sonst die Teilmitte;
+     opts.frame = Größe, auf die die Kamera passt (ganze Platte: das Bett). */
+  function show(geom, opts = {}) {
     if (!renderer) return false;
     disposeMesh();
     geomRef = geom;
     const g = new THREE.BufferGeometry();
-    const cx = (geom.mn[0] + geom.mx[0]) / 2, cy = (geom.mn[1] + geom.mx[1]) / 2, cz = geom.mn[2];
+    const cx = opts.center ? opts.center[0] : (geom.mn[0] + geom.mx[0]) / 2, cy = opts.center ? opts.center[1] : (geom.mn[1] + geom.mx[1]) / 2, cz = geom.mn[2];
     offset = [cx, cy, cz];
-    setExtras([]);
+    setExtras([]); setOverlay([]);
     const p = new Float32Array(geom.pos.length);
     for (let i = 0; i < p.length; i += 3) { p[i] = geom.pos[i] - cx; p[i + 1] = geom.pos[i + 1] - cy; p[i + 2] = geom.pos[i + 2] - cz; }
     g.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -107,16 +111,27 @@ const Viewer = (() => {
     }));
     scene.add(mesh);
 
-    maxDim = Math.max(geom.x, geom.y, geom.z) || 10;
+    maxDim = Math.max(geom.x, geom.y, geom.z, opts.frame || 0) || 10;
     setBedGrid(maxDim);
     clip.helper.size = maxDim * 1.5;
     setClipFraction(0);
     clearMeasurement();
-
-    camera.position.set(maxDim * 1.3, -maxDim * 1.5, maxDim * 1.1);
-    camera.near = maxDim / 100; camera.far = maxDim * 60; camera.updateProjectionMatrix();
-    controls.target.set(0, 0, geom.z / 2); controls.update();
+    userMoved = false;
+    fit(opts.frame ? [opts.frame, opts.frame, geom.z] : [geom.x, geom.y, geom.z]);
     return true;
+  }
+  /* Kamera so weit weg, dass die Hülle [x, y, z] mit Rand ins Bild passt – auch im Hochformat (Handy): maßgeblich ist der
+     engere der beiden Blickwinkel. */
+  let lastFit = null, userMoved = false;
+  function fit(dims) {
+    if (!camera) return;
+    lastFit = dims = dims || lastFit || [maxDim, maxDim, maxDim];
+    const r = 0.5 * Math.hypot(dims[0], dims[1], dims[2]) || 10, vf = camera.fov * Math.PI / 180;
+    const f = Math.min(vf, 2 * Math.atan(Math.tan(vf / 2) * (camera.aspect || 1)));
+    const dist = r / Math.sin(f / 2) * 1.1, dir = new THREE.Vector3(1.3, -1.5, 1.1).normalize().multiplyScalar(dist);
+    camera.position.set(dir.x, dir.y, dir.z + dims[2] / 2);
+    camera.near = Math.max(0.05, dist / 200); camera.far = dist * 40; camera.updateProjectionMatrix();
+    controls.target.set(0, 0, dims[2] / 2); controls.update();
   }
 
   function clear() {
@@ -165,6 +180,26 @@ const Viewer = (() => {
         transparent: op < 1, opacity: op, depthWrite: op >= 1, wireframe: wireframeOn, clippingPlanes: clip.on ? [clip.plane] : [], polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
       scene.add(m);
       extras.push(m);
+    }
+  }
+  /* Farbige Schicht auf dem Teil (Farb-Modifikatoren des Designers, js/modpaint.js): list = [{pos (Koordinaten wie geom),
+     color}] – eigene Liste, damit sie die Vorschau der Beschriftung (setExtras) nicht stört. */
+  let overlays = [];
+  function setOverlay(list) {
+    if (!renderer) return;
+    for (const m of overlays) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+    overlays = [];
+    for (const e of list || []) {
+      if (!e.pos || !e.pos.length) continue;
+      const p = new Float32Array(e.pos.length);
+      for (let i = 0; i < p.length; i += 3) { p[i] = e.pos[i] - offset[0]; p[i + 1] = e.pos[i + 1] - offset[1]; p[i + 2] = e.pos[i + 2] - offset[2]; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: e.color, roughness: .6, metalness: .05, flatShading: true, side: THREE.DoubleSide,
+        wireframe: wireframeOn, clippingPlanes: clip.on ? [clip.plane] : [], polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      scene.add(m);
+      overlays.push(m);
     }
   }
   function setAxes(on) { if (axes) axes.visible = on; }
@@ -246,5 +281,5 @@ const Viewer = (() => {
     });
   }
 
-  return { available, init, show, clear, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
+  return { available, init, show, fit, clear, setOverlay, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
 })();

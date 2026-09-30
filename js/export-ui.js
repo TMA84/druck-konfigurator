@@ -412,8 +412,7 @@ function pickPrintSlot(i){
   const targets=single?project.parts:project.parts.filter(p=>p.slot==null);
   if(single)project.parts.forEach(p=>{p.slot=i});
   else{store.last[slotKey(r.printer.id)]=i;persist()}
-  let changed=0;
-  if(s&&s.present&&s.type)for(const p of targets){const m=materialForSlotType(s.type,p.input&&p.input.material);if(p.input&&m!==p.input.material){p.input.material=m;changed++}}
+  const changed=adoptSlotMaterialFor(targets,i);
   loadPartIntoForm(project.parts[project.selected]);update();
   toast((single?t('Druckt mit Slot {n}',{n:i+1}):t('Standard-Slot {n} für Teile ohne eigenen Slot',{n:i+1}))+(changed?' · '+t('Filament auf {type} umgestellt',{type:s.type}):''));
 }
@@ -423,9 +422,9 @@ $('slotPanelList').addEventListener('click',e=>{const li=e.target.closest('[data
 function applySlotToAll(slot){
   if(!project||!lastResult)return;
   const r=lastResult,tpl=exportTemplate(r.printer.id,r.dSel),def=+(store.last[slotKey(r.printer.id)]||0);
-  const s=tpl&&slotSource(tpl).slots[slot??def];let changed=0;
-  for(const p of project.parts){p.slot=slot;
-    if(s&&s.present&&s.type&&p.input){const m=materialForSlotType(s.type,p.input.material);if(m!==p.input.material){p.input.material=m;changed++}}}
+  const s=tpl&&slotSource(tpl).slots[slot??def];
+  for(const p of project.parts)p.slot=slot;
+  const changed=adoptSlotMaterialFor(project.parts,slot??def);
   loadPartIntoForm(project.parts[project.selected]);update();
   toast(t('Slot {n} für alle {count} Teile',{n:(slot??def)+1,count:project.parts.length})+(changed?' · '+t('Filament auf {type} umgestellt',{type:s.type}):''));
 }

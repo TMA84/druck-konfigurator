@@ -11,6 +11,18 @@ const ACCEL_KEYS = [[t('Beschleunigung Standard'), 'default_acceleration'], [t('
   [t('Beschleunigung Innenwand'), 'inner_wall_acceleration'], [t('Beschleunigung massive Füllung'), 'internal_solid_infill_acceleration'],
   [t('Beschleunigung Füllung'), 'sparse_infill_acceleration'], [t('Beschleunigung obere Fläche'), 'top_surface_acceleration']];
 const PART_GAP_MM = 8;          // Abstand zwischen Teilen beim Anordnen
+/* Druckreihenfolge „Objekt für Objekt“ (Orca print_sequence = by object): jedes Teil wird ganz fertig gedruckt, bevor das
+   nächste beginnt. Dann müssen die Teile den Freiraum des Druckkopfs einhalten (extruder_clearance_radius aus dem
+   Druckerprofil, S1: 60 mm) und höchstens eines darf höher sein als der Abstand bis zur X-Achse (height_to_rod, S1: 48 mm) –
+   Orca prüft beides und bricht sonst ab. Die Oberfläche setzt den Modus je Projekt (setPrintSequence). */
+const printSeq = { byObject: false };
+function setPrintSequence(on) { printSeq.byObject = !!on; }
+function clearanceOf(tpl) {
+  const s = (tpl && tpl.settings) || {};
+  const num1 = v => +[].concat(v ?? [])[0];
+  return { radius: num1(s.extruder_clearance_radius) || 60, rod: num1(s.extruder_clearance_height_to_rod) || 40 };
+}
+const packGap = tpl => printSeq.byObject ? Math.max(PART_GAP_MM, clearanceOf(tpl).radius + 1) : PART_GAP_MM;
 const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße versetzt ab (Spalten = ⌈√Platten⌉)
 const objectPath = k => '/3D/Objects/object_' + k + '.model';
 
@@ -230,6 +242,11 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
     diff[c.perSlot ? 1 + c.index : 0].add(c.key);
     if (before !== c.value) changes.push({ label: c.label, key: c.key, before, after: c.value });
   }
+  if (printSeq.byObject && 'print_sequence' in settings) {
+    const before = settings.print_sequence;
+    settings.print_sequence = 'by object'; diff[0].add('print_sequence');
+    if (before !== 'by object') changes.push({ label: t('Druckreihenfolge'), key: 'print_sequence', before, after: 'by object' });
+  }
   for (const c of machine) {
     if (!(c.key in settings)) continue;
     const slotted = c.index != null && Array.isArray(settings[c.key]);
@@ -311,7 +328,7 @@ const itemTexts = p => (p.texts || (p.part && p.part.texts) || []).filter(x => x
 function textVolumes(k, p) {
   const R = (p.part && p.part.R) || null, vols = [], negs = [];
   itemTexts(p).forEach((x, j) => {
-    const e = { id: TEXT_ID_BASE + k * 1000 + j + 1, pos: textMesh(x, R), name: (x.mode === 'engraved' ? 'Gravur' : 'Schrift') + ' „' + String(x.text).slice(0, 40) + '“' };
+    const e = { id: TEXT_ID_BASE + k * 1000 + j + 1, pos: textMesh(typeof textScaled === 'function' ? textScaled(x, p.part) : x, R), name: (x.mode === 'engraved' ? 'Gravur' : 'Schrift') + ' „' + String(x.text).slice(0, 40) + '“' };
     if (x.mode === 'engraved') negs.push({ ...e, subtype: 'negative_part', settings: [] }); else vols.push({ ...e, slot: x.slot ?? null });
   });
   return { vols, negs };
@@ -409,7 +426,7 @@ function packGroup(geoms, idx, W, H, gap) {
   return best ? best.bins : [];
 }
 function packPlates(geoms, groups, tpl) {
-  const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = PART_GAP_MM;
+  const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = packGap(tpl);
   const plates = [];   // je Platte die belegten Rechtecke {i, x, y, w, h, rot} (inkl. Abstand)
   const sources = [];  // je Platte: aus welcher Gruppe (Plattennummer) sie stammt
   for (const [gi, idx] of groups.entries()) {
@@ -724,6 +741,34 @@ function relocateTransform(m, c, pl) {
   out.push(tx * R[0] + ty * R[3] + tz * R[6] + pl.x, tx * R[1] + ty * R[4] + tz * R[7] + pl.y, tx * R[2] + ty * R[5] + tz * R[8]);
   return out;
 }
+// 3MF-Objekt vergrößern/verkleinern: Weltachsen um die Mitte der Grundfläche pv skalieren (Zeilenvektor · Matrix)
+function scaleItemTransform(m, s, pv) {
+  if (!s || (s[0] === 1 && s[1] === 1 && s[2] === 1)) return m;
+  const o = m.slice();
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) o[r * 3 + k] = m[r * 3 + k] * s[k];
+  for (let k = 0; k < 3; k++) o[9 + k] = (m[9 + k] - pv[k]) * s[k] + pv[k];
+  return o;
+}
+/* Transformation eines 3MF-Objekts passend zu part.geom: erst die Drehung part.R (Weltachsen, wie rotatePositions), dann
+   die Größe part.scale um die Mitte der Grundfläche, zuletzt zurück aufs Bett (Unterkante wie vorher). Ohne Drehung und
+   Größe unverändert. g = part.geom (gedreht und skaliert), g0z = Unterkante vor der Drehung (Designer: meist 0). */
+function partItemTransform(m, part, g) {
+  const R = part && part.R, rot = R && R.some((v, i) => v !== [1, 0, 0, 0, 1, 0, 0, 0, 1][i]), sc = part && part.scale;
+  if (!rot && !(sc && (sc[0] !== 1 || sc[1] !== 1 || sc[2] !== 1))) return m;
+  let o = m.slice();
+  if (rot) {
+    // Zeilenvektor: w' = w · Rᵀ → M' = M · Rᵀ, t' = t · Rᵀ
+    const mul = row => [0, 1, 2].map(k => row[0] * R[k * 3] + row[1] * R[k * 3 + 1] + row[2] * R[k * 3 + 2]);
+    for (let r = 0; r < 4; r++) { const v = mul([o[r * 3], o[r * 3 + 1], o[r * 3 + 2]]); o[r * 3] = v[0]; o[r * 3 + 1] = v[1]; o[r * 3 + 2] = v[2]; }
+  }
+  o = scaleItemTransform(o, sc, geomPivot(g));
+  if (rot) {   // gedrehtes Teil wieder auf das Bett: Unterkante wie vor der Drehung (origPos, meist 0)
+    let z0 = Infinity; const P = part.origPos || []; for (let i = 2; i < P.length; i += 3) if (P[i] < z0) z0 = P[i];
+    o[11] += (isFinite(z0) ? z0 : 0) - g.mn[2];
+  }
+  return o;
+}
+const geomPivot = g => [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, g.mn[2]];
 const fmtTransform = m => m.map(v => { const s = String(Math.round(v * 1e6) / 1e6); return s === '-0' ? '0' : s; }).join(' ');
 const PLATE_FILE_KEYS = /[ \t]*<metadata key="(thumbnail_file|thumbnail_no_light_file|top_file|pick_file|pattern_file|pattern_bbox_file)" value="[^"]*"\/>\n?/g;
 
@@ -763,7 +808,7 @@ function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, 
     if (src && src.length) {
       const id = String(j.part.objectId), base = src[Math.min(j.part.instance || 0, src.length - 1)], inst = used.get(id) || 0;
       used.set(id, inst + 1);
-      const tr = fmtTransform(relocateTransform(base.m, c, pl));
+      const tr = fmtTransform(relocateTransform(partItemTransform(base.m, j.part, g), c, pl));
       let attrs = base.attrs.replace(/\s*transform="[^"]*"/, '') + ' transform="' + tr + '"';
       if (inst >= src.length || j.part.copy) attrs = attrs.replace(/p:UUID="[^"]*"/, 'p:UUID="' + uuid(0x8000 + i, 'c0de-4553-aec9-835e5b724bb4') + '"');
       buildXml.push('  <item' + (attrs.startsWith(' ') ? '' : ' ') + attrs + ' />');
@@ -815,7 +860,8 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   // Slots, die nur Farb-Modifikatoren des Designers nutzen (z. B. ein Schriftzug), bekommen die Filamentwerte ihres Teils –
   // sonst blieben dort die Vorlagenwerte, und Orca lehnt die Mischung ab („nozzle temperatures are incompatible“)
   const dmap = threemf.designMap || {};
-  items.forEach(j => ((j.part && j.part.modSlots) || []).forEach(d => { const s = dmap[d] ?? d;
+  // dasselbe für die Bemalung je Dreieck (js/paint.js: Filamente des Designers, umgelegt über designMap)
+  items.forEach(j => [...((j.part && j.part.modSlots) || []), ...((j.part && j.part.paintSlots) || [])].forEach(d => { const s = dmap[d] ?? d;
     if (s !== slot && s < nFil && !extra.some(e => e.slot === s)) extra.push({ slot: s, r: j.r || r }); }));
   items.forEach(j => { if (partSlot(j) >= nFil) notes.push(t('{part}: Slot {n} gibt es an deinem Drucker nicht – bitte in Orca zuweisen.', { part: j.geom.name, n: partSlot(j) + 1 })); });
   items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(t('{part} · {body}: Slot {n} gibt es an deinem Drucker nicht – Slot {last} wird verwendet.', { part: j.geom.name, body: b.name, n: b.slot + 1, last: nFil })); }));
@@ -879,6 +925,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   if (!relayout) {
     // Je Build-Item die Platte seiner Instanz – dasselbe Objekt kann auf mehreren Platten stehen
     const plateOfItem = new Map(items.map(j => [j.part.objectId + '#' + (j.part.instance || 0), j.plate || 1]));
+    const itemOf = new Map(items.map(j => [j.part.objectId + '#' + (j.part.instance || 0), j]));
     const itemCount = new Map();
     out[rootPath] = zipLib.strToU8(zipLib.strFromU8(out[rootPath]).replace(/<((?:\w+:)?item\b)([^>]*?)(\/?)>/g, (all, tag, attrs, close) => {
       const id = (/objectid="([^"]+)"/.exec(attrs) || [])[1], inst = itemCount.get(id) || 0;
@@ -886,7 +933,8 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
       const shift = shifts.get(plateOfItem.get(id + '#' + inst));
       if (!shift) return all;
       const t = (/transform="([^"]+)"/.exec(attrs) || [])[1];
-      const m = t ? t.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+      const j = itemOf.get(id + '#' + inst);
+      const m0 = t ? t.trim().split(/\s+/).map(Number) : [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], m = j ? partItemTransform(m0, j.part, j.geom) : m0;
       m[9] += shift[0]; m[10] += shift[1];
       const tr = 'transform="' + m.map(v => String(Math.round(v * 1e4) / 1e4)).join(' ') + '"';
       return '<' + tag + (t ? attrs.replace(/transform="[^"]+"/, tr) : attrs + ' ' + tr) + close + '>';
@@ -915,6 +963,16 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     if (out['Metadata/filament_sequence.json']) out['Metadata/filament_sequence.json'] = zipLib.strToU8(JSON.stringify(Object.fromEntries(Array.from({ length: lay.count }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }]))));
   }
   out['Metadata/model_settings.config'] = zipLib.strToU8(ms);
+  // Bemalung je Dreieck: Filamente des Designers auf die eigenen Slots umschreiben (designMap), sonst blieben Nummern stehen,
+  // die es am Drucker nicht gibt (Mario mit 7 Farben, eine ACE mit 4 Slots)
+  const pmap = threemf.designMap || {}, remap = st => Math.min((pmap[st - 1] ?? st - 1), nFil - 1) + 1;
+  if (typeof paintRemap === 'function' && items.some(j => j.part && j.part.paintState && (j.part.paintSlots || []).some(d => remap(d + 1) !== d + 1)))
+    for (const name of Object.keys(out)) {
+      if (!/\.model$/i.test(name)) continue;
+      const txt = zipLib.strFromU8(out[name]);
+      if (!txt.includes('paint_color="')) continue;
+      out[name] = zipLib.strToU8(txt.replace(/paint_color="([0-9A-Fa-f]+)"/g, (all, code) => { try { return 'paint_color="' + paintRemap(code, remap) + '"'; } catch (e) { return all; } }));
+    }
   return { bytes: zipLib.zipSync(out, { level: 6 }), changes, objectChanges, notes, plateCount: relayout ? lay.count : shifts.size };
 }
 

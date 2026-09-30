@@ -46,6 +46,8 @@
         <span class="menu-group">Weitere Exporte</span>
         <button type="button" role="menuitem" id="orcaFilBtn" data-toast="Filament-JSON gespeichert">Filament-JSON für OrcaSlicer</button>
         <button type="button" role="menuitem" id="orcaProcBtn" data-toast="Process-JSON gespeichert">Process-JSON für OrcaSlicer</button>
+        <p class="menu-note">In OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug bleibt außen vor (Druckerprofil).</p>
+        <p class="menu-note warn" id="orcaNote"></p>
         <button type="button" role="menuitem" id="printBtn">Datenblatt drucken / PDF …</button>
         <button type="button" role="menuitem" id="copyBtn">Datenblatt als Text kopieren</button>
       </div>
@@ -99,6 +101,7 @@
         <label for="partPick">Teil</label><select id="partPick" aria-label="Teil wählen"></select>
         <label for="partSlot">Slot</label><select id="partSlot"></select>
         <button type="button" class="linkbtn" id="partSlotAll">Für alle Teile übernehmen</button>
+        <div id="partUses" class="part-uses hidden"></div>
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
         <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div></div>
@@ -141,20 +144,13 @@
 
       <details class="fold">
         <summary><span id="orderedTitle">Einstellungen in Slicer-Reihenfolge</span></summary>
-        <p class="muted" id="orderedIntro"></p><div id="orderedSettings"></div>
-      </details>
-      <details class="fold">
-        <summary>Stützparameter</summary>
-        <div id="supportParams"></div>
+        <p class="muted" id="orderedIntro"></p>
+        <label class="only-ov-toggle"><input type="checkbox" id="orderedOnlyOv"> Nur für diesen Auftrag angepasste Werte zeigen</label>
+        <div id="orderedSettings"></div>
       </details>
       <details class="fold" id="hintsFold" open>
         <summary>Hinweise</summary>
         <div id="warning" class="note"></div><div id="checks" class="note ok"></div>
-      </details>
-      <details class="fold">
-        <summary>OrcaSlicer-Import (JSON)</summary>
-        <p class="muted">Über <b>Datei → Weitere Exporte → Filament-/Process-JSON</b> speichern und in OrcaSlicer über <b>Datei → Einstellungen importieren</b> beide laden. Rückzug ist ein Hardware-Profil deines Druckers und bleibt bewusst außen vor – den Wert oben manuell unter Printer Settings → Extruder eintragen.</p>
-        <div id="orcaNote" class="note"></div>
       </details>
     </article>
   </div>
@@ -314,12 +310,22 @@
 <section id="view3d" role="tabpanel" aria-labelledby="tab3d" class="view view-model" hidden>
   <aside class="model-col noprint" aria-label="Modell">
     <div class="model-card noprint" id="modelCard">
-        <div class="model-head"><span class="eyebrow">Modell</span><span><button class="linkbtn" type="button" data-action="add" id="addModelBtn">+ Hinzufügen</button> · <button class="linkbtn" type="button" data-action="open">Modell öffnen</button></span></div>
+        <div class="model-head"><span class="eyebrow">Modell</span><span><button class="linkbtn" type="button" data-action="add" id="addModelBtn">+ Hinzufügen</button> · <button class="linkbtn" type="button" data-action="open">Modell öffnen</button><span id="removeModelWrap" class="hidden"> · <button class="linkbtn" type="button" id="removeModelBtn" title="Modell entfernen – bei mehreren hinzugefügten Modellen auch nur eines">Entfernen</button></span></span></div>
         <div id="fileinfo">Noch keine Datei geladen.</div>
+        <div id="filBar" class="fil-bar hidden">
+          <div class="fil-head"><span class="eyebrow">Filamente</span>
+            <span class="seg fil-view" role="group" aria-label="Farben in der 3D-Ansicht"><button type="button" data-colview="slot" aria-pressed="true" title="So, wie es mit deinem Filament gedruckt wird">Slotfarben</button><button type="button" data-colview="designer" aria-pressed="false" title="Farben wie vom Designer angelegt">Designer</button></span></div>
+          <div id="filDesign" class="fil-design hidden">
+            <div class="fil-sub"><span>Modell → Slot</span><span><button type="button" id="filDesignAuto" class="linkbtn" title="Jede Farbe des Designers auf den Slot mit der ähnlichsten Farbe und passendem Material legen">Automatisch</button> · <button type="button" id="filDesignReset" class="linkbtn">Wie vom Designer</button></span></div>
+            <ol id="filDesignList" class="fil-dlist" aria-label="Filamente des Modells und ihre Slots"></ol>
+          </div>
+          <div class="fil-sub"><span>Slots am Drucker</span><button class="linkbtn" id="filBarEdit" type="button">Slots bearbeiten</button></div>
+          <ol id="filBarList" class="fil-list" aria-label="Filament-Slots – Klick weist den Slot dem gewählten Teil zu"></ol>
+        </div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
         <p id="importNotes" class="muted hidden"></p>
         <section id="designBox" class="plates hidden" aria-labelledby="designTitle">
-          <div class="orient-head"><span class="eyebrow" id="designTitle">Farben des Designers</span><button type="button" id="designReset" class="linkbtn hidden">Wie vom Designer</button></div>
+          <div class="orient-head"><span class="eyebrow" id="designTitle">Farben des Designers</span><span><button type="button" id="designAuto" class="linkbtn" title="Jede Farbe des Designers auf den Slot mit der ähnlichsten Farbe legen (Belegung vom Drucker oder eigene Angabe)">Automatisch zuordnen</button> <button type="button" id="designReset" class="linkbtn hidden">Wie vom Designer</button></span></div>
           <p class="muted small">Jede Farbe auf einen Slot deiner ACE legen – z. B. auf einen mit derselben Filamentart.</p>
           <ul id="designList" class="design-list"></ul>
           <p id="designNote" class="muted small hidden"></p>
@@ -327,7 +333,8 @@
         <section id="plateBox" class="plates hidden" aria-labelledby="plateTitle">
           <div class="orient-head"><span class="eyebrow" id="plateTitle">Platten</span><button type="button" id="plateAuto" class="linkbtn hidden" title="Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen">Platzsparend anordnen</button></div>
           <p id="plateInfo" class="muted small"></p>
-          <div id="plateCopies" class="plate-copies"><span>Anzahl <b id="plateCopyName"></b></span><span class="stepper"><button type="button" id="plateCopyMinus" aria-label="Eine Kopie weniger">−</button><input id="plateCopyN" type="number" min="1" max="50" step="1" inputmode="numeric" aria-label="Anzahl des gewählten Teils"><button type="button" id="plateCopyPlus" aria-label="Eine Kopie mehr">+</button></span></div>
+          <label class="seq-toggle" title="Orca: Druckreihenfolge „nach Objekt“ – spart Fahrwege und Fäden zwischen Teilen, ein Fehldruck betrifft nur ein Teil"><input type="checkbox" id="plateByObject"> Objekt für Objekt drucken</label>
+          <p id="plateSeqNote" class="muted small"></p>
           <p id="plateSave" class="note small hidden"></p>
           <p id="plateWarn" class="note bad small hidden"></p>
           <ol id="plateList" class="plate-list"></ol>
@@ -343,8 +350,24 @@
           </div>
           <button type="button" id="orientAll" class="linkbtn hidden" data-orient="all">Alle Teile nach Vorschlag ausrichten</button>
         </section>
+        <section id="sizeBox" class="orient hidden" aria-labelledby="sizeTitle">
+          <div class="orient-head"><span class="eyebrow" id="sizeTitle">Größe</span><span id="sizePart" class="muted"></span></div>
+          <div class="size-form">
+            <label>Skalierung <span class="unit"><input id="szPct" type="number" min="1" max="2000" step="1" inputmode="decimal" aria-label="Skalierung in Prozent"> %</span></label>
+            <label class="size-lock" title="Aus: jede Achse einzeln ändern"><input type="checkbox" id="szUniform" checked> gleichmäßig</label>
+            <label>X <span class="unit"><input id="szX" type="number" min="0.1" step="0.1" inputmode="decimal" aria-label="Breite X in mm"> mm</span></label>
+            <label>Y <span class="unit"><input id="szY" type="number" min="0.1" step="0.1" inputmode="decimal" aria-label="Tiefe Y in mm"> mm</span></label>
+            <label>Z <span class="unit"><input id="szZ" type="number" min="0.1" step="0.1" inputmode="decimal" aria-label="Höhe Z in mm"> mm</span></label>
+          </div>
+          <div class="orient-tools" role="group" aria-label="Größe">
+            <button type="button" data-sz="50">50 %</button><button type="button" data-sz="200">200 %</button>
+            <button type="button" id="szFit" title="So groß wie möglich, damit das Teil noch in den Bauraum passt">Bauraum füllen</button>
+            <button type="button" id="szReset" title="Originalgröße aus der Datei">Original</button>
+          </div>
+          <p id="szNote" class="muted small"></p>
+        </section>
         <section id="bodyBox" class="bodies hidden" aria-labelledby="bodyTitle">
-          <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><label class="muted small body-show"><input type="checkbox" id="bodyShow"> Farben zeigen</label></div>
+          <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><label class="muted small body-show"><input type="checkbox" id="bodyShow" checked> Farben zeigen</label></div>
           <p id="bodyInfo"></p>
           <ul id="bodyList" class="body-list"></ul>
           <div id="bodyJoin" class="body-join hidden"><label for="bodyJoinSel">Mit Teil vereinen</label><select id="bodyJoinSel"></select><button type="button" id="bodyJoinBtn">Vereinen</button></div>
@@ -378,23 +401,22 @@
           </div>
           <p id="txWarn" class="note bad small hidden"></p>
         </section>
-        <p class="oh-info muted"></p>
         <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
   </aside>
   <div id="stage">
     <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
-    <div id="info" class="hud"></div>
     <p id="volWarn" class="hud vol-warn hidden" role="status"></p>
-    <div id="controls" class="hud">
-      <button id="btnWireframe" type="button">Wireframe</button>
-      <button id="btnAxes" type="button" class="active">Achsen</button>
-      <button id="btnClip" type="button">Schnitt</button>
-      <button id="btnMeasure" type="button">Messen</button>
+    <div id="controls" class="hud toolbar" role="toolbar" aria-label="Werkzeuge">
+      <span class="tb-group" role="group" aria-label="Modell"><button type="button" data-action="add" title="Modell hinzufügen (kombiniert drucken)" aria-label="Modell hinzufügen (kombiniert drucken)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/><path d="M18 15v6M15 18h6" class="plus"/></svg><span class="tb-label">Hinzufügen</span></button><button type="button" id="tbNewPlate" title="Gewähltes Teil auf eine neue Platte" aria-label="Gewähltes Teil auf eine neue Platte"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="1.5"/><path d="M3 10h14M3 14.5h14M7.7 5v14M12.3 5v14"/><path d="M19 3v6M16 6h6" class="plus"/></svg><span class="tb-label">Neue Platte</span></button><button type="button" data-orient="all" id="tbOrientAll" title="Alle Teile nach Vorschlag ausrichten" aria-label="Alle Teile nach Vorschlag ausrichten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M8 15l4-9 4 9z"/><path d="M12 3v2"/><path d="M17 9a6 6 0 0 1 2 5" /><path d="M19 14l1.5-2.2M19 14l-2.4-.8"/></svg><span class="tb-label">Ausrichten</span></button><button type="button" id="tbArrange" title="Platzsparend anordnen" aria-label="Platzsparend anordnen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="6" width="5" height="5"/><rect x="13" y="6" width="5" height="5"/><rect x="6" y="13" width="12" height="5"/></svg><span class="tb-label">Anordnen</span></button></span>
       <span class="hud-sep" aria-hidden="true"></span>
-      <button type="button" data-orient="pick" id="btnPick" title="Fläche anklicken, die aufs Bett soll">Fläche aufs Bett</button>
-      <button type="button" data-orient="x" title="90° um X">↻ X</button><button type="button" data-orient="y" title="90° um Y">↻ Y</button>
+      <span class="tb-group" role="group" aria-label="Teil"><button type="button" id="tbCopyPlus" title="Eine Kopie mehr" aria-label="Eine Kopie mehr"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg><span class="tb-label">Kopie +</span></button><button type="button" id="tbCopyMinus" title="Eine Kopie weniger" aria-label="Eine Kopie weniger"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg><span class="tb-label">Kopie −</span></button><button type="button" id="tbSplit" title="In einzelne Teile trennen (Körper)" aria-label="In einzelne Teile trennen (Körper)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="tb-label">Trennen</span></button><button type="button" id="tbDelete" title="Gewähltes Teil entfernen" aria-label="Gewähltes Teil entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4.5h6V7M7 7l1 13h8l1-13"/><path d="M10.5 11v6M13.5 11v6"/></svg><span class="tb-label">Entfernen</span></button></span>
+      <span class="hud-sep" aria-hidden="true"></span>
+      <span class="tb-group" role="group" aria-label="Bearbeiten"><button type="button" data-orient="pick" id="btnPick" title="Fläche anklicken, die aufs Bett soll" aria-label="Fläche anklicken, die aufs Bett soll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18"/><path d="M6 15l6-9 6 9z"/><path d="M6 15h12" class="thick"/></svg><span class="tb-label">Fläche aufs Bett</span></button><button type="button" id="tbRotate" aria-haspopup="true" title="Drehen (90° um X, Y oder Z)" aria-label="Drehen (90° um X, Y oder Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M17 3v4.5h-4.5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span class="tb-label">Drehen</span></button><button type="button" id="tbScale" aria-haspopup="true" title="Größe ändern" aria-label="Größe ändern"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.5"/><rect x="8" y="8" width="8" height="8" rx="1"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/></svg><span class="tb-label">Größe</span></button><button type="button" id="btnClip" title="Schnittansicht" aria-label="Schnittansicht"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" stroke-dasharray="3 2"/><rect x="5" y="4" width="14" height="16" rx="1.5"/></svg><span class="tb-label">Schnitt</span></button><button type="button" id="tbText" title="Beschriftung hinzufügen" aria-label="Beschriftung hinzufügen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="tb-label">Text</span></button><button type="button" id="btnMeasure" title="Abstand messen (zwei Punkte anklicken)" aria-label="Abstand messen (zwei Punkte anklicken)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16l13-13 5 5-13 13z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/></svg><span class="tb-label">Messen</span></button></span>
+      <span class="hud-sep" aria-hidden="true"></span>
+      <span class="tb-group" role="group" aria-label="Ansicht"><button type="button" id="btnPlate" title="Alle Teile der Platte des gewählten Teils an ihrem Platz zeigen" aria-label="Alle Teile der Platte des gewählten Teils an ihrem Platz zeigen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="11" rx="1.5"/><path d="M7 9V6h4v3M13 9V4h4v5"/></svg><span class="tb-label">Ganze Platte</span></button><button type="button" id="btnWireframe" title="Drahtgitter" aria-label="Drahtgitter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5M4 16.5l8-4.5 8 4.5" stroke-dasharray="2 2"/></svg><span class="tb-label">Drahtgitter</span></button><button type="button" id="btnAxes" class="active" title="Achsen zeigen" aria-label="Achsen zeigen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V5M5 19h14M5 19l10-7"/><path d="M5 5l-1.5 2M5 5l1.5 2M19 19l-2-1.5M19 19l-2 1.5"/></svg><span class="tb-label">Achsen</span></button></span>
     </div>
+    <div id="tbPop" class="hud tb-pop hidden" role="dialog" aria-label="Werkzeug"></div>
     <div id="subControls" class="hud">
       <div id="clipPanel" class="hidden"><span>Achse:</span>
         <button id="clipAxisX" type="button" class="active">X</button><button id="clipAxisY" type="button">Y</button><button id="clipAxisZ" type="button">Z</button>
@@ -402,8 +424,8 @@
       <div id="measureLabel"></div>
     </div>
     <div id="ohBar" class="hud hidden">
+      <div class="ob-head"><div id="info"></div><div class="stats"><span>X <b id="sx">–</b></span><span>Y <b id="sy">–</b></span><span>Z <b id="sz">–</b></span><span><b id="sv">–</b></span></div></div>
       <div class="vbar"><label for="thresh">Überhangwinkel ≤ <span class="help help-dark" title="Winkel von der Senkrechten. Flächen, die steiler überhängen als dieser Wert, werden rot markiert und zählen für die Stützen-Entscheidung. 45° ist ein sicherer Standard, 50–55° spart Stützen.">?</span></label><input type="range" id="thresh" min="30" max="70" value="45"><span class="val" id="threshVal">45°</span></div>
-      <div class="stats"><span>Breite X <b id="sx">–</b></span><span>Tiefe Y <b id="sy">–</b></span><span>Höhe Z <b id="sz">–</b></span><span>Volumen <b id="sv">–</b></span></div>
       <div class="legend"><span><i style="background:#9aa8bc"></i>liegt auf dem Druckbett</span><span><i style="background:#3fa8f5"></i>unkritisch</span><span><i style="background:#f2b53d"></i>nahe am Grenzwinkel</span><span><i style="background:#e5514f"></i>über Grenzwinkel</span></div>
       <p id="ohInfo" class="oh-info"></p>
     </div>
@@ -592,6 +614,7 @@
 <script src="js/data.js"></script>
 <script src="js/config.js"></script>
 <script src="js/stl.js"></script>
+<script src="js/paint.js"></script>
 <script src="js/import.js"></script>
 <script src="js/orient.js"></script>
 <script src="js/holes.js"></script>
@@ -616,12 +639,17 @@
 <script src="js/orient-ui.js"></script>
 <script src="js/part-settings.js"></script>
 <script src="js/holes-ui.js"></script>
+<script src="js/modpaint.js"></script>
 <script src="js/bodies-ui.js"></script>
 <script src="js/engrave-ui.js"></script>
 <script src="js/overrides-ui.js"></script>
 <script src="js/costs-ui.js"></script>
 <script src="js/design-ui.js"></script>
 <script src="js/plates-ui.js"></script>
+<script src="js/slot-picker.js"></script>
+<script src="js/size-ui.js"></script>
+<script src="js/sections-ui.js"></script>
+<script src="js/toolbar-ui.js"></script>
 <script src="js/preview-ui.js"></script>
 <script src="vendor/flv.min.js"></script>
 <script src="js/workbench-ui.js"></script>
@@ -631,5 +659,6 @@
 <script src="js/spools-ui.js"></script>
 <script src="js/history-ui.js"></script>
 <script src="js/printer-picker.js"></script>
+<script src="js/project-store.js"></script>
 </body>
 </html>

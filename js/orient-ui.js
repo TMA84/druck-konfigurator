@@ -6,13 +6,16 @@ const orientCache = new WeakMap();   // Teil → {th, res}
 let orientJob = 0;                   // verhindert, dass eine alte Berechnung eine neue überschreibt
 
 const selectedPart = () => project && project.parts[project.selected];
-// Makerworld-3MF: Lage des Designers bleibt (Entscheidung 2026-09-26); nur STL-Teile werden gedreht.
-const orientable = () => !!project && !project.threemf;
+/* Drehen geht jetzt auch bei Makerworld-3MF: die Drehung steht dann in der Transformation des Objekts (js/export3mf.js
+   partItemTransform), Modifikatoren und Bemalung drehen mit. Ohne Zutun bleibt die Lage des Designers. */
+const orientable = () => !!project;
+// Vorschlag (Auflageflächen durchprobieren) nur bis zu dieser Netzgröße – darüber würde die Seite spürbar hängen
+const ORIENT_MAX_TRIS = 150000;
 const mm2 = v => de(v, 0) + ' mm²';
 
 function setPartRotation(part, R) {
   part.R = R;
-  part.geom = makeGeom(part.name, rotatePositions(part.origPos, R));
+  part.geom = partGeom(part);
   orientCache.delete(part);
   if (part === selectedPart()) showModel(part.geom); else renderPartList();
 }
@@ -36,12 +39,18 @@ function renderOrient() {
   const box = $('orientBox'), part = selectedPart();
   box.classList.toggle('hidden', !part);
   if (!part) return;
+  if (typeof secSum === 'function') secSum('orient', '');
   const tools = [...document.querySelectorAll('[data-orient]')];
   tools.forEach(b => { b.disabled = !orientable(); });
   $('orientPart').textContent = project.parts.length > 1 ? part.name : '';
   $('orientAll').classList.toggle('hidden', !orientable() || project.parts.length < 2);
   if (!orientable()) {
     $('orientInfo').textContent = t('Lage aus der 3MF bleibt erhalten – die Designer legen ihre Teile in der Regel schon richtig hin.');
+    $('orientSuggest').classList.add('hidden');
+    return;
+  }
+  if (part.geom.n > ORIENT_MAX_TRIS) {
+    $('orientInfo').textContent = t('Sehr feines Netz ({n} Dreiecke) – kein automatischer Vorschlag. Mit „Fläche aufs Bett“ oder den 90°-Knöpfen drehen.', { n: part.geom.n.toLocaleString(LOCALE()) });
     $('orientSuggest').classList.add('hidden');
     return;
   }
@@ -61,6 +70,7 @@ function showOrientResult(part, res) {
   $('orientInfo').textContent = t('Aktuelle Lage: {supports} · Auflage {contact}{warn}.', { supports: supportText(c), contact: mm2(c.contact), warn: c.contact < MIN_CONTACT_MM2 ? t(' – sehr wenig, Kippgefahr') : '' });
   const s = res.suggestion;
   $('orientSuggest').classList.toggle('hidden', !s);
+  if (typeof secSum === 'function') secSum('orient', s ? t('besserer Vorschlag') : '');
   if (s) $('orientSuggestText').textContent = t('Besser: andere Seite aufs Bett – {supports}, Auflage {contact}, Höhe {h} mm.', { supports: supportText(s), contact: mm2(s.contact), h: de(s.height, 1) });
 }
 
@@ -86,8 +96,9 @@ async function orientAll() {
   for (const [i, part] of project.parts.entries()) {
     $('orientInfo').textContent = t('Prüfe Teil {i} von {n} …', { i: i + 1, n: project.parts.length });
     await new Promise(r => setTimeout(r, 0));   // Anzeige zwischendurch aktualisieren
+    if (part.geom.n > ORIENT_MAX_TRIS) continue;  // sehr feine Netze: kein Vorschlag (siehe renderOrient)
     const res = orientResult(part, th);
-    if (res.suggestion) { part.R = res.suggestion.R; part.geom = makeGeom(part.name, rotatePositions(part.origPos, part.R)); orientCache.delete(part); changed++; }
+    if (res.suggestion) { part.R = res.suggestion.R; part.geom = partGeom(part); orientCache.delete(part); changed++; }
   }
   showModel(selectedPart().geom);
   toast(changed ? t('{c} von {n} Teilen neu ausgerichtet', { c: changed, n: project.parts.length }) : t('Alle Teile liegen bereits gut'));
