@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.7.0] – 2026-09-30
 
 ### Neu
 - **Filamente von Anycubic und SUNLU** in ② Druckwerte, nach Hersteller gruppiert (16 Anycubic, 18 SUNLU) mit den **Druckwerten der Hersteller** (Anycubic: eigene Kobra-S1-Profile aus OrcaSlicer bzw. Produktseite; SUNLU: Produktseiten und SUNLUs Slicer-Profile) und ihren **Farben** (Anycubic mit den offiziellen Farbcodes aus dem Shop, SUNLU nach Farbnamen). Farbe anklicken trägt sie für den Slot des Teils ein. Alle 34 Profile mit der Orca-CLI geslict.
@@ -12,9 +12,6 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - Bemalung des Designers wird in der 3D-Ansicht jetzt genau gezeigt (auch geteilte Dreiecke), getrennte Teile einer Makerworld-3MF behalten ihre Bemalung beim Export.
 - **Rückgängig / Wiederholen** für das ganze Projekt: Strg/⌘+Z, Strg/⌘+Umschalt+Z (oder Strg+Y) und zwei Knöpfe vorn in der Werkzeugleiste – Slot, Größe, Drehung, Platte, Kopien, Entfernen, Farbzuordnung, Druckreihenfolge, Beschriftung, Bohrlöcher (bis 60 Schritte).
 - **Beschriftung auf Objekten des Designers** (Makerworld-/Orca-3MF): erhaben mit eigenem Slot oder vertieft; kommt als weiteres Bauteil ins Objekt, wie OrcaSlicer es speichert (mit Orca-CLI geprüft).
-
-### Behoben
-- Gemalte Stützen und Naht lösten im Tab ③ kein neues Slicen aus – die Vorschau zeigte die alten Stützen.
 
 ### Verbessert
 - Pinselstriche werden auch bei großen bemalten Flächen flüssig angezeigt (nur die geänderten Dreiecke).
