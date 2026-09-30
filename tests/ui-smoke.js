@@ -424,6 +424,14 @@ async function runSmoke(opts={}){
       const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),sl=dialogSlots(tpl)[project.parts[project.selected].slot??defaultSlot()];
       ok(sl&&sl.colour==='#002FA7'&&sl.type==='PLA','Farbe angeklickt: Slot bekommt PLA Klein Blue');
       store.settings.manualSlots=JSON.parse(saved)||undefined;if(!store.settings.manualSlots)delete store.settings.manualSlots;persist();
+      // Spule per RFID erkannt (Drucker-Verbindung nachgestellt): statt der Farbauswahl nur ein Hinweis; ohne RFID wieder die Farben
+      { const s0=project.parts[project.selected].slot??defaultSlot(),n=exportTemplate(lastResult.printer.id,lastResult.dSel).slots.length,old=slotState;
+        const mk=rfid=>Array.from({length:n},(_,i)=>({type:'PLA',colour:'#3366CC',name:'PLA',present:true,rfid:rfid&&i===s0}));
+        slotState={printer:lastResult.printer.id,live:{slots:mk(true),via:'lan',time:new Date()},note:''};update();await wait(150);
+        ok(/RFID/.test($('matColours').textContent)&&!$('matColours').querySelector('[data-mat-colour]'),'RFID-Spule im Slot: keine Farbauswahl, nur Hinweis');
+        slotState={printer:lastResult.printer.id,live:{slots:mk(false),via:'lan',time:new Date()},note:''};update();await wait(150);
+        ok($('matColours').querySelectorAll('[data-mat-colour]').length>20,'ohne RFID: Farben des Herstellers wieder da');
+        slotState=old;update();await wait(100); }
       $('material').value=before;$('material').dispatchEvent(new Event('change',{bubbles:true}));await wait(150); }
     // Objekte überspringen (Tab ④): Liste aus dem G-Code, Befehl skip/start mit der Nummer (Drucker nachgestellt)
     { const objs=[{id:0,name:'a.stl_id_0_copy_0',polygon:[[0,0],[10,0],[10,10]]},{id:1,name:'a.stl_id_0_copy_1',polygon:[[20,0],[30,0],[30,10]]},{id:2,name:'b.stl_id_1_copy_0',polygon:[[40,0],[50,0],[50,10]]}];

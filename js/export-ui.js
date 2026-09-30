@@ -54,7 +54,7 @@ function slotSource(tpl){
   // Die Vorlage kennt nur den Stand beim Speichern in Orca – Typ und Farbe daraus wären irreführend.
   return {kind:'template',slots:tpl.slots.map(()=>({type:'',colour:'',name:'',present:true}))};
 }
-function dialogSlots(tpl){return slotSource(tpl).slots.map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:s.present,idx:i}))}
+function dialogSlots(tpl){return slotSource(tpl).slots.map((s,i)=>({type:s.type,colour:s.colour,name:s.name,present:s.present,rfid:!!s.rfid,idx:i}))}
 // Belegung, die in die 3MF geschrieben wird (Typ und Farbe je Slot); Vorlage = unverändert lassen
 function exportSlots(tpl){const s=slotSource(tpl);return s.kind==='template'?null:s.slots}
 

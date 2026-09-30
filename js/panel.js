@@ -127,6 +127,12 @@ function renderMatColours(m){
   box.classList.toggle('hidden',!c||!c.length);
   if(!c||!c.length){box.innerHTML='';return}
   const approx=c.some(x=>x[2]),slot=matSlotTarget();
+  // Hat die ACE die Spule per RFID gelesen, ist die Farbe bekannt – dann nur ein Hinweis statt der Farbauswahl
+  const tpl=lastResult&&typeof exportTemplate==='function'&&exportTemplate(lastResult.printer.id,lastResult.dSel),live=tpl&&typeof dialogSlots==='function'?dialogSlots(tpl)[slot]:null;
+  if(live&&live.rfid&&live.present){
+    box.innerHTML='<div class="mc-rfid"><i style="background:'+esc(/^#[0-9a-f]{6}$/i.test(live.colour||'')?live.colour:'#888888')+'"></i>'+esc(t('Slot {slot}: {type} – Farbe per RFID von der ACE gelesen',{slot:slot+1,type:live.type||''}))+'</div>';
+    return;
+  }
   box.innerHTML='<div class="mc-head"><b>'+esc(t('Farben von {brand}',{brand:m.brand||''}))+'</b> <span class="muted">'+esc(t('{n} Farben – Klick trägt sie für Slot {slot} ein',{n:c.length,slot:slot+1}))+'</span></div>'+
     '<div class="mc-list">'+c.map((x,i)=>'<button type="button" class="mc-swatch" data-mat-colour="'+i+'" style="--sw:'+esc(x[1])+'" title="'+esc(x[0]+' · '+x[1]+(x[2]?' ('+t('ungefähr')+')':''))+'" aria-label="'+esc(x[0])+'"></button>').join('')+'</div>'+
     '<div class="mc-foot muted">'+(approx?esc(t('≈ SUNLU nennt keine Farbcodes – Farben nach dem Namen gewählt.'))+' ':'')+(m.url?'<a href="'+esc(m.url)+'" target="_blank" rel="noopener">'+esc(t('Produktseite'))+'</a>':'')+'</div>';

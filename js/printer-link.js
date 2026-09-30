@@ -70,7 +70,7 @@ const aceSlots = st => ((st && st.ace) || []).flatMap(box => box.slots.map(s => 
 async function fetchLanStatus(host) {
   const st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host));
   const slots = [];
-  (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : t('leer'), present: s.present, box: box.id, index: s.index })));
+  (st.ace || []).forEach(box => box.slots.forEach(s => slots.push({ type: s.type, colour: s.colour || '#888888', name: s.present ? s.type + (s.rfid ? ' (RFID)' : '') : t('leer'), present: s.present, rfid: !!(s.present && s.rfid), box: box.id, index: s.index })));
   if (!slots.length) throw Error(st.has_ace === 0 ? t('Am Drucker ist keine ACE angeschlossen') : t('Drucker meldet keine ACE-Slots'));
   return { slots, host, time: new Date(), via: 'lan', status: st };
 }

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- ② Druckwerte: Die Farben des Herstellers erscheinen nur noch, wenn der Slot des Teils seine Farbe nicht per RFID von der ACE bekommen hat – sonst steht dort nur „Farbe per RFID von der ACE gelesen“.
+
 ## [10.8.0] – 2026-09-30
 
 ### Neu

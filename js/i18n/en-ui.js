@@ -416,5 +416,6 @@ I18N.add({
  "„{name}“ wird übersprungen": "Skipping “{name}”",
  "Kamerabild hing – verbinde neu …": "Camera image stalled – reconnecting …",
  "Kamerabild von vor {s} s – warte auf neue Bilder …": "Camera image is {s} s old – waiting for new frames …",
- "Kamera liefert keine Bilder – später erneut starten": "Camera delivers no images – try again later"
+ "Kamera liefert keine Bilder – später erneut starten": "Camera delivers no images – try again later",
+ "Slot {slot}: {type} – Farbe per RFID von der ACE gelesen": "Slot {slot}: {type} \u2013 colour read from the ACE via RFID"
 });
