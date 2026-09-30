@@ -316,5 +316,12 @@ I18N.add({
  "ein Teil bleibt immer – zum Leeren „Entfernen“ in der Modellkarte": "one part always stays – use “Remove” in the model card to clear",
  "bei Objekten aus einer Makerworld-3MF noch nicht möglich": "not yet possible for objects from a Makerworld 3MF",
  "Sehr feines Netz ({n} Dreiecke) – kein automatischer Vorschlag. Mit „Fläche aufs Bett“ oder den 90°-Knöpfen drehen.": "Very fine mesh ({n} triangles) – no automatic suggestion. Rotate with “Face on bed” or the 90° buttons.",
- "Größe {p}": "size {p}"
+ "Größe {p}": "size {p}",
+ "Änderung erkannt – wird gleich neu geslict …": "Change detected – slicing again in a moment …",
+ "Fertig": "Done",
+ "Lade Vorschau …": "Loading preview …",
+ "{s} s": "{s} s",
+ "(etwa {s} s)": "(about {s} s)",
+ "Fortschritt beim Slicen": "Slicing progress",
+ "Slicen mit OrcaSlicer": "Slicing with OrcaSlicer"
 });

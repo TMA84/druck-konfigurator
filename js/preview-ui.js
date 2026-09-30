@@ -165,7 +165,8 @@ async function pvLoad(plate) {
     $('pvLayer').max = Math.max(0, pv.data.layers.length - 1); $('pvLayer').value = $('pvLayer').max;
     pvBuild();
     $('pvStatus').classList.add('hidden');
-  } catch (e) { $('pvStatus').textContent = t('Vorschau nicht verfügbar: {msg}', { msg: t(e.message) }); }
+    if (typeof sliceBar === 'function' && sb.phase === 'preview') sliceBar('done');
+  } catch (e) { $('pvStatus').textContent = t('Vorschau nicht verfügbar: {msg}', { msg: t(e.message) }); if (typeof sliceBar === 'function' && sb.phase === 'preview') sliceBar('done'); }
 }
 
 // Zum aktuellen Slice-Auftrag laden (nur wenn der Tab sichtbar ist und der Auftrag neu ist)

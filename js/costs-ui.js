@@ -68,6 +68,8 @@ function costPurge() {
 // und einen Stand, der schon fehlschlug, nicht endlos wiederholen
 function scheduleAutoCost() {
   clearTimeout(costTimer);
+  { const sig = costSignature();   // Ladebalken: Änderung erkannt, gleich wird neu geslict
+    if (costAuto() && sig && !costState.busy && sig !== costState.sig && sig !== costState.failedSig && typeof sliceBar === 'function') sliceBar('wait'); }
   costTimer = setTimeout(() => {
     const sig = costSignature();
     if (costAuto() && sig && !costState.busy && sig !== costState.sig && sig !== costState.failedSig) runCosts();
@@ -185,6 +187,7 @@ async function runCosts() {
       : 'Nicht berechnet: {list} Lösung: in ① Modell bei den Teilen Slots mit derselben Filamentart wählen oder passendes Filament einlegen.',
       { list: clash.map(c => (clash.length > 1 || projectLayout(plTpl()).count > 1 ? t('Platte {n}: {text}', { n: c.plate, text: c.text }) : c.text)).join(' ') }), failedSig: costSignature() };
     if (typeof clearSlicePreview === 'function') clearSlicePreview(t('Keine Vorschau – so lässt sich nicht slicen (siehe Kosten links).'));
+    if (typeof sliceBar === 'function') sliceBar('error');
     renderCostPanel(); return;
   }
   costState = { ...costState, busy: true, error: '' };
@@ -195,16 +198,22 @@ async function runCosts() {
     const prev = costState.slice && costState.slice.job ? costState.sigs : null, changed = changedPlates(prev, sigs);
     const partial = changed && changed.length < sigs.plates.length;
     $('costPanelInfo').textContent = partial ? (changed.length ? t('Slicen: nur Platte {list} …', { list: changed.join(', ') }) : t('Übernehme den letzten Stand …')) : t('Slicen mit OrcaSlicer …');
+    const nSlice = partial ? changed.length : sigs.plates.length, t0 = performance.now();
+    if (typeof sliceBar === 'function') sliceBar('slice', { plates: nSlice, note: $('costPanelInfo').textContent.replace(/ …$/, '') });
     const q = partial ? '?plates=' + changed.join(',') + '&count=' + sigs.plates.length + '&reuse=' + costState.slice.job : '';
     const res = await fetch('api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw Error(data.error || t('Server antwortet mit HTTP {status}', { status: res.status }));
     if (costState.stale || project !== costProject) { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; renderCostPanel(); return; }
     costState = { sig, sigs, slice: data, materials: slotMaterials(plan), notes, busy: false, error: '', failedSig: null };
+    if (typeof sbLearn === 'function' && nSlice) sbLearn(performance.now() - t0, nSlice);
+    // Vorschau nur im Tab ③ laden – sonst ist der Lauf hier fertig
+    if (typeof sliceBar === 'function') sliceBar(document.body.dataset.tab === 'slice' ? 'preview' : 'done');
     if (typeof refreshSlicePreview === 'function') setTimeout(() => refreshSlicePreview(true));
   } catch (e) {
     const stale = costState.stale;
     costState = { ...costState, busy: false, slice: null, stale: false, error: stale ? '' : t('Nicht berechnet: {msg}', { msg: t(e.message) }), failedSig: stale ? null : costSignature() };
+    if (typeof sliceBar === 'function') sliceBar('error');
     if (typeof clearSlicePreview === 'function') clearSlicePreview(stale ? '' : t('Keine Vorschau – das Slicen ist fehlgeschlagen.'));
   }
   renderCostPanel();   // hat sich während des Slicens etwas geändert, plant das gleich den nächsten Lauf

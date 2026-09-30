@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.6.1] – 2026-09-30
+
+### Neu
+- **Ladebalken beim Slicen:** oben im Tab ③ nach jeder Änderung (Änderung erkannt → Slicen mit geschätzter Dauer, gelernt aus den letzten Läufen → Vorschau laden), dazu ein Kreisel am Reiter „③ Slicen & Kosten“, wenn im Hintergrund geslict wird.
+
 ## [10.6.0] – 2026-09-30
 
 ### Neu

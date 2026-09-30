@@ -994,3 +994,17 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 #info .i-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #info .i-meta { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #info .i-dot { margin: 0 6px; opacity: .6; }
+/* Ladebalken im Tab ③ (js/slicebar.js) */
+.slice-bar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 8px 14px; border-radius: var(--r-m);
+  background: var(--sheet); border: 1px solid var(--rule); box-shadow: 0 2px 10px rgba(0,0,0,.06); font-size: 13px; transition: opacity .4s; }
+.slice-bar.hidden { display: none; }
+.slice-bar .sb-track { flex: 1; height: 6px; border-radius: 3px; background: var(--paper-2, var(--rule)); overflow: hidden; position: relative; }
+.slice-bar .sb-track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 3px; transition: width .25s linear; }
+.slice-bar.waiting .sb-track i { width: 30% !important; animation: sb-wait 1.2s ease-in-out infinite; opacity: .55; }
+@keyframes sb-wait { 0% { left: -30%; } 100% { left: 100%; } }
+.slice-bar.done .sb-track i { background: var(--ok); }
+.slice-bar .sb-text { flex: none; min-width: 0; max-width: 55%; color: var(--ink-2, var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.tab-spin { display: inline-block; width: 11px; height: 11px; margin-left: 6px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: tab-spin .8s linear infinite; vertical-align: -1px; }
+.tab-spin.hidden { display: none; }
+@keyframes tab-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .slice-bar.waiting .sb-track i, .tab-spin { animation: none; } }
