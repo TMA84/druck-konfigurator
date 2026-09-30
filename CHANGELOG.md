@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.8.2] – 2026-09-30
 
 ### Behoben
 - **Kamerabild auf dem iPhone:** Der Player flv.js lief auf dem iPhone nicht. Jetzt mpegts.js (Nachfolger von flv.js), das auf dem iPhone ab iOS 17.1 über Apples ManagedMediaSource abspielt; ältere iPhones bekommen einen Hinweis.
