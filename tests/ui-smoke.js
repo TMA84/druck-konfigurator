@@ -473,9 +473,14 @@ async function runSmoke(opts={}){
       skRender(st);await wait(300);
       const rows=[...$('wbObjects').querySelectorAll('[data-sk-row]')];
       ok(rows.length===3&&/Kopie 2/.test(rows[1].textContent)&&/übersprungen/.test(rows[2].textContent),'Objekte: Liste mit Kopien, übersprungenes markiert');
-      $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(400);
-      ok(sent.length===1&&sent[0].type==='skip'&&sent[0].action==='start'&&JSON.stringify(sent[0].data)==='{"parts":[1]}','Überspringen: skip/start mit Objekt 1');
-      window.fetch=of;window.confirm=oc;store.settings.printerHosts=hosts;skRender(null); }
+      $('wbObjects').querySelector('[data-sk-sel="0"]').click();await wait(50);
+      ok(sk.sel===0&&$('wbObjects').querySelector('[data-sk-row="0"]').classList.contains('sel'),'Objekt-Name angeklickt: hervorgehoben (bleibt stehen)');
+      $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(100);
+      ok(sent.length===0&&sk.ask===1&&!!$('wbObjects').querySelector('[data-sk-yes="1"]')&&$('wbObjects').querySelector('[data-sk-row="1"]').classList.contains('sel'),'Überspringen: erst Rückfrage in der Liste, Objekt hervorgehoben, nichts gesendet');
+      $('wbObjects').querySelector('[data-sk-no]').click();await wait(50);ok(sk.ask===-1&&sent.length===0,'Rückfrage abgebrochen: nichts gesendet');
+      $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(50);$('wbObjects').querySelector('[data-sk-yes="1"]').click();await wait(400);
+      ok(sent.length===1&&sent[0].type==='skip'&&sent[0].action==='start'&&JSON.stringify(sent[0].data)==='{"parts":[1]}','Überspringen bestätigt: skip/start mit Objekt 1');
+      window.fetch=of;window.confirm=oc;store.settings.printerHosts=hosts;sk.sel=sk.ask=-1;skRender(null); }
     // Bemalen (Werkzeugleiste): Strich mit der Maus auf dem Teil, Umschalt radiert, Rückgängig, Export mit paint_color, übersteht Neuladen
     { selectPart(0);setTab('3d');await wait(300);const p=project.parts[0];p.paintUser=null;
       ok(!$('tbPaint').disabled,'Werkzeugleiste: Bemalen verfügbar');

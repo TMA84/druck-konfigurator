@@ -2,8 +2,10 @@
 /* Objekte überspringen (Tab ④ Druckauftrag): Liste der Objekte des laufenden Drucks mit „Überspringen“ – z. B. wenn sich
    ein Teil gelöst hat. Die Objekte liest der Server beim Start aus dem G-Code (EXCLUDE_OBJECT_DEFINE, api/printing/objects –
    nur für Drucke aus dem Tool); der Befehl geht über api/anycubic/command (skip/start, tools/anycubic_lan.py) mit der
-   Nummer des Objekts (Reihenfolge im G-Code). Umrisse erscheinen im 3D-Fortschritt (übersprungen rot, unter der Maus orange). */
-const sk = { name: null, objects: null, loading: false, hover: -1, lines: null, st: null };
+   Nummer des Objekts (Reihenfolge im G-Code). Umrisse erscheinen im 3D-Fortschritt (übersprungen rot, gewählt/unter der Maus blau). */
+const sk = { name: null, objects: null, loading: false, hover: -1, sel: -1, ask: -1, lines: null, st: null };
+// hervorgehobenes Objekt: das gerade gefragte, sonst das gewählte, sonst das unter der Maus
+const skHi = () => sk.ask >= 0 ? sk.ask : sk.sel >= 0 ? sk.sel : sk.hover;
 
 // „teil.stl_id_1_copy_0“ → „teil.stl“ (Kopie 2, wenn es mehrere gibt)
 function skLabel(o, all) {
@@ -23,19 +25,24 @@ function skRender(st) {
   sk.st = st;
   const box = $('wbObjects'), job = st && st.job;
   if (!box) return;
-  if (!job || !job.name) { box.classList.add('hidden'); box.innerHTML = ''; sk.name = null; sk.objects = null; skClearLines(); return; }
+  if (!job || !job.name) { box.classList.add('hidden'); box.innerHTML = ''; sk.name = null; sk.objects = null; sk.sel = sk.ask = -1; skClearLines(); return; }
   if (job.name !== sk.name && !sk.loading) { skLoad(job.name); return; }
   const objs = sk.objects;
   if (!objs || objs.length < 2) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   const skipped = new Set(job.skipped || []), left = objs.length - objs.filter(o => skipped.has(o.id)).length;
+  if (skipped.has(sk.ask)) sk.ask = -1;
+  const hi = skHi();
   box.classList.remove('hidden');
   box.innerHTML = '<div class="wb-obj-head"><b>' + esc(t('Objekte')) + '</b> <span class="muted">' + esc(t('{n} von {m} werden gedruckt', { n: left, m: objs.length })) + '</span></div>' +
     '<ul class="wb-obj-list">' + objs.map(o => {
       const off = skipped.has(o.id);
-      return '<li data-sk-row="' + o.id + '" class="' + (off ? 'off' : '') + '"><span class="wb-obj-name" title="' + esc(o.name) + '">' + esc(skLabel(o, objs)) + '</span>' +
+      // Name anklicken: Objekt im 3D-Fortschritt blau hervorheben (gedruckte Bahnen sind schon orange) (bleibt stehen – auch ohne Maus, z. B. am iPhone)
+      return '<li data-sk-row="' + o.id + '" class="' + (off ? 'off' : '') + (o.id === hi ? ' sel' : '') + (o.id === sk.ask ? ' ask' : '') + '">' +
+        '<button type="button" class="wb-obj-name linkbtn" data-sk-sel="' + o.id + '" title="' + esc(t('Im 3D-Fortschritt zeigen')) + ' · ' + esc(o.name) + '">' + esc(skLabel(o, objs)) + '</button>' +
         (off ? '<span class="wb-obj-state">' + esc(job.skipped_confirmed ? t('übersprungen') : t('übersprungen (gesendet)')) + '</span>'
+          : o.id === sk.ask ? '<span class="wb-obj-ask"><span>' + esc(t('Wirklich überspringen?')) + '</span><button type="button" class="btn small danger" data-sk-yes="' + o.id + '">' + esc(t('Ja, überspringen')) + '</button><button type="button" class="linkbtn" data-sk-no>' + esc(t('Nein')) + '</button></span>'
           : '<button type="button" class="btn sec small" data-sk-skip="' + o.id + '"' + (left < 2 ? ' disabled title="' + esc(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')) + '"' : '') + '>' + esc(t('Überspringen')) + '</button>') + '</li>';
-    }).join('') + '</ul><p class="wb-obj-note muted">' + esc(t('Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.')) + '</p>';
+    }).join('') + '</ul><p class="wb-obj-note muted">' + esc(t('Name anklicken zeigt das Objekt blau im 3D-Fortschritt. Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.')) + '</p>';
   skDrawLines(skipped);
 }
 // Umrisse im 3D-Fortschritt (js/live-ui.js)
@@ -60,28 +67,58 @@ function skDrawLines(skipped) {
   }
   skClearLines();
   skHookView();
-  sk.lines = sk.objects.filter(o => o.polygon && o.polygon.length > 2).map(o => {
-    const pts = o.polygon.map(([x, y]) => new THREE.Vector3(x - lv.cx, y - lv.cy, 0.3));
-    const col = o.id === sk.hover ? 0xf0a371 : skipped.has(o.id) ? 0xe5514f : 0x7d8792;
-    const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col }));
-    lv.scene.add(line); return line;
-  });
+  // Umrisse auf Höhe der aktuellen Schicht; das hervorgehobene Objekt zusätzlich als blauer Block vom Bett bis dorthin
+  const z = Math.max(0.4, lv.shown >= 0 && lv.data.layers[lv.shown] ? lv.data.layers[lv.shown][0] : 0.4), hi = skHi();
+  sk.lines = [];
+  for (const o of sk.objects) {
+    if (!o.polygon || o.polygon.length < 3) continue;
+    const on = o.id === hi, pts = o.polygon.map(([x, y]) => new THREE.Vector3(x - lv.cx, y - lv.cy, z + 0.2));
+    const col = on ? 0x2fb8ff : skipped.has(o.id) ? 0xe5514f : 0x7d8792;
+    const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, depthTest: !on }));
+    if (on) line.renderOrder = 10;
+    lv.scene.add(line); sk.lines.push(line);
+    if (on) {
+      const shape = new THREE.Shape(o.polygon.map(([x, y]) => new THREE.Vector2(x - lv.cx, y - lv.cy)));
+      const block = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: z + 0.2, bevelEnabled: false }),
+        new THREE.MeshBasicMaterial({ color: 0x2fb8ff, transparent: true, opacity: 0.38, depthWrite: false }));
+      block.renderOrder = 9;
+      lv.scene.add(block); sk.lines.push(block);
+    }
+  }
   if (typeof lvRender === 'function') lvRender();
 }
-function skAsk(o, btn) {
+function skRedraw() { if (sk.st) skRender(sk.st); }
+// Objekt zeigen: hervorheben und den 3D-Fortschritt einblenden (statt Kamera)
+function skShow(id) {
+  sk.sel = id;
+  if (id >= 0 && typeof lv !== 'undefined' && lv.mode === 'cam' && typeof liveMode === 'function') liveMode('live');
+  skRedraw();
+}
+/* Überspringen erst nach Rückfrage in der Liste (kein Browser-Dialog – so bleibt das Objekt im 3D-Fortschritt sichtbar) */
+function skAsk(o) {
   const skipped = new Set((sk.st && sk.st.job && sk.st.job.skipped) || []);
   if (skipped.has(o.id)) { toast(t('„{name}“ ist schon übersprungen', { name: skLabel(o, sk.objects) })); return; }
   if (sk.objects.length - skipped.size < 2) { toast(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')); return; }
-  if (!confirm(t('„{name}“ ab jetzt nicht mehr drucken? Das lässt sich nicht zurücknehmen.', { name: skLabel(o, sk.objects) }))) return;
-  wbCmd(btn || null, 'skip', 'start', { parts: [o.id] }, t('„{name}“ wird übersprungen', { name: skLabel(o, sk.objects) }));
+  sk.ask = o.id; skShow(o.id);
+  const row = $('wbObjects').querySelector('[data-sk-row="' + o.id + '"]'); if (row) row.scrollIntoView({ block: 'nearest' });
 }
 $('wbObjects').addEventListener('click', e => {
-  const b = e.target.closest('[data-sk-skip]'); if (!b || !sk.objects) return;
-  const o = sk.objects.find(x => x.id === +b.dataset.skSkip); if (o) skAsk(o, b);
+  if (!sk.objects) return;
+  const find = id => sk.objects.find(x => x.id === id);
+  const sel = e.target.closest('[data-sk-sel]');
+  if (sel) { const id = +sel.dataset.skSel; sk.ask = -1; skShow(sk.sel === id ? -1 : id); return; }
+  const b = e.target.closest('[data-sk-skip]');
+  if (b) { const o = find(+b.dataset.skSkip); if (o) skAsk(o); return; }
+  if (e.target.closest('[data-sk-no]')) { sk.ask = -1; skRedraw(); return; }
+  const y = e.target.closest('[data-sk-yes]');
+  if (y) {
+    const o = find(+y.dataset.skYes); sk.ask = -1;
+    if (o) wbCmd(y, 'skip', 'start', { parts: [o.id] }, t('„{name}“ wird übersprungen', { name: skLabel(o, sk.objects) }));
+  }
 });
 
 /* Im 3D-Fortschritt anklicken: Strahl der Maus bis zur Höhe der aktuellen Schicht, Objekt, in dessen Umriss der Punkt
-   liegt (Ziehen = drehen, kein Klick). Unter der Maus orange umrandet. */
+   liegt (Ziehen = drehen, kein Klick). Unter der Maus blau hervorgehoben. */
 function skPick(ev) {
   if (!sk.objects || !lv.renderer || !lv.data || !sk.st || !sk.st.job) return null;
   const r = lv.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);

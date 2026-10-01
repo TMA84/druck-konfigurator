@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Verbessert
+- **Objekte überspringen – sehen, welches gemeint ist:** Name anklicken hebt das Objekt im 3D-Fortschritt **blau** hervor (Block vom Bett bis zur aktuellen Schicht, bleibt stehen – auch am Handy; gedruckte Bahnen sind ja schon orange). Die Rückfrage steht jetzt in der Liste (**Ja, überspringen** / **Nein**) statt als Browser-Dialog, damit das Objekt dabei sichtbar bleibt; bei Kamera-Ansicht wechselt sie zum 3D-Fortschritt.
+
 ### Behoben
 - **Drucker blieb nach einem Neustart „beschäftigt“:** Riss die Verbindung ab (Drucker aus/neu gestartet), zeigte das Tool weiter den letzten Stand – z. B. „busy“ nach einem Abbruch – und kam teils nicht wieder an den Drucker heran (Verbindungs-Thread starb an einem unerwarteten Fehler). Jetzt: ohne Verbindung „nicht erreichbar“ statt altem Stand, nach 10 s baut die nächste Abfrage die Verbindung neu auf, ohne Verbindung startet kein Druck.
 

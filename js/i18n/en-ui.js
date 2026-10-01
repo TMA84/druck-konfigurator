@@ -1,6 +1,11 @@
 'use strict';
 /* Englische Texte für Sprache/Darstellung in der Kopfzeile (index.html, js/theme.js). */
 I18N.add({
+ "Im 3D-Fortschritt zeigen": "Show in the 3D progress",
+ "Wirklich überspringen?": "Really skip?",
+ "Ja, überspringen": "Yes, skip",
+ "Nein": "No",
+ "Name anklicken zeigt das Objekt blau im 3D-Fortschritt. Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.": "Click a name to highlight the object in blue in the 3D progress. Skipped objects are no longer printed from now on – this can't be undone.",
  "Drucker meldet „beschäftigt“, aber es läuft kein Auftrag – meist wartet am Display ein Dialog (z. B. nach einem Abbruch). Dort bestätigen oder den Drucker aus- und einschalten.": "The printer reports “busy”, but no job is running – usually a dialog is waiting on its display (e.g. after a cancel). Confirm it there or switch the printer off and on.",
  "Erneut abfragen": "Check again",
  "Filament aus der ACE übernehmen und neu slicen": "Use the filament from the ACE and re-slice",
