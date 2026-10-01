@@ -448,7 +448,31 @@ function packGroup(geoms, idx, W, H, gap) {
     const fill = bins.length ? bins[0].used.reduce((s, r) => s + r.w * r.h, 0) : 0, rots = bins.reduce((s, b) => s + b.used.filter(r => r.rot).length, 0);
     if (!best || lexLess([bins.length, rots, -fill], [best.bins.length, best.rots, -best.fill])) best = { bins, fill, rots };
   }
-  return best ? best.bins : [];
+  return best ? best.bins.map(b => compactBin(geoms, b, W, H, gap)) : [];
+}
+/* Teile einer Platte als möglichst kompakten Block legen: Auf dem leeren Bett landen wenige Teile sonst an Kante und
+   Ecke (z. B. 12 gleiche als „L“). Probiert schmalere Bettbreiten durch und nimmt die Anordnung mit der kürzesten
+   längeren Seite (dann kleinsten Fläche), in der noch alle Teile passen. */
+function compactBin(geoms, bin, W, H, gap) {
+  const rects = bin.used, ext = rs => [Math.max(...rs.map(r => r.x + r.w)) - Math.min(...rs.map(r => r.x)), Math.max(...rs.map(r => r.y + r.h)) - Math.min(...rs.map(r => r.y))];
+  if (rects.length < 2) return bin;
+  const allowRot = rects.some(r => r.rot), idx = rects.map(r => r.i), score = rs => { const [a, b] = ext(rs); return [Math.round(Math.max(a, b)), Math.round(a * b)]; };
+  let best = rects, bestScore = score(rects);
+  const minW = Math.max(...rects.map(r => r.w)), STEPS = 40;
+  for (let k = 0; k <= STEPS; k++) {
+    const w = minW + (W + gap - minW) * k / STEPS;
+    for (const order of PACK_ORDERS) {
+      const b = maxRectsBin(w, H + gap);
+      let ok = true;
+      for (const i of idx.slice().sort((a, c) => order(geoms[a], geoms[c]) || a - c)) {
+        const f = b.find(geoms[i].x + gap, geoms[i].y + gap, allowRot);
+        if (!f) { ok = false; break; }
+        b.place({ ...f, i });
+      }
+      if (ok && lexLess(score(b.used), bestScore)) { best = b.used; bestScore = score(b.used); }
+    }
+  }
+  return best === rects ? bin : { used: best };
 }
 function packPlates(geoms, groups, tpl) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = packGap(tpl);

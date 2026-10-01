@@ -1121,6 +1121,6 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .part-list .src-name small { margin-left: 6px; font-weight: 400; color: var(--ink-3); }
 .part-list li.src-head .stepper input { width: 42px; }
 .part-list li.in-src > .slot-chip { margin-left: 18px; }
-.part-list .pcopies { font-weight: 600; color: var(--accent); margin-left: 4px; }
+.part-list .pcopies, .plate-parts .pcopies { font-weight: 600; color: var(--accent); margin-left: 4px; }
 .gap-ctl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin: 6px 0; flex-wrap: wrap; }
 .gap-ctl .stepper input { width: 44px; }

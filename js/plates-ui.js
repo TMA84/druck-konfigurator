@@ -32,7 +32,8 @@ function computeLayout(tpl) {
       oversizePlates: plateShifts(project.parts.map(p => ({ geom: p.geom, plate: p.plate })), tpl).oversize };
   }
   const r = project.platesFixed ? arrangeByPlate(project.parts, tpl) : packAll(tpl);
-  return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: r.overflow };
+  // automatisch angeordnet: weitere Platten sind gewollt, kein „passte nicht“
+  return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: !!project.platesFixed && r.overflow };
 }
 // Alle Teile platzsparend auf möglichst wenige Platten (ohne Zuordnung) – auch für „Platzsparend wären es n Platten“
 function packAll(tpl) {
@@ -86,6 +87,16 @@ function movePart(i, plate) {
 }
 
 const copyGroupOf = p => p.copyGroup ? project.parts.filter(x => x.copyGroup === p.copyGroup) : [p];
+// Teile einer Platte, Kopien zusammengefasst: [{name (ohne „ (2)“), idx: [Teil-Indizes]}]
+function plateRows(idx) {
+  const rows = [], by = new Map();
+  for (const i of idx) {
+    const p = project.parts[i], k = p.copyGroup || 'i' + i;
+    if (!by.has(k)) { const r = { name: p.name.replace(/ \(\d+\)$/, ''), idx: [] }; by.set(k, r); rows.push(r); }
+    by.get(k).idx.push(i);
+  }
+  return rows;
+}
 function cloneFrom(p) {
   return { ...p, input: p.input ? { ...p.input } : null, overrides: p.overrides ? { ...p.overrides } : null,
     bodies: p.bodies ? p.bodies.map(b => ({ ...b })) : p.bodies, holes: (p.holes || []).map(h => ({ ...h })) };
@@ -188,7 +199,9 @@ function renderPlates() {
       (conflict ? '<p class="note bad small">' + t(project.threemf ? '<b>Slict so nicht:</b> {text} Lösung: oben unter <b>Farben des Designers</b> auf Slots mit derselben Filamentart legen oder passendes Filament einlegen.'
         : '<b>Slict so nicht:</b> {text} Lösung: den Teilen/Körpern Slots mit derselben Filamentart geben oder passendes Filament einlegen.', { text: esc(conflictText(conflict, kinds)) }) + '</p>' : '') +
       // Teile der Platte (Platte und Anzahl ändern: in der Teileliste oben, Zeile des gewählten Teils)
-      '<ul class="plate-parts">' + idx.map(i => '<li' + (i === project.selected ? ' class="sel"' : '') + '><button type="button" class="linkbtn" data-pick="' + i + '">' + esc(project.parts[i].name) + '</button></li>').join('') + '</ul></li>';
+      // Kopien eines Teils als eine Zeile „Teil ×14“ (20 Sätze wären sonst 40 Zeilen)
+      '<ul class="plate-parts">' + plateRows(idx).map(r => '<li' + (r.idx.includes(project.selected) ? ' class="sel"' : '') + '><button type="button" class="linkbtn" data-pick="' + r.idx[0] + '">' +
+        esc(r.name) + (r.idx.length > 1 ? ' <span class="pcopies">×' + r.idx.length + '</span>' : '') + '</button></li>').join('') + '</ul></li>';
   }
   $('plateList').innerHTML = html;
   // „Ganze Platte“ in der 3D-Ansicht: nach Verschieben, Kopien, Anordnen neu zeichnen (einmal je neuer Anordnung)
