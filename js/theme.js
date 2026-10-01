@@ -1,4 +1,6 @@
 'use strict';
+// Nur 3D-Fortschritt (zum Einbetten, z. B. Home-Assistant-Dashboard): früh setzen, damit der Rest der Seite gar nicht erst aufblitzt
+if (/[?&]ansicht=3d\b/.test(location.search)) document.documentElement.classList.add('embed-3d');
 /* Darstellung hell/dunkel: html[data-theme]. Gespeichert als „light“, „dark“ oder „auto“ (folgt dem System).
    Steht im <head>, damit die Seite nicht erst hell aufblitzt. Knöpfe: [data-theme-set], Sprache: [data-lang]. */
 (() => {

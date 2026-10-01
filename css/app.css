@@ -1131,3 +1131,10 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .part-list .pcopies, .plate-parts .pcopies { font-weight: 600; color: var(--accent); margin-left: 4px; }
 .gap-ctl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin: 6px 0; flex-wrap: wrap; }
 .gap-ctl .stepper input { width: 44px; }
+
+/* Nur 3D-Fortschritt (index.html?ansicht=3d, js/config.js EMBED_3D): zum Einbetten, z. B. im Home-Assistant-Dashboard */
+html.embed-3d .topbar, html.embed-3d .tabs, html.embed-3d footer, html.embed-3d .wb-view,
+html.embed-3d #wbGrid > :not(.wb-cam) { display: none !important; }
+html.embed-3d, html.embed-3d body { overflow: hidden; background: #14161a; }
+html.embed-3d .wb-cam { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; margin: 0; }
+html.embed-3d .wb-live { height: 100vh; max-height: none; min-height: 0; }

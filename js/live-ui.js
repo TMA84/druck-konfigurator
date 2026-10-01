@@ -495,7 +495,7 @@ function lvRemaining(st) {
 // Umschalter Kamera | 3D-Fortschritt (Wahl bleibt gespeichert)
 function liveMode(mode) {
   lv.mode = mode;
-  store.settings.wbView = mode; persist();
+  if (!EMBED_3D) { store.settings.wbView = mode; persist(); }
   const live = mode === 'live';
   $('wbLiveStage').classList.toggle('hidden', !live);
   document.querySelector('.wb-video').classList.toggle('hidden', live);
@@ -512,4 +512,4 @@ $('wbLivePos').addEventListener('change', e => {
   store.settings.livePos = e.currentTarget.checked; persist();
   if (e.currentTarget.checked) toast(t('Kopfposition wird auch während des Drucks abgefragt (alle 5 s)'));
 });
-liveMode(store.settings.wbView === 'cam' ? 'cam' : 'live');
+liveMode(!EMBED_3D && store.settings.wbView === 'cam' ? 'cam' : 'live');

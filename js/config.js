@@ -5,6 +5,10 @@
 const APP_CONFIG = { vendors: ['Anycubic'] };
 if (typeof location !== 'undefined' && /[?&]alle-drucker\b/.test(location.search)) APP_CONFIG.vendors = null;
 
+/* „index.html?ansicht=3d“: nur der 3D-Fortschritt des laufenden Drucks, bildschirmfüllend – zum Einbetten (Home-Assistant-
+   Dashboard, Webseiten-Karte). Ändert keine gespeicherten Einstellungen (gewählter Reiter, Kamera/3D), kein Hinweisdialog. */
+const EMBED_3D = typeof location !== 'undefined' && /[?&]ansicht=3d\b/.test(location.search);
+
 const vendorEnabled = v => !APP_CONFIG.vendors || APP_CONFIG.vendors.includes(v);
 const BUILTIN_VENDOR = { kobra_s1: 'Anycubic', snapmaker_u1: 'Snapmaker' };
 

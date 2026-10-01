@@ -485,7 +485,7 @@ function setTab(name){
   document.body.dataset.tab=name;
   // schmale Reiterleiste (Handy): gewählten Reiter ganz ins Bild holen, ohne die Seite zu verschieben
   {const bar=document.querySelector('.tabs'),b=tabs[name]&&tabs[name][0];if(bar&&b&&bar.scrollWidth>bar.clientWidth){const r=b.getBoundingClientRect(),q=bar.getBoundingClientRect();if(r.left<q.left||r.right>q.right)bar.scrollBy({left:r.left-q.left-(q.width-r.width)/2,behavior:'smooth'})}}
-  try{localStorage.setItem(TAB_KEY,name)}catch(e){/* nur Komfort */}
+  if(!EMBED_3D)try{localStorage.setItem(TAB_KEY,name)}catch(e){/* nur Komfort */}
   if(typeof onWorkbenchTab==='function')onWorkbenchTab(name==='printer');
   if(name==='slice'&&typeof refreshSlicePreview==='function')refreshSlicePreview();
 }
@@ -537,7 +537,9 @@ try{const t=localStorage.getItem(TAB_KEY);setTab(tabs[t]?t:'3d')}catch(e){setTab
 const DISCLAIMER_KEY='druckKonfigurator.disclaimer',DISCLAIMER_VERSION='2';
 $('disclaimerOk').addEventListener('click',()=>{try{localStorage.setItem(DISCLAIMER_KEY,DISCLAIMER_VERSION)}catch(e){/* nicht speicherbar */}$('disclaimerDlg').close()});
 {let seen=null;try{seen=localStorage.getItem(DISCLAIMER_KEY)}catch(e){/* nicht lesbar */}
- if(seen!==DISCLAIMER_VERSION)$('disclaimerDlg').showModal()}
+ if(seen!==DISCLAIMER_VERSION&&!EMBED_3D)$('disclaimerDlg').showModal()}
+// eingebettete 3D-Ansicht: gleich den Drucker-Reiter (nach dem Laden – die Werkbank kommt erst nach app.js)
+if(EMBED_3D)window.addEventListener('load',()=>setTab('printer'));
 update();
 
 /* Modell entfernen (Knopf in der Modellkarte): alles – oder, wenn mehrere Modelle hinzugefügt wurden, nur eines davon

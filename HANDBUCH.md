@@ -434,6 +434,8 @@ Gedruckt wird genau der Stand der letzten Kostenberechnung. Hast du danach etwas
 
 Als **Home-Assistant-Add-on** (Repository `https://github.com/TMA84/ha-addons`) läuft das Tool in der Seitenleiste von Home Assistant. In den Add-on-Einstellungen trägst du die **Drucker-IP** ein; die Seite verbindet sich damit von selbst. **access_pin** schützt den optionalen direkten Port 8765 mit einer PIN (der Weg über die Seitenleiste bleibt durch Home Assistant geschützt).
 
+**3D-Fortschritt im Dashboard:** Die Adresse des Tools mit `?ansicht=3d` zeigt nur den 3D-Fortschritt des laufenden Drucks, bildschirmfüllend – als **Webseiten-Karte** im Dashboard: `/api/hassio_ingress/<Kennung des Add-ons>/?ansicht=3d` (die Kennung steht in der Adresszeile, wenn du das Add-on über die Seitenleiste öffnest).
+
 Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensoren an Home Assistant (Gerät „Druck-Konfigurator Anycubic Kobra S1“):
 
 | Sensor | Inhalt |
