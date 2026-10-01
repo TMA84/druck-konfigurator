@@ -444,6 +444,17 @@ async function runSmoke(opts={}){
       ok(Math.abs(project.parts[0].geom.x-4)<0.01&&!$('inchHint').classList.contains('hidden'),'Strg+Z: wieder 4 mm, Angebot wieder da');
       $('inchKeep').click();await wait(100);ok($('inchHint').classList.contains('hidden'),'„Passt so“ blendet das Angebot aus');
       showProject(keep);await wait(500); }
+    // Modell aus zwei Teilen (eine STL, zwei getrennte Körper): Kopfzeile mit gemeinsamer Anzahl, Kopien als eine Zeile
+    { const box=(x0,y0,x1,y1,h)=>{const v=[[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0],[x0,y0,h],[x1,y0,h],[x1,y1,h],[x0,y1,h]];return [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]].map(t=>t.map(i=>v[i]))};
+      const tr=box(0,0,20,20,5).concat(box(40,0,55,15,2)),b=new ArrayBuffer(84+50*tr.length),d=new DataView(b);d.setUint32(80,tr.length,true);
+      tr.forEach((t,i)=>t.forEach((q,j)=>q.forEach((c,k)=>d.setFloat32(84+50*i+12+j*12+k*4,c,true))));
+      const keep=project;await loadFiles([new File([b],'satz.stl')]);setTab('model');await wait(300);
+      const inp=$('partList').querySelector('[data-src-copies-n]');
+      ok(project.parts.length===2&&!!inp,'Modell aus zwei Teilen: Kopfzeile mit Anzahl');
+      inp.value='3';inp.dispatchEvent(new Event('change',{bubbles:true}));await wait(600);
+      const rows=[...$('partList').querySelectorAll('[data-part]')];
+      ok(project.parts.length===6&&rows.length===2&&rows.every(r=>/×3/.test(r.textContent)),'Anzahl 3 für das Modell: je Teil 3, zwei Zeilen „×3“');
+      showProject(keep);await wait(500); }
     // Objekte überspringen (Tab ④): Liste aus dem G-Code, Befehl skip/start mit der Nummer (Drucker nachgestellt)
     { const objs=[{id:0,name:'a.stl_id_0_copy_0',polygon:[[0,0],[10,0],[10,10]]},{id:1,name:'a.stl_id_0_copy_1',polygon:[[20,0],[30,0],[30,10]]},{id:2,name:'b.stl_id_1_copy_0',polygon:[[40,0],[50,0],[50,10]]}];
       const of=window.fetch,sent=[],oc=window.confirm,hosts=store.settings.printerHosts;
@@ -487,7 +498,7 @@ async function runSmoke(opts={}){
     setTab('model');await wait(50);
     { const name=project.parts[3].name;
       $('partList').querySelector('[data-del-part="3"]').click();await wait(80);
-      ok(project.parts.length===3&&!project.parts.some(p=>p.name===name)&&$('partList').querySelectorAll('[data-part]').length===3&&/entfernt/.test($('toast').textContent),'✕ entfernt „'+name+'“');
+      ok(project.parts.length===3&&!project.parts.some(p=>p.name===name)&&$('partList').querySelectorAll('[data-part]').length===new Set(project.parts.map((p,i)=>p.copyGroup||'#'+i)).size&&/entfernt/.test($('toast').textContent),'✕ entfernt „'+name+'“');
       $('toast').querySelector('button').click();await wait(80);
       ok(project.parts.length===4&&project.parts[3].name===name&&project.parts.every((p,i)=>p.id===i),'Rückgängig stellt das Teil wieder her'); }
     // Slot für alle Teile

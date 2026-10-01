@@ -442,5 +442,12 @@ I18N.add({
  "Aufbau": "Structure",
  "Hinweise ({n})": "Notes ({n})",
  "Was wird gedruckt": "What is printed",
- "Lage auf dem Bett (3D)": "Position on the bed (3D)"
+ "Lage auf dem Bett (3D)": "Position on the bed (3D)",
+ "„{name}“ mit {n} Kopien entfernt": "Removed “{name}” with {n} copies",
+ "Ein Satz weniger": "One set fewer",
+ "Ein Satz mehr": "One set more",
+ "Anzahl für alle Teile des Modells": "Quantity for all parts of the model",
+ "Teil mit allen {n} Kopien entfernen": "Remove the part with all {n} copies",
+ "{name}: {n} Sätze": "{name}: {n} sets",
+ "Platten {list}": "Plates {list}"
 });

@@ -1115,3 +1115,10 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
   .spec-group:first-child .spec-grid { grid-template-columns: 1fr; }
 }
 .spec-group .spec-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+/* Teileliste: Kopfzeile je Modell (gemeinsame Anzahl), Kopien als eine Zeile */
+.part-list li.src-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; background: var(--paper-2); font-size: 12.5px; flex-wrap: nowrap; }
+.part-list .src-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.part-list .src-name small { margin-left: 6px; font-weight: 400; color: var(--ink-3); }
+.part-list li.src-head .stepper input { width: 42px; }
+.part-list li.in-src > .slot-chip { margin-left: 18px; }
+.part-list .pcopies { font-weight: 600; color: var(--accent); margin-left: 4px; }

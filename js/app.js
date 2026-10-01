@@ -190,9 +190,26 @@ function renderPartList(){
   const th=+$('thresh').value,label={none:t('ohne Stützen'),few:t('wenig Stützen'),needed:t('Stützen')};
   const def=typeof defaultSlot==='function'?defaultSlot():0,many=project.parts.length>1;
   const tpl=typeof plTpl==='function'?plTpl():null,lay=tpl&&typeof projectLayout==='function'?projectLayout(tpl):null;
+  /* Kopien als eine Zeile (×n), Teile eines Modells (gleiche Datei) unter einer Kopfzeile mit gemeinsamer Anzahl – so sind
+     z. B. 20 Sätze eines Modells aus zwei Teilen eine Eingabe (vorher je Teil einzeln, 40 Zeilen). */
+  const groupOf=p=>p.copyGroup?project.parts.filter(x=>x.copyGroup===p.copyGroup):[p];
+  const isBase=(p,i)=>!p.copyGroup||project.parts.findIndex(x=>x.copyGroup===p.copyGroup)===i;
+  const bases=project.parts.map((p,i)=>i).filter(i=>isBase(project.parts[i],i));
+  const bySrc=new Map();bases.forEach(i=>{const k=project.parts[i].src||'';(bySrc.get(k)||bySrc.set(k,[]).get(k)).push(i)});
+  const curBase=(()=>{const p=project.parts[project.selected];return p?project.parts.indexOf(groupOf(p)[0]):-1})();
+  const shown=new Set(),srcHead=i=>{const p=project.parts[i],k=p.src||'',grp=bySrc.get(k)||[];
+    if(!k||grp.length<2||shown.has(k))return '';shown.add(k);
+    const counts=grp.map(j=>groupOf(project.parts[j]).length),same=counts.every(c=>c===counts[0]);
+    return '<li class="src-head"><span class="src-name" title="'+esc(p.srcName||'')+'">'+esc(p.srcName||t('Modell'))+'<small>'+esc(t('{n} Teile',{n:grp.length}))+'</small></span>'+
+      '<span class="pcount">'+t('Anzahl')+' <span class="stepper"><button type="button" data-src-copies="-1" data-src="'+esc(k)+'" aria-label="'+esc(t('Ein Satz weniger'))+'">−</button>'+
+      '<input data-src-copies-n data-src="'+esc(k)+'" type="number" min="1" max="50" step="1" inputmode="numeric" value="'+(same?counts[0]:'')+'" placeholder="–" aria-label="'+esc(t('Anzahl für alle Teile des Modells'))+'">'+
+      '<button type="button" data-src-copies="1" data-src="'+esc(k)+'" aria-label="'+esc(t('Ein Satz mehr'))+'">+</button></span></span></li>'};
   list.innerHTML=project.parts.map((p,i)=>{
-    const g=p.geom,lv=analyze(g,th).level,sel=i===project.selected;
-    const plate=lay&&lay.count>1?t('Platte {n}',{n:lay.plateOf[i]})+' · ':'';
+    if(!isBase(p,i))return '';
+    const g=p.geom,lv=analyze(g,th).level,sel=i===curBase,nCopies=groupOf(p).length,inSrc=(bySrc.get(p.src||'')||[]).length>1&&!!p.src;
+    const pl=lay&&lay.count>1?[...new Set(groupOf(p).map(x=>lay.plateOf[project.parts.indexOf(x)]))].sort((a,b)=>a-b):[];
+    const plate=pl.length?(pl.length>1?t('Platten {list}',{list:pl.join(', ')}):t('Platte {n}',{n:pl[0]}))+' · ':'';
+    const head=srcHead(i),shortName=inSrc&&p.srcName&&p.name.startsWith(p.srcName+' · ')?p.name.slice(p.srcName.length+3):p.name.replace(/ \(\d+\)$/,'');
     let tools='';
     const cols=partColours(p),dots=[...new Set(cols.flatMap(c=>c.effs||[c.eff]))].filter(s=>s!=null&&s!==(p.slot??def));
     const slots=typeof slotChoices==='function'?slotChoices():[],dot=s=>'<span class="pdot" style="background:'+(slots[s]&&/^#[0-9a-f]{6}$/i.test(slots[s].colour)?slots[s].colour:'#c7ccd4')+'" title="Slot '+(s+1)+'"></span>';
@@ -208,15 +225,16 @@ function renderPartList(){
         '<input data-copies-n type="number" min="1" max="50" step="1" inputmode="numeric" value="'+n+'" aria-label="'+esc(t('Anzahl des gewählten Teils'))+'">'+
         '<button type="button" data-copies="1" aria-label="'+esc(t('Eine Kopie mehr'))+'">+</button></span></span></div>';
     }
-    return '<li'+(sel?' class="sel"':'')+'>'+slotChipHTML(p.slot??null,def,'data-part-slot="'+i+'"',p.name)+
-      '<button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
+    return head+'<li class="'+(sel?'sel':'')+(inSrc?' in-src':'')+'">'+slotChipHTML(p.slot??null,def,'data-part-slot="'+i+'"',p.name)+
+      '<button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(shortName)+(nCopies>1?' <span class="pcopies">×'+nCopies+'</span>':'')+'</span>'+
       '<span class="pmeta">'+(dots.length?'<span class="pdots">'+dots.map(dot).join('')+'</span>':'')+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+(sel?'':' dot')+'" title="'+esc(label[lv])+'">'+(sel?label[lv]:'')+'</span></button>'+
-      (many?'<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button>':'')+tools+'</li>';
+      (many&&project.parts.length>nCopies?'<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(nCopies>1?t('Teil mit allen {n} Kopien entfernen',{n:nCopies}):t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button>':'')+tools+'</li>';
   }).join('');
   if(typeof renderFilamentBar==='function')renderFilamentBar();
 }
 $('partList').addEventListener('click',e=>{
-  const d=e.target.closest('[data-del-part]');if(d){removePart(+d.dataset.delPart);return}
+  const d=e.target.closest('[data-del-part]');if(d){const p=project.parts[+d.dataset.delPart];removeParts(p.copyGroup?project.parts.map((x,k)=>x.copyGroup===p.copyGroup?k:-1).filter(k=>k>=0):[+d.dataset.delPart]);return}
+  const sc=e.target.closest('[data-src-copies]');if(sc){setSourceCopies(sc.dataset.src,null,+sc.dataset.srcCopies);return}
   const c=e.target.closest('[data-part-slot]');
   if(c){const p=project.parts[+c.dataset.partSlot],def=defaultSlot();
     openSlotPicker(c,p.slot??null,{title:t('Slot für {name}',{name:p.name}),std:t('Standard (Slot aus dem Export-Dialog)'),stdSlot:def},v=>setPartSlot(p,v));return}
@@ -232,7 +250,17 @@ $('partList').addEventListener('click',e=>{
 $('partList').addEventListener('change',e=>{
   const m=e.target.closest('[data-part-move]');if(m){movePart(+m.dataset.partMove,+m.value);return}
   const n=e.target.closest('[data-copies-n]');if(n)setCopies(project.parts[project.selected],num(n.value)||1);
+  const sn=e.target.closest('[data-src-copies-n]');if(sn&&num(sn.value)>0)setSourceCopies(sn.dataset.src,num(sn.value),0);
 });
+// Anzahl für alle Teile eines Modells (Kopfzeile): jedes Teil der Datei bekommt n Exemplare (bzw. eins mehr/weniger)
+function setSourceCopies(src,n,delta){
+  if(!project)return;
+  const bases=project.parts.filter((p,i)=>p.src===src&&(!p.copyGroup||project.parts.findIndex(x=>x.copyGroup===p.copyGroup)===i));
+  const sel=project.parts[project.selected];
+  for(const b of bases){const cur=copyGroupOf(b).length,want=Math.max(1,Math.min(50,n!=null?Math.round(n):cur+delta));if(want!==cur)setCopies(b,want)}
+  const k=project.parts.indexOf(sel);if(k>=0&&k!==project.selected)selectPart(k);
+  toast(t('{name}: {n} Sätze',{name:bases[0]?bases[0].srcName||'':'',n:copyGroupOf(bases[0]).length}));
+}
 // Körper beim Überfahren in der 3D-Ansicht hervorheben (wie bisher in „Mehrfarbig“)
 $('partList').addEventListener('mouseover',e=>{const r=e.target.closest('[data-pcol-row^="body:"]');if(r&&typeof paintBodies==='function')paintBodies(project.parts[project.selected],+r.dataset.pcolRow.split(':')[1])});
 $('partList').addEventListener('mouseout',e=>{if(e.target.closest('[data-pcol-row^="body:"]')&&!e.relatedTarget?.closest?.('[data-pcol-row^="body:"]')&&typeof paintBodies==='function')paintBodies(project.parts[project.selected])});
@@ -242,18 +270,21 @@ $('partList').addEventListener('keydown',e=>{const b=e.target.closest('[data-par
 /* Einzelnes Teil aus dem Projekt entfernen (mindestens eins bleibt). Teile aus einer 3MF fehlen danach im Export:
    threemf.removed erzwingt neu geschriebene Build-Items; Platten ohne eigene Teile behalten die Lage des Designers.
    „Rückgängig“ in der Meldung stellt den Stand davor wieder her. */
-function removePart(i){
-  if(!project||project.parts.length<2||!project.parts[i])return;
+function removePart(i){removeParts([i])}
+// mehrere Teile auf einmal (✕ an einer Zeile mit Kopien: das Teil mit allen Kopien)
+function removeParts(idxs){
+  idxs=[...new Set(idxs)].filter(i=>project&&project.parts[i]).sort((a,b)=>b-a);
+  if(!project||!idxs.length||project.parts.length-idxs.length<1)return;
   const before={parts:project.parts.slice(),selected:project.selected,removed:project.threemf&&project.threemf.removed,groups:project.parts.map(p=>p.copyGroup)};
-  const p=project.parts[i],tpl=lastResult&&exportTemplate(lastResult.printer.id,lastResult.dSel);
-  if(project.threemf&&p.objectId!=null&&!p.extra)project.threemf.removed=true;
-  project.parts.splice(i,1);
-  if(p.copyGroup){const rest=project.parts.filter(x=>x.copyGroup===p.copyGroup);if(rest.length===1)rest[0].copyGroup=null}
+  const p=project.parts[idxs[idxs.length-1]],tpl=lastResult&&exportTemplate(lastResult.printer.id,lastResult.dSel),first=idxs[idxs.length-1];
+  for(const i of idxs){const q=project.parts[i];if(project.threemf&&q.objectId!=null&&!q.extra)project.threemf.removed=true;project.parts.splice(i,1)}
+  const groups=new Set(idxs.map(i=>before.parts[i].copyGroup).filter(Boolean));
+  for(const g of groups){const rest=project.parts.filter(x=>x.copyGroup===g);if(rest.length===1)rest[0].copyGroup=null}
   project.parts.forEach((x,k)=>{x.id=k});
   if(tpl&&typeof normalizePlates==='function')normalizePlates(tpl);
-  const sel=i<project.selected?project.selected-1:Math.min(project.selected===i?i:project.selected,project.parts.length-1);
+  const below=idxs.filter(i=>i<project.selected).length,sel=idxs.includes(project.selected)?Math.min(first,project.parts.length-1):project.selected-below;
   afterPartsChanged(sel);
-  toast(t('„{name}“ entfernt',{name:p.name}),{label:t('Rückgängig'),fn:()=>{
+  toast(idxs.length>1?t('„{name}“ mit {n} Kopien entfernt',{name:p.name.replace(/ \(\d+\)$/,''),n:idxs.length}):t('„{name}“ entfernt',{name:p.name}),{label:t('Rückgängig'),fn:()=>{
     project.parts=before.parts;project.parts.forEach((x,k)=>{x.id=k;x.copyGroup=before.groups[k]});
     if(project.threemf)project.threemf.removed=before.removed;
     afterPartsChanged(before.selected);
