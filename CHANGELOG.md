@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **Werkbank, Achsen:** Die Z-Knöpfe heißen jetzt **Bett ↑** (oben) und **Bett ↓** (unten) – wie sich das Bett beim Kobra S1 bewegt – statt Z+/Z− mit Erklärsatz.
+
 ## [10.9.2] – 2026-10-01
 
 ### Verbessert
