@@ -419,8 +419,8 @@ Drucke, die über LAN gestartet wurden (auch aus Anycubics Slicer oder diesem To
 
 Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder **An Drucker senden …** in der Vorschau) den Druck einer Platte, ohne OrcaSlicer zu öffnen:
 
-1. **Platte** wählen. Der Dialog fragt den Drucker ab: frei? Ist er beschäftigt, lässt er sich nicht starten.
-2. Die Tabelle zeigt je Werkzeug im G-Code, aus welchem **ACE-Slot** gedruckt wird (Werkzeug T0 = Slot 1 usw.) und was dort steckt. Passt Material oder Slot nicht (leer, anderes Material), steht es rot da – die Temperaturen im G-Code gelten für das geslicte Material. Dann Filament tauschen oder neu slicen; „Trotzdem drucken“ geht auf eigene Verantwortung.
+1. **Platte** wählen. Der Dialog fragt den Drucker ab: frei? Ist er beschäftigt, lässt er sich nicht starten. Meldet er „beschäftigt“, obwohl kein Auftrag läuft (Kobra S1 oft nach einem Abbruch), wartet meist am Display ein Dialog – dort bestätigen oder den Drucker aus- und einschalten, dann **Erneut abfragen**.
+2. Die Tabelle zeigt je Werkzeug im G-Code, aus welchem **ACE-Slot** gedruckt wird (Werkzeug T0 = Slot 1 usw.) und was dort steckt. Passt Material oder Slot nicht (leer, anderes Material), steht es rot da – die Temperaturen im G-Code gelten für das geslicte Material. Dann Filament tauschen oder **Filament aus der ACE übernehmen und neu slicen**: Das stellt die Teile auf das Filament in den Slots um, verwirft eigene Slot-Angaben, die der ACE widersprechen, slict neu und öffnet den Dialog wieder (gesendet wird erst auf deinen Klick). „Trotzdem drucken“ geht auf eigene Verantwortung.
 3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
 4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
 

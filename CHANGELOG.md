@@ -2,9 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.3] – 2026-10-01
 
 ### Verbessert
+- **Senden: „beschäftigt“ ohne Auftrag** (Kobra S1 nach einem Abbruch) – der Dialog sagt, dass am Display meist ein Dialog wartet, mit **Erneut abfragen**.
+- **Senden: falsches Material** – neuer Knopf **„Filament aus der ACE übernehmen und neu slicen“**: Teile aufs Filament der Slots umstellen, widersprechende eigene Slot-Angaben verwerfen, neu slicen, Dialog wieder öffnen.
 - **Werkbank, Achsen:** Die Z-Knöpfe heißen jetzt **Bett ↑** (oben) und **Bett ↓** (unten) – wie sich das Bett beim Kobra S1 bewegt – statt Z+/Z− mit Erklärsatz.
 
 ## [10.9.2] – 2026-10-01

@@ -525,6 +525,21 @@ async function runSmoke(opts={}){
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
     crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
     ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');
+    // Sendedialog ohne Drucker: „busy“ ohne Auftrag (nach Abbruch) und PETG im G-Code ↔ PLA in der ACE – nur Anzeige, nichts gesendet
+    { const ctx0=sendCtx,info0=sendInfo;
+      sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:[null,null,{kind:'petg',name:'PETG'}],name:'t',onStarted:null};
+      sendInfo={state:'busy',printing:false,job:null,ace:[{id:0,slots:[{index:0,type:'ASA',present:true},{index:1,type:'PLA',present:true},{index:2,type:'PLA',present:true,colour:'#EFF0F1'},{index:3,type:'ABS',present:true}]}]};
+      $('sendPlate').innerHTML='<option value="1">1</option>';renderSendDialog();
+      ok(/kein Auftrag/.test($('sendState').textContent)&&!!$('sendState').querySelector('[data-send-refresh]')&&$('sendGo').disabled,'Senden: „busy“ ohne Auftrag – Hinweis aufs Display, erneut abfragen, Senden gesperrt');
+      ok(!!$('sendMap').querySelector('[data-send-adopt]')&&/anderes Material/.test($('sendMap').textContent),'Senden: PETG↔PLA – „Filament aus der ACE übernehmen und neu slicen“');
+      sendInfo={...sendInfo,state:'free'};renderSendDialog();ok(/bereit/.test($('sendState').textContent)&&!$('sendGo').disabled,'Senden: frei – bereit');
+      { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials,tab=document.body.dataset.tab;let adopted=0,resliced=0;
+        store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:[null,{type:'PLA',colour:'#00FF00',override:true},{type:'PETG',colour:'#FFFFFF',override:true},null]};
+        window.runCosts=async()=>{resliced++};window.openSendDialog=()=>{};window.adoptSlotMaterials=()=>{adopted++};
+        await sendAdopt();const rows=store.settings.manualSlots[id];
+        ok(rows[2]===null&&rows[1]&&rows[1].type==='PLA'&&adopted===1&&resliced===1,'Übernehmen: PETG-Angabe auf Slot 3 verworfen (ACE: PLA), passende bleibt, Teile umgestellt, neu geslict');
+        window.runCosts=rc;window.openSendDialog=os;window.adoptSlotMaterials=ad;store.settings.manualSlots=JSON.parse(ms0)||undefined;persist();setTab('settings'); }
+      sendCtx=ctx0;sendInfo=info0; }
     // Spulen-Dialog (braucht den Server; ohne Server nur der Hinweis)
     ACTIONS.spools();await wait(400);ok($('spoolDlg').open&&$('spoolBody').textContent.length>20,'Dialog Spulen & Restmengen');$('spoolDlg').close();
     // Darstellung: dunkel/hell (Sprache nicht umschalten – das lädt die Seite neu)

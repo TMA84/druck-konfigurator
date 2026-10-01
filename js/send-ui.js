@@ -31,8 +31,12 @@ async function openSendDialog(plate, opts) {
 function renderSendDialog() {
   const s = sendCtx.slice, plate = +$('sendPlate').value, p = s.plates.find(x => x.plate === plate), st = sendInfo;
   const free = st && !st.printing && (st.state === 'free' || !st.state);
-  $('sendState').textContent = !st ? '' : free ? t('Drucker bereit ({model}, Firmware {fw}).', { model: st.model || 'Kobra S1', fw: st.firmware || '?' })
-    : t('Drucker ist nicht frei ({what}) – erst den laufenden Vorgang beenden.', { what: st.job ? t('druckt „{name}“', { name: st.job.name }) : t(st.state) });
+  // „busy“ ohne Auftrag: meist wartet nach einem Abbruch ein Dialog am Display (Kobra S1, Firmware 2.7) – das Tool schickt dafür nichts
+  const stuck = st && !free && !st.job && !st.printing && st.state === 'busy';
+  $('sendState').innerHTML = !st ? '' : free ? esc(t('Drucker bereit ({model}, Firmware {fw}).', { model: st.model || 'Kobra S1', fw: st.firmware || '?' }))
+    : (stuck ? esc(t('Drucker meldet „beschäftigt“, aber es läuft kein Auftrag – meist wartet am Display ein Dialog (z. B. nach einem Abbruch). Dort bestätigen oder den Drucker aus- und einschalten.'))
+      : esc(t('Drucker ist nicht frei ({what}) – erst den laufenden Vorgang beenden.', { what: st.job ? t('druckt „{name}“', { name: st.job.name }) : t(st.state) }))) +
+      ' <button type="button" class="linkbtn" data-send-refresh>' + esc(t('Erneut abfragen')) + '</button>';
   $('sendState').className = 'note' + (free ? '' : ' bad');
   const slots = aceSlots(st);
   let warn = 0;
@@ -48,12 +52,33 @@ function renderSendDialog() {
   }).join('');
   $('sendMap').innerHTML = '<table class="changes"><thead><tr><th>' + t('Werkzeug') + '</th><th>G-Code</th><th>ACE</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     (p && typeof spoolShortage === 'function' && spoolShortage(p.grams).length ? '<p class="note bad">' + esc(spoolShortagePrefix(spoolShortage(p.grams)) + ' ' + spoolShortageText(spoolShortage(p.grams))) + '</p>' : '') +
-    (warn ? '<p class="note bad">' + t('{n} Slot(s) passen nicht zum G-Code. Temperaturen im G-Code gelten für das geslicte Material – erst Filament tauschen oder neu slicen.', { n: warn }) + '</p>' : '');
+    (warn ? '<p class="note bad">' + t('{n} Slot(s) passen nicht zum G-Code. Temperaturen im G-Code gelten für das geslicte Material – erst Filament tauschen oder neu slicen.', { n: warn }) +
+      (!sendCtx.onStarted && project ? ' <button type="button" class="btn sec" data-send-adopt>' + esc(t('Filament aus der ACE übernehmen und neu slicen')) + '</button>' : '') + '</p>' : '');
   $('sendGo').disabled = !free;
   $('sendGo').textContent = warn ? t('Trotzdem drucken') : t('Jetzt drucken');
 }
 
 $('sendPlate').addEventListener('change', renderSendDialog);
+/* Material passt nicht: eigene Angaben, die der ACE widersprechen, verwerfen, die Teile auf das Filament der Slots
+   umstellen (adoptSlotMaterials), neu slicen und den Dialog mit dem neuen G-Code wieder öffnen – gesendet wird erst auf Klick */
+async function sendAdopt() {
+  const plate = +$('sendPlate').value, slots = aceSlots(sendInfo), id = lastResult && lastResult.printer.id;
+  const rows = id && store.settings.manualSlots && store.settings.manualSlots[id];
+  if (rows) {
+    const differs = (r, a) => { const k = kindOfType(r.type || ''); return k ? !slotMatchesKind(a.type, k) : String(r.type || '').toUpperCase() !== String(a.type).toUpperCase(); };
+    store.settings.manualSlots[id] = rows.map((r, i) => r && r.override && slots[i] && slots[i].present && slots[i].type && differs(r, slots[i]) ? null : r);
+    persist();
+  }
+  adoptSlotMaterials();
+  $('sendDlg').close();
+  setTab('slice');
+  await runCosts();
+  if (costState.slice && !costState.error) openSendDialog(plate);
+}
+$('sendDlg').addEventListener('click', e => {
+  if (e.target.closest('[data-send-adopt]')) { sendAdopt(); return; }
+  if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted });
+});
 $('sendGo').addEventListener('click', async () => {
   const plate = +$('sendPlate').value, host = printerHost(SEND_PRINTER), btn = $('sendGo');
   btn.disabled = true; btn.textContent = t('Lade hoch …');
