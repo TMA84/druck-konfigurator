@@ -374,7 +374,7 @@
           <p id="szNote" class="muted small"></p>
         </section>
         <section id="bodyBox" class="bodies hidden" aria-labelledby="bodyTitle">
-          <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><label class="muted small body-show"><input type="checkbox" id="bodyShow" checked> Farben zeigen</label></div>
+          <div class="orient-head"><span class="eyebrow" id="bodyTitle">Mehrfarbig</span><input type="checkbox" id="bodyShow" class="hidden" checked aria-hidden="true" tabindex="-1"></div>
           <p id="bodyInfo"></p>
           <div id="bodyJoin" class="body-join hidden"><label for="bodyJoinSel">Mit Teil vereinen</label><select id="bodyJoinSel"></select><button type="button" id="bodyJoinBtn">Vereinen</button></div>
           <button type="button" id="bodySplit" class="linkbtn hidden">In einzelne Teile trennen</button>
@@ -447,6 +447,7 @@
     </div>
     <div id="ohBar" class="hud hidden">
       <div class="ob-head"><div id="info"></div><div class="stats"><span>X <b id="sx">–</b></span><span>Y <b id="sy">–</b></span><span>Z <b id="sz">–</b></span><span><b id="sv">–</b></span></div></div>
+      <div class="oh-mode"><span class="seg vm-seg" role="group" aria-label="Ansicht des Modells"><button type="button" data-vmode="colours" aria-pressed="true" title="Slot-, Körper- und Malfarben – so, wie es gedruckt wird">Farben</button><button type="button" data-vmode="overhang" aria-pressed="false" title="Überhänge: blau unkritisch, gelb nahe am Grenzwinkel, rot darüber">Grenzwinkel</button></span></div>
       <div class="vbar"><label for="thresh">Überhangwinkel ≤ <span class="help help-dark" title="Winkel von der Senkrechten. Flächen, die steiler überhängen als dieser Wert, werden rot markiert und zählen für die Stützen-Entscheidung. 45° ist ein sicherer Standard, 50–55° spart Stützen.">?</span></label><input type="range" id="thresh" min="30" max="70" value="45"><span class="val" id="threshVal">45°</span></div>
       <div class="legend"><span><i style="background:#9aa8bc"></i>liegt auf dem Druckbett</span><span><i style="background:#3fa8f5"></i>unkritisch</span><span><i style="background:#f2b53d"></i>nahe am Grenzwinkel</span><span><i style="background:#e5514f"></i>über Grenzwinkel</span></div>
       <p id="ohInfo" class="oh-info"></p>

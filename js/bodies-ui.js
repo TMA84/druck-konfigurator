@@ -80,6 +80,7 @@ function ptMergeLayers(list) {
 // Vorschau: alle Körper in ihrer Slotfarbe (Häkchen) oder ein Körper hervorgehoben (Zeile unter der Maus)
 function paintBodies(part, highlight) {
   let paint = null;
+  viewModeSync();
   if (typeof plateView !== 'undefined' && plateView && shownPlate) {
     // ganze Platte: jedes Teil (und seine Körper) in seiner Slotfarbe, das gewählte Teil beim Überfahren hervorgehoben
     let over = [];
@@ -110,8 +111,8 @@ function paintBodies(part, highlight) {
     else if ($('bodyShow').checked) paint = part.bodies.map(b => ({ start: b.start, count: b.count, rgb: viewRgb(showHex(bodySlot(part, b), b.dSlot, slots)) }));
   } else if (part && part.paintState && part.paintState.length === part.geom.n && $('bodyShow').checked) {
     paint = paintedColours(part, slots);
-  } else if (part && ((part.modVols && part.modVols.length) || paintUserCodes(part)) && $('bodyShow').checked) {   // modVols: [] bei einfachen Teilen
-    // nur Modifikatoren oder eigene Bemalung: das Teil selbst in seiner Slotfarbe, damit die Farben zusammenpassen
+  } else if (part && $('bodyShow').checked) {
+    // einfaches Teil, Modifikatoren oder eigene Bemalung: das Teil selbst in seiner Slotfarbe
     paint = [{ start: 0, count: part.geom.n, rgb: viewRgb(showHex(part.slot ?? defaultSlot(), part.dSlot, slots)) }];
   }
   const pv = paint && highlight == null && typeof paintView === 'function' ? paintView(part, slots) : null;
@@ -143,7 +144,21 @@ function renderBodies() {
   paintBodies(part);
 }
 
-$('bodyShow').addEventListener('change', () => paintBodies(project && project.parts[project.selected]));
+/* Umschalter unter dem Modell (#ohBar): „Farben“ (Slot-, Körper-, Malfarben) oder „Grenzwinkel“ (Überhangfarben).
+   Dahinter steht weiter #bodyShow (das Malen schaltet es kurz auf Farben, js/paint-ui.js); die Wahl bleibt gemerkt. */
+function viewModeSync() {
+  const c = $('bodyShow').checked;
+  document.querySelectorAll('[data-vmode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.vmode === 'colours') === c)));
+  $('ohBar').classList.toggle('vm-colours', c);
+}
+function viewModeSet(mode) {
+  $('bodyShow').checked = mode !== 'overhang';
+  store.settings.viewMode = $('bodyShow').checked ? 'colours' : 'overhang'; persist();
+  paintBodies(project && project.parts[project.selected]);
+}
+$('bodyShow').checked = store.settings.viewMode !== 'overhang';
+$('ohBar').addEventListener('click', e => { const b = e.target.closest('[data-vmode]'); if (b) viewModeSet(b.dataset.vmode); });
+viewModeSync();
 
 function replaceParts(parts, selected) {
   project.parts = parts;

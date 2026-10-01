@@ -176,7 +176,7 @@ Besteht ein Teil aus mehreren **Körpern**, zeigt der Schritt **① Modell** den
 - die Bauteile eines Objekts in einer 3MF (die Slots des Designers werden übernommen),
 - Dateien, die du selbst vereint hast (siehe unten).
 
-Jeder Körper bekommt über die Auswahl rechts einen eigenen **Slot** – und damit die Farbe, die in diesem Slot steckt. „wie Teil“ heißt: Er bekommt den Slot des Teils. Fährst du mit der Maus über eine Zeile, leuchtet der Körper in der Vorschau gelb auf; **Farben zeigen** färbt alle Körper in der Farbe ihres Slots (live vom Drucker oder aus deiner Belegung, sonst Ersatzfarben).
+Jeder Körper bekommt über die Auswahl rechts einen eigenen **Slot** – und damit die Farbe, die in diesem Slot steckt. „wie Teil“ heißt: Er bekommt den Slot des Teils. Fährst du mit der Maus über eine Zeile, leuchtet der Körper in der Vorschau gelb auf; Der Umschalter **Farben | Grenzwinkel** unter dem Modell zeigt mit „Farben“ alle Körper in der Farbe ihres Slots (live vom Drucker oder aus deiner Belegung, sonst Ersatzfarben).
 
 Steht dasselbe Objekt einer 3MF auf mehreren Platten, gilt die Farbwahl für **alle Platten** – Orca speichert sie je Objekt. Der Kasten nennt dann, auf welchen Platten das Objekt steht.
 
@@ -320,7 +320,7 @@ Bearbeiten über **✎ Bearbeiten / überschreiben**, **⚙ Einstellungen → Fi
 - **Eigene Angaben löschen** nimmt alle Überschreibungen zurück.
 - Mit der Werksfirmware kannst du überschriebene Slots zusätzlich **in die ACE schreiben**; danach meldet der Drucker sie selbst und die Überschreibung entfällt.
 
-Die Slots bestimmen Filamenttyp und Farbe in der 3MF, die Vorauswahl im Export-Dialog und die Farben in der Vorschau („Farben zeigen“).
+Die Slots bestimmen Filamenttyp und Farbe in der 3MF, die Vorauswahl im Export-Dialog und die Farben in der Vorschau (Umschalter „Farben“ unter dem Modell).
 
 **Mehrere ACE-Einheiten:** Am Kobra S1 gehen bis zu **2 ACE** (8 Slots), andere Anycubic-Drucker mit ACE Pro 2 bis zu 4 (16 Slots). Die Slots zählen durch: ACE 2 hat die Slots 5–8 (in den Listen „Slot 5 · ACE 2“). Mit Verbindung erkennt das Tool die Anzahl selbst und merkt sie sich; ohne Verbindung stellst du sie im Dialog **Filament-Slots** unter **ACE-Einheiten** ein. 3MF, Slicen, Kosten, Filamentverwaltung und Home-Assistant-Sensoren nutzen dann alle Slots. Im Tab **④ Drucker** wählst du die Einheit über die Reiter **ACE 1 / ACE 2 …**; Laden, Trocknen und Temperatur gelten für die gewählte Einheit, „Automatisch nachfüllen“ für alle. *Hinweis:* Direkt drucken aus Slot 5–8 ist nur mit einer ACE am Drucker getestet – die Zuordnung (Slot 5 = ACE 2, Slot 1) folgt der Zählung des Druckers.
 
@@ -485,7 +485,8 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 ![3D-Ansicht](docs/img/ansicht3d.png)
 
 - Maus: **links ziehen** drehen, **rechts ziehen** verschieben, **Rad** zoomen.
-- **Überhangwinkel** (unten): Flächen steiler als dieser Winkel werden rot markiert; grau = liegt auf dem Bett.
+- **Farben | Grenzwinkel** (unten, bleibt gemerkt): „Farben“ zeigt das Teil in Slot-, Körper- und Malfarben, so wie es gedruckt wird; „Grenzwinkel“ zeigt die Überhänge – blau unkritisch, gelb nahe am Grenzwinkel, rot darüber, grau liegt auf dem Bett. Beim Malen schaltet das Tool kurz auf „Farben“.
+- **Überhangwinkel** (unten): Flächen steiler als dieser Winkel gelten als Überhang (rot in „Grenzwinkel“) und zählen für die Stützen-Entscheidung.
 - **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben), **Messen** (zwei Punkte anklicken).
 - **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Spalte daneben unter „Lage auf dem Bett“.
 - Die Drahtbox zeigt den **Bauraum** des Druckers. Ist sie rot, passt das Teil nicht hinein (der Hinweis oben nennt Breite, Tiefe oder Höhe) – Teil drehen oder in OrcaSlicer skalieren/teilen.

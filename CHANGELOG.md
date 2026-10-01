@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Neu
+- **Umschalter „Farben | Grenzwinkel“** unter dem Modell (bleibt gemerkt): Farben = Slot-, Körper- und Malfarben wie gedruckt, auch für einfache Teile; Grenzwinkel = Überhänge blau/gelb/rot. Ersetzt „Farben zeigen“ unter Mehrfarbig.
+
 ### Behoben
 - **Grenzwinkel in der Modellansicht wieder sichtbar:** Einfache Teile (STL) erschienen einfarbig in der Slotfarbe statt blau/gelb/rot nach Überhang – eine leere Modifikatorliste galt als „hat Modifikatoren“.
 
