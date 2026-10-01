@@ -103,13 +103,16 @@ function wbRender() {
   // Druckauftrag
   if (job) {
     const jt = wbJobTitle(job.name), pct = job.progress ?? 0;
+    // Restzeit: eigene Schätzung aus Orca und der aktuellen Schicht (js/live-ui.js lvRemaining), sonst die des Druckers
+    const own = !job.paused && typeof lvRemaining === 'function' ? lvRemaining(st) : null, remMin = own ? Math.round(own.s / 60) : job.remaining_min;
+    const remTip = own ? t('Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}', { m: wbMin(job.remaining_min) }) : t('Laut Drucker');
     $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') +
       '<div class="wb-jobtitle" title="' + esc(job.name) + '">' + esc(jt.title) + '</div>' + (jt.sub ? '<div class="wb-jobsub">' + esc(jt.sub) + '</div>' : '') +
       '<div class="wb-bigpct"><b>' + pct + ' %</b><span>' + (job.paused ? t('pausiert') : esc(t(job.status || ''))) + '</span></div>' +
       '<div class="wb-progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%"></i></div>' +
       '<dl class="wb-jobinfo"><div><dt>' + t('Schicht') + '</dt><dd>' + (job.layer ?? '–') + ' / ' + (job.layers ?? '–') + '</dd></div>' +
-      '<div><dt>' + t('Fertig um') + '</dt><dd>' + (job.remaining_min != null && !job.paused ? wbClock(job.remaining_min) : '–') + '</dd></div>' +
-      '<div><dt>' + t('Verbleibend') + '</dt><dd>' + wbMin(job.remaining_min) + '</dd></div><div><dt>' + t('Gedruckt') + '</dt><dd>' + wbMin(job.elapsed_min) + '</dd></div>' +
+      '<div title="' + esc(remTip) + '"><dt>' + t('Fertig um') + '</dt><dd>' + (remMin != null && !job.paused ? wbClock(remMin) : '–') + '</dd></div>' +
+      '<div title="' + esc(remTip) + '"><dt>' + t('Verbleibend') + '</dt><dd>' + wbMin(remMin) + (own && job.remaining_min != null ? '<small class="wb-printer-rem">' + esc(t('Drucker: {m}', { m: wbMin(job.remaining_min) })) + '</small>' : '') + '</dd></div><div><dt>' + t('Gedruckt') + '</dt><dd>' + wbMin(job.elapsed_min) + '</dd></div>' +
       (job.filament_mm ? '<div><dt>' + t('Filament bisher') + '</dt><dd>' + de(job.filament_mm / 1000, 1) + ' m</dd></div>' : '') + '</dl>';
   } else $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + t('Kein Druck aktiv. Drucken lässt sich aus dem Schritt <b>③ Slicen &amp; Kosten</b>.') + '</p>';
   $('wbPause').disabled = !job || job.paused; $('wbResume').disabled = !job || !job.paused; $('wbStop').disabled = !job;

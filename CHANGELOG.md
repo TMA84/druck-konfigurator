@@ -11,6 +11,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - Druckhistorie: „Objekt(e) übersprungen“ bei solchen Drucken (der gezählte Verbrauch stimmt ohnehin, er kommt aus dem gemeldeten Filament).
 
 ### Behoben
+- **Restzeit im Tab ④ sprang stark:** Angezeigt wurde die Schätzung des Druckers. Für Drucke aus dem Tool rechnet die Seite jetzt selbst: Orcas Gesamtzeit verteilt auf die Schichten (Weg und Vorschub aller Bewegungen, dazu die Farbwechsel mit der Wechselzeit des Profils), ab der aktuellen Schicht aufsummiert und an das gemessene Tempo angepasst. Der Wert des Druckers steht klein darunter.
 - Kurztest des Container-Images scheiterte zufällig („Connection reset“, Exit-Code 23): „curl | grep -q“ mit pipefail – jetzt Antwort erst lesen, dann prüfen, mit Wiederholungen.
 
 ## [10.8.3] – 2026-09-30

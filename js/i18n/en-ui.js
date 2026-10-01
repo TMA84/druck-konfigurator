@@ -425,5 +425,8 @@ I18N.add({
  "{name} ist nur {dims} mm groß – vielleicht ist die Datei in Zoll gespeichert.": "{name} is only {dims} mm in size – the file may be in inches.",
  "In Zoll umrechnen (×25,4)": "Convert from inches (×25.4)",
  "Passt so": "Keep as is",
- "{n} Teil(e) von Zoll in mm umgerechnet – Strg/⌘+Z nimmt es zurück": "Converted {n} part(s) from inches to mm – Ctrl/⌘+Z undoes it"
+ "{n} Teil(e) von Zoll in mm umgerechnet – Strg/⌘+Z nimmt es zurück": "Converted {n} part(s) from inches to mm – Ctrl/⌘+Z undoes it",
+ "Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}": "From the Orca estimate and the current layer; the printer reports {m}",
+ "Laut Drucker": "As reported by the printer",
+ "Drucker: {m}": "Printer: {m}"
 });

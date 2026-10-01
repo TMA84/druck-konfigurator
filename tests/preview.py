@@ -57,6 +57,8 @@ G92 E0
 G1 X0 Y10 E1
 G1 X0 Y20 E1
 G1 X0 Y30 E0.5
+; estimated printing time (normal mode) = 1m 30s
+; machine_load_filament_time = 20
 """
 with tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False) as f:
     f.write(GCODE)
@@ -83,5 +85,10 @@ check("Bereich stimmt (Bogen geht bis y = -5)", abs(bb[0]) < 1e-6 and abs(bb[3] 
 check("absolute Extrusion: Rückzug erzeugt keine Bahn", kinds[l2:].count("Top surface") and head["count"] == len(kinds))
 xs = [head["bbox"][0] + v / 65535 * (head["bbox"][3] - head["bbox"][0]) for v in q[0::2]]
 check("Koordinaten zurückgerechnet (x = 0 … 30)", min(xs) < 0.01 and max(xs) > 29.99, (min(xs), max(xs)))
+# Zeit je Schicht (für die eigene Restzeit in ④): Weg/Vorschub, Farbwechsel mit der Wechselzeit des Profils; Orcas Gesamtzeit
+ls = head.get("layer_s") or []
+check("Zeit je Schicht: zwei Schichten, Schicht 1 ≈ 0,8 s", len(ls) == 2 and 0.6 < ls[0] < 1.0, ls)
+check("Farbwechsel T0→T1 zählt mit der Wechselzeit (20 s)", 20 < ls[1] < 21.5, ls)
+check("Orcas Gesamtzeit aus dem G-Code (1m 30s = 90 s)", head.get("orca_s") == 90, head.get("orca_s"))
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

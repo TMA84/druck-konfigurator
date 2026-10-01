@@ -440,6 +440,7 @@ function liveUpdate(st) {
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {
+    lv.at = null;
     lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; }
     $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden');
     $('wbLiveInfo').textContent = '';
@@ -461,10 +462,34 @@ function liveUpdate(st) {
   const li = onPath ? head.li : cur;
   // neue Schicht: blass; was der Kopf abfährt, färbt lvHeadTick nach und nach orange (ohne Kopf: ganz orange)
   if (li !== lv.shown || !!head !== (lv.shownDone != null)) lvColour(li, head ? lv.data.layers[li][1] : null);
+  lv.at = { li, frac: onPath ? head.frac : 0.5 };   // für die eigene Restzeit (lvRemaining)
   const z = lv.data.layers[li] ? lv.data.layers[li][0] : 0;
   $('wbLiveInfo').textContent = (onPath ? t('Schicht {l} von {n} ({p} %) · Z {z} mm', { l: li + 1, n, p: Math.round(head.frac * 100), z: de(z, 2) })
     : t('Schicht {l} von {n} · Z {z} mm', { l: L || cur + 1, n: T || n, z: de(z, 2) })) +
     (head ? ' · ' + (head.real ? t('Kopf: echte Position') : t('Kopf: geschätzt')) : '');
+}
+
+/* Eigene Restzeit (Tab ④ „Verbleibend“, „Fertig um“): Orcas Gesamtzeit (orca_s) verteilt nach dem Anteil jeder Schicht
+   (layer_s: Weg/Vorschub aller Bewegungen plus Farbwechsel mit der Wechselzeit des Profils, tools/gcode_preview.py); ab der
+   aktuellen Schicht aufsummiert. Läuft der Druck schneller oder langsamer als geschätzt, gleicht das gemessene Tempo
+   (gedruckte Zeit des Druckers gegen die geschätzte bis hier) es nach und nach aus. null = keine Daten (ältere Vorschau). */
+const LV_PACE_MIN = 0.75, LV_PACE_MAX = 1.5, LV_PACE_FULL_S = 3600, LV_PACE_FROM_S = 900;
+function lvRemaining(st) {
+  const d = lv.data, job = st && st.job;
+  if (!d || !job || !Array.isArray(d.layer_s) || !d.orca_s || !lv.at || d.layer_s.length !== d.layers.length) return null;
+  const ls = d.layer_s, tot = ls.reduce((s, v) => s + v, 0);
+  if (!(tot > 0)) return null;
+  const k = d.orca_s / tot, li = Math.min(ls.length - 1, Math.max(0, lv.at.li));
+  let before = 0; for (let i = 0; i < li; i++) before += ls[i];
+  const done = k * (before + lv.at.frac * ls[li]), rest = Math.max(0, d.orca_s - done);
+  // Tempo: gedruckte Zeit laut Drucker (inkl. Aufheizen) gegen die geschätzte – erst ab ¼ h, voll ab 1 h
+  const el = (+job.elapsed_min || 0) * 60;
+  let pace = 1;
+  if (done > LV_PACE_FROM_S && el > 0) {
+    const w = Math.min(1, done / LV_PACE_FULL_S);
+    pace = 1 + w * (Math.min(LV_PACE_MAX, Math.max(LV_PACE_MIN, el / done)) - 1);
+  }
+  return { s: rest * pace, pace };
 }
 
 // Umschalter Kamera | 3D-Fortschritt (Wahl bleibt gespeichert)

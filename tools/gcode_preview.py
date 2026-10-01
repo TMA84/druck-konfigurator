@@ -34,6 +34,11 @@ def build_preview(path):
     x = y = z = 0.0
     e_abs, relative, tool, kind, layer_z = 0.0, True, 0, TYPE_INDEX["other"], None
     tools = set()
+    # Zeit je Schicht (Weg / Vorschub, alle Bewegungen – ohne Beschleunigung) und Orcas Gesamtzeit: die Seite verteilt damit
+    # Orcas Schätzung auf die Schichten und rechnet die Restzeit selbst (genauer als die des Druckers, js/live-ui.js)
+    layer_s, orca_s, t_layer = [], None, 0.0
+    changes, n_change, cur_tool = [], 0, None      # Farbwechsel je Schicht; Dauer aus dem Profil (machine_*_time, Fußzeile)
+    change_keys = {"machine_load_filament_time": 0.0, "machine_unload_filament_time": 0.0, "machine_tool_change_time": 0.0}
     bb = [math.inf, math.inf, math.inf, -math.inf, -math.inf, -math.inf]
     last = None  # (ende_x, ende_y, dx, dy, art, werkzeug, vorschub) der letzten Bahn – zum Zusammenfassen
 
@@ -70,15 +75,31 @@ def build_preview(path):
                     except ValueError:
                         continue
                     if layer_z is None or abs(nz - layer_z) > 1e-6:
+                        if layers:
+                            layer_s.append(round(t_layer, 1))
+                            changes.append(n_change)
+                        t_layer, n_change = 0.0, 0
                         layer_z = nz
                         layers.append([round(nz, 4), len(attrs) // 2])
                         last = None
+                elif raw.startswith("; machine_") and "=" in raw:
+                    k, v = (s.strip() for s in raw[2:].split("=", 1))
+                    if k in change_keys:
+                        try:
+                            change_keys[k] = float(v.split(",")[0])
+                        except ValueError:
+                            pass
+                elif raw.startswith("; estimated printing time (normal mode)"):
+                    orca_s = sum(int(a) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[u] for a, u in re.findall(r"(\d+)\s*([dhms])", raw.split("=", 1)[-1]))
                 continue
             line = raw.split(";", 1)[0].strip()
             if not line:
                 continue
             if line[0] == "T" and line[1:].isdigit():
                 tool = int(line[1:]) & 0xFF
+                if cur_tool is not None and tool != cur_tool:
+                    n_change += 1
+                cur_tool = tool
                 tools.add(tool)
                 last = None
                 continue
@@ -96,6 +117,8 @@ def build_preview(path):
                 if "F" in w:
                     feed = w["F"]
                 nx, ny, nz = w.get("X", x), w.get("Y", y), w.get("Z", z)
+                if feed > 0:
+                    t_layer += math.sqrt((nx - x) ** 2 + (ny - y) ** 2 + (nz - z) ** 2) / (feed / 60)
                 de = 0.0
                 if "E" in w:
                     de = w["E"] if relative else w["E"] - e_abs
@@ -127,13 +150,20 @@ def build_preview(path):
                         travel = max(travel, feed / 60)
                 x, y = nx, ny
     n = len(attrs) // 2
+    if layers:
+        layer_s.append(round(t_layer, 1))
+        changes.append(n_change)
+    change_s = sum(change_keys.values())
+    if change_s > 0:
+        layer_s = [round(t + c * change_s, 1) for t, c in zip(layer_s, changes)]
     if not n:
         bb = [0, 0, 0, 0, 0, 0]
     # auf 16 bit je Koordinate verkleinern (x und y je auf die bbox skaliert)
     sx, sy = max(bb[3] - bb[0], 1e-6), max(bb[4] - bb[1], 1e-6)
     q = array("H", (int(round((v - (bb[0] if i % 2 == 0 else bb[1])) / (sx if i % 2 == 0 else sy) * 65535)) for i, v in enumerate(segs)))
     head = json.dumps({"count": n, "types": TYPES, "layers": layers, "bbox": [round(v, 3) for v in bb],
-                       "tools": sorted(tools), "speed_unit": SPEED_UNIT, "travel": round(travel, 1)}).encode()
+                       "tools": sorted(tools), "speed_unit": SPEED_UNIT, "travel": round(travel, 1),
+                       "layer_s": layer_s, "orca_s": orca_s}).encode()
     pad = (-(5 + 4 + len(head))) % 4
     return b"GCPV3" + struct.pack("<I", len(head)) + head + b" " * pad + q.tobytes() + attrs.tobytes() + speeds.tobytes()
 
