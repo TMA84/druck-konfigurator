@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.4] – 2026-10-01
 
 ### Verbessert
 - **Objekte überspringen – sehen, welches gemeint ist:** Name anklicken hebt das Objekt im 3D-Fortschritt **blau** hervor (Block vom Bett bis zur aktuellen Schicht, bleibt stehen – auch am Handy; gedruckte Bahnen sind ja schon orange). Die Rückfrage steht jetzt in der Liste (**Ja, überspringen** / **Nein**) statt als Browser-Dialog, damit das Objekt dabei sichtbar bleibt; bei Kamera-Ansicht wechselt sie zum 3D-Fortschritt.
