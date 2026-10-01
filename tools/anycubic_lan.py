@@ -182,6 +182,8 @@ IDLE_S = 600
 POLL_QUERIES = [("info", "query"), ("multiColorBox", "getInfo"), ("peripherie", "query"), ("tempature", "query"),
                 ("fan", "query"), ("light", "query")]
 FIRST_DATA_S = 12
+# Ohne Verbindung (Drucker aus, Neustart): nach so vielen Sekunden baut die nächste Abfrage die Verbindung ganz neu auf
+RELINK_S = 10
 _links, _links_lock = {}, threading.Lock()
 
 
@@ -201,13 +203,15 @@ class PrinterLink:
         self.first = threading.Event()
         self.error = None
         self.error_kind = None
+        self.error_at = 0
         self.client = None
         self.web_topic = None
         self.model_id = None
         self.discovery = {}
         self.last_access = time.time()
         self.stopped = False
-        threading.Thread(target=self._run, daemon=True, name="printer-" + host).start()
+        self.thread = threading.Thread(target=self._run, daemon=True, name="printer-" + host)
+        self.thread.start()
 
     # -- Verbindung --
     def _connect(self):
@@ -276,11 +280,22 @@ class PrinterLink:
                             break
                         time.sleep(0.1)
             except LanError as e:
-                self.error, self.error_kind = str(e), e.kind
+                self.error, self.error_kind, self.error_at = str(e), e.kind, time.time()
                 self.first.set()                               # wartende Anfragen bekommen den Fehler
                 if e.kind in ("lan_off", "unsupported", "rejected", "missing_libs", "forbidden"):
                     self.stopped = True                        # bleibt so, bis der Nutzer etwas ändert
+            except Exception as e:   # unerwartet (z. B. beim Neustart des Druckers) – der Thread darf nicht sterben
+                self.error, self.error_kind, self.error_at = "Verbindungsfehler: " + _reason(e), "unreachable", time.time()
+                self.first.set()
             finally:
+                # Verbindung weg: alten Stand verwerfen – sonst zeigt die Seite nach einem Neustart des Druckers weiter
+                # „busy“ von vorher (beobachtet 2026-10-01, Kobra S1)
+                with self.lock:
+                    had = bool(self.reports)
+                    self.reports.clear()
+                    self.seen.clear()
+                if had and not self.error and not self.stopped:
+                    self.error, self.error_kind, self.error_at = "Verbindung zum Drucker unterbrochen", "unreachable", time.time()
                 if self.client:
                     self.client.loop_stop()
                     try:
@@ -289,7 +304,10 @@ class PrinterLink:
                         pass
                     self.client = None
             if not self.stopped:
-                time.sleep(backoff)
+                for _ in range(backoff * 10):
+                    if self.stopped:
+                        break
+                    time.sleep(0.1)
                 backoff = min(backoff * 2, 60)
         with _links_lock:
             if _links.get(self.host) is self:
@@ -388,7 +406,11 @@ def get_link(host):
     host = check_host(host)
     with _links_lock:
         link = _links.get(host)
-        if link is None or link.stopped:
+        # neu aufbauen: beendet, Thread tot oder seit RELINK_S ohne Verbindung (z. B. Drucker neu gestartet)
+        stale = link is not None and (not link.thread.is_alive() or (not link.connected.is_set() and link.error and time.time() - link.error_at > RELINK_S))
+        if link is None or link.stopped or stale:
+            if link is not None:
+                link.stopped = True
             link = _links[host] = PrinterLink(host)
         link.last_access = time.time()
     return link
@@ -785,6 +807,8 @@ def print_gcode(host, path, filename, options=None):
     für dieses Modell geslict wurde. options: auto_leveling, timelapse, flow_calibration (0/1)."""
     link = _ready(host)
     o = options or {}
+    if not link.connected.is_set():
+        raise LanError(link.error or "Keine Verbindung zum Drucker", "unreachable")
     if link._printing() or str(link.data("info").get("state")) not in ("free", "None", ""):
         raise LanError("Der Drucker ist nicht frei (%s) – erst den laufenden Vorgang beenden" % link.data("info").get("state"), "forbidden")
     facts = gcode_facts(path)

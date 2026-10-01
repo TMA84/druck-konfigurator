@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Drucker blieb nach einem Neustart „beschäftigt“:** Riss die Verbindung ab (Drucker aus/neu gestartet), zeigte das Tool weiter den letzten Stand – z. B. „busy“ nach einem Abbruch – und kam teils nicht wieder an den Drucker heran (Verbindungs-Thread starb an einem unerwarteten Fehler). Jetzt: ohne Verbindung „nicht erreichbar“ statt altem Stand, nach 10 s baut die nächste Abfrage die Verbindung neu auf, ohne Verbindung startet kein Druck.
+
 ## [10.9.3] – 2026-10-01
 
 ### Verbessert

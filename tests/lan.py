@@ -116,6 +116,17 @@ class FakeBroker(threading.Thread):
         self.fans = {"fan_speed_pct": 0, "aux_fan_speed_pct": 0, "box_fan_level": 0}
         self.light, self.pos, self.moves, self.starts = {"type": 2, "status": 0, "brightness": 0}, {"x": 10, "y": 20, "z": 5}, [], []
         self.silent, self.ignore = set(), set()   # (Art, Aktion): ausführen ohne Antwort / gar nicht ausführen
+        self.conns = []
+
+    def drop(self):
+        # Drucker startet neu: alle Verbindungen weg
+        for c in self.conns:
+            try:
+                c.shutdown(socket.SHUT_RDWR)
+                c.close()
+            except OSError:
+                pass
+        self.conns = []
 
     def run(self):
         while True:
@@ -125,6 +136,7 @@ class FakeBroker(threading.Thread):
                     conn = self.tls.wrap_socket(conn, server_side=True)
                 except (ssl.SSLError, OSError):
                     continue
+            self.conns.append(conn)
             threading.Thread(target=self.client, args=(conn,), daemon=True).start()
 
     def reply(self, conn, kind, doc):
@@ -459,6 +471,44 @@ for kind, action, data in (("print", "stop", {"taskid": "1"}), ("axis", "move", 
 # 5) Wie am echten Drucker: MQTT über TLS mit selbst signiertem Zertifikat (mqtts://)
 tls_broker = FakeBroker(tls=True)
 tls_broker.start()
+# Neustart des Druckers (2026-10-01): Verbindung weg → kein alter Stand („busy“), sondern „nicht erreichbar“;
+# danach baut die nächste Abfrage die Verbindung neu auf, auch wenn der Verbindungs-Thread an einem unerwarteten Fehler starb
+lan.close_all()
+lan.INFO_PORT = http_srv.server_address[1]
+lan.RELINK_S = 0.5
+check("Neustart: vorher verbunden", lan.status("127.0.0.1")["connected"])
+good_port = lan.INFO_PORT
+lan.INFO_PORT = 1
+broker.drop()
+time.sleep(1.0)
+try:
+    st = lan.status("127.0.0.1")
+    check("Neustart: kein alter Stand ohne Verbindung", False, (st.get("state"), st.get("connected")))
+except lan.LanError as e:
+    check("Neustart: kein alter Stand ohne Verbindung", e.kind == "unreachable", e)
+try:
+    lan.print_gcode("127.0.0.1", __file__, "x.gcode")
+    check("Neustart: ohne Verbindung kein Druckstart", False)
+except lan.LanError as e:
+    check("Neustart: ohne Verbindung kein Druckstart", e.kind in ("unreachable", "timeout"), e)
+lan.INFO_PORT = good_port
+time.sleep(0.6)
+st = lan.status("127.0.0.1")
+check("Neustart: Verbindung von selbst neu, frischer Stand", st["connected"] and st["state"] == INFO.get("state"), (st.get("connected"), st.get("state")))
+real_hs = lan.handshake
+lan.handshake = lambda host: (_ for _ in ()).throw(RuntimeError("kaputt"))
+broker.drop()
+time.sleep(1.0)
+try:
+    lan.status("127.0.0.1")
+    check("Unerwarteter Fehler: gemeldet statt hängen", False)
+except lan.LanError as e:
+    check("Unerwarteter Fehler: gemeldet statt hängen", "kaputt" in str(e) and lan.get_link("127.0.0.1").thread.is_alive(), e)
+lan.handshake = real_hs
+time.sleep(0.6)
+check("Unerwarteter Fehler: danach wieder verbunden", lan.status("127.0.0.1")["connected"])
+lan.RELINK_S = 10
+
 tls_srv, _ = make_http(tls_broker.port, scheme="mqtts")
 lan.close_all()
 lan.INFO_PORT = tls_srv.server_address[1]
