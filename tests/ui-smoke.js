@@ -473,6 +473,9 @@ async function runSmoke(opts={}){
       skRender(st);await wait(300);
       const rows=[...$('wbObjects').querySelectorAll('[data-sk-row]')];
       ok(rows.length===3&&/Kopie 2/.test(rows[1].textContent)&&/übersprungen/.test(rows[2].textContent),'Objekte: Liste mit Kopien, übersprungenes markiert');
+      { const objs2=Array.from({length:30},(_,i)=>({id:i,name:'c.stl_id_0_copy_'+i,polygon:[[i,0],[i+1,0],[i+1,1]]}));const keepO=sk.objects,bx=$('wbObjects'),ph=bx.parentNode,nx=bx.nextSibling;document.body.appendChild(bx);sk.objects=objs2;skRender(st);
+        const l=$('wbObjects').querySelector('.wb-obj-list');l.scrollTop=200;const s0=l.scrollTop;skRender({...st});skRender({...st,job:{...st.job,skipped:[2,5]}});
+        ok(s0>0&&$('wbObjects').querySelector('.wb-obj-list').scrollTop===s0,'Objektliste: Scrollposition bleibt bei neuem Stand ('+s0+' px)');ph.insertBefore(bx,nx);sk.objects=keepO;skRender(st); }
       $('wbObjects').querySelector('[data-sk-sel="0"]').click();await wait(50);
       ok(sk.sel===0&&$('wbObjects').querySelector('[data-sk-row="0"]').classList.contains('sel'),'Objekt-Name angeklickt: hervorgehoben (bleibt stehen)');
       $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(100);

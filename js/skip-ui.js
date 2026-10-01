@@ -25,15 +25,15 @@ function skRender(st) {
   sk.st = st;
   const box = $('wbObjects'), job = st && st.job;
   if (!box) return;
-  if (!job || !job.name) { box.classList.add('hidden'); box.innerHTML = ''; sk.name = null; sk.objects = null; sk.sel = sk.ask = -1; skClearLines(); return; }
+  if (!job || !job.name) { box.classList.add('hidden'); box.innerHTML = ''; box.dataset.html = ''; sk.name = null; sk.objects = null; sk.sel = sk.ask = -1; skClearLines(); return; }
   if (job.name !== sk.name && !sk.loading) { skLoad(job.name); return; }
   const objs = sk.objects;
-  if (!objs || objs.length < 2) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  if (!objs || objs.length < 2) { box.classList.add('hidden'); box.innerHTML = ''; box.dataset.html = ''; return; }
   const skipped = new Set(job.skipped || []), left = objs.length - objs.filter(o => skipped.has(o.id)).length;
   if (skipped.has(sk.ask)) sk.ask = -1;
   const hi = skHi();
   box.classList.remove('hidden');
-  box.innerHTML = '<div class="wb-obj-head"><b>' + esc(t('Objekte')) + '</b> <span class="muted">' + esc(t('{n} von {m} werden gedruckt', { n: left, m: objs.length })) + '</span></div>' +
+  const html = '<div class="wb-obj-head"><b>' + esc(t('Objekte')) + '</b> <span class="muted">' + esc(t('{n} von {m} werden gedruckt', { n: left, m: objs.length })) + '</span></div>' +
     '<ul class="wb-obj-list">' + objs.map(o => {
       const off = skipped.has(o.id);
       // Name anklicken: Objekt im 3D-Fortschritt blau hervorheben (gedruckte Bahnen sind schon orange) (bleibt stehen – auch ohne Maus, z. B. am iPhone)
@@ -43,6 +43,12 @@ function skRender(st) {
           : o.id === sk.ask ? '<span class="wb-obj-ask"><span>' + esc(t('Wirklich überspringen?')) + '</span><button type="button" class="btn small danger" data-sk-yes="' + o.id + '">' + esc(t('Ja, überspringen')) + '</button><button type="button" class="linkbtn" data-sk-no>' + esc(t('Nein')) + '</button></span>'
           : '<button type="button" class="btn sec small" data-sk-skip="' + o.id + '"' + (left < 2 ? ' disabled title="' + esc(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')) + '"' : '') + '>' + esc(t('Überspringen')) + '</button>') + '</li>';
     }).join('') + '</ul><p class="wb-obj-note muted">' + esc(t('Name anklicken zeigt das Objekt blau im 3D-Fortschritt. Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.')) + '</p>';
+  // nur neu zeichnen, wenn sich etwas geändert hat – der Stand kommt alle paar Sekunden, sonst springt die Liste beim Scrollen zurück
+  if (box.innerHTML !== html && box.dataset.html !== html) {
+    const list = box.querySelector('.wb-obj-list'), top = list ? list.scrollTop : 0;
+    box.innerHTML = html; box.dataset.html = html;
+    const nl = box.querySelector('.wb-obj-list'); if (nl) nl.scrollTop = top;
+  }
   skDrawLines(skipped);
 }
 // Umrisse im 3D-Fortschritt (js/live-ui.js)
