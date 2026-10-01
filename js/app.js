@@ -314,10 +314,10 @@ function plateGeom(){
   for(const i of idx){
     const g=project.parts[i].geom,pl=lay.places&&lay.places[i],cx=(g.mn[0]+g.mx[0])/2,cy=(g.mn[1]+g.mx[1])/2,P=g.pos,z0=g.mn[2];
     // dieselbe Umrechnung auch für Farb-Modifikatoren (js/bodies-ui.js modOverlayFor)
-    const xf=pl?(x,y,z)=>{const a=x-cx,b=y-cy;return[(pl.rot?-b:a)+pl.lx,(pl.rot?a:b)+pl.ly,z-z0]}:(x,y,z)=>[x+sx,y+sy,z-z0];
+    const xf=pl?(x,y,z)=>{const [u,v]=placeXY(pl,x-cx,y-cy);return[u+pl.lx,v+pl.ly,z-z0]}:(x,y,z)=>[x+sx,y+sy,z-z0];
     ranges.push({i,start:o/9,count:P.length/9,xf});
     for(let v=0;v<P.length;v+=3){
-      if(pl){const x=P[v]-cx,y=P[v+1]-cy;pos[o]=(pl.rot?-y:x)+pl.lx;pos[o+1]=(pl.rot?x:y)+pl.ly}   // wie placeTransform (+90° um Z)
+      if(pl){const [u,w]=placeXY(pl,P[v]-cx,P[v+1]-cy);pos[o]=u+pl.lx;pos[o+1]=w+pl.ly}   // wie placeTransform (Drehung um Z in 90°-Schritten)
       else{pos[o]=P[v]+sx;pos[o+1]=P[v+1]+sy}                                                     // 3MF: Lage des Designers
       pos[o+2]=P[v+2]-g.mn[2];o+=3;
     }

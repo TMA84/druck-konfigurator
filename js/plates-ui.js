@@ -55,7 +55,7 @@ function geomId(g) {
 function layoutKey(tpl, packOnly) {
   const tm = project.threemf;
   const head = [geomId(project), bedSize(tpl).join('x'), (tpl.bedCenter || []).join(','), [].concat(tpl.settings && tpl.settings.printable_height || [])[0],
-    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer'].join('|');
+    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer', 'gap' + packGapMm].join('|');
   return head + '|' + project.parts.map(p => { const g = p.geom || {};
     return geomId(g) + ':' + g.x + ':' + g.y + ':' + g.z + (packOnly ? '' : ':' + (p.plate || '') + (ownPlaced(p) ? '*' : '')); }).join(';');
 }
@@ -211,6 +211,19 @@ $('plateAuto').addEventListener('click', () => {
 
 /* Druckreihenfolge umschalten: Objekt für Objekt braucht Abstand – die Teile werden neu angeordnet (bei Makerworld-3MF die
    Platten des Designers einzeln, die sind sonst meist zu eng). */
+/* Abstand zwischen den Teilen beim Anordnen (einstellbar, gemerkt in store.settings.packGap): neu anordnen, wie es die
+   Zuordnung zulässt (automatisch verteilte Platten sofort; Makerworld-Platten des Designers bleiben, wie sie sind). */
+setPackGap(store.settings.packGap ?? PART_GAP_MM);
+function packGapSet(mm) {
+  setPackGap(mm); store.settings.packGap = packGapMm; persist();
+  $('packGapIn').value = String(packGapMm);
+  const tpl = plTpl(); if (tpl && project) normalizePlates(tpl);
+  if (project) update();
+}
+$('packGapIn').value = String(packGapMm);
+$('packGapIn').addEventListener('change', () => packGapSet(Math.round(num($('packGapIn').value))));
+$('packGapMinus').addEventListener('click', () => packGapSet(packGapMm - 1));
+$('packGapPlus').addEventListener('click', () => packGapSet(packGapMm + 1));
 $('plateByObject').addEventListener('change', () => {
   if (!project) return;
   project.printSeq = $('plateByObject').checked ? 'object' : 'layer';

@@ -501,6 +501,11 @@ async function runSmoke(opts={}){
       ok(project.parts.length===3&&!project.parts.some(p=>p.name===name)&&$('partList').querySelectorAll('[data-part]').length===new Set(project.parts.map((p,i)=>p.copyGroup||'#'+i)).size&&/entfernt/.test($('toast').textContent),'✕ entfernt „'+name+'“');
       $('toast').querySelector('button').click();await wait(80);
       ok(project.parts.length===4&&project.parts[3].name===name&&project.parts.every((p,i)=>p.id===i),'Rückgängig stellt das Teil wieder her'); }
+    // Abstand beim Anordnen: wirkt auf die Anordnung (Cache!), Grenzen 3–15 mm
+    { const g0=packGapMm,tpl=plTpl(),gap=v=>{$('packGapIn').value=String(v);$('packGapIn').dispatchEvent(new Event('change'))};
+      gap(99);ok(packGapMm===15&&$('packGapIn').value==='15','Abstand auf 15 mm begrenzt');
+      const k15=layoutKey(tpl);gap(3);ok(packGapMm===3&&layoutKey(tpl)!==k15&&store.settings.packGap===3,'Abstand 3 mm gemerkt, Anordnung wird neu berechnet');
+      gap(g0); }
     // Slot für alle Teile
     setTab('settings');await wait(50);
     ok(!$('partScope').classList.contains('hidden')&&!$('partSlotAll').classList.contains('hidden'),'Slot-Auswahl mit „Für alle Teile übernehmen“');

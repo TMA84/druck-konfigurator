@@ -338,6 +338,10 @@
           <p id="plateInfo" class="muted small"></p>
           <label class="seq-toggle" title="Orca: Druckreihenfolge „nach Objekt“ – spart Fahrwege und Fäden zwischen Teilen, ein Fehldruck betrifft nur ein Teil"><input type="checkbox" id="plateByObject"> Objekt für Objekt drucken</label>
           <p id="plateSeqNote" class="muted small"></p>
+          <div class="gap-ctl" title="Abstand zwischen den Teilen beim automatischen Anordnen (3–15 mm). Objekt für Objekt: mindestens der Freiraum des Druckkopfs.">
+            <span>Abstand zwischen Teilen</span>
+            <span class="stepper"><button type="button" id="packGapMinus" aria-label="Abstand kleiner">−</button><input id="packGapIn" type="number" min="3" max="15" step="1" inputmode="numeric" aria-label="Abstand zwischen Teilen in mm"><button type="button" id="packGapPlus" aria-label="Abstand größer">+</button></span> mm
+          </div>
           <p id="plateSave" class="note small hidden"></p>
           <p id="plateWarn" class="note bad small hidden"></p>
           <ol id="plateList" class="plate-list"></ol>

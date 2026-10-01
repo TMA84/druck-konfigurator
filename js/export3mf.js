@@ -22,7 +22,12 @@ function clearanceOf(tpl) {
   const num1 = v => +[].concat(v ?? [])[0];
   return { radius: num1(s.extruder_clearance_radius) || 60, rod: num1(s.extruder_clearance_height_to_rod) || 40 };
 }
-const packGap = tpl => printSeq.byObject ? Math.max(PART_GAP_MM, clearanceOf(tpl).radius + 1) : PART_GAP_MM;
+// Abstand beim Anordnen: einstellbar in der Plattenübersicht (setPackGap, 3–15 mm, Standard PART_GAP_MM); Objekt für Objekt
+// mindestens der Freiraum des Druckkopfs
+const PACK_GAP_MIN = 3, PACK_GAP_MAX = 15;
+let packGapMm = PART_GAP_MM;
+function setPackGap(mm) { packGapMm = Math.max(PACK_GAP_MIN, Math.min(PACK_GAP_MAX, Number(mm) || PART_GAP_MM)); }
+const packGap = tpl => printSeq.byObject ? Math.max(packGapMm, clearanceOf(tpl).radius + 1) : packGapMm;
 const PLATE_STRIDE = 1.2;       // Orca legt Platte n um 1,2 × Bettgröße versetzt ab (Spalten = ⌈√Platten⌉)
 const objectPath = k => '/3D/Objects/object_' + k + '.model';
 
@@ -377,7 +382,7 @@ function volumeExcess(g, vol) {
   return out;
 }
 
-/* Teile platzsparend aufs Bett legen (Grundfläche = Hüllrechteck, Abstand PART_GAP_MM). Verfahren „freie Rechtecke“
+/* Teile platzsparend aufs Bett legen (Grundfläche = Hüllrechteck, Abstand packGap – einstellbar, Standard PART_GAP_MM). Verfahren „freie Rechtecke“
    (MaxRects, beste kurze Seite): jedes Teil kommt in die freie Lücke, in die es am knappsten passt, auf die erste
    Platte mit Platz; wenn es hilft, um 90° um die Hochachse gedreht. Mehrere Sortierungen werden durchprobiert, die
    mit den wenigsten Platten gewinnt (bei Gleichstand die dichteste erste Platte). Je Platte wird die belegte Fläche
@@ -458,12 +463,13 @@ function packPlates(geoms, groups, tpl) {
   const used = plates.map((p, k) => [p, sources[k]]).filter(([p]) => p.length);
   const cols = Math.ceil(Math.sqrt(used.length || 1)), places = [];
   used.forEach(([rects, src], pi) => {
-    const usedW = Math.max(...rects.map(r => r.x + r.w)) - gap, usedD = Math.max(...rects.map(r => r.y + r.h)) - gap;
-    const lx0 = bx - usedW / 2, ly0 = by - usedD / 2;
+    const minX = Math.min(...rects.map(r => r.x)), minY = Math.min(...rects.map(r => r.y));
+    const usedW = Math.max(...rects.map(r => r.x + r.w)) - gap - minX, usedD = Math.max(...rects.map(r => r.y + r.h)) - gap - minY;
+    const lx0 = bx - usedW / 2 - minX, ly0 = by - usedD / 2 - minY;
     const ox = (pi % cols) * bw * PLATE_STRIDE, oy = -Math.floor(pi / cols) * bd * PLATE_STRIDE;
     for (const r of rects) {
       const lx = lx0 + r.x + (r.w - gap) / 2, ly = ly0 + r.y + (r.h - gap) / 2;
-      places[r.i] = { plate: pi, x: ox + lx, y: oy + ly, lx, ly, group: src, rot: !!r.rot };
+      places[r.i] = { plate: pi, x: ox + lx, y: oy + ly, lx, ly, group: src, rot: !!r.rot, ang: r.ang ?? (r.rot ? 90 : 0) };
     }
   });
   // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
@@ -474,7 +480,11 @@ function packPlates(geoms, groups, tpl) {
 // Grundfläche eines platzierten Teils (gedreht: Breite und Tiefe getauscht)
 const footprint = (g, pl) => pl && pl.rot ? [g.y, g.x] : [g.x, g.y];
 // 3MF-Transformation (Zeilenvektor · Matrix): gedreht = +90° um Z, sonst nur verschoben
-const placeTransform = (pl, hz) => (pl.rot ? '0 1 0 -1 0 0 0 0 1 ' : '1 0 0 0 1 0 0 0 1 ') + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
+// Drehung um Z in 90°-Schritten (pl.ang; ältere Lagen nur pl.rot = 90°) – Zeilenvektor: 90° → (−y, x), 180° → (−x, −y), 270° → (y, −x)
+const placeAng = pl => pl ? (pl.ang != null ? ((pl.ang % 360) + 360) % 360 : pl.rot ? 90 : 0) : 0;
+const ROT_Z = { 0: [1, 0, 0, 0, 1, 0, 0, 0, 1], 90: [0, 1, 0, -1, 0, 0, 0, 0, 1], 180: [-1, 0, 0, 0, -1, 0, 0, 0, 1], 270: [0, -1, 0, 1, 0, 0, 0, 0, 1] };
+const placeXY = (pl, a, b) => { const k = placeAng(pl); return k === 90 ? [-b, a] : k === 180 ? [-a, -b] : k === 270 ? [b, -a] : [a, b]; };
+const placeTransform = (pl, hz) => ROT_Z[placeAng(pl)].map(String).join(' ') + ' ' + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
 // Alle Teile automatisch auf möglichst wenige Platten (ohne feste Zuordnung)
 function arrangeParts(geoms, tpl) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl); }
 // Nach Plattenzuordnung je Teil (1-basiert); Platten in aufsteigender Reihenfolge, Lücken fallen weg
@@ -522,11 +532,11 @@ function layout3mf(items, tpl, mode) {
       const bins = [...new Set(idx.map(i => pk.places[i].plate))].sort((a, b) => a - b), base = f;
       if (bins.length > 1) overflow = true;
       f += bins.length;
-      for (const i of idx) { const pl = pk.places[i]; local[i] = { f: base + 1 + bins.indexOf(pl.plate), lx: pl.lx, ly: pl.ly, rot: pl.rot }; }
+      for (const i of idx) { const pl = pk.places[i]; local[i] = { f: base + 1 + bins.indexOf(pl.plate), lx: pl.lx, ly: pl.ly, rot: pl.rot, ang: pl.ang }; }
     }
   }
   const cols = Math.ceil(Math.sqrt(f || 1));
-  const places = local.map(L => { const pi = L.f - 1; return { plate: pi, x: (pi % cols) * bw * PLATE_STRIDE + L.lx, y: -Math.floor(pi / cols) * bd * PLATE_STRIDE + L.ly, lx: L.lx, ly: L.ly, rot: L.rot }; });
+  const places = local.map(L => { const pi = L.f - 1; return { plate: pi, x: (pi % cols) * bw * PLATE_STRIDE + L.lx, y: -Math.floor(pi / cols) * bd * PLATE_STRIDE + L.ly, lx: L.lx, ly: L.ly, rot: L.rot, ang: L.ang }; });
   // zu groß: in Designer-Lage so, wie es liegt; beim Packen auch gedreht nicht
   const oversize = all.filter(i => volumeExcess(geoms[i], vol).length && (designer.has(local[i].f) || volumeExcess({ x: geoms[i].y, y: geoms[i].x, z: geoms[i].z }, vol).length));
   return { count: f, plateOf: local.map(L => L.f), places, overflow, oversize, oversizePlates, designer };
@@ -757,7 +767,7 @@ function patchModifierExtruders(ms, objectId, map, nFil) {
    Hüllrechtecks (Weltkoordinaten) optional +90° um Z drehen und diese Mitte auf (pl.x, pl.y) setzen. Höhe bleibt. */
 const ROT_Z90 = [0, 1, 0, -1, 0, 0, 0, 0, 1], ROT_ID = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 function relocateTransform(m, c, pl) {
-  const R = pl.rot ? ROT_Z90 : ROT_ID, out = [];
+  const R = ROT_Z[placeAng(pl)] || ROT_ID, out = [];
   for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) out.push(m[r * 3] * R[k] + m[r * 3 + 1] * R[3 + k] + m[r * 3 + 2] * R[6 + k]);
   const tx = m[9] - c[0], ty = m[10] - c[1], tz = m[11];
   out.push(tx * R[0] + ty * R[3] + tz * R[6] + pl.x, tx * R[1] + ty * R[4] + tz * R[7] + pl.y, tx * R[2] + ty * R[5] + tz * R[8]);

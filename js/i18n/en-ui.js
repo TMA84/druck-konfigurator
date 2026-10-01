@@ -449,5 +449,10 @@ I18N.add({
  "Anzahl für alle Teile des Modells": "Quantity for all parts of the model",
  "Teil mit allen {n} Kopien entfernen": "Remove the part with all {n} copies",
  "{name}: {n} Sätze": "{name}: {n} sets",
- "Platten {list}": "Plates {list}"
+ "Platten {list}": "Plates {list}",
+ "Abstand zwischen Teilen": "Gap between parts",
+ "Abstand kleiner": "Smaller gap",
+ "Abstand größer": "Larger gap",
+ "Abstand zwischen Teilen in mm": "Gap between parts in mm",
+ "Abstand zwischen den Teilen beim automatischen Anordnen (3–15 mm). Objekt für Objekt: mindestens der Freiraum des Druckkopfs.": "Gap between parts when arranging automatically (3–15 mm). Object by object: at least the print head clearance."
 });
