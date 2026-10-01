@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Überspringen im 3D-Fortschritt:** Objekt anklicken statt in der Liste suchen; unter der Maus orange umrandet.
+- **Übersprungene Objekte im 3D-Fortschritt:** ab der Schicht des Überspringens dunkel, der Druckkopf lässt sie aus und fährt wie der Drucker gleich zum nächsten Objekt.
+- **STL in Zoll:** Bei sehr kleinen STL (höchstens 10 mm) bietet das Tool „In Zoll umrechnen (×25,4)“ an, mit Rückgängig; Skalierung jetzt bis 3000 %.
+- Druckhistorie: „Objekt(e) übersprungen“ bei solchen Drucken (der gezählte Verbrauch stimmt ohnehin, er kommt aus dem gemeldeten Filament).
+
+### Behoben
+- Kurztest des Container-Images scheiterte zufällig („Connection reset“, Exit-Code 23): „curl | grep -q“ mit pipefail – jetzt Antwort erst lesen, dann prüfen, mit Wiederholungen.
+
 ## [10.8.3] – 2026-09-30
 
 ### Verbessert

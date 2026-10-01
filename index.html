@@ -327,6 +327,7 @@
         </div>
         <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
         <p id="importNotes" class="muted hidden"></p>
+        <div id="inchHint" class="inch-hint hidden" role="status"></div>
         <section id="plateBox" class="plates hidden" aria-labelledby="plateTitle">
           <div class="orient-head"><span class="eyebrow" id="plateTitle">Platten</span><button type="button" id="plateAuto" class="linkbtn hidden" title="Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen">Platzsparend anordnen</button></div>
           <p id="plateInfo" class="muted small"></p>
@@ -350,7 +351,7 @@
         <section id="sizeBox" class="orient hidden" aria-labelledby="sizeTitle">
           <div class="orient-head"><span class="eyebrow" id="sizeTitle">Größe</span><span id="sizePart" class="muted"></span></div>
           <div class="size-form">
-            <label>Skalierung <span class="unit"><input id="szPct" type="number" min="1" max="2000" step="1" inputmode="decimal" aria-label="Skalierung in Prozent"> %</span></label>
+            <label>Skalierung <span class="unit"><input id="szPct" type="number" min="1" max="3000" step="1" inputmode="decimal" aria-label="Skalierung in Prozent"> %</span></label>
             <label class="size-lock" title="Aus: jede Achse einzeln ändern"><input type="checkbox" id="szUniform" checked> gleichmäßig</label>
             <label>X <span class="unit"><input id="szX" type="number" min="0.1" step="0.1" inputmode="decimal" aria-label="Breite X in mm"> mm</span></label>
             <label>Y <span class="unit"><input id="szY" type="number" min="0.1" step="0.1" inputmode="decimal" aria-label="Tiefe Y in mm"> mm</span></label>

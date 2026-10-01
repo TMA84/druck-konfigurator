@@ -67,9 +67,15 @@ jobs:
           set -euo pipefail
           img="${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}-${{ matrix.arch }}"
           docker run -d --name druck-test -p 8765:8765 "$img"
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/api/health && break; sleep 2; done
-          curl -fsS http://127.0.0.1:8765/api/health | grep -q '"slicer": "2' || { docker logs druck-test; exit 1; }
-          curl -fsS http://127.0.0.1:8765/ | grep -q 'Druck-Konfigurator'
+          # Antwort erst ganz lesen, dann prüfen: „curl | grep -q“ mit pipefail scheiterte zufällig (grep schließt die Leitung
+          # früh → curl Schreibfehler 23); dazu Wiederholungen, falls der frisch gestartete Server eine Verbindung zurücksetzt
+          get() { curl -fsS --retry 5 --retry-all-errors --retry-delay 2 --max-time 15 "http://127.0.0.1:8765$1"; }
+          for i in $(seq 1 30); do get /api/health >/dev/null 2>&1 && break; sleep 2; done
+          health="$(get /api/health)" || { docker logs druck-test; exit 1; }
+          echo "$health"
+          grep -q '"slicer": "2' <<<"$health" || { docker logs druck-test; exit 1; }
+          page="$(get /)"
+          grep -q 'Druck-Konfigurator' <<<"$page"
 
     outputs:
       version: ${{ steps.meta.outputs.version }}

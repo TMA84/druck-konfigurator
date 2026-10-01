@@ -45,9 +45,21 @@ function skClearLines() {
   sk.lines = null;
   if (typeof lvRender === 'function') lvRender();
 }
+// Schicht des Druckers → Schicht der Vorschau (wie liveUpdate)
+function skPreviewLayer(L) {
+  const n = lv.data.layers.length, T = sk.st && sk.st.job ? +sk.st.job.layers || 0 : 0;
+  return T > 0 ? Math.min(n - 1, Math.max(0, Math.round(L / T * n) - 1)) : Math.min(n - 1, Math.max(0, L - 1));
+}
 function skDrawLines(skipped) {
   if (typeof lv === 'undefined' || !lv.scene || !lv.data || !sk.objects) return;
+  // Bahnen übersprungener Objekte ab der Schicht des Überspringens dunkel, der Kopf lässt sie aus (js/live-ui.js)
+  if (typeof lvSkipSet === 'function') {
+    const at = (sk.st && sk.st.job && sk.st.job.skipped_at) || {}, cur = lv.shown >= 0 ? lv.shown : 0;
+    lvSkipSet(sk.objects.filter(o => skipped.has(o.id) && o.polygon && o.polygon.length > 2)
+      .map(o => ({ polygon: o.polygon, from: at[o.id] != null ? skPreviewLayer(+at[o.id]) : cur })));
+  }
   skClearLines();
+  skHookView();
   sk.lines = sk.objects.filter(o => o.polygon && o.polygon.length > 2).map(o => {
     const pts = o.polygon.map(([x, y]) => new THREE.Vector3(x - lv.cx, y - lv.cy, 0.3));
     const col = o.id === sk.hover ? 0xf0a371 : skipped.has(o.id) ? 0xe5514f : 0x7d8792;
@@ -56,11 +68,49 @@ function skDrawLines(skipped) {
   });
   if (typeof lvRender === 'function') lvRender();
 }
+function skAsk(o, btn) {
+  const skipped = new Set((sk.st && sk.st.job && sk.st.job.skipped) || []);
+  if (skipped.has(o.id)) { toast(t('„{name}“ ist schon übersprungen', { name: skLabel(o, sk.objects) })); return; }
+  if (sk.objects.length - skipped.size < 2) { toast(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')); return; }
+  if (!confirm(t('„{name}“ ab jetzt nicht mehr drucken? Das lässt sich nicht zurücknehmen.', { name: skLabel(o, sk.objects) }))) return;
+  wbCmd(btn || null, 'skip', 'start', { parts: [o.id] }, t('„{name}“ wird übersprungen', { name: skLabel(o, sk.objects) }));
+}
 $('wbObjects').addEventListener('click', e => {
   const b = e.target.closest('[data-sk-skip]'); if (!b || !sk.objects) return;
-  const o = sk.objects.find(x => x.id === +b.dataset.skSkip); if (!o) return;
-  if (!confirm(t('„{name}“ ab jetzt nicht mehr drucken? Das lässt sich nicht zurücknehmen.', { name: skLabel(o, sk.objects) }))) return;
-  wbCmd(b, 'skip', 'start', { parts: [o.id] }, t('„{name}“ wird übersprungen', { name: skLabel(o, sk.objects) }));
+  const o = sk.objects.find(x => x.id === +b.dataset.skSkip); if (o) skAsk(o, b);
 });
+
+/* Im 3D-Fortschritt anklicken: Strahl der Maus bis zur Höhe der aktuellen Schicht, Objekt, in dessen Umriss der Punkt
+   liegt (Ziehen = drehen, kein Klick). Unter der Maus orange umrandet. */
+function skPick(ev) {
+  if (!sk.objects || !lv.renderer || !lv.data || !sk.st || !sk.st.job) return null;
+  const r = lv.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, lv.camera);
+  const z = lv.shown >= 0 && lv.data.layers[lv.shown] ? lv.data.layers[lv.shown][0] : 0, p = new THREE.Vector3();
+  if (!rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), p)) return null;
+  const x = p.x + lv.cx, y = p.y + lv.cy;
+  const inside = poly => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  return sk.objects.find(o => o.polygon && o.polygon.length > 2 && inside(o.polygon)) || null;
+}
+function skHookView() {
+  if (sk.hooked || typeof lv === 'undefined' || !lv.renderer) return;
+  sk.hooked = true;
+  const el = lv.renderer.domElement;
+  let down = null;
+  el.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+  el.addEventListener('pointerup', e => {
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) { down = null; return; }
+    down = null;
+    const o = skPick(e); if (o) skAsk(o);
+  });
+  el.addEventListener('pointermove', e => {
+    if (e.buttons) return;
+    const o = skPick(e), h = o ? o.id : -1;
+    el.style.cursor = o ? 'pointer' : '';
+    el.title = o ? t('{name} – anklicken zum Überspringen', { name: skLabel(o, sk.objects) }) : '';
+    if (h !== sk.hover) { sk.hover = h; if (sk.st && sk.st.job) skDrawLines(new Set(sk.st.job.skipped || [])); }
+  });
+}
 $('wbObjects').addEventListener('mouseover', e => { const r = e.target.closest('[data-sk-row]'); const h = r ? +r.dataset.skRow : -1; if (h !== sk.hover) { sk.hover = h; if (sk.st && sk.st.job) skDrawLines(new Set(sk.st.job.skipped || [])); } });
 $('wbObjects').addEventListener('mouseleave', () => { sk.hover = -1; if (sk.st && sk.st.job) skDrawLines(new Set(sk.st.job.skipped || [])); });

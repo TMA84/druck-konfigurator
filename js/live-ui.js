@@ -85,7 +85,7 @@ function lvBuild() {
   const bed = lvBed(), frame = Math.max(size, Math.min(Math.max(bed.x1 - bed.x0, bed.y1 - bed.y0), size * 2.2));
   lv.camera.position.set(frame * 0.9, -frame * 1.1, frame * 0.8 + top);
   lv.controls.target.set(0, 0, top / 3); lv.controls.update();
-  lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null;
+  lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null; lv.skip = null; lv.skipKey = null;
   lvHeadInit();
 }
 
@@ -198,11 +198,14 @@ function lvTrack(li) {
   const d = lv.data, start = d.layers[li][1], end = li + 1 < d.layers.length ? d.layers[li + 1][1] : d.count, P = lv.pos, n = end - start;
   const sp = lvSpeeds(), unit = d.speed_unit || 2, first = li === 0, travel = d.travel > 0 ? d.travel : sp.travel;
   // Bewegungen: [Länge, Höchstgeschw., Beschl., dx, dy, Bahn k oder −1 = Fahrt]
-  const M = [];
+  const M = [], skip = lv.skip;
+  let prev = -1;    // letzte gedruckte Bahn (übersprungene Objekte zählen nicht – der Drucker fährt direkt weiter)
   for (let k = 0; k < n; k++) {
     const i = start + k, o = i * 6;
-    if (k) { const q = o - 6, dx = P[o] - P[q + 3], dy = P[o + 1] - P[q + 4], L = Math.hypot(dx, dy);
+    if (skip && skip[i]) continue;
+    if (prev >= 0) { const q = prev * 6, dx = P[o] - P[q + 3], dy = P[o + 1] - P[q + 4], L = Math.hypot(dx, dy);
       if (L > 1e-3) M.push([L, travel, first ? Math.min(sp.firstAccel * 2, sp.travelAcc) : sp.travelAcc, dx / L, dy / L, -1]); }
+    prev = i;
     const dx = P[o + 3] - P[o], dy = P[o + 4] - P[o + 1], L = Math.hypot(dx, dy), ty = d.types[d.a[2 * i]];
     const v = d.v && d.v[i] ? d.v[i] * unit : first ? sp.first : (sp.types[ty] || sp.other);
     M.push([L, v, first ? sp.firstAccel : (sp.accels[ty] || sp.accel), L ? dx / L : 1, L ? dy / L : 0, k]);
@@ -231,6 +234,8 @@ function lvTrack(li) {
     t += lvMoveTime(L, vj[i], vj[i + 1], vm, acc);
     if (k >= 0) b[k] = t;
   }
+  // übersprungene Bahnen: ohne eigene Zeit (Beginn = Ende = Zeitpunkt der nächsten gedruckten Bahn)
+  if (skip) for (let k = n - 1, next = t; k >= 0; k--) { if (skip[start + k]) { a[k] = b[k] = next; } else next = a[k]; }
   return (lv.track = { li, start, end, a, b, len: t });
 }
 function lvPointAt(tr, s) {
@@ -351,13 +356,36 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && lv
    mit Kopf: was er schon abgefahren hat orange („gerade gedruckt“), der Rest der Schicht blass – so sieht man das Einfärben
    auch bei dunklem Filament. Danach die kommenden Schichten je nach Wahl (lvGhostApply). */
 const LV_PENDING = [0.42, 0.44, 0.48];
-function lvCurColour(i, split, withHead) { return !withHead || i < split ? LV_NOW : LV_PENDING; }
+/* Übersprungene Objekte (js/skip-ui.js): Bahnen ab der Schicht des Überspringens, deren Mitte im Umriss des Objekts
+   liegt, dunkel; der Kopf lässt sie aus (lvTrack) und fährt wie der Drucker gleich zum nächsten Objekt. */
+const LV_SKIP = [0.32, 0.2, 0.2];
+function lvSkipSet(objs) {
+  // objs: [{polygon: [[x,y]…], from: Schicht der Vorschau}] – gleiche Eingabe → nichts tun
+  const key = JSON.stringify(objs.map(o => [o.from, o.polygon.length, o.polygon[0]]));
+  if (!lv.data || key === lv.skipKey) return;
+  lv.skipKey = key;
+  const d = lv.data, n = d.count, P = lv.pos, mask = objs.length ? new Uint8Array(n) : null;
+  const inside = (x, y, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  for (const o of objs) {
+    const poly = o.polygon.map(([x, y]) => [x - lv.cx, y - lv.cy]), xs = poly.map(p => p[0]), ys = poly.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const from = d.layers[Math.max(0, Math.min(d.layers.length - 1, o.from))][1];
+    for (let i = from; i < n; i++) {
+      const q = i * 6, mx = (P[q] + P[q + 3]) / 2, my = (P[q + 1] + P[q + 4]) / 2;
+      if (mx >= x0 && mx <= x1 && my >= y0 && my <= y1 && inside(mx, my, poly)) mask[i] = 1;
+    }
+  }
+  lv.skip = mask; lv.track = null;
+  if (lv.shown >= 0) lvColour(lv.shown, lv.shownDone);
+}
+function lvCurColour(i, split, withHead) { return lv.skip && lv.skip[i] ? LV_SKIP : !withHead || i < split ? LV_NOW : LV_PENDING; }
 function lvColour(cur, done) {
   const d = lv.data, col = lv.mesh.geometry.attributes.color.array, cache = {};
   const start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, withHead = done != null;
   for (let i = 0; i < end; i++) {
     let c;
-    if (i < start) { const k = d.a[2 * i + 1]; c = cache[k] || (cache[k] = lvVisible(hexToRgb01(toolColour(k)))); }
+    if (i < start) { const k = d.a[2 * i + 1]; c = lv.skip && lv.skip[i] ? LV_SKIP : cache[k] || (cache[k] = lvVisible(hexToRgb01(toolColour(k)))); }
     else c = lvCurColour(i, done, withHead);
     for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
   }

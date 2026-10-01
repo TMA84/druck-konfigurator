@@ -196,6 +196,7 @@ class PrinterLink:
         self.seen = {}             # Art → Zeitpunkt des letzten Berichts
         self.pos_until = 0         # bis dahin Kopfposition auch während des Drucks abfragen (status(…, pos=True))
         self.skipped = {}          # Auftrag (task_id) → übersprungene Objekte, die das Tool gesendet hat (skip/start)
+        self.skipped_at = {}       # Auftrag → {Objekt: Schicht des Druckers beim Überspringen} (für den 3D-Fortschritt)
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -488,6 +489,7 @@ def _job_with_skips(link, project):
     if job:
         sent = sorted(link.skipped.get(str(job.get("task_id")), set()))
         job["skipped"] = sorted(set(sent) | set(job["skipped_reported"]))
+        job["skipped_at"] = {str(k): v for k, v in link.skipped_at.get(str(job.get("task_id")), {}).items()}
         job["skipped_confirmed"] = bool(job["skipped_reported"])
     return job
 
@@ -643,7 +645,11 @@ def command(host, kind, action, data):
         job = link.project() or {}
         parts = {int(x) for x in (payload or {}).get("objects_skip_parts", [])}
         with link.lock:
-            link.skipped[str(job.get("task_id"))] = parts
+            key = str(job.get("task_id"))
+            link.skipped[key] = parts
+            at = link.skipped_at.setdefault(key, {})
+            for p in parts:
+                at.setdefault(p, job.get("curr_layer") or 0)
         if rep is None or ok:
             reported = set(_reported_skips(link.project()))
             return {"ok": True, "state": "verified" if parts <= reported else "sent", "code": rep and rep.get("code"), "msg": rep and rep.get("msg"),

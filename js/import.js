@@ -275,7 +275,12 @@ function parse3MF(fileName, zip, zipLib) {
 /* STL hat keine Einheit. Manche Programme (Blender, Onshape …) speichern in Meter – dann ist das Teil nur Bruchteile
    eines Millimeters groß und Orca kann es nicht slicen. Wie OrcaSlicer: ist die längste Seite unter 0,5 mm und wären es
    in Meter gelesen 5–1000 mm, wird auf mm umgerechnet (mit Hinweis). */
-const STL_METER_MAX_MM = 0.5;
+const STL_METER_MAX_MM = 0.5, STL_INCH_MAX_MM = 10;
+function stlMaxSize(pos) {
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i++) { const k = i % 3; if (pos[i] < lo[k]) lo[k] = pos[i]; if (pos[i] > hi[k]) hi[k] = pos[i]; }
+  return Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+}
 function stlToMm(pos, fileName, notes) {
   let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < pos.length; i++) { const k = i % 3; if (pos[i] < lo[k]) lo[k] = pos[i]; if (pos[i] > hi[k]) hi[k] = pos[i]; }
@@ -283,6 +288,7 @@ function stlToMm(pos, fileName, notes) {
   if (!(size > 0) || size >= STL_METER_MAX_MM || size * 1000 < 5 || size * 1000 > 1000) return pos;
   const out = new Float32Array(pos.length);
   for (let i = 0; i < pos.length; i++) out[i] = pos[i] * 1000;
+  out.unitFixed = 'm';
   notes.push(t('{file}: in Meter gespeichert ({size} mm groß) – auf Millimeter umgerechnet ({mm} mm).', { file: fileName.replace(/^.*[\\/]/, ''), size: de(size, 3), mm: de(size * 1000, 1) }));
   return out;
 }
@@ -290,7 +296,9 @@ function stlParts(fileName, bytes, notes = []) {
   const pos = stlToMm(readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), fileName, notes);
   const groups = splitBodyGroups(pos);
   const base = fileName.replace(/^.*[\\/]/, '');
-  return groups.map((g, i) => ({ name: groups.length > 1 ? base + ' · Teil ' + (i + 1) : base, pos: g.pos,
+  // Sehr kleine STL: vielleicht in Zoll gespeichert – nicht eindeutig, deshalb nur ein Angebot in der Seite (inchHint)
+  const inch = !pos.unitFixed && stlMaxSize(pos) <= STL_INCH_MAX_MM && stlMaxSize(pos) * 25.4 <= 1000;
+  return groups.map((g, i) => ({ name: groups.length > 1 ? base + ' · Teil ' + (i + 1) : base, pos: g.pos, ...(inch ? { inchHint: true } : {}),
     ...(g.bodies.length > 1 ? { bodies: g.bodies.map((count, j) => ({ name: 'Körper ' + (j + 1), count })) } : {}) }));
 }
 

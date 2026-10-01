@@ -72,6 +72,12 @@ spools.track(st, {"filename": "b.gcode", "progress": 60, "supplies_usage": 5000}
 spools.track(st, {"filename": "b.gcode", "progress": 61, "supplies_usage": 5100}, 0, now=405)
 check("mittendrin: nur der Zuwachs", abs(asa["used_g"] - before - spools.mm_to_g(100, "ASA")) < 1e-3, asa["used_g"] - before)
 spools.track(st, None, 0, now=500)
+# Objekt übersprungen: kommt in die Historie (der Verbrauch kommt ohnehin aus den gemeldeten Millimetern)
+spools.track(st, {"filename": "c.gcode", "progress": 0, "supplies_usage": 0}, 0, now=600)
+spools.track(st, {"filename": "c.gcode", "progress": 30, "supplies_usage": 500}, 0, now=610, skipped=[2])
+spools.track(st, None, 0, now=700)
+check("übersprungene Objekte in der Historie", st["history"][-1].get("skipped") == [2], st["history"][-1])
+check("ohne Überspringen kein Eintrag", "skipped" not in st["history"][-2], st["history"][-2])
 
 # Änderungen von der Seite
 spools.update(st, {"action": "update", "id": white["id"], "remaining_g": 250, "name": "Weiß matt"})

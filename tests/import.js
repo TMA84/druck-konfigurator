@@ -136,7 +136,10 @@ check('Falscher Dateityp meldet Fehler', /nur STL, 3MF oder ZIP/.test(err), err)
   check('STL in Meter: auf mm umgerechnet (43 × 78 × 3,5)', Math.abs(g.x - 43) < 0.01 && Math.abs(g.y - 78) < 0.01 && Math.abs(g.z - 3.5) < 0.01, [g.x, g.y, g.z]);
   check('STL in Meter: Hinweis', m.notes.some(n => /Meter/.test(n)), m.notes);
   const s = imp([{ name: 'klein.stl', bytes: stlBytes(box(0, 0, 0, 2, 1, 1)) }]), gs = K.makeGeom('', s.parts[0].pos);
-  check('kleines Teil in mm (2 mm) bleibt', Math.abs(gs.x - 2) < 1e-6 && !s.notes.some(n => /Meter/.test(n))); }
+  check('kleines Teil in mm (2 mm) bleibt', Math.abs(gs.x - 2) < 1e-6 && !s.notes.some(n => /Meter/.test(n)));
+  check('sehr kleines Teil: Angebot „vielleicht Zoll“', s.parts[0].inchHint === true);
+  check('normales Teil (50 mm): kein Zoll-Angebot', !imp([{ name: 'n.stl', bytes: stlBytes(box(0, 0, 0, 50, 20, 10)) }]).parts[0].inchHint);
+  check('in Meter umgerechnet: kein Zoll-Angebot', !m.parts[0].inchHint); }
 
 const mw = process.env.MW3MF;
 if (mw && fs.existsSync(mw)) {

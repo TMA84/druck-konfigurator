@@ -3,7 +3,7 @@
    jede Achse einzeln. part.scale = [sx, sy, sz] bezogen auf die Originalgröße, angewandt nach der Drehung um die Mitte der
    Grundfläche (js/orient.js partGeom). Gilt für alle Platzierungen desselben Teils (Kopien). 3MF-Objekte: die Datei des
    Designers bleibt, die Skalierung kommt in die Transformation (js/export3mf.js scaleItemTransform). */
-const SZ_MIN = 0.01, SZ_MAX = 20;
+const SZ_MIN = 0.01, SZ_MAX = 30;   // bis 3000 % – Zoll → mm braucht 2540 %
 
 function sizeOrig(part) {   // Maße ohne Skalierung (nach der Drehung)
   const s = part.scale || [1, 1, 1], g = part.geom;

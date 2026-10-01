@@ -85,7 +85,8 @@ function histRows(d) {
     const byType = {};
     Object.entries(types).forEach(([k, g]) => { const tk = histTypeKey(k); byType[tk] = (byType[tk] || 0) + (+g || 0); });
     const dur = typeof h.duration_s === 'number' ? h.duration_s : h.start ? h.end - h.start : 0;
-    return { h, end: h.end, month: histMonthKey(h.end), grams, cost, byType, dur: Math.max(0, dur), changes: h.changes || 0, est: h.estimate || null, name: histTitle(h) };
+    return { h, end: h.end, month: histMonthKey(h.end), grams, cost, byType, dur: Math.max(0, dur), changes: h.changes || 0, est: h.estimate || null, name: histTitle(h),
+      skipped: Array.isArray(h.skipped) ? h.skipped.length : 0 };
   }).sort((a, b) => b.end - a.end);
 }
 const histSum = rows => rows.reduce((s, r) => ({ n: s.n + 1, g: s.g + r.grams, eur: s.eur + r.cost, h: s.h + r.dur / 3600 }), { n: 0, g: 0, eur: 0, h: 0 });
@@ -147,7 +148,9 @@ function histTable(rows) {
       (pct != null ? ' <span class="hs-diff' + (Math.abs(pct) >= 15 ? ' big' : '') + '">' + (pct > 0 ? '+' : '') + de(pct, 0) + ' %</span>' : '') + '</small>' : '';
     const gTxt = e && e.total_g > 0 ? '<small>' + t('geschätzt {g}', { g: de(e.total_g, 1) + ' g' }) + (gp != null ? ' (' + (gp > 0 ? '+' : '') + de(gp, 0) + ' %)' : '') + '</small>' : '';
     const date = new Date(r.end * 1000).toLocaleString(LOCALE(), { dateStyle: 'short', timeStyle: 'short' });
-    return '<tr><td>' + esc(date) + '</td><td><b>' + esc(r.name.title) + '</b>' + (r.name.sub ? '<small>' + esc(r.name.sub) + '</small>' : '') + '</td>' +
+    // übersprungene Objekte: echter Verbrauch ohne sie, die Schätzung noch mit ihnen
+    const skTxt = r.skipped ? '<small class="hs-skip">' + esc(t('{n} Objekt(e) übersprungen – die Schätzung enthält sie noch', { n: r.skipped })) + '</small>' : '';
+    return '<tr><td>' + esc(date) + '</td><td><b>' + esc(r.name.title) + '</b>' + (r.name.sub ? '<small>' + esc(r.name.sub) + '</small>' : '') + skTxt + '</td>' +
       '<td>' + (r.dur ? histDur(r.dur) : '–') + (e && e.time_s ? '<small>' + t('geschätzt {time}', { time: histDur(e.time_s) }) + '</small>' : '') + '</td>' +
       '<td class="num">' + de(r.grams, 1) + ' g' + gTxt + '</td><td class="num">' + de(r.cost, 2) + ' €' + estTxt + '</td><td class="num">' + (r.changes || '–') + '</td></tr>';
   }).join('');

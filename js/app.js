@@ -50,7 +50,9 @@ function partsFromImport(imp){
       // geteilte Dreiecke des Designers (Index → Code) und Herkunft der Dreiecke in der 3MF (eigene Bemalung, js/paint-ui.js)
       paintCodes:p.paintCodes||null,paintSrc:p.paintSrc||null,
       // gemalte Stützen und Naht des Designers (Index → Code)
-      supCodes:p.supCodes||null,seamCodes:p.seamCodes||null}));
+      supCodes:p.supCodes||null,seamCodes:p.seamCodes||null,
+      // sehr kleine STL: vielleicht in Zoll (js/import.js) – Knopf „In Zoll umrechnen“ unter dem Modell
+      inchHint:!!p.inchHint}));
     parts.forEach((q,i)=>{if(q.bodies)q.bodies.forEach((b,j)=>{const e=imp.parts[i].bodies[j].extruder;b.dSlot=e?e-1:q.dSlot})});
     if(imp.threemf)imp.threemf.designMap={};
     return parts;
@@ -102,7 +104,24 @@ function addParts(imp){
 }
 
 // Kopf der Modellkarte: Name, Dreiecke, Platten, Herkunft – die Anzahl der Teile steht schon in der Teileliste
+/* Teile, die vielleicht in Zoll gespeichert sind (sehr kleine STL): Angebot unter dem Modell. Umrechnen = Größe ×25,4
+   (wie ① Größe, mit Rückgängig); „Passt so“ blendet es aus. */
+function renderInchHint(){
+  const box=$('inchHint'),parts=project?project.parts.filter(p=>p.inchHint&&!p.scale):[];
+  box.classList.toggle('hidden',!parts.length);
+  if(!parts.length){box.innerHTML='';return}
+  const g=parts[0].geom,dims=[g.x,g.y,g.z].map(v=>de(v,1)).join(' × ');
+  box.innerHTML='<span>'+esc(parts.length>1?t('{n} Teile sind sehr klein – vielleicht ist die Datei in Zoll gespeichert.',{n:parts.length}):t('{name} ist nur {dims} mm groß – vielleicht ist die Datei in Zoll gespeichert.',{name:parts[0].name,dims}))+'</span>'+
+    '<button type="button" class="btn sec small" id="inchApply">'+esc(t('In Zoll umrechnen (×25,4)'))+'</button><button type="button" class="linkbtn" id="inchKeep">'+esc(t('Passt so'))+'</button>';
+}
+document.addEventListener('click',e=>{
+  if(!project)return;
+  if(e.target.id==='inchApply'){const ps=project.parts.filter(p=>p.inchHint&&!p.scale);ps.forEach(p=>{if(!p.scale)setPartScale(p,[25.4,25.4,25.4]);p.inchHint=false});
+    renderInchHint();update();toast(t('{n} Teil(e) von Zoll in mm umgerechnet – Strg/⌘+Z nimmt es zurück',{n:ps.length}))}
+  else if(e.target.id==='inchKeep'){project.parts.forEach(p=>{p.inchHint=false});renderInchHint();update()}
+});
 function renderFileinfo(){
+  renderInchHint();
   const p=project,n=p.parts.reduce((s,x)=>s+x.geom.n,0),plates=p.threemf&&p.threemf.plates.length>1?' · '+t('{n} Platten',{n:p.threemf.plates.length}):'';
   $('fileinfo').innerHTML='<b>'+esc(p.name)+'</b><br>'+t('{n} Dreiecke',{n:n.toLocaleString(LOCALE())})+plates+
     (p.threemf&&p.threemf.settings&&p.threemf.settings.printer_settings_id?'<br><small>'+t('Ursprünglich für: {name}',{name:esc(p.threemf.settings.printer_settings_id)})+'</small>':'');

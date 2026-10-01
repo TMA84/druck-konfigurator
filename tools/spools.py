@@ -149,6 +149,8 @@ def finish_entry(state, t, now):
     start = t.get("start")
     e = {"job": t["job"], "start": start, "end": now, "duration_s": round(now - start) if isinstance(start, (int, float)) else None,
          "used": used, "grams_total": round(sum(used.values()), 2), "types": types, "cost_eur": round(cost, 3), "changes": t.get("changes", 0)}
+    if t.get("skipped"):
+        e["skipped"] = list(t["skipped"])      # übersprungene Objekte – die Schätzung enthält sie noch
     key = find_plan(state, t["job"])
     if key:
         e["estimate"] = state["plans"].pop(key)
@@ -219,8 +221,10 @@ def sync_slots(state, slots, now=None):
     return events
 
 
-def track(state, project, loaded_slot, now=None):
-    """Verbrauch mitzählen. project = info.project des Druckers (None = kein Druck), loaded_slot aus der ACE."""
+def track(state, project, loaded_slot, now=None, skipped=None):
+    """Verbrauch mitzählen. project = info.project des Druckers (None = kein Druck), loaded_slot aus der ACE.
+    skipped: übersprungene Objekte dieses Drucks (Nummern) – kommen in die Historie; der Verbrauch selbst stimmt ohnehin,
+    weil er aus den Millimetern kommt, die der Drucker wirklich gefördert hat."""
     now = now or time.time()
     t = state.get("track") or {}
     changed = False
@@ -254,6 +258,9 @@ def track(state, project, loaded_slot, now=None):
                     t["used"][sp["id"]] = round(t["used"].get(sp["id"], 0) + g, 3)
                 t["mm"] = mm
                 changed = True
+        if skipped is not None and sorted(skipped) != t.get("skipped", []):
+            t["skipped"] = sorted(int(x) for x in skipped)
+            changed = True
         state["track"] = t
     elif t.get("job"):
         # Druck zu Ende: in die Liste der letzten Drucke
@@ -595,7 +602,12 @@ class Tracker:
             if boxes:   # alle ACE-Einheiten, Slots durchgehend nummeriert (ACE 2 = Slot 5–8)
                 changed = bool(sync_slots(state, self.lan.all_slots(boxes))) or changed
             loaded = self.lan.loaded_slot(boxes) if boxes else -1
-            changed = track(state, info.get("project") if info else None, loaded) or changed
+            project = info.get("project") if info else None
+            skipped = None
+            if project and hasattr(link, "skipped"):
+                sent = link.skipped.get(str(project.get("task_id")), set())
+                skipped = sorted(set(sent) | set(self.lan._reported_skips(project) if hasattr(self.lan, "_reported_skips") else []))
+            changed = track(state, project, loaded, skipped=skipped) or changed
             if changed or time.time() - self.saved > 60:     # „zuletzt gesehen“ höchstens minütlich schreiben
                 save(state, self.path)
                 self.saved = time.time()
