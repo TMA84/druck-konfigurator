@@ -85,6 +85,9 @@ async function runSmoke(opts={}){
   items[1].click();await wait(50);
   ok(geom.name==='b.stl'&&$('partList').querySelector('[data-part="1"]').getAttribute('aria-current')==='true','Klick wählt Teil 2');
   ok($('summary').textContent.includes('30'),'Datenblatt zeigt Maße von Teil 2');
+  // Überhangfarben bleiben sichtbar (10.9.0: leeres modVols übermalte das Teil in der Slotfarbe)
+  if(Viewer.available()&&geom.n){setTab('3d');await wait(100);const side=[...Array(geom.n).keys()].find(i=>!geom.bed[i]&&geom.ang[i]<=0);
+    ok(side!=null&&Viewer.triColor(side).map(v=>v.toFixed(2)).join()==='0.25,0.66,0.96','Seitenwand in Überhangfarbe „unkritisch“ (blau), nicht in der Slotfarbe');setTab('settings')}
   // Werte je Teil: Teil 2 bekommt PETG, Halterung und Slot 2 – Teil 1 behält seine Auswahl
   ok(!$('partScope').classList.contains('hidden')&&$('partScopeName').textContent==='b.stl','Formular zeigt, für welches Teil es gilt');
   sel('material','petg');sel('object','holder');

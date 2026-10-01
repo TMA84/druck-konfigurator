@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Grenzwinkel in der Modellansicht wieder sichtbar:** Einfache Teile (STL) erschienen einfarbig in der Slotfarbe statt blau/gelb/rot nach Überhang – eine leere Modifikatorliste galt als „hat Modifikatoren“.
+
 ## [10.9.0] – 2026-10-01
 
 ### Neu

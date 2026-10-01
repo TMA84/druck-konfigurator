@@ -110,7 +110,7 @@ function paintBodies(part, highlight) {
     else if ($('bodyShow').checked) paint = part.bodies.map(b => ({ start: b.start, count: b.count, rgb: viewRgb(showHex(bodySlot(part, b), b.dSlot, slots)) }));
   } else if (part && part.paintState && part.paintState.length === part.geom.n && $('bodyShow').checked) {
     paint = paintedColours(part, slots);
-  } else if (part && (part.modVols || paintUserCodes(part)) && $('bodyShow').checked) {
+  } else if (part && ((part.modVols && part.modVols.length) || paintUserCodes(part)) && $('bodyShow').checked) {   // modVols: [] bei einfachen Teilen
     // nur Modifikatoren oder eigene Bemalung: das Teil selbst in seiner Slotfarbe, damit die Farben zusammenpassen
     paint = [{ start: 0, count: part.geom.n, rgb: viewRgb(showHex(part.slot ?? defaultSlot(), part.dSlot, slots)) }];
   }
