@@ -16,7 +16,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verify3mf-'));
 const ctx = vm.createContext({ console, TextDecoder });
 for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf', 'purge'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
-const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,widenTemplate,build3mf,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
+const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,widenTemplate,build3mf,arrangeParts,footprint,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
 
 /* ---------- Testmodelle ---------- */
 function boxTris(x0, y0, z0, x1, y1, z1) {
@@ -166,9 +166,11 @@ const [bw1] = [250];
 let res = ONLY_MW ? null : sliceParts('Mehrteilig', 'kobra_s1', [MODELS.cube, MODELS.mushroom, MODELS.pillar], 1);
 if (res) {
   const g = res.gcodes[0], [bx, by] = res.tpl.bedCenter;
-  const w = g.bb[2] - g.bb[0], sumW = MODELS.cube.x + MODELS.mushroom.x + MODELS.pillar.x + 2 * 8;
+  // erwartete Breite aus der Anordnung des Tools (kompakter Block, 8 mm Abstand) – Orca muss sie so übernehmen
+  const ms = [MODELS.cube, MODELS.mushroom, MODELS.pillar], lay = K.arrangeParts(ms, res.tpl), w = g.bb[2] - g.bb[0];
+  const sumW = Math.max(...lay.places.map((p, i) => p.lx + K.footprint(ms[i], p)[0] / 2)) - Math.min(...lay.places.map((p, i) => p.lx - K.footprint(ms[i], p)[0] / 2));
   check(Math.abs(g.maxZ - Math.max(MODELS.cube.z, MODELS.mushroom.z, MODELS.pillar.z)) < 0.3, `Höhe ${g.maxZ} = höchstes Teil`);
-  check(Math.abs(w - sumW) < 1.5, `Teile nebeneinander: Wände über ${w.toFixed(1)} mm ≈ ${sumW.toFixed(1)} mm (inkl. 2 × 8 mm Abstand)`);
+  check(Math.abs(w - sumW) < 1.5, `Teile wie angeordnet: Wände über ${w.toFixed(1)} mm ≈ ${sumW.toFixed(1)} mm (inkl. 8 mm Abstand)`);
   check(Math.abs((g.bb[0] + g.bb[2]) / 2 - bx) < 1.5 && g.bb[0] > 0 && g.bb[2] < bw1, `Gruppe mittig auf dem Bett (${g.bb[0].toFixed(1)}–${g.bb[2].toFixed(1)}, Mitte ${bx})`);
 }
 const big = stl('platte.stl', boxTris(0, 0, 0, 200, 190, 3));
