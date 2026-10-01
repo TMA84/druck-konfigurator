@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.0] – 2026-10-01
 
 ### Neu
 - **Platten kompakter:** Teile einer nicht vollen Platte liegen als mittiger Block statt an Rand und Ecke (12 Teile vorher als „L“, jetzt 3 × 4). Unter jeder Platte stehen Kopien als eine Zeile („Teil 1 ×20“). Beim automatischen Anordnen kein Hinweis „Nicht alles passte …“ mehr – weitere Platten sind dort gewollt.
