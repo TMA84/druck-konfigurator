@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.1] – 2026-10-01
 
 ### Neu
 - **Umschalter „Farben | Grenzwinkel“** unter dem Modell (bleibt gemerkt): Farben = Slot-, Körper- und Malfarben wie gedruckt, auch für einfache Teile; Grenzwinkel = Überhänge blau/gelb/rot. Ersetzt „Farben zeigen“ unter Mehrfarbig.
