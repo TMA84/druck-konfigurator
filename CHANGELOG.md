@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.6] – 2026-10-01
 
 ### Neu
 - **Nur 3D-Fortschritt zum Einbetten:** `…/?ansicht=3d` zeigt bildschirmfüllend nur den 3D-Fortschritt des laufenden Drucks – z. B. als Webseiten-Karte im Home-Assistant-Dashboard. Ändert keine gespeicherten Einstellungen, kein Hinweisdialog.
