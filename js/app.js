@@ -97,7 +97,7 @@ function addParts(imp){
   project.notes=notes.concat(imp.notes||[]);
   if(typeof normalizePlates==='function'&&tpl)normalizePlates(tpl);
   renderFileinfo();
-  const nt=$('importNotes');nt.textContent=project.notes.join(' ');nt.classList.toggle('hidden',!project.notes.length);
+  renderImportNotes(project.notes);
   $('partList').classList.remove('hidden');
   toast(t('{n} Teil(e) hinzugefügt – jetzt {total} Teile',{n:add.length,total:project.parts.length}));
   selectPart(first);
@@ -120,6 +120,13 @@ document.addEventListener('click',e=>{
     renderInchHint();update();toast(t('{n} Teil(e) von Zoll in mm umgerechnet – Strg/⌘+Z nimmt es zurück',{n:ps.length}))}
   else if(e.target.id==='inchKeep'){project.parts.forEach(p=>{p.inchHint=false});renderInchHint();update()}
 });
+// Hinweise vom Import: eine Zeile (ℹ), Klick zeigt alles
+function renderImportNotes(notes){
+  const el=$('importNotes');notes=notes||[];
+  el.classList.toggle('hidden',!notes.length);el.classList.remove('open');
+  el.innerHTML=notes.length?'<button type="button" class="in-toggle" aria-expanded="false" title="'+esc(t('Alle Hinweise zeigen'))+'">ℹ '+esc(notes.length>1?t('{n} Hinweise zum Import',{n:notes.length})+': ':'')+'</button><span>'+notes.map(esc).join(' ')+'</span>':'';
+}
+$('importNotes').addEventListener('click',()=>{const el=$('importNotes'),o=!el.classList.contains('open');el.classList.toggle('open',o);const b=el.querySelector('.in-toggle');if(b)b.setAttribute('aria-expanded',String(o))});
 function renderFileinfo(){
   renderInchHint();
   const p=project,n=p.parts.reduce((s,x)=>s+x.geom.n,0),plates=p.threemf&&p.threemf.plates.length>1?' · '+t('{n} Platten',{n:p.threemf.plates.length}):'';
@@ -131,7 +138,7 @@ function showProject(p){
   if(typeof setPrintSequence==='function')setPrintSequence(p.printSeq==='object');   // Druckreihenfolge des Projekts
   initPartInputs(p.parts);
   renderFileinfo();
-  const notes=$('importNotes');notes.textContent=p.notes.join(' ');notes.classList.toggle('hidden',!p.notes.length);
+  renderImportNotes(p.notes);
   $('partList').classList.remove('hidden');
   $('modelCard').classList.add('loaded');$('modelBadge').classList.remove('hidden');$('removeModelWrap').classList.remove('hidden');
   selectPart(0);
@@ -203,7 +210,7 @@ function renderPartList(){
     }
     return '<li'+(sel?' class="sel"':'')+'>'+slotChipHTML(p.slot??null,def,'data-part-slot="'+i+'"',p.name)+
       '<button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(p.name)+'</span>'+
-      '<span class="pmeta">'+(dots.length?'<span class="pdots">'+dots.map(dot).join('')+'</span>':'')+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+'">'+label[lv]+'</span></button>'+
+      '<span class="pmeta">'+(dots.length?'<span class="pdots">'+dots.map(dot).join('')+'</span>':'')+plate+(p.bodies?t('{n} Körper',{n:p.bodies.length})+' · ':'')+de(g.x,0)+'×'+de(g.y,0)+'×'+de(g.z,0)+' mm</span><span class="plevel '+lv+(sel?'':' dot')+'" title="'+esc(label[lv])+'">'+(sel?label[lv]:'')+'</span></button>'+
       (many?'<button type="button" class="pdel" data-del-part="'+i+'" title="'+esc(t('Teil entfernen'))+'" aria-label="'+esc(t('„{name}“ entfernen',{name:p.name}))+'">✕</button>':'')+tools+'</li>';
   }).join('');
   if(typeof renderFilamentBar==='function')renderFilamentBar();

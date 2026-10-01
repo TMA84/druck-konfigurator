@@ -428,5 +428,19 @@ I18N.add({
  "{n} Teil(e) von Zoll in mm umgerechnet – Strg/⌘+Z nimmt es zurück": "Converted {n} part(s) from inches to mm – Ctrl/⌘+Z undoes it",
  "Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}": "From the Orca estimate and the current layer; the printer reports {m}",
  "Laut Drucker": "As reported by the printer",
- "Drucker: {m}": "Printer: {m}"
+ "Drucker: {m}": "Printer: {m}",
+ "{n} Slots": "{n} slots",
+ "{n} belegt": "{n} loaded",
+ "Modell: {n} Farben": "model: {n} colours",
+ "Alle Hinweise zeigen": "Show all notes",
+ "{n} Hinweise zum Import": "{n} import notes",
+ "Werkzeuge für das gewählte Teil": "Tools for the selected part",
+ "Lage": "Position",
+ "Bohrlöcher": "Holes",
+ "Temperatur & Kühlung": "Temperature & cooling",
+ "Tempo": "Speed",
+ "Aufbau": "Structure",
+ "Hinweise ({n})": "Notes ({n})",
+ "Was wird gedruckt": "What is printed",
+ "Lage auf dem Bett (3D)": "Position on the bed (3D)"
 });

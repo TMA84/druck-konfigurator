@@ -115,11 +115,13 @@ function renderFilamentBar() {
   const def = typeof defaultSlot === 'function' ? defaultSlot() : 0, p = project.parts[project.selected], cur = p ? p.slot ?? def : null;
   const uses = slots.map(s => project.parts.filter(x => (x.slot ?? def) === s.idx).length), n = slots.length;
   renderDesignFilaments(slots);
+  const known = slots.filter(s => s.type).length, dcount = project.threemf && typeof designColours === 'function' ? designColours().length : 0;
+  $('filSum').textContent = ' · ' + [t('{n} Slots', { n: slots.length }) + (known ? ' (' + t('{n} belegt', { n: known }) + ')' : ''), dcount >= 2 ? t('Modell: {n} Farben', { n: dcount }) : ''].filter(Boolean).join(' · ');
   $('filBarList').innerHTML = slots.map((s, i) => {
     const bg = validSlotHex(s.colour) ? s.colour : '#c7ccd4';
     return '<li><button type="button" data-fil="' + i + '" class="fil' + (i === cur ? ' sel' : '') + (s.present === false ? ' empty' : '') + '" style="--chip:' + bg + ';--chip-ink:' + slotInk(bg) + '"' +
       ' title="' + esc((typeof slotLabel === 'function' ? slotLabel(i, n) : 'Slot ' + (i + 1)) + (s.type ? ' · ' + s.type : '') + (i === def ? ' · ' + t('Standard-Slot') : '') + ' – ' + t('Klick: für das gewählte Teil')) + '">' +
-      '<span class="fil-n">' + (i + 1) + '</span><span class="fil-t">' + esc(s.present === false ? t('leer') : s.type || '–') + '</span>' +
+      '<span class="fil-n">' + (i + 1) + '</span>' + (s.present === false || s.type ? '<span class="fil-t">' + esc(s.present === false ? t('leer') : s.type) + '</span>' : '') +
       (uses[i] ? '<span class="fil-u" title="' + esc(t('{n} Teil(e)', { n: uses[i] })) + '">' + uses[i] + '</span>' : '') + (i === def ? '<span class="fil-std">★</span>' : '') + '</button></li>';
   }).join('');
 }
@@ -131,6 +133,13 @@ $('filBarList').addEventListener('click', e => {
   if (!p.input || p.input.material === before) toast(t('{part}: Slot {n}', { part: p.name, n: +b.dataset.fil + 1 }));
 });
 $('filBarEdit').addEventListener('click', () => { if (typeof openSlotDialog === 'function') openSlotDialog(); });
+// Filamente ein-/ausklappen (gemerkt); zugeklappt bleibt die Kurzinfo im Titel
+function filApply() {
+  const open = store.settings.filOpen !== false;
+  $('filBar').classList.toggle('collapsed', !open); $('filToggle').setAttribute('aria-expanded', String(open));
+}
+$('filToggle').addEventListener('click', () => { store.settings.filOpen = store.settings.filOpen === false; persist(); filApply(); });
+filApply();
 
 /* „Filamente des Modells“ wie in OrcaSlicer: je Filament des Designers (Makerworld-3MF) Farbe, Nummer und Material, dazu
    der Slot, auf den es gedruckt wird (designMap; Klick → Slot wählen, wie „Remap filaments“). */

@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Neu
+- **① Modell und ② Druckwerte übersichtlicher:** Teile oben (ruhige Zeilen, Stützen als Farbpunkt, Details nur beim gewählten Teil), Filamente einklappbar mit schmaler Slot-Leiste, Werkzeuge des Teils als Reiter statt Abschnitten untereinander, Import-Hinweise in einer Zeile. Druckwerte links in Gruppen, **Farbwechsel & Spülmenge** jetzt dort (statt in ③), kleine 3D-Ansicht eingeklappt; rechts die Werte in drei Karten (Temperatur & Kühlung, Tempo, Aufbau), Hinweise mit Anzahl.
 - **Überspringen im 3D-Fortschritt:** Objekt anklicken statt in der Liste suchen; unter der Maus orange umrandet.
 - **Übersprungene Objekte im 3D-Fortschritt:** ab der Schicht des Überspringens dunkel, der Druckkopf lässt sie aus und fährt wie der Drucker gleich zum nächsten Objekt.
 - **STL in Zoll:** Bei sehr kleinen STL (höchstens 10 mm) bietet das Tool „In Zoll umrechnen (×25,4)“ an, mit Rückgängig; Skalierung jetzt bis 3000 %.

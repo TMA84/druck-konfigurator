@@ -106,6 +106,7 @@
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
         <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div>
         <div id="matColours" class="mat-colours hidden"></div></div>
+      <span class="eyebrow in-head">Was wird gedruckt</span>
       <div class="field"><label for="object">Objekt</label><select id="object">
         <option value="general">Funktionsteil</option>
         <option value="holder">Halterung / Befestigung</option>
@@ -122,11 +123,19 @@
         <div class="field"><label for="goal">Priorität</label><select id="goal"><option value="balanced">Ausgewogen</option><option value="quality">Hohe Qualität</option><option value="fast">Schneller Druck</option><option value="strong">Maximale Stabilität</option></select></div>
         <div class="field"><label for="load">Belastung</label><select id="load"><option value="medium">Mittel</option><option value="low">Gering</option><option value="high">Hoch</option></select></div>
       </div>
+      <span class="eyebrow in-head">Stützen</span>
       <div class="field"><label for="support">Support</label><select id="support"><option value="auto">Automatisch entscheiden</option><option value="avoid">Möglichst vermeiden</option><option value="allow">Support erlaubt</option></select></div>
       <div class="field"><label for="supportLevel">Stützreduzierung <span class="help" title="Wirkt nur, wenn Stützen nötig sind. Weniger Stützen sparen Material, erhöhen aber das Risiko für Durchhängen.">?</span></label><select id="supportLevel"><option value="safe">Stark und sicher</option><option value="balanced" selected>Ausgewogen</option><option value="reduced">Stark reduziert</option><option value="minimal">Minimal – gerade noch haltend</option></select></div>
 
+      <section id="purgePanel" class="in-group purge-group noprint hidden" aria-labelledby="purgePanelTitle">
+        <span class="eyebrow" id="purgePanelTitle">Farbwechsel &amp; Spülmenge</span>
+        <div class="field"><label for="purgePanelFlush">Spülmenge am Drucker <span class="help" title="Stellst du am Touchscreen ein (ACE-Menü → Spülmenge). Hier eintragen, was dort eingestellt ist – danach richten sich die Abfall-Schätzung und die Wechselzeit in der 3MF.">?</span></label><select id="purgePanelFlush"></select></div>
+        <p id="purgePanelInfo" class="muted small"></p>
+        <div class="field-links"><button class="linkbtn" type="button" data-action="purge">Eigene Messwerte …</button></div>
+      </section>
       <div id="storeWarn" class="note bad hidden"></div>
-      <div id="miniView" class="mini-view noprint hidden" role="img" aria-label="3D-Vorschau: Lage des gewählten Teils auf dem Bett"><span class="mini-label">Lage auf dem Bett · ziehen zum Drehen</span></div>
+      <details class="fold mini-fold noprint" id="miniFold"><summary>Lage auf dem Bett (3D)</summary>
+      <div id="miniView" class="mini-view noprint hidden" role="img" aria-label="3D-Vorschau: Lage des gewählten Teils auf dem Bett"><span class="mini-label">Lage auf dem Bett · ziehen zum Drehen</span></div></details>
     </aside>
 
 
@@ -193,12 +202,6 @@
         <p id="slotPanelSource" class="muted small"></p>
         <div id="slotPanelConnect" class="slot-connect hidden"><input id="slotPanelHost" inputmode="decimal" placeholder="IP des Druckers, z. B. 192.168.1.50" autocomplete="off" aria-label="IP-Adresse des Druckers"><button class="btn sec" type="button" id="slotPanelConnectBtn">Verbinden</button></div>
         <div class="field-links"><button class="linkbtn" type="button" data-action="slots">✎ Bearbeiten / überschreiben</button><button class="linkbtn" type="button" id="slotPanelReload">Vom Drucker laden</button></div>
-      </section>
-      <section id="purgePanel" class="side-panel noprint hidden" aria-labelledby="purgePanelTitle">
-        <span class="eyebrow" id="purgePanelTitle">Farbwechsel &amp; Spülmenge</span>
-        <div class="field"><label for="purgePanelFlush">Spülmenge am Drucker <span class="help" title="Stellst du am Touchscreen ein (ACE-Menü → Spülmenge). Hier eintragen, was dort eingestellt ist – danach richten sich die Abfall-Schätzung und die Wechselzeit in der 3MF.">?</span></label><select id="purgePanelFlush"></select></div>
-        <p id="purgePanelInfo" class="muted small"></p>
-        <div class="field-links"><button class="linkbtn" type="button" data-action="purge">Eigene Messwerte …</button></div>
       </section>
     </aside>
     <section id="previewDlg" class="preview-panel" aria-labelledby="previewTitle">
@@ -315,19 +318,21 @@
     <div class="model-card noprint" id="modelCard">
         <div class="model-head"><span class="eyebrow">Modell</span><span><button class="linkbtn" type="button" data-action="add" id="addModelBtn">+ Hinzufügen</button> · <button class="linkbtn" type="button" data-action="open">Modell öffnen</button><span id="removeModelWrap" class="hidden"> · <button class="linkbtn" type="button" id="removeModelBtn" title="Modell entfernen – bei mehreren hinzugefügten Modellen auch nur eines">Entfernen</button></span></span></div>
         <div id="fileinfo">Noch keine Datei geladen.</div>
+        <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
+        <p id="importNotes" class="muted hidden"></p>
+        <div id="inchHint" class="inch-hint hidden" role="status"></div>
         <div id="filBar" class="fil-bar hidden">
-          <div class="fil-head"><span class="eyebrow">Filamente</span>
+          <div class="fil-head"><button type="button" class="fil-toggle" id="filToggle" aria-expanded="true" aria-controls="filBody"><span class="eyebrow">Filamente</span><span class="fil-sum" id="filSum"></span></button>
             <span class="seg fil-view" role="group" aria-label="Farben in der 3D-Ansicht"><button type="button" data-colview="slot" aria-pressed="true" title="So, wie es mit deinem Filament gedruckt wird">Slotfarben</button><button type="button" data-colview="designer" aria-pressed="false" title="Farben wie vom Designer angelegt">Designer</button></span></div>
+          <div id="filBody" class="fil-body">
           <div id="filDesign" class="fil-design hidden">
             <div class="fil-sub"><span>Modell → Slot</span><span><button type="button" id="filDesignAuto" class="linkbtn" title="Jede Farbe des Designers auf den Slot mit der ähnlichsten Farbe und passendem Material legen">Automatisch</button> · <button type="button" id="filDesignReset" class="linkbtn">Wie vom Designer</button></span></div>
             <ol id="filDesignList" class="fil-dlist" aria-label="Filamente des Modells und ihre Slots"></ol>
           </div>
           <div class="fil-sub"><span>Slots am Drucker</span><button class="linkbtn" id="filBarEdit" type="button">Slots bearbeiten</button></div>
           <ol id="filBarList" class="fil-list" aria-label="Filament-Slots – Klick weist den Slot dem gewählten Teil zu"></ol>
+          </div>
         </div>
-        <ol id="partList" class="part-list hidden" aria-label="Teile im Projekt"></ol>
-        <p id="importNotes" class="muted hidden"></p>
-        <div id="inchHint" class="inch-hint hidden" role="status"></div>
         <section id="plateBox" class="plates hidden" aria-labelledby="plateTitle">
           <div class="orient-head"><span class="eyebrow" id="plateTitle">Platten</span><button type="button" id="plateAuto" class="linkbtn hidden" title="Zuordnung verwerfen und alle Teile auf möglichst wenige Platten verteilen">Platzsparend anordnen</button></div>
           <p id="plateInfo" class="muted small"></p>

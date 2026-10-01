@@ -120,7 +120,7 @@ Oben im Feld wählst du, **was** gemalt wird: **Farbe**, **Stützen** oder **Nah
 
 **Modell entfernen:** In der Modellkarte **Entfernen** – bei mehreren hinzugefügten Modellen auch nur eines davon; **Rückgängig** in der Meldung holt es zurück. **Neuladen der Seite:** Das geladene Projekt samt allen Einstellungen bleibt erhalten (im Browser gespeichert).
 
-**3D-Ansicht:** **Ganze Platte** zeigt alle Teile der Platte des gewählten Teils an ihrem Platz (auch die Platten einer Makerworld-3MF). Bemalung und Farb-Modifikatoren des Designers erscheinen in ihren Farben, sehr dunkle Filamente etwas aufgehellt. Die Abschnitte der Modellkarte (Platten, Lage, Mehrfarbig, Bohrlöcher, Beschriftung) lassen sich auf- und zuklappen und zeigen eine Kurzinfo im Titel.
+**3D-Ansicht:** **Ganze Platte** zeigt alle Teile der Platte des gewählten Teils an ihrem Platz (auch die Platten einer Makerworld-3MF). Bemalung und Farb-Modifikatoren des Designers erscheinen in ihren Farben, sehr dunkle Filamente etwas aufgehellt. Die Modellkarte zeigt oben die **Teile** (je Teil eine Zeile: Slot, Name, Punkt für Stützen grün/gelb/rot; beim gewählten Teil Platte, Körper und Anzahl), darunter die einklappbaren **Filamente** und die **Werkzeuge für das gewählte Teil** als Reiter – **Platten, Lage, Größe, Farben, Bohrlöcher, Text**, immer einer offen, mit Kurzinfo (z. B. „4 Platten“, „150 %“). Hinweise vom Import stehen in einer Zeile (ℹ, anklicken zeigt alles).
 
 Bei mehreren Teilen erscheint im Schritt **① Modell** eine **Teileliste**. Jede Zeile zeigt Name, Maße, Slot und ob das Teil Stützen braucht.
 
@@ -229,7 +229,7 @@ Unter **Bohrlöcher verstärken** listet das Tool die runden Löcher des gewähl
 
 ## 6. Einstellungen und Datenblatt
 
-Links wählst du **Filament, Objektart, Priorität, Belastung, Support** und **Stützreduzierung**. Rechts steht das **Datenblatt** mit den wichtigsten Werten (Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim) und aufklappbar:
+Links wählst du in Gruppen: **Filament** (mit den Farben des Herstellers), **Was wird gedruckt** (Objekt, Priorität, Belastung), **Stützen** (Support, Stützreduzierung) und – beim Kobra S1 – **Farbwechsel & Spülmenge** (die Spülmenge am Drucker; stand früher in ③). Die kleine 3D-Ansicht der Lage ist unten eingeklappt. Rechts steht das **Datenblatt** in drei Karten: **Temperatur & Kühlung** (Düse, Bett, Lüfter), **Tempo** (Wände, Füllung, Volumenstrom, Beschleunigung, Rückzug) und **Aufbau** (Schichthöhe, Wände, Deck/Boden, Füllung, Stützen, Brim); die **Hinweise** zeigen ihre Anzahl und sind offen, wenn es etwas zu beachten gibt – und aufklappbar:
 
 - **Einstellungen in Slicer-Reihenfolge** – alle Werte in der Reihenfolge der Slicer-Registerkarten
 - **Stützparameter** – alle Stützwerte (Abstände, Schnittstelle, Baum-Parameter)

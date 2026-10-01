@@ -42,6 +42,7 @@ function specCell(x){
     '<span class="v">'+x[1]+'</span>'+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</div>';
 }
 
+$('hintsFold').addEventListener('toggle',e=>{if(e.isTrusted)$('hintsFold').dataset.touched='1'});
 function update(){
   if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
@@ -56,7 +57,12 @@ function update(){
   document.body.dataset.printer=r.printer.id;
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
-  $('settings').innerHTML=r.rows.map(specCell).join('');
+  // Werte in drei Karten: Temperatur & Kühlung, Tempo, Aufbau (unbekannte Zeilen kommen zum Aufbau)
+  const SPEC_GROUPS=[[t('Temperatur & Kühlung'),['Düse','Heizbett','Lüfter']],[t('Tempo'),['Außenwand / Innenwand','Füllung / Travel','Max. Volumenstrom','Beschleunigung','Rückzug']],
+    [t('Aufbau'),null]];
+  const known=new Set(SPEC_GROUPS.flatMap(g=>g[1]||[]));
+  $('settings').innerHTML=SPEC_GROUPS.map(([title,keys])=>{const rows=r.rows.filter(x=>keys?keys.includes(x[0]):!known.has(x[0]));
+    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('');
   // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
   const oo=store.settings.orderOpen||{};
   $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
@@ -72,6 +78,9 @@ function update(){
   $('orcaNote').innerHTML=orcaWarningText(r);
   $('danger').innerHTML=r.danger.length?t('<b>Achtung:</b>')+'<br>'+r.danger.map(esc).join('<br>'):'';
   $('warning').innerHTML=r.warn.join('<br><br>');
+  // Hinweise: Anzahl im Titel; offen, solange es etwas zu beachten gibt (Warnungen), sonst zu
+  { const n=r.warn.length,s=$('hintsFold').querySelector('summary'); s.textContent=n?t('Hinweise ({n})',{n}):t('Hinweise');
+    if(!$('hintsFold').dataset.touched)$('hintsFold').open=n>0; }
   $('checks').innerHTML=t('<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse {noz} · Bett reinigen · erste Schicht beobachten',{noz:esc(r.nozLabel)})+(r.dryNeed&&r.m.dry?' · '+esc(t(r.m.dry)):'')+(geom?'<br>'+t('STL-Maße und Überhanganalyse ({th}°) wurden berücksichtigt.',{th:r.a.th}):'');
   // Die Anleitung für den Slicer braucht nur, wer von Hand einstellt – der 3MF-Export trägt die Werte selbst ein
   $('supportGuide').innerHTML='<h3>'+t('Stützen-Empfehlung')+'</h3><b>'+esc(t(r.sup))+'</b><br>'+esc(r.supNeed)+

@@ -1058,3 +1058,60 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .inch-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--info-soft, #eaf2fb); color: var(--info, #1f5f8b); font-size: 12.5px; }
 .inch-hint.hidden { display: none; }
 .wb-printer-rem { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }
+/* ① Modell übersichtlicher (2026-10-01): Filamente einklappbar, schmale Slot-Leiste, ruhige Teilezeilen, Import-Hinweis einzeilig */
+.fil-toggle { display: inline-flex; align-items: baseline; gap: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; min-width: 0; }
+.fil-toggle::before { content: "▾"; font-size: 10px; margin-right: 5px; color: var(--ink-3); transition: transform .15s; }
+.fil-bar.collapsed .fil-toggle::before { transform: rotate(-90deg); }
+.fil-sum { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fil-bar.collapsed .fil-body, .fil-bar.collapsed .fil-view { display: none; }
+.fil-list { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 5px; }
+.fil-list .fil { grid-template-rows: 24px auto; }
+.fil-list .fil-n { font-size: 12px; }
+.fil-list .fil-t { font-size: 10.5px; padding: 1px 2px 2px; }
+.part-list .pmeta { font-family: inherit; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.part-list .plevel { font-size: 10.5px; padding: 0 6px; }
+.part-list button[data-part] { padding: 7px 6px 7px 8px; }
+#importNotes { font-size: 12px; margin: 6px 0 0; display: flex; gap: 4px; cursor: pointer; }
+#importNotes.hidden { display: none; }
+#importNotes > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#importNotes.open > span { white-space: normal; }
+#importNotes .in-toggle { flex: none; padding: 0; border: 0; background: none; color: var(--info, #1f5f8b); font: inherit; cursor: pointer; }
+/* Werkzeuge des Teils als Reiter (js/sections-ui.js) */
+.sec-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; margin: 12px 0 0; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
+.sec-tabs.hidden { display: none; }
+.sec-tabs button { flex: none; display: grid; gap: 0; padding: 5px 9px 6px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; background: none; color: var(--ink-2, var(--ink)); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; text-align: left; }
+.sec-tabs button .sec-sum { font-size: 10.5px; font-weight: 400; color: var(--ink-3); white-space: nowrap; }
+.sec-tabs button:hover { background: var(--paper-2); }
+.sec-tabs button[aria-selected="true"] { background: var(--sheet, var(--paper)); border-color: var(--rule); color: var(--accent); margin-bottom: -1px; }
+.sec-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sec.sec-off { display: none !important; }
+.sec > .orient-head > .eyebrow[id], .sec > .orient-head > .sec-toggle { display: none; }
+.sec > .orient-head:empty { display: none; }
+.sec { margin-top: 10px; }
+.part-list .plevel.dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; }
+.plevel.none.dot { background: var(--ok); } .plevel.few.dot { background: var(--warn); } .plevel.needed.dot { background: var(--bad); }
+.fil-head { flex-wrap: wrap; gap: 4px 8px; }
+.fil-head .fil-view { margin-left: auto; }
+.fil-head .fil-view button { white-space: nowrap; }
+.fil-list { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); }
+.fil-list .fil-u { top: 2px; right: 2px; min-width: 13px; height: 13px; font-size: 9px; line-height: 13px; }
+.fil-list .fil-std { left: 3px; top: 1px; font-size: 9px; }
+/* ② Druckwerte übersichtlicher (2026-10-01): Gruppen links, Werte in drei Karten rechts */
+.inputs .in-head { display: block; margin: 18px 0 -4px; }
+.inputs .purge-group { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--rule); display: grid; gap: 8px; }
+.inputs .purge-group.hidden { display: none; }
+.inputs .mini-fold { margin-top: 14px; }
+.inputs .mini-fold > summary { font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; border-top: 0; margin-top: 16px; }
+.spec-group { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px 4px; background: var(--paper); min-width: 0; }
+.spec-title { margin: 0 0 2px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.spec-group .spec-cell { padding: 8px 10px 9px 0; }
+.spec-group .spec-cell .v { font-size: 19px; }
+@media (max-width: 640px) { .spec { grid-template-columns: 1fr; } }
+.part-list li.sel .pname { white-space: normal; overflow-wrap: anywhere; }
+@media (min-width: 1100px) {
+  .spec { grid-template-columns: minmax(170px, .7fr) minmax(250px, 1.15fr) minmax(250px, 1.15fr); }
+  .spec-group:first-child .spec-grid { grid-template-columns: 1fr; }
+}
+.spec-group .spec-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

@@ -397,7 +397,7 @@ async function runSmoke(opts={}){
     // Größe (① Modell → Größe / Werkzeugleiste) und Werkzeugleiste
     { selectPart(0);await wait(50);const x0=project.parts[0].geom.x;
       document.querySelector('[data-sz="50"]').click();await wait(80);
-      ok(Math.abs(project.parts[0].geom.x-x0/2)<0.01&&/50 %/.test($('sizeBox').querySelector('.sec-sum').textContent),'Größe 50 %: Teil halb so breit');
+      ok(Math.abs(project.parts[0].geom.x-x0/2)<0.01&&/50 %/.test(document.querySelector('[data-sec-tab="size"] .sec-sum').textContent),'Größe 50 %: Teil halb so breit');
       $('szX').value=String(x0*1.5);$('szX').dispatchEvent(new Event('change'));await wait(80);
       ok(Math.abs(project.parts[0].geom.x-x0*1.5)<0.05&&Math.abs(project.parts[0].scale[1]-1.5)<1e-3,'Zielmaß X: gleichmäßig auf 150 %');
       $('szReset').click();await wait(80);ok(!project.parts[0].scale&&Math.abs(project.parts[0].geom.x-x0)<0.01,'Original stellt die Größe wieder her');
