@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.9.5] – 2026-10-01
 
 ### Behoben
 - **Objektliste im Druck sprang beim Scrollen zurück:** Sie wurde bei jedem neuen Stand (alle paar Sekunden) neu aufgebaut. Jetzt nur noch bei Änderungen, die Scrollposition bleibt.
