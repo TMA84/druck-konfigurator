@@ -429,7 +429,7 @@ async function runSmoke(opts={}){
       const saved=JSON.stringify(store.settings.manualSlots||null);
       $('matColours').querySelector('[data-mat-colour="5"]').click();await wait(200);
       const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),sl=dialogSlots(tpl)[project.parts[project.selected].slot??defaultSlot()];
-      ok(sl&&sl.colour==='#002FA7'&&sl.type==='PLA','Farbe angeklickt: Slot bekommt PLA Klein Blue');
+      ok(sl&&sl.colour==='#1729AB'&&sl.type==='PLA','Farbe angeklickt: Slot bekommt PLA Klein Blue (Code von sunlu.com)');
       store.settings.manualSlots=JSON.parse(saved)||undefined;if(!store.settings.manualSlots)delete store.settings.manualSlots;persist();
       // Spule per RFID erkannt (Drucker-Verbindung nachgestellt): statt der Farbauswahl nur ein Hinweis; ohne RFID wieder die Farben
       { const s0=project.parts[project.selected].slot??defaultSlot(),n=exportTemplate(lastResult.printer.id,lastResult.dSel).slots.length,old=slotState;

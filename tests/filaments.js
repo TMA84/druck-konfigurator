@@ -24,7 +24,8 @@ for (const m of V.concat(K.BUILTIN.filter(b => b.id === 'pla_hs'))) {
   check(n + ': Geschwindigkeiten aus dem Bezugsprofil', [m.outer, m.inner, m.fill].every(a => Array.isArray(a) && a.length === 3) && m.first > 0);
   check(n + ': Farben mit gültigem Code', Array.isArray(m.colours) && m.colours.length > 0 && m.colours.every(c => typeof c[0] === 'string' && /^#[0-9A-F]{6}$/.test(c[1])), (m.colours || []).find(c => !/^#[0-9A-F]{6}$/.test(c[1])));
   check(n + ': Faser-Filament schleifend', !/CF/.test(n) || m.abrasive === true);
-  if (m.brand === 'SUNLU') check(n + ': SUNLU-Farben als ungefähr markiert (SUNLU nennt keine Codes)', m.colours.every(c => c[2] === 1));
+  // SUNLU: Codes aus den Farbtabellen auf sunlu.com – je Linie mind. ein Drittel aus der eigenen Tabelle (SUNLU PLA hat viele Shop-Farben ohne Tabelleneintrag)
+  if (m.brand === 'SUNLU') check(n + ': SUNLU-Farben mit Codes von sunlu.com', m.colours.filter(c => c[2] !== 1).length * 3 >= m.colours.length, m.colours.filter(c => c[2] !== 1).length + '/' + m.colours.length);
   const res = K.compute({ printer: 'kobra_s1', material: m.id, nozD: '0.4', nozM: 'steel_hardened', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' }, geom, { getMat: K.getMat, settings: K.store.settings });
   check(n + ': Rechenkern liefert Werte (Status Herstellerwerte)', res.m.id === m.id && res.nozzle >= m.nozzle[0] - 5 && (m.id === 'pla_hs' || res.effectiveStatus === 'vendor'), [res.nozzle, res.effectiveStatus]);
 }

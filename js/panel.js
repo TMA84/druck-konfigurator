@@ -144,7 +144,7 @@ function renderMatColours(m){
   }
   box.innerHTML='<div class="mc-head"><b>'+esc(t('Farben von {brand}',{brand:m.brand||''}))+'</b> <span class="muted">'+esc(t('{n} Farben – Klick trägt sie für Slot {slot} ein',{n:c.length,slot:slot+1}))+'</span></div>'+
     '<div class="mc-list">'+c.map((x,i)=>'<button type="button" class="mc-swatch" data-mat-colour="'+i+'" style="--sw:'+esc(x[1])+'" title="'+esc(x[0]+' · '+x[1]+(x[2]?' ('+t('ungefähr')+')':''))+'" aria-label="'+esc(x[0])+'"></button>').join('')+'</div>'+
-    '<div class="mc-foot muted">'+(approx?esc(t('≈ SUNLU nennt keine Farbcodes – Farben nach dem Namen gewählt.'))+' ':'')+(m.url?'<a href="'+esc(m.url)+'" target="_blank" rel="noopener">'+esc(t('Produktseite'))+'</a>':'')+'</div>';
+    '<div class="mc-foot muted">'+(approx?esc(t('≈ Einige Farben stehen ohne Code auf der Herstellerseite – sie sind ungefähr (im Tooltip markiert).'))+' ':'')+(m.url?'<a href="'+esc(m.url)+'" target="_blank" rel="noopener">'+esc(t('Produktseite'))+'</a>':'')+'</div>';
 }
 $('matColours').addEventListener('click',e=>{
   const b=e.target.closest('[data-mat-colour]');if(!b||!lastResult)return;

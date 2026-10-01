@@ -395,7 +395,7 @@ I18N.add({
  "Farben von {brand}": "{brand} colours",
  "{n} Farben – Klick trägt sie für Slot {slot} ein": "{n} colours – click to set it for slot {slot}",
  "ungefähr": "approximate",
- "≈ SUNLU nennt keine Farbcodes – Farben nach dem Namen gewählt.": "≈ SUNLU publishes no colour codes – colours chosen by name.",
+ "≈ Einige Farben stehen ohne Code auf der Herstellerseite – sie sind ungefähr (im Tooltip markiert).": "≈ Some colors have no code on the maker's site – they are approximate (marked in the tooltip).",
  "Produktseite": "Product page",
  "Slot {n}: {name} {colour}": "Slot {n}: {name} {colour}",
  "(überschreibt die Angabe des Druckers)": "(overrides what the printer reports)",

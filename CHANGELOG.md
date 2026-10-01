@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **SUNLU-Farben mit den echten Farbcodes** aus SUNLUs Farbtabellen auf sunlu.com (19 Filamente, z. B. Klein Blue #1729AB statt geschätzt #002FA7); fehlende Farben der Tabellen ergänzt. Shop-Farben ohne Tabelleneintrag bleiben als ungefähr markiert.
+
 ## [10.9.1] – 2026-10-01
 
 ### Neu
