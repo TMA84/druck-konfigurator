@@ -450,6 +450,8 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
 
+**Druck pausieren / fortsetzen** (`button.druck_konfigurator_pause`, `…_resume`): nur, wenn du in den Add-on-Einstellungen **Steuern aus Home Assistant** einschaltest (Standard aus) – damit steuert Home Assistant den Drucker. Abbrechen geht nie über Home Assistant; ohne laufenden Druck lehnt der Drucker den Befehl ab.
+
 **Filament knapp** (`binary_sensor.druck_konfigurator_filament_low`): an, wenn eine Spule unter der Warnschwelle liegt oder die wartenden Platten der Warteschlange mehr brauchen als im Slot ist (Grund im Attribut `filament_note`) – gut für eine Benachrichtigung, bevor die nächste Platte startet.
 
 **Kamera „3D-Fortschritt“** (`camera.druck_konfigurator_progress`): ein Bild des laufenden Drucks – schräg von oben, gedruckte Schichten in den Farben der ACE-Slots, die aktuelle hell, dazu der Umriss des ganzen Modells. Neu bei jeder Schicht, nur für Drucke aus dem Tool. Es braucht keine Anmeldung am Add-on (anders als die eingebettete Seite) – geht also auch in der Handy-App und als Bild in Benachrichtigungen, z. B.:
