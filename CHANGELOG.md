@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.11.2] – 2026-10-02
 
 ### Behoben
 - **Drucker zeigte das Modell nach dem Hochladen nicht an:** OrcaSlicer schreibt auf der Kommandozeile (Container) kein Vorschaubild in den G-Code. Das Tool zeichnet es jetzt selbst (schräg von oben, Filamentfarben, durchsichtiger Hintergrund) und setzt es wie Orca ein – Größe aus dem Profil (Kobra S1: 230 × 110 PNG). Beim Hochladen und beim Herunterladen des G-Codes; ein Fehler dabei hält den Druck nie auf.
