@@ -494,3 +494,7 @@ I18N.add({
 I18N.add({
  "Letztes Objekt – danach druckt der Drucker nichts mehr. Wirklich überspringen?": "Last object – the printer will print nothing after this. Really skip?"
 });
+
+I18N.add({
+ "{n} Objekt(e) im Projekt auf „nicht drucken“ oder neben den Platten – weggelassen, wie in Bambu Studio/OrcaSlicer.": "{n} object(s) set to „don't print“ or placed beside the plates – left out, as in Bambu Studio/OrcaSlicer."
+});

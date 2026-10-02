@@ -224,10 +224,16 @@ function parse3MF(fileName, zip, zipLib) {
   }
 
   const parts = [], notes = [];
-  let skipped = 0;
+  let skipped = 0, offPlate = 0;
+  // Objekte, die das Projekt nicht druckt: in Bambu/Orca auf „nicht drucken“ (printable="0") oder auf keiner Platte
+  // (neben dem Bett abgelegt). Sie mitzunehmen schob beim Mitten des Designer-Layouts das echte Teil vom Bett
+  // (2026-10-02, Bambu-3MF „KOBRA-3-S1-REDONDO…“: Orca brach ab, keine Objekte auf der Platte).
+  const hasPlates = settings.plates.some(pl => pl.instances.length);
   root.items.forEach(item => {
     const obj = root.objects.get(item.objectid);
     if (!obj || (obj.type && obj.type !== 'model')) return;
+    const inst0 = seen.get(item.objectid) || 0;
+    if (!item.printable || (hasPlates && !plateOf.has(item.objectid + '#' + inst0))) { seen.set(item.objectid, inst0 + 1); offPlate++; return; }
     const ms = settings.objects.get(item.objectid);
     // Modifier, Negativteile und Stützen-Blocker/-Erzwinger sind keine druckbaren Körper
     const skipPart = pid => { const p = ms && ms.parts.get(pid); const skip = !!p && p.subtype !== 'normal_part'; if (skip) skipped++; return skip; };
@@ -266,6 +272,7 @@ function parse3MF(fileName, zip, zipLib) {
   });
   if (!parts.length) throw Error(t('keine druckbaren Objekte in {file}', { file: fileName }));
   if (skipped) notes.push(t('{n} Modifier/Hilfskörper ausgelassen (werden nicht gedruckt).', { n: skipped }));
+  if (offPlate) notes.push(t('{n} Objekt(e) im Projekt auf „nicht drucken“ oder neben den Platten – weggelassen, wie in Bambu Studio/OrcaSlicer.', { n: offPlate }));
   let projectSettings = null;
   try { projectSettings = JSON.parse(text('Metadata/project_settings.config') || 'null'); } catch (e) { notes.push(t('Einstellungen der 3MF nicht lesbar – nur die Geometrie wird verwendet.')); }
   return { parts, notes, threemf: { name: fileName, zip, plates: settings.plates, settings: projectSettings } };

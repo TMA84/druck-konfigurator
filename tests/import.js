@@ -108,6 +108,20 @@ check('3MF threemf', r.threemf && r.threemf.plates.length === 2 && r.threemf.set
   check('3MF Bauteile = Körper', r.parts.length === 1 && b.length === 2 && b.map(x => x.name).join() === 'Platte,Schrift' && b[0].extruder === null && b[1].extruder === 3 && b[1].partId === '2', JSON.stringify(b));
 }
 
+// 5c) Objekte, die das Projekt nicht druckt (Bambu: printable="0" bzw. auf keiner Platte) – weglassen, sonst schob das
+// Mitten des Designer-Layouts das echte Teil vom Bett (2026-10-02, Orca: keine Objekte auf der Platte)
+{ const rootNP = rootFile.replace(/<build>[\s\S]*<\/build>/, '<build><item objectid="3" transform="1 0 0 0 1 0 0 0 1 100 50 0"/>' +
+    '<item objectid="4" transform="1 0 0 0 1 0 0 0 1 100 -180 0" printable="0"/></build>');
+  const setNP = settingsFile.replace(/<plate>[\s\S]*<\/plate>/, '<plate><metadata key="plater_id" value="1"/><model_instance><metadata key="object_id" value="3"/></model_instance></plate>');
+  r = imp([{ name: 'np.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(rootNP), '3D/Objects/object_1.model': u8(objFile), 'Metadata/model_settings.config': u8(setNP) }) }]);
+  check('3MF „nicht drucken“ weggelassen', r.parts.length === 1 && r.parts[0].name === 'Halter & Clip' && r.notes.some(n => /nicht drucken/.test(n)), r.parts.map(p => p.name).join() + ' | ' + r.notes.join('|'));
+  const rootOff = rootNP.replace(' printable="0"', '');
+  r = imp([{ name: 'off.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(rootOff), '3D/Objects/object_1.model': u8(objFile), 'Metadata/model_settings.config': u8(setNP) }) }]);
+  check('3MF Objekt auf keiner Platte weggelassen', r.parts.length === 1, r.parts.length);
+  r = imp([{ name: 'ohneplatten.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(rootOff), '3D/Objects/object_1.model': u8(objFile) }) }]);
+  check('3MF ohne Platten-Angaben: alle Objekte', r.parts.length === 2, r.parts.length);
+}
+
 // 6) ZIP mit einer 3MF und STLs → 3MF hat Vorrang
 r = imp([{ name: 'mw.zip', bytes: fflate.zipSync({ 'projekt.3mf': tmf, 'teil.stl': stlBytes(boxTris(0, 0, 0, 5, 5, 5)) }) }]);
 check('ZIP: 3MF hat Vorrang', r.parts.length === 2 && r.threemf && r.notes.some(n => /ignoriert/.test(n)), r.notes.join('|'));

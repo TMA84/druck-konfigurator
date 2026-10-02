@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **3MF aus Bambu Studio ließ sich nicht slicen:** Objekte, die im Projekt auf „nicht drucken“ stehen oder neben den Platten liegen, nahm das Tool mit – beim Mitten des Designer-Layouts rutschte dadurch das echte Teil vom Bett, und Orca brach ab („keine Objekte auf der Platte“). Solche Objekte lässt das Tool jetzt weg, wie Bambu Studio/OrcaSlicer (mit Hinweis).
+
 ## [10.11.1] – 2026-10-02
 
 ### Verbessert
