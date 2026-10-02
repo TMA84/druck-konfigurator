@@ -101,6 +101,31 @@ function slotMaterialChanges() {
   }
   return out;
 }
+/* Teile, deren Filament (Druckwerte) eine andere Art ist als das, was in ihrem Slot steckt – Belegung vom Drucker (ACE,
+   RFID) oder eigene Angabe; die Vorlage zählt nicht (kennt keine Typen). So slict Orca mit den falschen Temperaturen
+   (2026-10-01: PETG geslict, PLA in der ACE). [{part, slot, have, want}] */
+function slotKindConflicts() {
+  if (!project || typeof slotChoices !== 'function') return [];
+  const slots = slotChoices(), def = costDefaultSlot(), out = [];
+  for (const p of project.parts) {
+    const s = slots[p.slot ?? def];
+    if (!s || !s.type || s.present === false || !p.input) continue;
+    const m = getMat(p.input.material);
+    if (m && m.kind && ORCA_KIND[m.kind] && !slotMatchesKind(s.type, m.kind)) out.push({ part: p, slot: (p.slot ?? def) + 1, have: s.type, want: m.name, rfid: !!s.rfid });
+  }
+  return out;
+}
+function slotKindText(list) {
+  const first = list[0];
+  return list.length === 1 && project.parts.length === 1
+    ? t('Slot {slot} enthält {have}{rfid} – bei den Druckwerten ist {want} gewählt. So würde mit den Temperaturen für {want} gedruckt.', { slot: first.slot, have: first.have, want: first.want, rfid: first.rfid ? t(' (von der ACE erkannt)') : '' })
+    : t('{n} Teil(e) mit anderem Filament als im Slot: {list}.', { n: list.length, list: list.slice(0, 4).map(c => t('{name}: {want} ↔ Slot {slot} {have}', { name: c.part.name, want: c.want, slot: c.slot, have: c.have })).join('; ') + (list.length > 4 ? ' …' : '') });
+}
+function renderSlotKindWarn() {
+  const list = slotKindConflicts(), html = list.length ? esc(slotKindText(list)) + ' <button type="button" class="btn sec small" data-adopt-slots>' + esc(t('Filament aus dem Slot übernehmen')) + '</button>' : '';
+  for (const id of ['matSlotWarn', 'costSlotWarn']) { const el = $(id); if (!el) continue; if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } el.classList.toggle('hidden', !list.length); }
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-adopt-slots]')) adoptSlotMaterials(); });
 function adoptSlotMaterials() {
   const ch = slotMaterialChanges(), n = ch.length;
   ch.forEach(([p, m]) => { p.input.material = m; });

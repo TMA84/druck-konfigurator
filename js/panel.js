@@ -54,6 +54,7 @@ function update(){
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
   renderMatColours(r.m);
+  if(typeof renderSlotKindWarn==='function')renderSlotKindWarn();
   document.body.dataset.printer=r.printer.id;
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});

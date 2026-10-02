@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Verbessert
+- **Falsches Filament früher bemerkt:** Ist bei den Druckwerten ein anderes Material gewählt als im Slot des Teils steckt (vom Drucker/ACE oder eigene Angabe), steht das rot unter der Filament-Auswahl und in ③ vor dem Slicen – mit **Filament aus dem Slot übernehmen**. Bisher fiel es erst im Sendedialog auf.
+
 ### Behoben
 - **Seite lud manchmal unvollständig** („Modell konnte nicht gelesen werden: … is not defined“): Der Server wies bei den gut 70 gleichzeitig geladenen Skripten einen Teil der Verbindungen ab (Warteschlange 5). Jetzt 128 – mit der alten kamen im Test nur ~20 von 100 gleichzeitigen Verbindungen durch, jetzt alle. Damit sind auch die gelegentlichen Fehlstarts der automatischen Tests weg.
 

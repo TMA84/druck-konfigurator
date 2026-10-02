@@ -464,3 +464,11 @@ I18N.add({
  "Abstand zwischen Teilen in mm": "Gap between parts in mm",
  "Abstand zwischen den Teilen beim automatischen Anordnen (3–15 mm). Objekt für Objekt: mindestens der Freiraum des Druckkopfs.": "Gap between parts when arranging automatically (3–15 mm). Object by object: at least the print head clearance."
 });
+
+I18N.add({
+ "Slot {slot} enthält {have}{rfid} – bei den Druckwerten ist {want} gewählt. So würde mit den Temperaturen für {want} gedruckt.": "Slot {slot} holds {have}{rfid} – the print settings use {want}. It would print with the temperatures for {want}.",
+ " (von der ACE erkannt)": " (detected by the ACE)",
+ "{n} Teil(e) mit anderem Filament als im Slot: {list}.": "{n} part(s) with a different filament than in the slot: {list}.",
+ "{name}: {want} ↔ Slot {slot} {have}": "{name}: {want} ↔ slot {slot} {have}",
+ "Filament aus dem Slot übernehmen": "Use the filament in the slot"
+});

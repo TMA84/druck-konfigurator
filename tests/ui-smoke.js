@@ -533,6 +533,14 @@ async function runSmoke(opts={}){
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
     crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
     ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');
+    // Filament ↔ Slot: PETG gewählt, im Slot steckt PLA (eigene Angabe) – Hinweis bei den Druckwerten und in ③, Übernehmen stellt um
+    { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),p=project.parts[project.selected],m0=p.input.material,sl=p.slot??costDefaultSlot();
+      const rows=Array.from({length:4},()=>null);rows[sl]={type:'PLA',colour:'#FFFFFF'};store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:rows};
+      update();await wait(50);setTab('settings');sel('material','petg');await wait(80);
+      ok(!$('matSlotWarn').classList.contains('hidden')&&/PLA/.test($('matSlotWarn').textContent)&&!$('costSlotWarn').classList.contains('hidden'),'PETG gewählt, PLA im Slot: Hinweis bei Druckwerten und Kosten');
+      $('matSlotWarn').querySelector('[data-adopt-slots]').click();await wait(80);
+      ok(getMat(p.input.material).kind==='pla'&&$('matSlotWarn').classList.contains('hidden'),'Filament aus dem Slot übernommen: PLA, Hinweis weg');
+      p.input.material=m0;store.settings.manualSlots=JSON.parse(ms0)||undefined;persist();loadPartIntoForm(p);update();await wait(50); }
     // Sendedialog ohne Drucker: „busy“ ohne Auftrag (nach Abbruch) und PETG im G-Code ↔ PLA in der ACE – nur Anzeige, nichts gesendet
     { const ctx0=sendCtx,info0=sendInfo;
       sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:[null,null,{kind:'petg',name:'PETG'}],name:'t',onStarted:null};

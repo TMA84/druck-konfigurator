@@ -105,7 +105,8 @@
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
         <div class="field-links noprint"><button class="linkbtn" type="button" data-click="editMat">✎ Werte anpassen</button><button class="linkbtn" type="button" data-click="newMat">＋ Neues Filament</button></div>
-        <div id="matColours" class="mat-colours hidden"></div></div>
+        <div id="matColours" class="mat-colours hidden"></div>
+        <p id="matSlotWarn" class="note bad small hidden" role="alert"></p></div>
       <span class="eyebrow in-head">Was wird gedruckt</span>
       <div class="field"><label for="object">Objekt</label><select id="object">
         <option value="general">Funktionsteil</option>
@@ -174,6 +175,7 @@
       <section id="costPanel" class="side-panel noprint" aria-labelledby="costPanelTitle">
         <span class="eyebrow" id="costPanelTitle">Kosten</span>
         <p id="costPanelInfo" class="muted small"></p>
+        <p id="costSlotWarn" class="note bad small hidden" role="alert"></p>
         <table id="costTable" class="cost-table hidden"><tbody></tbody></table>
         <div id="plateCosts" class="hidden">
           <span class="eyebrow">Je Platte</span>
