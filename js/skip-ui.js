@@ -40,8 +40,8 @@ function skRender(st) {
       return '<li data-sk-row="' + o.id + '" class="' + (off ? 'off' : '') + (o.id === hi ? ' sel' : '') + (o.id === sk.ask ? ' ask' : '') + '">' +
         '<button type="button" class="wb-obj-name linkbtn" data-sk-sel="' + o.id + '" title="' + esc(t('Im 3D-Fortschritt zeigen')) + ' · ' + esc(o.name) + '">' + esc(skLabel(o, objs)) + '</button>' +
         (off ? '<span class="wb-obj-state">' + esc(job.skipped_confirmed ? t('übersprungen') : t('übersprungen (gesendet)')) + '</span>'
-          : o.id === sk.ask ? '<span class="wb-obj-ask"><span>' + esc(t('Wirklich überspringen?')) + '</span><button type="button" class="btn small danger" data-sk-yes="' + o.id + '">' + esc(t('Ja, überspringen')) + '</button><button type="button" class="linkbtn" data-sk-no>' + esc(t('Nein')) + '</button></span>'
-          : '<button type="button" class="btn sec small" data-sk-skip="' + o.id + '"' + (left < 2 ? ' disabled title="' + esc(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')) + '"' : '') + '>' + esc(t('Überspringen')) + '</button>') + '</li>';
+          : o.id === sk.ask ? '<span class="wb-obj-ask"><span>' + esc(left < 2 ? t('Letztes Objekt – danach druckt der Drucker nichts mehr. Wirklich überspringen?') : t('Wirklich überspringen?')) + '</span><button type="button" class="btn small danger" data-sk-yes="' + o.id + '">' + esc(t('Ja, überspringen')) + '</button><button type="button" class="linkbtn" data-sk-no>' + esc(t('Nein')) + '</button></span>'
+          : '<button type="button" class="btn sec small" data-sk-skip="' + o.id + '">' + esc(t('Überspringen')) + '</button>') + '</li>';
     }).join('') + '</ul><p class="wb-obj-note muted">' + esc(t('Name anklicken zeigt das Objekt blau im 3D-Fortschritt. Übersprungene Objekte druckt der Drucker ab sofort nicht mehr – das lässt sich nicht zurücknehmen.')) + '</p>';
   // nur neu zeichnen, wenn sich etwas geändert hat – der Stand kommt alle paar Sekunden, sonst springt die Liste beim Scrollen zurück
   if (box.innerHTML !== html && box.dataset.html !== html) {
@@ -104,7 +104,6 @@ function skShow(id) {
 function skAsk(o) {
   const skipped = new Set((sk.st && sk.st.job && sk.st.job.skipped) || []);
   if (skipped.has(o.id)) { toast(t('„{name}“ ist schon übersprungen', { name: skLabel(o, sk.objects) })); return; }
-  if (sk.objects.length - skipped.size < 2) { toast(t('Das letzte Objekt lässt sich nicht überspringen – dann den Druck abbrechen')); return; }
   sk.ask = o.id; skShow(o.id);
   const row = $('wbObjects').querySelector('[data-sk-row="' + o.id + '"]'); if (row) row.scrollIntoView({ block: 'nearest' });
 }

@@ -486,6 +486,12 @@ async function runSmoke(opts={}){
       $('wbObjects').querySelector('[data-sk-no]').click();await wait(50);ok(sk.ask===-1&&sent.length===0,'Rückfrage abgebrochen: nichts gesendet');
       $('wbObjects').querySelector('[data-sk-skip="1"]').click();await wait(50);$('wbObjects').querySelector('[data-sk-yes="1"]').click();await wait(400);
       ok(sent.length===1&&sent[0].type==='skip'&&sent[0].action==='start'&&JSON.stringify(sent[0].data)==='{"parts":[1]}','Überspringen bestätigt: skip/start mit Objekt 1');
+      // auch das letzte noch laufende Objekt lässt sich überspringen – mit deutlicher Rückfrage
+      skRender({...st,job:{...st.job,skipped:[1,2]}});await wait(50);
+      const last=$('wbObjects').querySelector('[data-sk-skip="0"]');ok(!!last&&!last.disabled,'letztes Objekt: Überspringen möglich');
+      last.click();await wait(50);ok(/Letztes Objekt/.test($('wbObjects').querySelector('.wb-obj-ask').textContent),'letztes Objekt: Rückfrage sagt, dass danach nichts mehr gedruckt wird');
+      $('wbObjects').querySelector('[data-sk-yes="0"]').click();await wait(400);
+      ok(sent.length===2&&JSON.stringify(sent[1].data)==='{"parts":[0]}','letztes Objekt übersprungen: skip/start mit Objekt 0');
       window.fetch=of;window.confirm=oc;store.settings.printerHosts=hosts;sk.sel=sk.ask=-1;skRender(null); }
     // Bemalen (Werkzeugleiste): Strich mit der Maus auf dem Teil, Umschalt radiert, Rückgängig, Export mit paint_color, übersteht Neuladen
     { selectPart(0);setTab('3d');await wait(300);const p=project.parts[0];p.paintUser=null;

@@ -490,3 +490,7 @@ I18N.add({
  "Orca {time} + Vorbereitung": "Orca {time} + preparation",
  "Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung ({p}) je Platte auf.": "Orca doesn't include bed levelling and heating – the tool adds the measured preparation ({p}) per plate."
 });
+
+I18N.add({
+ "Letztes Objekt – danach druckt der Drucker nichts mehr. Wirklich überspringen?": "Last object – the printer will print nothing after this. Really skip?"
+});

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **Jedes Objekt überspringbar**, auch das letzte noch laufende (bisher gesperrt – „dann abbrechen“). Beim letzten fragt die Zeile deutlicher nach: danach druckt der Drucker nichts mehr.
+
 ## [10.11.0] – 2026-10-02
 
 ### Neu
