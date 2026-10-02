@@ -149,10 +149,12 @@ class ProgressImages:
         path = self.find_preview(job["name"])
         if not path or not os.path.exists(path):
             return None
-        if not self.r or self.r.path != path:
+        layer = preview_layer(job, len(self.r.layers)) if self.r and self.r.path == path else None
+        # neue Datei – oder dieselbe noch einmal gedruckt (Schicht fällt zurück): neu zeichnen
+        if not self.r or self.r.path != path or (layer is not None and layer < self.r.drawn):
             slots = [s for box in (st.get("ace") or []) for s in (box.get("slots") or [])]
             self.r, self.key = Renderer(path, [s.get("colour") for s in slots]), None
-        layer = preview_layer(job, len(self.r.layers))
+            layer = preview_layer(job, len(self.r.layers))
         key = (path, layer)
         if key == self.key:
             return None

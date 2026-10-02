@@ -82,6 +82,11 @@ check("erstes Bild", a and a[:4] == b"\x89PNG")
 check("gleiche Schicht: kein neues Bild", imgs(st) is None)
 st["job"]["layer"] = 4
 check("neue Schicht: neues Bild", imgs(st) is not None)
+st["job"]["layer"] = 10
+imgs(st)
+st["job"]["layer"] = 1
+again = imgs(st)
+check("gleiche Datei noch einmal gedruckt: Bild neu ab Schicht 1", again is not None and imgs.r.drawn == 0, imgs.r.drawn)
 check("fremder Druck (keine Vorschau): kein Bild", imgs({"job": {"name": "Fremd", "layer": 1, "layers": 2}}) is None)
 check("kein Druck: kein Bild", imgs({"job": None}) is None and imgs(None) is None)
 _, _, rg = decode(imgs.r.png())
