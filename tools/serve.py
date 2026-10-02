@@ -48,6 +48,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anycubic_lan  # noqa: E402
 import gcode_preview  # noqa: E402
+import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
 import printqueue  # noqa: E402
 import progress_image  # noqa: E402
@@ -304,6 +305,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             path = slicer.job_file(m.group(1), m.group(2), m.group(3))
             if not path:
                 return self._json(404, {"error": "Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen", "kind": "not_found"})
+            if m.group(3) == "gcode":
+                with_thumbnail(m.group(1), m.group(2), path)
             return self._file(path, "text/x.gcode" if m.group(3) == "gcode" else "application/octet-stream",
                               "plate_%s.gcode" % m.group(2) if m.group(3) == "gcode" else None)
         if url.path.startswith("/api/"):
@@ -392,6 +395,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if not gcode:
                     raise slicer.SliceError("Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen", "bad_request")
                 name = re.sub(r"[^\w.\-]+", "_", str(req.get("name") or "druck"))[:80] + "_Platte" + str(int(req["plate"])) + ".gcode"
+                with_thumbnail(str(req.get("job", "")), str(req.get("plate", "")), gcode)   # Bild fürs Display des Druckers
                 res = anycubic_lan.print_gcode(req["host"], gcode, name, req.get("options") or {})
                 remember_print(res.get("filename") or name, str(req.get("job", "")), int(req["plate"]))
                 return res
@@ -504,6 +508,16 @@ def _printed_dir():
 def _stem(name):
     base = str(name or "").replace("\\", "/").rsplit("/", 1)[-1]
     return re.sub(r"(\.(gcode|3mf|gco|g))+$", "", base, flags=re.I)
+
+
+def with_thumbnail(job, plate, gcode):
+    """Vorschaubild in den G-Code, wenn Orca keins geschrieben hat (tools/gcode_thumbnail.py) – Fehler nie weiterreichen."""
+    try:
+        prev = slicer.job_file(job, plate, "preview")
+        if prev and gcode_thumbnail.add_thumbnails(gcode, prev):
+            print("Vorschaubild in Platte %s eingesetzt" % plate, flush=True)
+    except Exception as e:   # ohne Bild drucken ist besser als gar nicht
+        print("Vorschaubild nicht eingesetzt: " + (str(e) or type(e).__name__), flush=True)
 
 
 def remember_print(filename, job, plate):

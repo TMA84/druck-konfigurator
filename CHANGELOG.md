@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Behoben
+- **Drucker zeigte das Modell nach dem Hochladen nicht an:** OrcaSlicer schreibt auf der Kommandozeile (Container) kein Vorschaubild in den G-Code. Das Tool zeichnet es jetzt selbst (schräg von oben, Filamentfarben, durchsichtiger Hintergrund) und setzt es wie Orca ein – Größe aus dem Profil (Kobra S1: 230 × 110 PNG). Beim Hochladen und beim Herunterladen des G-Codes; ein Fehler dabei hält den Druck nie auf.
 - **3MF aus Bambu Studio ließ sich nicht slicen:** Objekte, die im Projekt auf „nicht drucken“ stehen oder neben den Platten liegen, nahm das Tool mit – beim Mitten des Designer-Layouts rutschte dadurch das echte Teil vom Bett, und Orca brach ab („keine Objekte auf der Platte“). Solche Objekte lässt das Tool jetzt weg, wie Bambu Studio/OrcaSlicer (mit Hinweis).
 
 ## [10.11.1] – 2026-10-02

@@ -51,8 +51,10 @@ def _colour(hexstr):
 class Renderer:
     """Ein Druck (Vorschau-Datei): Projektion einmal berechnen, dann Schicht für Schicht dazuzeichnen."""
 
-    def __init__(self, path, colours=None):
-        self.path = path
+    def __init__(self, path, colours=None, size=(W, H), alpha=False, frame=True, shade=(0.5, 0.5)):
+        """size: Bildgröße; alpha: durchsichtiger Hintergrund (Vorschaubild im G-Code); frame: Bett und Umriss zeichnen."""
+        self.path, (self.w, self.h), self.alpha, self.shade = path, size, alpha, shade   # Helligkeit unten, Zuwachs bis oben
+        W_, H_ = self.w, self.h
         head, q, tools = read_preview(path)
         self.head, self.tools = head, tools
         bb = head["bbox"]
@@ -66,20 +68,23 @@ class Renderer:
         pts = [proj(*c) for c in corners]
         u0, u1 = min(p[0] for p in pts), max(p[0] for p in pts)
         v0, v1 = min(p[1] for p in pts), max(p[1] for p in pts)
-        k = min((W - 2 * MARGIN) / max(u1 - u0, 1e-6), (H - 2 * MARGIN) / max(v1 - v0, 1e-6))
-        ou, ov = (W - k * (u1 - u0)) / 2 - k * u0, (H - k * (v1 - v0)) / 2 - k * v0
+        m = MARGIN if frame else 2
+        k = min((W_ - 2 * m) / max(u1 - u0, 1e-6), (H_ - 2 * m) / max(v1 - v0, 1e-6))
+        ou, ov = (W_ - k * (u1 - u0)) / 2 - k * u0, (H_ - k * (v1 - v0)) / 2 - k * v0
         self.to_px = lambda x, y, z: (ou + k * (x - y) * COS30, ov + k * (-(x + y) * SIN30 * 0.9 - z))
         self.bb, self.sx, self.sy, self.q = bb, sx, sy, q
         self.colours = [c for c in (_colour(c) for c in (colours or [])) if c] or DEFAULT_COLOURS
         self.zmax = max(z1, 1e-6)
-        self.px = bytearray(bytes(BG) * (W * H))
+        self.bpp = 4 if alpha else 3
+        self.px = bytearray((b"\0\0\0\0" if alpha else bytes(BG)) * (W_ * H_))
         self.drawn = -1                              # bis zu dieser Schicht gezeichnet
-        self._frame(corners)
+        if frame:
+            self._frame(corners)
 
     def _set(self, x, y, c):
-        if 0 <= x < W and 0 <= y < H:
-            i = (y * W + x) * 3
-            self.px[i:i + 3] = bytes(c)
+        if 0 <= x < self.w and 0 <= y < self.h:
+            i = (y * self.w + x) * self.bpp
+            self.px[i:i + self.bpp] = bytes(c) + (b"\xff" if self.alpha else b"")
 
     def _line(self, a, b, c):
         (x0, y0), (x1, y1) = a, b
@@ -110,7 +115,7 @@ class Renderer:
             z = self.layers[li][0]
             a = self.layers[li][1]
             b = self.layers[li + 1][1] if li + 1 < len(self.layers) else self.n
-            shade = 0.5 + 0.5 * (z / self.zmax)
+            shade = self.shade[0] + self.shade[1] * (z / self.zmax)
             bright = li == layer
             for s in range(a, b):
                 c = self.colours[self.tools[s] % len(self.colours)]
@@ -121,9 +126,10 @@ class Renderer:
         return True
 
     def png(self):
-        rows = b"".join(b"\x00" + bytes(self.px[y * W * 3:(y + 1) * W * 3]) for y in range(H))
+        row = self.w * self.bpp
+        rows = b"".join(b"\x00" + bytes(self.px[y * row:(y + 1) * row]) for y in range(self.h))
         chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
-        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", self.w, self.h, 8, 6 if self.alpha else 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(rows, 6)) + chunk(b"IEND", b""))
 
 
