@@ -528,6 +528,9 @@ def status(host, pos=False):
     with link.lock:
         reps = dict(link.reports)
         pos_age = time.time() - link.seen["axis"] if "axis" in link.seen else None
+        # letzte Meldungen (Art, Aktion, Zustand) – zur Fehlersuche, z. B. was nach einem Abbruch kommt (Rohdaten der Werkbank)
+        now = time.time()
+        recent = [{"age_s": round(now - ts, 1), "type": k, "action": a, "state": st, "code": c, "own": m} for ts, k, a, m, st, c in link.recent]
     data = lambda k: ((reps.get(k) or {}).get("data")) or {}
     info, peri, temp, fan, light, axis = data("info"), data("peripherie"), data("tempature"), data("fan"), data("light"), data("axis")
     t = info.get("temp") or {}
@@ -544,7 +547,7 @@ def status(host, pos=False):
             "ace": ace_boxes({"multiColorBox": [reps["multiColorBox"]]} if "multiColorBox" in reps else {}),
             "connected": link.connected.is_set(), "error": link.error, "missing": [k for k, _ in POLL_QUERIES if k not in reps],
             # Rohdaten zum Nachsehen (z. B. ob die Firmware die Spülmenge meldet); Geheimnisse entfernt
-            "raw": {k: [v.get("data")] for k, v in reps.items()}}
+            "raw": {k: [v.get("data")] for k, v in reps.items()}, "recent": recent}
 
 
 # ---------- Befehle ----------

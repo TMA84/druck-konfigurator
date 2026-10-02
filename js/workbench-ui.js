@@ -221,7 +221,7 @@ $('wbDry').addEventListener('click', e => {
   const box = wbBox(), on = !(box.drying && box.drying.status);
   wbCmd(e.currentTarget, 'multiColorBox', 'setDry', { multi_color_box: [{ id: box.id, drying_status: { status: on ? 1 : 0, target_temp: Math.round(num($('wbDryTemp').value)), duration: Math.round(num($('wbDryMin').value)) } }] }, on ? t('Trocknen gestartet') : t('Trocknen beendet'));
 });
-$('wbRaw').addEventListener('click', () => { $('wbRawOut').classList.toggle('hidden'); if (wb.st) $('wbRawOut').textContent = JSON.stringify(wb.st.raw, null, 1); });
+$('wbRaw').addEventListener('click', () => { $('wbRawOut').classList.toggle('hidden'); if (wb.st) $('wbRawOut').textContent = JSON.stringify({ ...wb.st.raw, letzte_meldungen: wb.st.recent }, null, 1); });
 
 /* ---------- Kamera: HTTP-FLV vom Drucker, über den Server (mpegts.js spielt es im Browser ab – Nachfolger von flv.js,
    läuft auch auf dem iPhone ab iOS 17.1 über Apples ManagedMediaSource; flv.js ging dort gar nicht) ----------

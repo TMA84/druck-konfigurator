@@ -64,7 +64,10 @@ def packet(ptype, flags, body):
 
 
 def read_packet(sock):
-    head = sock.recv(1)
+    try:
+        head = sock.recv(1)
+    except OSError:   # Verbindung vom Test getrennt (broker.drop)
+        return None, None, None
     if not head:
         return None, None, None
     mult, length = 1, 0
