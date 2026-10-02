@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.11.0] – 2026-10-02
 
 ### Neu
 - **Home Assistant: Druck pausieren / fortsetzen** als Knöpfe – nur mit der Add-on-Option **Steuern aus Home Assistant** (Standard aus). Abbrechen geht nie über Home Assistant; ohne laufenden Druck lehnt der Drucker ab.
