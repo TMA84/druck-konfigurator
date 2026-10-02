@@ -347,5 +347,22 @@ spools.update(part, {"action": "import_history", "history": ex["history"], "idma
 check("nachgereicht zweimal: nichts doppelt", len(part["history"]) == len(ex["history"]))
 fails("import_history: kaputt", lambda: spools.update(part, {"action": "import_history", "history": "x"}), "history")
 
+# Kobra S1: fertiger Auftrag bleibt gemeldet, bis am Display bestätigt – Ende zählt ab „fertig“, genau ein Eintrag
+fin = spools.blank_state() if hasattr(spools, "blank_state") else {"spools": [], "track": {}, "history": []}
+fin.setdefault("spools", []); fin.setdefault("history", [])
+job = {"filename": "Satz_Platte1.gcode", "progress": 0, "supplies_usage": 0, "print_status": 1, "state": "printing"}
+spools.track(fin, job, -1, now=1000)
+spools.track(fin, dict(job, progress=50, supplies_usage=100), -1, now=4000)
+spools.track(fin, dict(job, progress=100, print_status=2, state="finished"), -1, now=7000)
+spools.track(fin, dict(job, progress=100, print_status=2, state="finished"), -1, now=50000)   # Stunden später noch gemeldet
+check("Fertig gemeldet: genau ein Eintrag, Dauer bis „fertig“", len(fin["history"]) == 1 and fin["history"][0]["duration_s"] == 6000, fin["history"])
+spools.track(fin, None, -1, now=60000)
+check("Danach Auftrag weg: kein zweiter Eintrag", len(fin["history"]) == 1 and fin["track"] == {}, fin["track"])
+spools.track(fin, dict(job, state="stoped", print_status=2), -1, now=61000)
+check("Abgebrochen ohne vorherigen Druck: kein Eintrag", len(fin["history"]) == 1)
+spools.track(fin, job, -1, now=70000)
+spools.track(fin, dict(job, state="stoped", print_status=2), -1, now=70085)
+check("Gleicher Name nochmal gedruckt, dann abgebrochen: neuer Eintrag mit 85 s", len(fin["history"]) == 2 and fin["history"][1]["duration_s"] == 85, fin["history"][-1:])
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

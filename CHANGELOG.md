@@ -12,6 +12,8 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - **Falsches Filament früher bemerkt:** Ist bei den Druckwerten ein anderes Material gewählt als im Slot des Teils steckt (vom Drucker/ACE oder eigene Angabe), steht das rot unter der Filament-Auswahl und in ③ vor dem Slicen – mit **Filament aus dem Slot übernehmen**. Bisher fiel es erst im Sendedialog auf.
 
 ### Behoben
+- **Restzeit ohne Vorbereitung:** Bett vermessen und Aufheizen vor der ersten Schicht (am S1 ~7 min) fehlten in der Restzeit und galten danach als „langsamer gedruckt“. Jetzt getrennt gerechnet; das Tool merkt sich die Dauer je Druck. Nachgerechnet an Platte 1 vom 01.10.: Orca 92,6 min, echt 99,7 min – mit Vorbereitung 99,6 min.
+- **Druckhistorie: Dauer viel zu lang** – der Kobra S1 meldet einen fertigen oder abgebrochenen Druck weiter, bis am Display bestätigt wird; das Tool zählte bis dahin weiter (ein Druck stand mit 22 h in der Historie). Jetzt endet er bei „fertig“/„abgebrochen“.
 - **Seite lud manchmal unvollständig** („Modell konnte nicht gelesen werden: … is not defined“): Der Server wies bei den gut 70 gleichzeitig geladenen Skripten einen Teil der Verbindungen ab (Warteschlange 5). Jetzt 128 – mit der alten kamen im Test nur ~20 von 100 gleichzeitigen Verbindungen durch, jetzt alle. Damit sind auch die gelegentlichen Fehlstarts der automatischen Tests weg.
 
 ## [10.9.6] – 2026-10-01

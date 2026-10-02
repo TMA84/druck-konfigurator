@@ -543,6 +543,16 @@ async function runSmoke(opts={}){
       $('matSlotWarn').querySelector('[data-adopt-slots]').click();await wait(80);
       ok(getMat(p.input.material).kind==='pla'&&$('matSlotWarn').classList.contains('hidden'),'Filament aus dem Slot übernommen: PLA, Hinweis weg');
       p.input.material=m0;store.settings.manualSlots=JSON.parse(ms0)||undefined;persist();loadPartIntoForm(p);update();await wait(50); }
+    // Restzeit mit Vorbereitung (Bett vermessen, Aufheizen): Zahlen wie Platte 1 am 01.10. (Orca 5557 s, echt 5983 s)
+    { const d0=lv.data,at0=lv.at,pr0=store.settings.prepS;delete store.settings.prepS;lv.prep={job:null,s:null};
+      lv.data={orca_s:5557,layer_s:Array(21).fill(100),layers:Array(21).fill([0,0])};lv.at={li:0,frac:0};
+      const r0=lvRemaining({job:{name:'P1',layer:0,elapsed_min:2}});
+      ok(r0&&r0.prep&&Math.abs(r0.s-(5557+300))<1,'Restzeit vor der 1. Schicht: Orca + restliche Vorbereitung ('+(r0&&Math.round(r0.s))+' s)');
+      lv.at={li:0,frac:0.01};const r1=lvRemaining({job:{name:'P1',layer:1,elapsed_min:7}});
+      ok(lv.prep.s===420&&store.settings.prepS===420&&Math.abs(r1.s-5557*0.99)<60,'1. Schicht: Vorbereitung 7 min gemerkt');
+      lv.at={li:10,frac:0};const done=5557*10/21,r2=lvRemaining({job:{name:'P1',layer:11,elapsed_min:Math.round((420+done)/60)}});
+      ok(Math.abs(r2.pace-1)<0.03,'Tempo ohne Vorbereitung gerechnet: kein Aufschlag ('+r2.pace.toFixed(3)+')');
+      lv.data=d0;lv.at=at0;if(pr0!=null)store.settings.prepS=pr0;else delete store.settings.prepS;persist(); }
     // Sendedialog ohne Drucker: „busy“ ohne Auftrag (nach Abbruch) und PETG im G-Code ↔ PLA in der ACE – nur Anzeige, nichts gesendet
     { const ctx0=sendCtx,info0=sendInfo;
       sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:[null,null,{kind:'petg',name:'PETG'}],name:'t',onStarted:null};

@@ -47,6 +47,7 @@ EXPORT_FORMAT = "druck-konfigurator-spools"
 MAX_SPOOLS = 500
 FLUSH_DEFAULT = 1.5
 HISTORY = 500
+ENDED_STATES = ("finished", "complete", "completed", "stoped", "stopped", "canceled", "cancelled", "failed")
 VIEW_HISTORY = 50          # so viele letzte Drucke bekommt die Seite mit GET /api/spools (alle über den Export)
 MAX_PLANS = 50
 PRICE_DEFAULT = 25.0
@@ -228,11 +229,21 @@ def track(state, project, loaded_slot, now=None, skipped=None):
     now = now or time.time()
     t = state.get("track") or {}
     changed = False
+    # Kobra S1: ein fertiger oder abgebrochener Auftrag bleibt gemeldet, bis jemand am Display bestätigt – das Ende zählt
+    # ab dann (2026-10-02: ein Druck stand mit 22 h in der Historie, beendet erst beim nächsten Druck)
+    ended = bool(project) and (project.get("print_status") in (2, 3) or str(project.get("state") or "").lower() in ENDED_STATES)
+    if ended:
+        if t.get("job") and not t.get("done"):
+            state.setdefault("history", []).append(finish_entry(state, t, now))
+            state["history"] = state["history"][-HISTORY:]
+            state["track"] = {"job": t["job"], "done": True}
+            return True
+        return changed
     if project:
         name = str(project.get("filename") or project.get("name") or "?")
         mm = project.get("supplies_usage")
         mm = float(mm) if isinstance(mm, (int, float)) else None
-        if t.get("job") != name:
+        if t.get("job") != name or t.get("done"):
             # Neuer Druck. Sieht der Server ihn erst mittendrin (z. B. nach einem Neustart), zählt er ab jetzt.
             early = (project.get("progress") or 0) <= 2
             t = {"job": name, "start": now, "mm": 0.0 if early or mm is None else mm, "slot": loaded_slot, "used": {}, "changes": 0}
@@ -262,6 +273,9 @@ def track(state, project, loaded_slot, now=None, skipped=None):
             t["skipped"] = sorted(int(x) for x in skipped)
             changed = True
         state["track"] = t
+    elif t.get("job") and t.get("done"):
+        state["track"] = {}
+        changed = True
     elif t.get("job"):
         # Druck zu Ende: in die Liste der letzten Drucke
         state.setdefault("history", []).append(finish_entry(state, t, now))

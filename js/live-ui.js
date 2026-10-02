@@ -8,7 +8,7 @@
    während des Drucks ab, api/anycubic/status?pos=1 – am Kobra S1 mit Firmware 2.7.2.7 geprüft am 2026-09-29) auf der
    gemeldeten Bahn, sonst geschätzt über die erwartete Schichtzeit. */
 
-const lv = { name: null, data: null, missing: false, renderer: null, scene: null, camera: null, controls: null, mesh: null, grid: null,
+const lv = { prep: { job: null, s: null }, name: null, data: null, missing: false, renderer: null, scene: null, camera: null, controls: null, mesh: null, grid: null,
   layerOf: null, shown: -2, shownDone: null, track: null, raf: 0, mode: null, loading: false, pos: null, cx: 0, cy: 0, head: null, layerAt: -1, layerSince: 0,
   hs: null, anim: 0, dirty: null, disp: null, lastTick: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
 const LV_POS_FRESH_S = 10;
@@ -474,6 +474,7 @@ function liveUpdate(st) {
    aktuellen Schicht aufsummiert. Läuft der Druck schneller oder langsamer als geschätzt, gleicht das gemessene Tempo
    (gedruckte Zeit des Druckers gegen die geschätzte bis hier) es nach und nach aus. null = keine Daten (ältere Vorschau). */
 const LV_PACE_MIN = 0.75, LV_PACE_MAX = 1.5, LV_PACE_FULL_S = 3600, LV_PACE_FROM_S = 900;
+const LV_PREP_DEFAULT_S = 420, LV_PREP_MIN_S = 60, LV_PREP_MAX_S = 1800;
 function lvRemaining(st) {
   const d = lv.data, job = st && st.job;
   if (!d || !job || !Array.isArray(d.layer_s) || !d.orca_s || !lv.at || d.layer_s.length !== d.layers.length) return null;
@@ -482,12 +483,24 @@ function lvRemaining(st) {
   const k = d.orca_s / tot, li = Math.min(ls.length - 1, Math.max(0, lv.at.li));
   let before = 0; for (let i = 0; i < li; i++) before += ls[i];
   const done = k * (before + lv.at.frac * ls[li]), rest = Math.max(0, d.orca_s - done);
-  // Tempo: gedruckte Zeit laut Drucker (inkl. Aufheizen) gegen die geschätzte – erst ab ¼ h, voll ab 1 h
   const el = (+job.elapsed_min || 0) * 60;
+  /* Vorbereitung vor der ersten Schicht (Bett vermessen, Aufheizen) rechnet Orca nicht mit – am S1 gemessen ~7 min
+     (2026-10-01: 99,7 min echt, Orca 92,6 min). Das Tool merkt sich die Dauer je Druck (store.settings.prepS) und
+     zählt sie getrennt: vorher kommt sie auf die Restzeit, danach nicht mehr ins Tempo. */
+  const prepEst = +store.settings.prepS > 0 ? +store.settings.prepS : LV_PREP_DEFAULT_S;
+  if (lv.prep.job !== job.name) lv.prep = { job: job.name, s: null };
+  if (!(+job.layer >= 1)) return { s: d.orca_s + Math.max(LV_PREP_MIN_S, prepEst - el), pace: 1, prep: true };
+  if (lv.prep.s == null) {
+    // erste Schicht gerade begonnen: bis hierher war Vorbereitung (nur wenn der Druck von Anfang an zu sehen war)
+    lv.prep.s = el > 0 && el < LV_PREP_MAX_S && done < 120 ? el : prepEst;
+    if (el > 0 && el < LV_PREP_MAX_S && done < 120) { store.settings.prepS = Math.round(+store.settings.prepS > 0 ? (+store.settings.prepS + el) / 2 : el); persist(); }
+  }
+  // Tempo: gedruckte Zeit laut Drucker (ohne Vorbereitung) gegen die geschätzte – erst ab ¼ h, voll ab 1 h
+  const run = Math.max(0, el - lv.prep.s);
   let pace = 1;
-  if (done > LV_PACE_FROM_S && el > 0) {
+  if (done > LV_PACE_FROM_S && run > 0) {
     const w = Math.min(1, done / LV_PACE_FULL_S);
-    pace = 1 + w * (Math.min(LV_PACE_MAX, Math.max(LV_PACE_MIN, el / done)) - 1);
+    pace = 1 + w * (Math.min(LV_PACE_MAX, Math.max(LV_PACE_MIN, run / done)) - 1);
   }
   return { s: rest * pace, pace };
 }
