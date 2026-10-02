@@ -46,6 +46,8 @@ ENTITIES = [
     ("queue_remaining_min", "sensor", "Warteschlange Restzeit", "min", "duration", None, "mdi:timer-sand"),
     ("plates", "sensor", "Platten fertig", None, None, None, "mdi:layers-outline"),
     ("bed_clear", "binary_sensor", "Bett abräumen", None, None, None, "mdi:printer-3d-nozzle-alert"),
+    # Spule unter der Warnschwelle oder die wartenden Platten der Warteschlange brauchen mehr, als im Slot ist
+    ("filament_low", "binary_sensor", "Filament knapp", None, "problem", None, "mdi:printer-3d-nozzle-alert"),
     # Druckhistorie der Filamentverwaltung (tools/spools.py stats): laufender Monat, beginnt am 1. wieder bei 0
     ("month_filament_g", "sensor", "Filament diesen Monat", "g", "weight", "total", "mdi:printer-3d-nozzle"),
     ("month_cost_eur", "sensor", "Filamentkosten diesen Monat", "EUR", "monetary", "total", "mdi:cash"),
@@ -96,6 +98,34 @@ def month_values(spool_view):
             "month_prints": int(sm.get("prints") or 0), "month": sm.get("month"), "month_hours": round(sm.get("hours") or 0, 2)}
 
 
+def filament_check(queue, spool_view):
+    """Hinweise (Text je Slot): Spule unter der Warnschwelle, oder die noch wartenden Platten der Warteschlange
+    brauchen mehr, als auf der Spule ist (Gramm je Slot aus dem Slicen)."""
+    sv = spool_view or {}
+    low = sv.get("low_g") or 100
+    spools = {sp["slot"]: sp for sp in sv.get("spools") or [] if isinstance(sp.get("slot"), int) and not sp.get("archived")
+              and isinstance(sp.get("remaining_g"), (int, float))}
+    need = {}
+    q = (queue or {}).get("queue") or {}
+    plates = {p.get("plate"): p for p in ((q.get("slice") or {}).get("plates") or [])}
+    for it in q.get("items") or []:
+        if it.get("state") == "wait":
+            for i, g in enumerate((plates.get(it.get("plate")) or {}).get("grams") or []):
+                if isinstance(g, (int, float)) and g > 0:
+                    need[i] = need.get(i, 0) + g
+    out = []
+    for i in sorted(set(spools) | set(need)):
+        sp = spools.get(i)
+        if not sp:
+            continue
+        rem = sp["remaining_g"]
+        if need.get(i, 0) > rem:
+            out.append("Slot %d: Warteschlange braucht noch ≈ %d g, auf der Spule ≈ %d g" % (i + 1, round(need[i]), round(rem)))
+        elif rem < low:
+            out.append("Slot %d: nur noch ≈ %d g" % (i + 1, round(rem)))
+    return out
+
+
 def payload(st, queue, now=None, spool_view=None):
     """Werte für <base>/state. st = anycubic_lan.status (oder None), queue = printqueue.api_get(), spool_view = spools.api_get()."""
     now = now or time.time()
@@ -110,6 +140,7 @@ def payload(st, queue, now=None, spool_view=None):
             "nozzle_temp": rnd(temps.get("curr_nozzle_temp")), "bed_temp": rnd(temps.get("curr_hotbed_temp")),
             "queue_state": sm.get("text") or "keine", "queue_remaining_min": round((sm.get("remaining_s") or 0) / 60),
             "plates": "%d/%d" % (sm.get("done") or 0, sm.get("total") or 0), "plates_done": sm.get("done") or 0,
+            "filament_low": "ON" if filament_check(queue, spool_view) else "OFF", "filament_note": "; ".join(filament_check(queue, spool_view)) or None,
             "plates_total": sm.get("total") or 0, "queue_current": sm.get("current"), "queue_next": sm.get("next"),
             "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view))
 
@@ -188,7 +219,7 @@ class Publisher:
                 c["icon"] = icon
             if comp == "binary_sensor":
                 c.update(payload_on="ON", payload_off="OFF")
-            if key in ("printer_state", "queue_state", "month_prints"):
+            if key in ("printer_state", "queue_state", "month_prints", "filament_low"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
         if self.image_fn:

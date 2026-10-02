@@ -189,6 +189,19 @@ two = {"ace": [{"id": 0, "slots": [{"index": i} for i in range(4)]}, {"id": 1, "
 check("zwei ACE: Sensoren für Slot 1–8", sorted(ha_mqtt.slot_payloads(two, {"spools": []})) == list(range(1, 9)))
 check("Slots ohne Drucker laut Filamentverwaltung", sorted(ha_mqtt.slot_payloads(None, SPOOLS)) == [1])
 
+# Filament knapp: Spule unter der Warnschwelle, oder die wartenden Platten brauchen mehr als auf der Spule ist
+sv = {"low_g": 100, "spools": [{"slot": 0, "remaining_g": 500}, {"slot": 1, "remaining_g": 60}, {"slot": 2, "remaining_g": 900, "archived": True}]}
+qv = {"queue": {"slice": {"plates": [{"plate": 1, "grams": [300, 0]}, {"plate": 2, "grams": [250, 10]}, {"plate": 3, "grams": [100, 0]}]},
+                "items": [{"plate": 1, "state": "done"}, {"plate": 2, "state": "wait"}, {"plate": 3, "state": "wait"}]}}
+fc = ha_mqtt.filament_check(qv, sv)
+check("Filament knapp: Slot 2 unter Warnschwelle, Slot 1 reicht (350 g < 500 g)", fc == ["Slot 2: nur noch ≈ 60 g"], fc)
+qv["queue"]["items"][0]["state"] = "wait"
+fc = ha_mqtt.filament_check(qv, sv)
+check("Filament knapp: Warteschlange braucht 650 g, Spule 500 g", fc[0] == "Slot 1: Warteschlange braucht noch ≈ 650 g, auf der Spule ≈ 500 g", fc)
+check("Filament reicht: nichts", ha_mqtt.filament_check(None, {"low_g": 100, "spools": [{"slot": 0, "remaining_g": 800}]}) == [])
+p_ = ha_mqtt.payload(None, qv, spool_view=sv)
+check("Stand: filament_low ON mit Text", p_["filament_low"] == "ON" and "Slot 1" in p_["filament_note"], p_.get("filament_note"))
+
 # ---------- gegen den Broker ----------
 broker = Broker()
 broker.start()
@@ -228,7 +241,7 @@ s1 = json.loads(disc("sensor", "slot1_remaining")[1])
 check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attributes_topic"] == "dk_test/slot/1" and s1["unit_of_measurement"] == "g"
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
-check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 1 + 4, sorted(set(uids)))
+check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 2 + 4, sorted(set(uids)))
 mc = json.loads(disc("sensor", "month_cost_eur")[1])
 check("Kosten diesen Monat: monetary EUR", mc["device_class"] == "monetary" and mc["unit_of_measurement"] == "EUR" and mc["state_class"] == "total"
       and mc["value_template"] == "{{ value_json.month_cost_eur }}", mc)
