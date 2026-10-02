@@ -12,7 +12,10 @@ Themen (base = MQTT_BASE_TOPIC):
   <base>/progress_image   PNG des Druckfortschritts (MQTT-Kamera „3D-Fortschritt“, retained; tools/progress_image.py) –
                           bei jeder neuen Schicht, nur für Drucke aus dem Tool
   <prefix>/<component>/<base>/<key>/config   Discovery (retained)
-Ein Gerät „Druck-Konfigurator <Druckermodell>“. Der Server liest nur – über MQTT wird nichts gesteuert.
+  <base>/cmd              nur mit MQTT_CONTROL=1: „pause“ / „resume“ (Knöpfe „Druck pausieren“ / „Druck fortsetzen“)
+Ein Gerät „Druck-Konfigurator <Druckermodell>“. Ohne MQTT_CONTROL liest der Server nur – über MQTT wird nichts gesteuert.
+Mit MQTT_CONTROL (Add-on-Option „Steuern aus Home Assistant“, Standard aus) nur Pausieren und Fortsetzen, nie Abbrechen;
+der Befehl geht wie aus der Werkbank an den Drucker (tools/anycubic_lan.py command) – ohne laufenden Druck lehnt er ab.
 """
 import datetime
 import json
@@ -68,7 +71,8 @@ def config_from_env(env=None):
     return {"host": host, "port": port, "user": env.get("MQTT_USER") or None, "password": env.get("MQTT_PASSWORD") or None,
             "tls": str(env.get("MQTT_TLS") or "").lower() in ("1", "true", "yes", "on"),
             "prefix": (env.get("MQTT_DISCOVERY_PREFIX") or "homeassistant").strip("/"),
-            "base": (env.get("MQTT_BASE_TOPIC") or "druck_konfigurator").strip("/")}
+            "base": (env.get("MQTT_BASE_TOPIC") or "druck_konfigurator").strip("/"),
+            "control": str(env.get("MQTT_CONTROL") or "").lower() in ("1", "true", "yes", "on")}
 
 
 def _finish(remaining_min, now):
@@ -165,11 +169,12 @@ def slot_payloads(st, spool_view):
 class Publisher:
     """Hintergrund-Thread mit stehender Verbindung zum Broker. Verbindet neu, wenn der Broker weg war."""
 
-    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S, image_fn=None):
+    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S, image_fn=None, control_fn=None):
         self.cfg, self.status_fn, self.queue_fn, self.spools_fn, self.image_fn = cfg, status_fn, queue_fn, spools_fn, image_fn
+        self.control_fn = control_fn if cfg.get("control") else None   # nur, wenn ausdrücklich eingeschaltet
         self.loop_s, self.every_s = loop_s, every_s
         b = cfg["base"]
-        self.t_avail, self.t_state, self.t_slot, self.t_image = b + "/availability", b + "/state", b + "/slot/%d", b + "/progress_image"
+        self.t_avail, self.t_state, self.t_slot, self.t_image, self.t_cmd = b + "/availability", b + "/state", b + "/slot/%d", b + "/progress_image", b + "/cmd"
         self.client, self.connected, self.need_discovery = None, False, True
         self.last, self.last_time, self.slots_last, self.disc_key = None, 0, {}, None
         self.last_error = None
@@ -226,6 +231,11 @@ class Publisher:
             out["%s/camera/%s/progress/config" % (prefix, base)] = dict(
                 common, name="3D-Fortschritt", unique_id=base + "_progress", default_entity_id="camera." + base + "_progress",
                 topic=self.t_image, icon="mdi:cube-outline")
+        if self.control_fn:
+            for key, name, icon in (("pause", "Druck pausieren", "mdi:pause"), ("resume", "Druck fortsetzen", "mdi:play")):
+                out["%s/button/%s/%s/config" % (prefix, base, key)] = dict(
+                    common, name=name, unique_id=base + "_" + key, default_entity_id="button." + base + "_" + key,
+                    command_topic=self.t_cmd, payload_press=key, icon=icon)
         for n in slots:
             key = "slot%d_remaining" % n
             out["%s/sensor/%s/%s/config" % (prefix, base, key)] = dict(
@@ -254,6 +264,8 @@ class Publisher:
                 return
             self.connected, self.need_discovery, self.last = True, True, None
             client.subscribe(cfg["prefix"] + "/status", qos=1)     # Home Assistant neu gestartet → Discovery erneut
+            if self.control_fn:
+                client.subscribe(self.t_cmd, qos=1)
             self.last_error = None
 
         def on_disconnect(*_a):
@@ -262,11 +274,21 @@ class Publisher:
         def on_message(_c, _u, msg):
             if msg.topic == cfg["prefix"] + "/status" and msg.payload == b"online":
                 self.need_discovery, self.last = True, None
+            elif msg.topic == self.t_cmd and self.control_fn and msg.payload in (b"pause", b"resume") and not msg.retain:
+                act = msg.payload.decode()
+                threading.Thread(target=self._control, args=(act,), daemon=True).start()   # nicht im Netz-Thread warten
 
         c.on_connect, c.on_disconnect, c.on_message = on_connect, on_disconnect, on_message
         c.connect_async(cfg["host"], cfg["port"], keepalive=60)
         c.loop_start()                                   # verbindet selbst neu (auch den ersten Versuch)
         self.client = c
+
+    def _control(self, action):
+        try:
+            self.control_fn(action)
+            self._log("Befehl aus Home Assistant: %s" % action)
+        except Exception as e:   # z. B. kein Druck läuft – nur melden
+            self._log("Befehl %s abgelehnt: %s" % (action, str(e) or type(e).__name__))
 
     def _log(self, msg):
         if msg != self.last_error:
@@ -321,12 +343,13 @@ class Publisher:
             time.sleep(self.loop_s)
 
 
-def start(status_fn, queue_fn, spools_fn, env=None, image_fn=None):
+def start(status_fn, queue_fn, spools_fn, env=None, image_fn=None, control_fn=None):
     """Aus serve.py: startet den Publisher, wenn MQTT_HOST gesetzt ist. Gibt (Publisher|None, Meldung) zurück."""
     cfg = config_from_env(env)
     if not cfg:
         return None, None
     if not AVAILABLE:
         return None, "Home Assistant (MQTT): braucht paho-mqtt (pip install -r requirements.txt) – aus"
-    p = Publisher(cfg, status_fn, queue_fn, spools_fn, image_fn=image_fn).start()
-    return p, "Home Assistant (MQTT): %s:%d, Themen %s/…, Discovery %s/…" % (cfg["host"], cfg["port"], cfg["base"], cfg["prefix"])
+    p = Publisher(cfg, status_fn, queue_fn, spools_fn, image_fn=image_fn, control_fn=control_fn).start()
+    return p, "Home Assistant (MQTT): %s:%d, Themen %s/…, Discovery %s/…%s" % (cfg["host"], cfg["port"], cfg["base"], cfg["prefix"],
+                                                                         ", Pausieren/Fortsetzen aus Home Assistant erlaubt" if cfg["control"] and control_fn else "")

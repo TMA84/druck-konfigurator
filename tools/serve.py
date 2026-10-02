@@ -580,7 +580,8 @@ def main():
         print("Warteschlange: " + printqueue.data_file(), flush=True)
         try:
             _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get,
-                                    image_fn=progress_image.ProgressImages(printed_preview))
+                                    image_fn=progress_image.ProgressImages(printed_preview),
+                                    control_fn=lambda action: anycubic_lan.command(printer_host() or "", "print", action, {}))
             if note:
                 print(note, flush=True)
         except Exception as e:   # MQTT darf den Start nie verhindern

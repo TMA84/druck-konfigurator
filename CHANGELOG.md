@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Neu
+- **Home Assistant: Druck pausieren / fortsetzen** als Knöpfe – nur mit der Add-on-Option **Steuern aus Home Assistant** (Standard aus). Abbrechen geht nie über Home Assistant; ohne laufenden Druck lehnt der Drucker ab.
 - **Home Assistant: „Filament knapp“** (`binary_sensor.druck_konfigurator_filament_low`): an, wenn eine Spule unter der Warnschwelle liegt oder die noch wartenden Platten der Warteschlange mehr brauchen, als im Slot ist; der Grund steht im Attribut `filament_note`.
 
 ### Verbessert

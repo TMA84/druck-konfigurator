@@ -158,7 +158,7 @@ def wait(cond, s=5):
 check("aus ohne MQTT_HOST", ha_mqtt.config_from_env({}) is None and ha_mqtt.config_from_env({"MQTT_HOST": " "}) is None)
 cfg = ha_mqtt.config_from_env({"MQTT_HOST": "core-mosquitto", "MQTT_USER": "u", "MQTT_PORT": "8883", "MQTT_TLS": "true"})
 check("Einstellungen", cfg == {"host": "core-mosquitto", "port": 8883, "user": "u", "password": None, "tls": True,
-                               "prefix": "homeassistant", "base": "druck_konfigurator"}, cfg)
+                               "prefix": "homeassistant", "base": "druck_konfigurator", "control": False}, cfg)
 check("Druckerstatus offline", ha_mqtt.printer_state(None) == "offline" and ha_mqtt.printer_state({"connected": False}) == "offline")
 check("Druckerstatus frei", ha_mqtt.printer_state({"connected": True, "state": "free", "job": None}) == "frei")
 check("Druckerstatus pausiert", ha_mqtt.printer_state({"connected": True, "job": {"status": "druckt", "paused": True}}) == "pausiert")
@@ -292,6 +292,25 @@ check("neu verbunden", wait(lambda: len(broker.logins) > logins, 10), broker.log
 check("nach Neuverbindung wieder online", wait(lambda: broker.pubs[-1][0] != "" and broker.last("dk_test/availability")[1] == "online"))
 pub.stop()
 check("beim Beenden offline", wait(lambda: broker.last("dk_test/availability")[1] == "offline"))
+
+# Steuern aus Home Assistant: nur mit MQTT_CONTROL, nur pause/resume, retained Befehle nicht
+calls = []
+off = ha_mqtt.Publisher(dict(cfg, base="dk_off"), lambda: ST, lambda: None, lambda: SPOOLS, loop_s=0.1, control_fn=calls.append).start()
+check("ohne MQTT_CONTROL: keine Knöpfe", wait(lambda: broker.last("homeassistant/sensor/dk_off/progress/config")) and broker.last("homeassistant/button/dk_off/pause/config") is None)
+broker.send_to_all("dk_off/cmd", b"pause"); time.sleep(0.5)
+check("ohne MQTT_CONTROL: Befehl wird ignoriert", calls == [], calls)
+off.stop()
+check("MQTT_CONTROL aus der Umgebung", ha_mqtt.config_from_env(dict(env, MQTT_CONTROL="true"))["control"] and not ha_mqtt.config_from_env(env)["control"])
+on = ha_mqtt.Publisher(dict(cfg, base="dk_on", control=True), lambda: ST, lambda: None, lambda: SPOOLS, loop_s=0.1, control_fn=calls.append).start()
+bt = lambda k: broker.last("homeassistant/button/dk_on/%s/config" % k)
+check("Knöpfe Pausieren/Fortsetzen angemeldet", wait(lambda: bt("pause") and bt("resume")) and json.loads(bt("pause")[1])["command_topic"] == "dk_on/cmd"
+      and json.loads(bt("resume")[1])["payload_press"] == "resume", bt("pause"))
+check("Befehlsthema abonniert", wait(lambda: "dk_on/cmd" in broker.subs), broker.subs)
+broker.send_to_all("dk_on/cmd", b"pause")
+broker.send_to_all("dk_on/cmd", b"stop")
+broker.send_to_all("dk_on/cmd", b"resume")
+check("pause/resume ausgeführt, stop nicht", wait(lambda: calls == ["pause", "resume"]), calls)
+on.stop()
 
 # Fortschrittsbild (MQTT-Kamera): Discovery „camera“, Bild retained, nur wenn image_fn eins liefert
 imgs = [b"\x89PNG\r\n\x1a\nEINS", None, b"\x89PNG\r\n\x1a\nZWEI"]
