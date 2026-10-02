@@ -8,6 +8,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - **Home Assistant: „Filament knapp“** (`binary_sensor.druck_konfigurator_filament_low`): an, wenn eine Spule unter der Warnschwelle liegt oder die noch wartenden Platten der Warteschlange mehr brauchen, als im Slot ist; der Grund steht im Attribut `filament_note`.
 
 ### Verbessert
+- **Druckzeiten mit Vorbereitung:** In ③, bei den Platten und in der Warteschlange kommt die gemessene Vorbereitung (Bett vermessen, Aufheizen; Standard 7 min) je Platte auf Orcas Zeit – z. B. „Druckzeit ≈ 16 min (Orca 9 min + Vorbereitung)“.
 - **Seite lädt schneller:** Der Server verbot dem Browser bisher, irgendetwas zu behalten, und schickte bei jedem Öffnen 80 Dateien mit 2,1 MB. Jetzt bekommt jede Datei eine Versionskennung und bleibt im Browser, bis sie sich ändert; Texte kommen gzip-komprimiert. Erstes Öffnen 632 KB statt 2,1 MB, jedes weitere 5 KB (gemessen lokal: 90–140 ms statt 210–810 ms). Spürbar vor allem am Handy über Home Assistant.
 
 ## [10.10.0] – 2026-10-02

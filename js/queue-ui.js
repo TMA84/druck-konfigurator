@@ -76,14 +76,14 @@ async function startQueue() {
   const o = orderPlates(s.plates, costState.materials, live.length ? live : null, slotMatchesKind);
   const materials = Object.fromEntries(Object.entries(costState.materials || {}).map(([k, m]) => [k, m ? { kind: m.kind, name: m.name } : null]));
   const name = project ? project.name : 'Druck';
-  const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s, changes: p.changes }));
+  const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s + prepS(), changes: p.changes }));
   if (qSrv.mode === 'server') {
     try { await queueApi({ action: 'create', name, job: s.job, plates, materials, order: o.list.map(n => n.plate) }); }
     catch (e) { toast(t('Warteschlange nicht angelegt: {msg}', { msg: e.message })); return; }
     queueSync();
   } else {
     saveQueue({ name, created: Date.now(), materials, slice: { job: s.job, plates },
-      items: o.list.map(n => { const p = s.plates.find(x => x.plate === n.plate); return { plate: n.plate, time_s: p.time_s, total_g: p.total_g, state: 'wait' }; }) });
+      items: o.list.map(n => { const p = s.plates.find(x => x.plate === n.plate); return { plate: n.plate, time_s: p.time_s + prepS(), total_g: p.total_g, state: 'wait' }; }) });
   }
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
   toast(t(o.changed ? 'Warteschlange mit {n} Platten angelegt – sortiert nach Filament' : 'Warteschlange mit {n} Platten angelegt', { n: s.plates.length }));

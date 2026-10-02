@@ -484,3 +484,9 @@ I18N.add({
 I18N.add({
  "Anzahl nur für dieses Teil …": "Quantity for this part only …"
 });
+
+I18N.add({
+ "Druckzeit ≈ {time} · {g} g": "Print time ≈ {time} · {g} g",
+ "Orca {time} + Vorbereitung": "Orca {time} + preparation",
+ "Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung ({p}) je Platte auf.": "Orca doesn't include bed levelling and heating – the tool adds the measured preparation ({p}) per plate."
+});

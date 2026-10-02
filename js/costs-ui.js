@@ -131,7 +131,8 @@ function renderCostPanel() {
   table.querySelector('tbody').innerHTML = html;
   table.classList.remove('hidden');
   info.innerHTML = (fresh ? '' : costState.busy || (costAuto() && costSignature() !== costState.failedSig) ? t('<b>Wird neu berechnet …</b>') + ' ' : t('<b>Veraltet</b> – das Projekt hat sich geändert, bitte neu berechnen.') + ' ') +
-    t('Druckzeit {time} · {g} g laut Orca', { time: duration(tot.time_s), g: de(tot.total_g, 1) }) + (costState.slice.plates.length > 1 ? ' · ' + t('{n} Platten', { n: costState.slice.plates.length }) : '') +
+    t('Druckzeit ≈ {time} · {g} g', { time: duration(tot.time_s + prepS() * costState.slice.plates.length), g: de(tot.total_g, 1) }) +
+      '<span class="muted small" title="' + esc(t('Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung ({p}) je Platte auf.', { p: duration(prepS()) })) + '"> (' + esc(t('Orca {time} + Vorbereitung', { time: duration(tot.time_s) })) + ')</span>' + (costState.slice.plates.length > 1 ? ' · ' + t('{n} Platten', { n: costState.slice.plates.length }) : '') +
     (costState.slice.sliced != null && costState.slice.sliced < costState.slice.plates.length ? ' · ' + t('neu geslict: {n} von {total}', { n: costState.slice.sliced, total: costState.slice.plates.length }) : '') +
     (costState.slice.orca ? ' <span class="muted">(OrcaSlicer ' + esc(costState.slice.orca) + ')</span>' : '') +
     ((costState.notes || []).length ? '<br>' + costState.notes.map(esc).join('<br>') : '');
@@ -161,7 +162,7 @@ function renderPlateCosts(slots, live) {
   const purge = costPurge(), cfg = costCfg();
   $('plateCosts').querySelector('tbody').innerHTML = s.plates.map(p => {
     const c = computeCosts({ total: p }, slots, purge, cfg);
-    return '<tr data-pv-plate="' + p.plate + '" title="' + t('In der Vorschau zeigen') + '"><td>' + p.plate + (p.reused ? '<small>' + t('unverändert') + '</small>' : '') + '</td><td>' + duration(p.time_s) + (p.changes ? '<small>' + t('{n} Wechsel', { n: p.changes }) + '</small>' : '') + '</td><td>' + de(p.total_g, 1) + ' g</td><td>' + eur(c.total) + '</td></tr>';
+    return '<tr data-pv-plate="' + p.plate + '" title="' + t('In der Vorschau zeigen') + '"><td>' + p.plate + (p.reused ? '<small>' + t('unverändert') + '</small>' : '') + '</td><td>' + duration(p.time_s + prepS()) + (p.changes ? '<small>' + t('{n} Wechsel', { n: p.changes }) + '</small>' : '') + '</td><td>' + de(p.total_g, 1) + ' g</td><td>' + eur(c.total) + '</td></tr>';
   }).join('');
   const o = orderPlates(s.plates, costState.materials, live.length ? live : null, slotMatchesKind);
   const miss = o.list.filter(n => n.missing.length);
@@ -178,6 +179,9 @@ $('plateCosts').addEventListener('click', e => {
   const sel = $('pvPlate'); sel.value = tr.dataset.pvPlate; sel.dispatchEvent(new Event('change'));
 });
 
+/* Vorbereitung je Platte (Bett vermessen, Aufheizen): rechnet Orca nicht mit; gemessen beim letzten Druck (js/live-ui.js,
+   store.settings.prepS), sonst ~7 min wie am S1 gemessen. Kommt auf die angezeigten Druckzeiten und in die Warteschlange. */
+const prepS = () => +store.settings.prepS > 0 ? +store.settings.prepS : 420;
 async function runCosts() {
   if (!project || costState.busy) return;
   const health = await serverHealth();

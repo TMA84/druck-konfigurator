@@ -214,7 +214,7 @@ function renderPlates() {
     const need = plateNeeds({ plate: k, grams: plateSlotUse(plan, idx) }, mats, slots.length ? slots : null, slotMatchesKind);
     const sp = sl && sl.plates.find(p => p.plate === k), conflict = tempConflict(kinds, usedSlots(plan, idx));
     html += '<li class="plate-card"><div class="plate-head"><b>' + t('Platte {n}', { n: k }) + '</b><span class="muted small">' + t(idx.length > 1 ? '{n} Teile' : '{n} Teil', { n: idx.length }) +
-      (sp ? ' · ' + duration(sp.time_s) + ' · ' + de(sp.total_g, 1) + ' g' : '') + '</span>' +
+      (sp ? ' · ' + duration(sp.time_s + prepS()) + ' · ' + de(sp.total_g, 1) + ' g' : '') + '</span>' +
       '<span class="plate-slots">' + need.tools.map(tl => { const s = slots[tl], c = s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : '#dddddd'; return '<span class="pslot" style="background:' + c + '" title="Slot ' + (tl + 1) + (s && s.type ? ' · ' + esc(s.type) : '') + '"></span>'; }).join('') + '</span></div>' +
       (lay.places ? plateSvg(tpl, lay, idx, slots, plan.slot) : '') +
       (need.missing.length ? '<p class="note bad small">' + need.missing.map(m => m.have ? t('Slot {n}: braucht {want}, eingelegt ist {have}', { n: m.slot + 1, want: esc(m.want), have: esc(m.have) })
