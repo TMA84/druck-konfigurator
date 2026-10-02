@@ -297,4 +297,5 @@ I18N.add({
   "Ausführlich:": "In detail:",
   "Handbuch öffnen (PDF)": "Open manual (PDF)",
   "– alle Funktionen mit Bildern, dazu Lösungen für häufige Probleme.": "– all features with pictures, plus solutions to common problems.",
+  "In OrcaSlicer über Datei → Einstellungen importieren beide laden. Rückzug bleibt außen vor (Druckerprofil).": "In OrcaSlicer, load both via <b>File → Import configs</b>. Retraction is left out (printer profile).",
 });
