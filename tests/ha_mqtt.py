@@ -123,7 +123,11 @@ class Broker(threading.Thread):
                         conn.sendall(packet(4, 0, rest[:2]))
                         rest = rest[2:]
                     with self.lock:
-                        self.pubs.append((topic, rest.decode(), bool(flags & 1)))
+                        try:
+                            payload = rest.decode()
+                        except UnicodeDecodeError:   # Bild (PNG) bleibt Bytes
+                            payload = rest
+                        self.pubs.append((topic, payload, bool(flags & 1)))
                 elif ptype == 12:  # PINGREQ
                     conn.sendall(packet(13, 0, b""))
                 elif ptype == 14:  # DISCONNECT
@@ -275,6 +279,17 @@ check("neu verbunden", wait(lambda: len(broker.logins) > logins, 10), broker.log
 check("nach Neuverbindung wieder online", wait(lambda: broker.pubs[-1][0] != "" and broker.last("dk_test/availability")[1] == "online"))
 pub.stop()
 check("beim Beenden offline", wait(lambda: broker.last("dk_test/availability")[1] == "offline"))
+
+# Fortschrittsbild (MQTT-Kamera): Discovery „camera“, Bild retained, nur wenn image_fn eins liefert
+imgs = [b"\x89PNG\r\n\x1a\nEINS", None, b"\x89PNG\r\n\x1a\nZWEI"]
+ipub = ha_mqtt.Publisher(dict(cfg, base="dk_img"), lambda: ST, lambda: None, lambda: SPOOLS, loop_s=0.1, every_s=0.6,
+                         image_fn=lambda st: imgs.pop(0) if imgs else None).start()
+cam = lambda: broker.last("homeassistant/camera/dk_img/progress/config")
+check("Kamera angemeldet", wait(cam) and json.loads(cam()[1])["topic"] == "dk_img/progress_image" and json.loads(cam()[1])["name"] == "3D-Fortschritt", cam())
+check("Bilder gesendet, retained, als Bytes", wait(lambda: not imgs) and wait(lambda: broker.last("dk_img/progress_image") == ("dk_img/progress_image", b"\x89PNG\r\n\x1a\nZWEI", True)),
+      broker.last("dk_img/progress_image"))
+check("ohne Bild keine Nachricht", sum(1 for p in broker.pubs if p[0] == "dk_img/progress_image") == 2)
+ipub.stop()
 
 # Falsches Passwort und fehlende Bibliothek: kein Absturz
 bad = ha_mqtt.Publisher(dict(cfg, password="falsch"), lambda: None, lambda: None, lambda: None, loop_s=0.1)

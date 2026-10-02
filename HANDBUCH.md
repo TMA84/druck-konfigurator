@@ -450,6 +450,17 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
 
+**Kamera „3D-Fortschritt“** (`camera.druck_konfigurator_progress`): ein Bild des laufenden Drucks – schräg von oben, gedruckte Schichten in den Farben der ACE-Slots, die aktuelle hell, dazu der Umriss des ganzen Modells. Neu bei jeder Schicht, nur für Drucke aus dem Tool. Es braucht keine Anmeldung am Add-on (anders als die eingebettete Seite) – geht also auch in der Handy-App und als Bild in Benachrichtigungen, z. B.:
+
+```yaml
+action: notify.mobile_app_mein_handy
+data:
+  title: 3D-Drucker
+  message: "Fertig: {{ states('sensor.druck_konfigurator_job') }}"
+  data:
+    image: /api/camera_proxy/camera.druck_konfigurator_progress
+```
+
 Damit lassen sich Automationen bauen, z. B. eine Handy-Benachrichtigung bei **Bett abräumen** oder bei wenig Filament; ein Beispiel steht in der README des Add-ons. Ohne Home Assistant geht dasselbe mit einem eigenen MQTT-Broker (Umgebungsvariablen `MQTT_HOST`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASSWORD`).
 
 ## 9. 3MF für OrcaSlicer speichern

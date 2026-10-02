@@ -49,6 +49,7 @@ import anycubic_lan  # noqa: E402
 import gcode_preview  # noqa: E402
 import ha_mqtt  # noqa: E402
 import printqueue  # noqa: E402
+import progress_image  # noqa: E402
 import slicer  # noqa: E402
 import spools  # noqa: E402
 
@@ -494,7 +495,8 @@ def main():
         WATCHER = printqueue.Watcher(anycubic_lan, printer_host).start()   # Warteschlange: fertige Platten erkennen
         print("Warteschlange: " + printqueue.data_file(), flush=True)
         try:
-            _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get)
+            _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get,
+                                    image_fn=progress_image.ProgressImages(printed_preview))
             if note:
                 print(note, flush=True)
         except Exception as e:   # MQTT darf den Start nie verhindern

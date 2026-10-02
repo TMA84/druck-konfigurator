@@ -9,6 +9,8 @@ Themen (base = MQTT_BASE_TOPIC):
   <base>/state            JSON mit allen Werten (siehe payload()), alle 15 s und bei Änderung – auch Filament, Kosten und
                           Anzahl der Drucke im laufenden Monat (aus der Druckhistorie, tools/spools.py stats)
   <base>/slot/<n>         JSON je ACE-Slot (1 …): remaining_g, name, type, colour, net_g, brand
+  <base>/progress_image   PNG des Druckfortschritts (MQTT-Kamera „3D-Fortschritt“, retained; tools/progress_image.py) –
+                          bei jeder neuen Schicht, nur für Drucke aus dem Tool
   <prefix>/<component>/<base>/<key>/config   Discovery (retained)
 Ein Gerät „Druck-Konfigurator <Druckermodell>“. Der Server liest nur – über MQTT wird nichts gesteuert.
 """
@@ -132,11 +134,11 @@ def slot_payloads(st, spool_view):
 class Publisher:
     """Hintergrund-Thread mit stehender Verbindung zum Broker. Verbindet neu, wenn der Broker weg war."""
 
-    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S):
-        self.cfg, self.status_fn, self.queue_fn, self.spools_fn = cfg, status_fn, queue_fn, spools_fn
+    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S, image_fn=None):
+        self.cfg, self.status_fn, self.queue_fn, self.spools_fn, self.image_fn = cfg, status_fn, queue_fn, spools_fn, image_fn
         self.loop_s, self.every_s = loop_s, every_s
         b = cfg["base"]
-        self.t_avail, self.t_state, self.t_slot = b + "/availability", b + "/state", b + "/slot/%d"
+        self.t_avail, self.t_state, self.t_slot, self.t_image = b + "/availability", b + "/state", b + "/slot/%d", b + "/progress_image"
         self.client, self.connected, self.need_discovery = None, False, True
         self.last, self.last_time, self.slots_last, self.disc_key = None, 0, {}, None
         self.last_error = None
@@ -189,6 +191,10 @@ class Publisher:
             if key in ("printer_state", "queue_state", "month_prints"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
+        if self.image_fn:
+            out["%s/camera/%s/progress/config" % (prefix, base)] = dict(
+                common, name="3D-Fortschritt", unique_id=base + "_progress", default_entity_id="camera." + base + "_progress",
+                topic=self.t_image, icon="mdi:cube-outline")
         for n in slots:
             key = "slot%d_remaining" % n
             out["%s/sensor/%s/%s/config" % (prefix, base, key)] = dict(
@@ -263,6 +269,14 @@ class Publisher:
             if sp != self.slots_last.get(n) or sent:
                 self._pub(self.t_slot % n, sp)
                 self.slots_last[n] = sp
+        if self.image_fn:
+            try:
+                img = self.image_fn(st)          # nur bei neuer Schicht ein Bild, sonst None
+            except Exception as e:               # das Bild darf den Stand nie aufhalten
+                img = None
+                self._log("Fortschrittsbild: " + (str(e) or type(e).__name__))
+            if img:
+                self.client.publish(self.t_image, img, qos=0, retain=True)
         return sent
 
     def _run(self):
@@ -276,12 +290,12 @@ class Publisher:
             time.sleep(self.loop_s)
 
 
-def start(status_fn, queue_fn, spools_fn, env=None):
+def start(status_fn, queue_fn, spools_fn, env=None, image_fn=None):
     """Aus serve.py: startet den Publisher, wenn MQTT_HOST gesetzt ist. Gibt (Publisher|None, Meldung) zurück."""
     cfg = config_from_env(env)
     if not cfg:
         return None, None
     if not AVAILABLE:
         return None, "Home Assistant (MQTT): braucht paho-mqtt (pip install -r requirements.txt) – aus"
-    p = Publisher(cfg, status_fn, queue_fn, spools_fn).start()
+    p = Publisher(cfg, status_fn, queue_fn, spools_fn, image_fn=image_fn).start()
     return p, "Home Assistant (MQTT): %s:%d, Themen %s/…, Discovery %s/…" % (cfg["host"], cfg["port"], cfg["base"], cfg["prefix"])

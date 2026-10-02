@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Neu
+- **Home Assistant: Kamera „3D-Fortschritt“** – das Add-on schickt bei jeder Schicht ein Bild des Druckfortschritts per MQTT (schräg von oben, in den Farben der ACE-Slots, aktuelle Schicht hell). Ohne Anmeldung am Add-on nutzbar: Dashboard, Handy-App, Bild in Benachrichtigungen. Gezeichnet ohne Zusatzpakete, schrittweise (0,2–0,4 s je Schicht, ~15 KB).
 - **Sätze zusammenhalten** (Plattenübersicht, Standard an): Bei Modellen aus mehreren Teilen kommt jeder Satz ganz auf eine Platte – 20 RFID-Halter: Platte 1 mit 14, Platte 2 mit 6 kompletten Sätzen statt 20 Haltern + 8 Deckeln und 12 einzelnen Deckeln. Höchstens eine Platte mehr als frei verteilt, sonst frei (mit Hinweis).
 
 ### Verbessert
