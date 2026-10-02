@@ -81,6 +81,7 @@ STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
 _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
+QUIET_GET = {"/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 
 
@@ -162,8 +163,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         # Adressen der Drucker sind unkritisch, Abfragen aber häufig – nur Fehler und API-Aufrufe loggen
-        if self.path == "/api/queue" and self.command == "GET" and args and str(args[1]) == "200":
-            return   # fragt die Seite alle paar Sekunden ab
+        if self.command in ("GET", "HEAD") and args and str(args[1]) in ("200", "304") and self.path.split("?")[0] in QUIET_GET:
+            return   # Abfragen im Takt (Seite alle paar Sekunden, Watchdog von Home Assistant) – nur Fehler protokollieren
         if self.path.startswith("/api/") or (args and str(args[1])[:1] in "45"):
             super().log_message(fmt, *args)
 
