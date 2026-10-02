@@ -34,7 +34,7 @@ def check(name, ok, detail=""):
         print("FEHLER " + name + (": " + str(detail) if detail else ""))
 
 
-srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(serve.Handler, directory=serve.ROOT))
+srv = serve.Server(("127.0.0.1", 0), functools.partial(serve.Handler, directory=serve.ROOT))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 PORT = srv.server_address[1]
 
@@ -154,6 +154,29 @@ os.environ.pop("KONFIGURATOR_PIN")
 st, _, _ = req("GET", "/api/queue")
 check("PIN entfernt: offen", st == 200, st)
 check("PIN-Vergleich ohne PIN immer falsch", not serve.pin_matches(""))
+
+# Viele Verbindungen auf einmal (die Seite lädt gut 70 Skripte): keine wird abgewiesen (2026-10-02: Warteschlange 5 →
+# einzelne Skripte fehlten, „getMat is not defined“)
+import socket as _sock
+from concurrent.futures import ThreadPoolExecutor
+def _burst(_):
+    try:
+        c = _sock.create_connection(("127.0.0.1", PORT), timeout=10)
+        c.sendall(b"GET /api/health HTTP/1.0\r\n\r\n")
+        data = b""
+        while True:
+            chunk = c.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        c.close()
+        return data.startswith(b"HTTP/1.0 200") or data.startswith(b"HTTP/1.1 200")
+    except OSError:
+        return False
+check("Server-Warteschlange groß genug", serve.Server.request_queue_size >= 64, serve.Server.request_queue_size)
+with ThreadPoolExecutor(max_workers=100) as ex:
+    results = list(ex.map(_burst, range(100)))
+check("100 gleichzeitige Verbindungen: alle beantwortet", all(results), "%d/100" % sum(results))
 
 srv.shutdown()
 print("%d ok, %d fehlgeschlagen" % (passed, failed))

@@ -80,8 +80,19 @@ async function main() {
     if (cmd === 'smoke') {
       // der Bedientest prüft deutsche Texte und beginnt mit leerem Speicher
       const url = a || base + 'index.html?alle-drucker';
-      await b2.go(url); await b2.evaluate("localStorage.clear(); localStorage.setItem('druckKonfigurator.lang','de'); true"); await b2.go(url);
-      const r = await b2.evaluate(`(async()=>{await new Promise(r=>{const s=document.createElement('script');s.src='tests/ui-smoke.js?'+Date.now();s.onload=r;document.head.appendChild(s)});const x=await runSmoke();return {ok:x.log.length,fail:x.fail,errors:x.errors||[]}})()`);
+      /* Startet der Test in einer unvollständig geladenen Seite („… is not defined“ gleich zu Beginn, selten), steht hier,
+         welche Skripte fehlten – und es gibt einen zweiten Versuch mit frisch geladener Seite (echte Fehler bleiben Fehler) */
+      const DIAG = "JSON.stringify({scripts:[...document.scripts].filter(s=>s.src).length,res:performance.getEntriesByType('resource').filter(e=>e.initiatorType==='script'&&(e.responseStatus!==200||!e.decodedBodySize)).map(e=>e.name.split('/').pop()+':'+e.responseStatus+':'+e.decodedBodySize),state:document.readyState})";
+      let r = null;
+      for (let attempt = 1; attempt <= 2 && !r; attempt++) {
+        await b2.go(url); await b2.evaluate("localStorage.clear(); localStorage.setItem('druckKonfigurator.lang','de'); true"); await b2.go(url);
+        try {
+          r = await b2.evaluate(`(async()=>{await new Promise(r=>{const s=document.createElement('script');s.src='tests/ui-smoke.js?'+Date.now();s.onload=r;document.head.appendChild(s)});const x=await runSmoke();return {ok:x.log.length,fail:x.fail,errors:x.errors||[]}})()`);
+        } catch (e) {
+          if (attempt === 2 || !/is not defined/.test(e.message)) throw e;
+          console.error('Seite unvollständig geladen (' + e.message.split('\n')[0] + ') – ' + await b2.evaluate(DIAG) + ' – zweiter Versuch');
+        }
+      }
       console.log(r.ok + ' ok, ' + r.fail.length + ' fehlgeschlagen');
       r.fail.forEach(f => console.log('  ' + f));
       process.exitCode = r.fail.length ? 1 : 0;

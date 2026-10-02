@@ -463,13 +463,20 @@ def preset_printer():
         return None
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # Die Seite lädt gut 70 Skripte auf einmal; mit der Standard-Warteschlange (5 Verbindungen) wies der Server einen Teil
+    # ab – dann fehlten Skripte und es hieß z. B. „getMat is not defined“ (gefunden 2026-10-02)
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("KONFIGURATOR_PORT", "8765"))
     host = os.environ.get("KONFIGURATOR_HOST", "127.0.0.1")
     if auth_pin() and not 4 <= len(auth_pin()) <= 32:
         sys.exit("KONFIGURATOR_PIN muss 4 bis 32 Zeichen lang sein – Server nicht gestartet")
     handler = functools.partial(Handler, directory=ROOT)
-    with http.server.ThreadingHTTPServer((host, port), handler) as server:
+    with Server((host, port), handler) as server:
         shown = "127.0.0.1" if host in ("127.0.0.1", "0.0.0.0") else host
         print(f"Druck-Konfigurator unter http://{shown}:{port}/" + (" (im ganzen Netz erreichbar)" if host == "0.0.0.0" else " – Fenster offen lassen."), flush=True)
         print("Zugriffsschutz: " + ("PIN nötig (außer Home-Assistant-Ingress und /api/health)" if auth_pin() else "aus (KONFIGURATOR_PIN nicht gesetzt)"), flush=True)

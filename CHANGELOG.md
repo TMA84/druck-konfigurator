@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Seite lud manchmal unvollständig** („Modell konnte nicht gelesen werden: … is not defined“): Der Server wies bei den gut 70 gleichzeitig geladenen Skripten einen Teil der Verbindungen ab (Warteschlange 5). Jetzt 128 – mit der alten kamen im Test nur ~20 von 100 gleichzeitigen Verbindungen durch, jetzt alle. Damit sind auch die gelegentlichen Fehlstarts der automatischen Tests weg.
+
 ## [10.9.6] – 2026-10-01
 
 ### Neu
