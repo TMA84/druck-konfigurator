@@ -81,6 +81,7 @@ STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
 _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
+GZIP_CACHE_MAX = 32 * 1024 * 1024
 
 
 def file_version(rel):
@@ -139,7 +140,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if gz:
             k = (rel, len(body), hash(body) if rel == "index.html" else etag)
             if k not in _gzip_cache:
-                if len(_gzip_cache) > 400:
+                # höchstens ~32 MB komprimierte Dateien halten (alle Dateien der Seite zusammen sind < 1 MB)
+                if sum(len(v) for v in _gzip_cache.values()) > GZIP_CACHE_MAX:
                     _gzip_cache.clear()
                 _gzip_cache[k] = gzip.compress(body, 6)
             body = _gzip_cache[k]
