@@ -53,7 +53,7 @@ let psStored = new Set();     // Ids, die schon in der Datenbank liegen
 function psSnapshot(blobs) {
   const parts = project.parts.map(p => psStrip(p, blobs, 1));
   return { v: 2, saved: Date.now(), name: project.name, notes: project.notes || [], threemf: project.threemf ? psStrip(project.threemf, blobs, 1) : null,
-    platesFixed: !!project.platesFixed, printSeq: project.printSeq || 'layer', selected: project.selected || 0, parts, blobs: [...blobs.keys()] };
+    platesFixed: !!project.platesFixed, keepSets: project.keepSets !== false, printSeq: project.printSeq || 'layer', selected: project.selected || 0, parts, blobs: [...blobs.keys()] };
 }
 function scheduleProjectSave() {
   if (psRestoring) return;
@@ -86,6 +86,7 @@ async function restoreProject() {
     for (const p of snap.parts) p.geom = partGeom(p);
     showProject({ name: snap.name, parts: snap.parts, threemf: snap.threemf, notes: snap.notes, platesFixed: snap.platesFixed, printSeq: snap.printSeq });
     project.platesFixed = snap.platesFixed;
+    project.keepSets = snap.keepSets !== false;
     if (snap.selected && snap.selected < project.parts.length) selectPart(snap.selected);
     toast(t('Projekt „{name}“ wiederhergestellt', { name: snap.name }));
     return true;

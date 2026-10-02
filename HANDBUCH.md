@@ -147,6 +147,7 @@ Unter der Teileliste zeigt **Platten** jede Platte als Karte: Draufsicht aufs Be
 
 - Zuerst verteilt das Tool alle Teile **automatisch** auf möglichst wenige Platten: Es füllt freie Flächen und dreht Teile um 90°, wenn dadurch eine Platte wegfällt.
 - Über die Auswahl neben einem Teil schiebst du es auf eine andere oder eine **neue Platte**. Ab dann gilt deine Zuordnung; passt eine Platte nicht mehr, kommt der Rest auf eine weitere. **Platzsparend anordnen** verwirft die Zuordnung.
+- **Sätze zusammenhalten** (bei Modellen aus mehreren Teilen mit Anzahl > 1, Standard an): Jeder Satz – z. B. Halter + Deckel – kommt ganz auf eine Platte; nach jeder Platte sind komplette Sätze fertig (20 RFID-Halter: 14 + 6 Sätze statt 20 Halter + 8 Deckel und 12 einzelne Deckel). Kostet das mehr als eine Platte zusätzlich, verteilt das Tool frei und sagt es.
 - **Abstand** (unter der Plattenübersicht, 3–15 mm, Standard 8 mm): Lücke zwischen den Teilen beim Anordnen. Kleiner = mehr Teile je Platte, größer = mehr Luft für Brim und Abkühlung. Bei „Objekt für Objekt“ gilt mindestens der Freiraum des Druckkopfs.
 - **Anzahl** (− / +) legt Kopien des gewählten Teils an. Kopien teilen Einstellungen, Slot und Farben; weniger stellen entfernt die letzten Kopien.
 - Makerworld-3MF behalten zunächst die Platten des Designers. Ginge es mit weniger, steht es da („3 statt 4 Platten“), und **Platzsparend anordnen** verteilt neu – Farb-Modifikatoren und Bemalung des Designers bleiben dabei erhalten. Auch **Anzahl** und **Verschieben** gehen bei Makerworld-Teilen.

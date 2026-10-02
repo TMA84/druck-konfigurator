@@ -33,13 +33,31 @@ function computeLayout(tpl) {
   }
   const r = project.platesFixed ? arrangeByPlate(project.parts, tpl) : packAll(tpl);
   // automatisch angeordnet: weitere Platten sind gewollt, kein „passte nicht“
-  return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: !!project.platesFixed && r.overflow };
+  return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: !!project.platesFixed && r.overflow, setsKept: r.setsKept };
 }
 // Alle Teile platzsparend auf möglichst wenige Platten (ohne Zuordnung) – auch für „Platzsparend wären es n Platten“
+/* Sätze eines Modells aus mehreren Teilen (gleiche Datei, src): Satz k = je Teil die k-te Kopie – z. B. 20 RFID-Halter =
+   20 × (Halter + Deckel). Nur Modelle mit mindestens zwei Teilen und mehr als einem Satz; [[Teil-Indizes], …] */
+function projectSets() {
+  if (!project || project.threemf) return [];
+  const bySrc = new Map();
+  project.parts.forEach((p, i) => {
+    if (!p.src) return;
+    const g = p.copyGroup || 'i' + i, m = bySrc.get(p.src) || bySrc.set(p.src, new Map()).get(p.src);
+    (m.get(g) || m.set(g, []).get(g)).push(i);
+  });
+  const sets = [];
+  for (const groups of bySrc.values()) {
+    const lists = [...groups.values()];
+    if (lists.length < 2 || Math.max(...lists.map(l => l.length)) < 2) continue;
+    for (let k = 0; k < Math.max(...lists.map(l => l.length)); k++) { const s = lists.map(l => l[k]).filter(i => i != null); if (s.length > 1) sets.push(s); }
+  }
+  return sets;
+}
 function packAll(tpl) {
   const key = layoutKey(tpl, true);
   if (plCache.all && plCache.all.key === key) return plCache.all.val;
-  const val = arrangeParts(project.parts.map(p => p.geom), tpl);
+  const val = arrangeParts(project.parts.map(p => p.geom), tpl, project.keepSets === false ? null : projectSets());
   plCache.all = { key, val };
   return val;
 }
@@ -56,7 +74,8 @@ function geomId(g) {
 function layoutKey(tpl, packOnly) {
   const tm = project.threemf;
   const head = [geomId(project), bedSize(tpl).join('x'), (tpl.bedCenter || []).join(','), [].concat(tpl.settings && tpl.settings.printable_height || [])[0],
-    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer', 'gap' + packGapMm].join('|');
+    packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer', 'gap' + packGapMm,
+    project.keepSets === false ? 'nosets' : 'sets:' + project.parts.map(p => (p.src || '') + '/' + (p.copyGroup || '')).join(',')].join('|');
   return head + '|' + project.parts.map(p => { const g = p.geom || {};
     return geomId(g) + ':' + g.x + ':' + g.y + ':' + g.z + (packOnly ? '' : ':' + (p.plate || '') + (ownPlaced(p) ? '*' : '')); }).join(';');
 }
@@ -158,6 +177,11 @@ function renderPlates() {
   // 3MF: Platten des Designers, bis angeordnet wird (layout); ohne layout packt das Tool nur Platten mit eigenen Teilen
   const auto = tm ? tm.layout === 'auto' : !project.platesFixed, designerLayout = tm && !tm.layout;
   $('plateByObject').checked = project.printSeq === 'object';
+  // Sätze zusammenhalten: nur bei Modellen aus mehreren Teilen mit mehreren Sätzen, beim automatischen Anordnen
+  const hasSets = !project.threemf && !project.platesFixed && projectSets().length > 0;
+  $('plateSetsRow').classList.toggle('hidden', !hasSets);
+  $('plateSets').checked = project.keepSets !== false;
+  $('plateSetsNote').textContent = hasSets && project.keepSets !== false && lay.setsKept === false ? t('Sätze zusammen hätten mehr als eine Platte zusätzlich gebraucht – Teile deshalb frei verteilt.') : '';
   $('plateSeqNote').textContent = project.printSeq === 'object' ? t('Jedes Teil wird ganz fertig gedruckt, bevor das nächste beginnt – dafür {r} mm Abstand für den Druckkopf.', { r: de(clearanceOf(tpl).radius, 0) }) : '';
   $('plateInfo').textContent = fixed ? t('{plates} aus der 3MF des Designers, Lage wie vom Designer.', { plates: plN })
     : plN + ' · ' + (designerLayout ? t('Platten des Designers wie angelegt, eigene Teile platzsparend') : auto ? t('automatisch platzsparend verteilt') : t('eigene Zuordnung'));
@@ -237,6 +261,12 @@ $('packGapIn').value = String(packGapMm);
 $('packGapIn').addEventListener('change', () => packGapSet(Math.round(num($('packGapIn').value))));
 $('packGapMinus').addEventListener('click', () => packGapSet(packGapMm - 1));
 $('packGapPlus').addEventListener('click', () => packGapSet(packGapMm + 1));
+$('plateSets').addEventListener('change', () => {
+  if (!project) return;
+  project.keepSets = $('plateSets').checked;
+  update();
+  toast(project.keepSets ? t('Sätze bleiben zusammen auf einer Platte') : t('Teile frei verteilt (Sätze können getrennt werden)'));
+});
 $('plateByObject').addEventListener('change', () => {
   if (!project) return;
   project.printSeq = $('plateByObject').checked ? 'object' : 'layer';

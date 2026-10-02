@@ -472,3 +472,11 @@ I18N.add({
  "{name}: {want} ↔ Slot {slot} {have}": "{name}: {want} ↔ slot {slot} {have}",
  "Filament aus dem Slot übernehmen": "Use the filament in the slot"
 });
+
+I18N.add({
+ "Sätze zusammenhalten": "Keep sets together",
+ "Jeder Satz eines Modells aus mehreren Teilen (z. B. Halter + Deckel) kommt ganz auf eine Platte – nach jeder Platte sind komplette Sätze fertig": "Each set of a multi-part model (e.g. holder + lid) goes onto one plate – complete sets are done after every plate",
+ "Sätze zusammen hätten mehr als eine Platte zusätzlich gebraucht – Teile deshalb frei verteilt.": "Keeping sets together would have needed more than one extra plate – parts are spread freely instead.",
+ "Sätze bleiben zusammen auf einer Platte": "Sets stay together on one plate",
+ "Teile frei verteilt (Sätze können getrennt werden)": "Parts spread freely (sets may be split)"
+});

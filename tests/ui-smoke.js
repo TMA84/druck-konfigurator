@@ -461,6 +461,8 @@ async function runSmoke(opts={}){
       inp.value='3';inp.dispatchEvent(new Event('change',{bubbles:true}));await wait(600);
       const rows=[...$('partList').querySelectorAll('[data-part]')];
       ok(project.parts.length===6&&rows.length===2&&rows.every(r=>/×3/.test(r.textContent)),'Anzahl 3 für das Modell: je Teil 3, zwei Zeilen „×3“');
+      { const sets=projectSets();ok(sets.length===3&&sets.every(x=>x.length===2&&project.parts[x[0]].src===project.parts[x[1]].src&&project.parts[x[0]].copyGroup!==project.parts[x[1]].copyGroup),'Sätze: 3 × (Teil 1 + Teil 2)');
+        update();await wait(100);ok(!$('plateSetsRow').classList.contains('hidden')&&$('plateSets').checked,'Schalter „Sätze zusammenhalten“ sichtbar und an'); }
       showProject(keep);await wait(500); }
     // Objekte überspringen (Tab ④): Liste aus dem G-Code, Befehl skip/start mit der Nummer (Drucker nachgestellt)
     { const objs=[{id:0,name:'a.stl_id_0_copy_0',polygon:[[0,0],[10,0],[10,10]]},{id:1,name:'a.stl_id_0_copy_1',polygon:[[20,0],[30,0],[30,10]]},{id:2,name:'b.stl_id_1_copy_0',polygon:[[40,0],[50,0],[50,10]]}];

@@ -403,8 +403,11 @@ function lexLess(a, b) { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) r
 function maxRectsBin(W, H) {
   let free = [{ x: 0, y: 0, w: W, h: H }];
   const fits = (f, w, h) => w <= f.w + 1e-6 && h <= f.h + 1e-6;
-  return {
+  const bin = {
     used: [],
+    // Kopie zum Ausprobieren (ganzer Satz passt oder keiner – packSets)
+    clone() { const c = maxRectsBin(W, H); c.setFree(free.map(f => ({ ...f }))); c.used = this.used.slice(); return c; },
+    setFree(f) { free = f; },
     // beste Lücke für w × h (optional gedreht) → {x, y, w, h, rot, score} oder null
     find(w, h, allowRot) {
       let best = null;
@@ -429,6 +432,7 @@ function maxRectsBin(W, H) {
       this.used.push(r);
     }
   };
+  return bin;
 }
 // Beste Lösung: wenigste Platten, dann möglichst wenige gedrehte Teile (Drehen nur, wenn es Platten spart), dann dichteste erste Platte
 function packGroup(geoms, idx, W, H, gap) {
@@ -474,12 +478,48 @@ function compactBin(geoms, bin, W, H, gap) {
   }
   return best === rects ? bin : { used: best };
 }
-function packPlates(geoms, groups, tpl) {
+/* Sätze zusammenhalten (Modell aus mehreren Teilen, z. B. RFID-Halter = Halter + Deckel, 20 Sätze): jeder Satz kommt
+   ganz auf eine Platte – sonst lagen auf der letzten Platte nur Deckel und nach Platte 1 war kein Satz fertig.
+   sets: Listen von Teil-Indizes (je Satz). Je Satz die erste Platte, auf der alle seine Teile Platz haben, sonst eine
+   neue. Teile, die zu keinem Satz gehören, werden danach wie gewohnt verteilt. Ergebnis: Platten (bins) wie packGroup. */
+function packSets(geoms, idx, sets, W, H, gap) {
+  const inSet = new Set(sets.flat()), rest = idx.filter(i => !inSet.has(i));
+  const area = i => geoms[i].x * geoms[i].y;
+  let best = null;
+  for (const allowRot of [false, true]) {
+    const bins = [];
+    for (const set of sets) {
+      const items = set.slice().sort((a, b) => area(b) - area(a) || a - b);
+      const tryBin = b => { const c = b.clone(); for (const i of items) { const f = c.find(geoms[i].x + gap, geoms[i].y + gap, allowRot); if (!f) return null; c.place({ ...f, i }); } return c; };
+      let done = false;
+      for (let k = 0; k < bins.length && !done; k++) { const c = tryBin(bins[k]); if (c) { bins[k] = c; done = true; } }
+      if (!done) { const c = tryBin(maxRectsBin(W + gap, H + gap)); if (!c) return null; bins.push(c); }   // Satz größer als das Bett
+    }
+    for (const i of rest.sort((a, b) => area(b) - area(a) || a - b)) {
+      const w = geoms[i].x + gap, h = geoms[i].y + gap;
+      let spot = null, bin = null;
+      for (const b of bins) { const f = b.find(w, h, allowRot); if (f) { spot = f; bin = b; break; } }
+      if (!spot) { bin = maxRectsBin(W + gap, H + gap); bins.push(bin); spot = bin.find(w, h, true) || { x: 0, y: 0, w, h, rot: false }; }
+      bin.place({ ...spot, i });
+    }
+    const rots = bins.reduce((s, b) => s + b.used.filter(r => r.rot).length, 0);
+    if (!best || lexLess([bins.length, rots], [best.bins.length, best.rots])) best = { bins, rots };
+  }
+  return best.bins.map(b => compactBin(geoms, b, W, H, gap));
+}
+function packPlates(geoms, groups, tpl, sets) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = packGap(tpl);
   const plates = [];   // je Platte die belegten Rechtecke {i, x, y, w, h, rot} (inkl. Abstand)
   const sources = [];  // je Platte: aus welcher Gruppe (Plattennummer) sie stammt
+  let setsKept = null;  // null = keine Sätze; true = zusammengehalten; false = hätte mehr als eine Platte zusätzlich gekostet
   for (const [gi, idx] of groups.entries()) {
-    const bins = packGroup(geoms, idx, bw, bd, gap);
+    let bins = packGroup(geoms, idx, bw, bd, gap);
+    const mine = sets && sets.map(s => s.filter(i => idx.includes(i))).filter(s => s.length > 1);
+    if (mine && mine.length) {
+      const kept = packSets(geoms, idx, mine, bw, bd, gap);
+      // höchstens eine Platte mehr als ohne Sätze – sonst wie bisher (und sagen)
+      if (kept && kept.length <= bins.length + 1) { bins = kept; if (setsKept !== false) setsKept = true; } else setsKept = false;
+    }
     if (!bins.length) { plates.push([]); sources.push(gi); }
     bins.forEach(b => { plates.push(b.used); sources.push(gi); });
   }
@@ -499,7 +539,7 @@ function packPlates(geoms, groups, tpl) {
   // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
   const vol = buildVolume(tpl), oversize = geoms.map((g, i) => i).filter(i => volumeExcess(geoms[i], vol).length && volumeExcess({ x: geoms[i].y, y: geoms[i].x, z: geoms[i].z }, vol).length);
   const overflow = used.length > new Set(used.map(([, s]) => s)).size;
-  return { places, plateCount: used.length, oversize, overflow };
+  return { places, plateCount: used.length, oversize, overflow, setsKept };
 }
 // Grundfläche eines platzierten Teils (gedreht: Breite und Tiefe getauscht)
 const footprint = (g, pl) => pl && pl.rot ? [g.y, g.x] : [g.x, g.y];
@@ -510,7 +550,7 @@ const ROT_Z = { 0: [1, 0, 0, 0, 1, 0, 0, 0, 1], 90: [0, 1, 0, -1, 0, 0, 0, 0, 1]
 const placeXY = (pl, a, b) => { const k = placeAng(pl); return k === 90 ? [-b, a] : k === 180 ? [-a, -b] : k === 270 ? [b, -a] : [a, b]; };
 const placeTransform = (pl, hz) => ROT_Z[placeAng(pl)].map(String).join(' ') + ' ' + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
 // Alle Teile automatisch auf möglichst wenige Platten (ohne feste Zuordnung)
-function arrangeParts(geoms, tpl) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl); }
+function arrangeParts(geoms, tpl, sets) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl, sets); }
 // Nach Plattenzuordnung je Teil (1-basiert); Platten in aufsteigender Reihenfolge, Lücken fallen weg
 function arrangeByPlate(items, tpl) {
   const nums = [...new Set(items.map(p => p.plate || 1))].sort((a, b) => a - b);
