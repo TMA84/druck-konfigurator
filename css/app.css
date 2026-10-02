@@ -362,6 +362,7 @@ dialog::backdrop { background: rgba(27, 31, 36, .45); }
 
 .toast {
   position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  max-width: min(560px, calc(100vw - 32px));
   background: var(--ink); color: #fff; padding: 9px 16px; border-radius: var(--r-m); font-size: 14px; z-index: 50;
   border-left: 4px solid var(--accent); transition: opacity var(--t-fast), transform var(--t-norm) var(--ease);
 }
@@ -1084,12 +1085,12 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 #importNotes.open > span { white-space: normal; }
 #importNotes .in-toggle { flex: none; padding: 0; border: 0; background: none; color: var(--info, #1f5f8b); font: inherit; cursor: pointer; }
 /* Werkzeuge des Teils als Reiter (js/sections-ui.js) */
-.sec-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; margin: 12px 0 0; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
+.sec-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 2px; margin: 12px 0 0; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
 .sec-tabs.hidden { display: none; }
-.sec-tabs button { flex: none; display: grid; gap: 0; padding: 5px 9px 6px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; background: none; color: var(--ink-2, var(--ink)); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; text-align: left; }
+.sec-tabs button { min-width: 0; border-radius: 7px !important; border-bottom: 1px solid transparent !important; display: grid; gap: 0; padding: 5px 9px 6px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; background: none; color: var(--ink-2, var(--ink)); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; text-align: left; }
 .sec-tabs button .sec-sum { font-size: 10.5px; font-weight: 400; color: var(--ink-3); white-space: nowrap; }
 .sec-tabs button:hover { background: var(--paper-2); }
-.sec-tabs button[aria-selected="true"] { background: var(--sheet, var(--paper)); border-color: var(--rule); color: var(--accent); margin-bottom: -1px; }
+.sec-tabs button[aria-selected="true"] { background: var(--sheet, var(--paper)); border-color: var(--rule) !important; color: var(--accent); }
 .sec-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .sec.sec-off { display: none !important; }
 .sec > .orient-head > .eyebrow[id], .sec > .orient-head > .sec-toggle { display: none; }
@@ -1138,3 +1139,7 @@ html.embed-3d #wbGrid > :not(.wb-cam) { display: none !important; }
 html.embed-3d, html.embed-3d body { overflow: hidden; background: #14161a; }
 html.embed-3d .wb-cam { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; margin: 0; }
 html.embed-3d .wb-live { height: 100vh; max-height: none; min-height: 0; }
+
+/* In der 3D-Ansicht oben statt unten – unten liegt die Leiste mit Überhangwinkel und Maßen (verdeckte sie sonst) */
+body[data-tab="3d"] .toast { bottom: auto; top: 186px; transform: translate(-50%, -20px); }
+body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }

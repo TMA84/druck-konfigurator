@@ -395,7 +395,8 @@ async function runSmoke(opts={}){
     await dropFile(mk('gross.stl',150,120,20),mk('klein.stl',60,60,30));await wait(300);
     ok(project.parts.length===2&&!$('plateBox').classList.contains('hidden'),'Platten-Übersicht bei zwei Teilen');
     ok(projectLayout(plTpl()).count===1&&document.querySelectorAll('#plateList .plate-svg rect[data-pick]').length===2,'beide Teile auf einer Platte mit Draufsicht');
-    selectPart(1);$('partList').querySelector('[data-copies="1"]').click();await wait(100);
+    selectPart(1);{const po=$('partList').querySelector('[data-pcount-open]');ok(!!po&&!$('partList').querySelector('[data-copies="1"]'),'Gleiche Anzahl im Modell: eigene Anzahl erst über „Anzahl nur für dieses Teil …“');po.click();await wait(50)}
+    $('partList').querySelector('[data-copies="1"]').click();await wait(100);
     ok(project.parts.length===3&&samePlacements(project.parts[1]).length===2,'Anzahl + legt eine Kopie an (gleiche Einstellungen)');
     selectPart(0);await wait(50);const mv=document.querySelector('#partList [data-part-move="0"]');mv.value=String(projectLayout(plTpl()).count+1);mv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
     ok(projectLayout(plTpl()).count===2&&!$('plateAuto').classList.contains('hidden'),'Teil auf neue Platte verschoben, „Platzsparend anordnen“ erscheint');

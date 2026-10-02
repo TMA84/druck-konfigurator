@@ -9,6 +9,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - **Sätze zusammenhalten** (Plattenübersicht, Standard an): Bei Modellen aus mehreren Teilen kommt jeder Satz ganz auf eine Platte – 20 RFID-Halter: Platte 1 mit 14, Platte 2 mit 6 kompletten Sätzen statt 20 Haltern + 8 Deckeln und 12 einzelnen Deckeln. Höchstens eine Platte mehr als frei verteilt, sonst frei (mit Hinweis).
 
 ### Verbessert
+- **Modell-Ansicht aufgeräumt:** Die Werkzeug-Reiter (Platten, Lage, Größe, Farben, Bohrlöcher, Text) stehen in einem Raster – bisher waren „Bohrlöcher“ und „Text“ abgeschnitten. Bei Modellen aus mehreren Teilen mit gleicher Anzahl gilt nur die Anzahl in der Kopfzeile; die eigene Anzahl eines Teils gibt es über „Anzahl nur für dieses Teil …“. Hinweise erscheinen in der 3D-Ansicht oben statt über der Überhang-Leiste.
 - **Werkbank → Rohdaten** zeigen die letzten 40 Meldungen des Druckers (Art, Aktion, Zustand, Alter) – zur Fehlersuche, z. B. was nach einem Abbruch kommt.
 - **Falsches Filament früher bemerkt:** Ist bei den Druckwerten ein anderes Material gewählt als im Slot des Teils steckt (vom Drucker/ACE oder eigene Angabe), steht das rot unter der Filament-Auswahl und in ③ vor dem Slicen – mit **Filament aus dem Slot übernehmen**. Bisher fiel es erst im Sendedialog auf.
 

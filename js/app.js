@@ -184,6 +184,8 @@ function partColours(p){
 }
 /* Teileliste wie in OrcaSlicer: je Teil ein farbiger Slot-Chip (Klick → Slot wählen), Name, Maße, Stützenbedarf, ✕.
    Die gewählte Zeile zeigt darunter Platte und Anzahl (Kopien) – ohne Umweg über die Plattenübersicht. */
+// Teile, bei denen die eigene Anzahl trotz gemeinsamer Anzahl des Modells eingeblendet ist (Link „Anzahl nur für dieses Teil …“)
+const partCountOpen=new Set();
 function renderPartList(){
   const list=$('partList');
   if(!project){list.innerHTML='';return}
@@ -221,9 +223,12 @@ function renderPartList(){
       const n=typeof copyGroupOf==='function'?copyGroupOf(p).length:1,cur=lay.plateOf[i];
       const opts=Array.from({length:lay.count},(_,k)=>'<option value="'+(k+1)+'"'+(k+1===cur?' selected':'')+'>'+t('Platte {n}',{n:k+1})+'</option>').join('')+'<option value="'+(lay.count+1)+'">'+t('Neue Platte')+'</option>';
       tools+='<div class="ptools">'+(lay.fixed3mf?'':'<label>'+t('Platte')+' <select data-part-move="'+i+'" aria-label="'+esc(t('Auf Platte verschieben'))+'">'+opts+'</select></label>')+
-        '<span class="pcount">'+t('Anzahl')+' <span class="stepper"><button type="button" data-copies="-1" aria-label="'+esc(t('Eine Kopie weniger'))+'">−</button>'+
+        // Modell aus mehreren Teilen mit gleicher Anzahl: die Anzahl steht in der Kopfzeile – hier nur auf Wunsch (sonst doppelt)
+        (inSrc&&(bySrc.get(p.src||'')||[]).every(j=>groupOf(project.parts[j]).length===n)&&!partCountOpen.has(p.copyGroup||i)
+          ?'<button type="button" class="linkbtn small" data-pcount-open="'+esc(String(p.copyGroup||i))+'">'+t('Anzahl nur für dieses Teil …')+'</button>'
+          :'<span class="pcount">'+t('Anzahl')+' <span class="stepper"><button type="button" data-copies="-1" aria-label="'+esc(t('Eine Kopie weniger'))+'">−</button>'+
         '<input data-copies-n type="number" min="1" max="50" step="1" inputmode="numeric" value="'+n+'" aria-label="'+esc(t('Anzahl des gewählten Teils'))+'">'+
-        '<button type="button" data-copies="1" aria-label="'+esc(t('Eine Kopie mehr'))+'">+</button></span></span></div>';
+        '<button type="button" data-copies="1" aria-label="'+esc(t('Eine Kopie mehr'))+'">+</button></span></span>')+'</div>';
     }
     return head+'<li class="'+(sel?'sel':'')+(inSrc?' in-src':'')+'">'+slotChipHTML(p.slot??null,def,'data-part-slot="'+i+'"',p.name)+
       '<button type="button" data-part="'+i+'"'+(sel?' aria-current="true"':'')+' title="'+esc(p.name)+'"><span class="pname">'+esc(shortName)+(nCopies>1?' <span class="pcopies">×'+nCopies+'</span>':'')+'</span>'+
@@ -235,6 +240,7 @@ function renderPartList(){
 $('partList').addEventListener('click',e=>{
   const d=e.target.closest('[data-del-part]');if(d){const p=project.parts[+d.dataset.delPart];removeParts(p.copyGroup?project.parts.map((x,k)=>x.copyGroup===p.copyGroup?k:-1).filter(k=>k>=0):[+d.dataset.delPart]);return}
   const sc=e.target.closest('[data-src-copies]');if(sc){setSourceCopies(sc.dataset.src,null,+sc.dataset.srcCopies);return}
+  const po=e.target.closest('[data-pcount-open]');if(po){const k=po.dataset.pcountOpen;partCountOpen.add(/^\d+$/.test(k)?+k:k);renderPartList();return}
   const c=e.target.closest('[data-part-slot]');
   if(c){const p=project.parts[+c.dataset.partSlot],def=defaultSlot();
     openSlotPicker(c,p.slot??null,{title:t('Slot für {name}',{name:p.name}),std:t('Standard (Slot aus dem Export-Dialog)'),stdSlot:def},v=>setPartSlot(p,v));return}

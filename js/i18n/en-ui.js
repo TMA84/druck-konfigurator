@@ -480,3 +480,7 @@ I18N.add({
  "Sätze bleiben zusammen auf einer Platte": "Sets stay together on one plate",
  "Teile frei verteilt (Sätze können getrennt werden)": "Parts spread freely (sets may be split)"
 });
+
+I18N.add({
+ "Anzahl nur für dieses Teil …": "Quantity for this part only …"
+});
