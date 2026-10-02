@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.10.0] – 2026-10-02
 
 ### Neu
 - **Home Assistant: Kamera „3D-Fortschritt“** – das Add-on schickt bei jeder Schicht ein Bild des Druckfortschritts per MQTT (schräg von oben, in den Farben der ACE-Slots, aktuelle Schicht hell). Ohne Anmeldung am Add-on nutzbar: Dashboard, Handy-App, Bild in Benachrichtigungen. Gezeichnet ohne Zusatzpakete, schrittweise (0,2–0,4 s je Schicht, ~15 KB).
