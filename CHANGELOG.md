@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **Seite lädt schneller:** Der Server verbot dem Browser bisher, irgendetwas zu behalten, und schickte bei jedem Öffnen 80 Dateien mit 2,1 MB. Jetzt bekommt jede Datei eine Versionskennung und bleibt im Browser, bis sie sich ändert; Texte kommen gzip-komprimiert. Erstes Öffnen 632 KB statt 2,1 MB, jedes weitere 5 KB (gemessen lokal: 90–140 ms statt 210–810 ms). Spürbar vor allem am Handy über Home Assistant.
+
 ## [10.10.0] – 2026-10-02
 
 ### Neu

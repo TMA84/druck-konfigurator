@@ -29,6 +29,7 @@ Aufruf: python tools/serve.py [PORT]
   KONFIGURATOR_PIN=<4–32 Zeichen>: Zugriffsschutz für den direkten Zugriff (NAS, Add-on-Port) – siehe „Zugriffsschutz“.
 """
 import functools
+import gzip
 import hmac
 import html
 import http.cookies
@@ -74,10 +75,88 @@ def printer_host():
         return preset_printer()
 
 
+# Dateien der Seite: mit Versionskennung (?v=…, index.html schreibt der Server so um) darf der Browser sie behalten –
+# beim zweiten Öffnen fallen gut 80 Anfragen und 2 MB weg (wichtig über Home-Assistant-Ingress/Cloud). Texte gzip.
+STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
+_VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
+_index_cache = {"key": None, "body": None}
+_gzip_cache = {}
+
+
+def file_version(rel):
+    try:
+        st = os.stat(os.path.join(ROOT, rel))
+    except OSError:
+        return None
+    return "%x%x" % (st.st_mtime_ns // 1000000 % 0xFFFFFFFF, st.st_size)
+
+
+def index_html():
+    """index.html mit ?v=<Version> an jeder eigenen Datei – neu, sobald sich index.html oder eine der Dateien ändert."""
+    path = os.path.join(ROOT, "index.html")
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    refs = [m.group(2) for m in _VERSION_RE.finditer(text)]
+    key = (os.stat(path).st_mtime_ns,) + tuple(file_version(r) for r in refs)
+    if _index_cache["key"] != key:
+        body = _VERSION_RE.sub(lambda m: m.group(1) + m.group(2) + ("?v=" + file_version(m.group(2)) if file_version(m.group(2)) else "") + m.group(3), text)
+        _index_cache.update(key=key, body=body.encode("utf-8"))
+    return _index_cache["body"]
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")
+        if not getattr(self, "_cache_set", False):
+            self.send_header("Cache-Control", "no-store")
+        self._cache_set = False
         super().end_headers()
+
+    def _static(self, url):
+        """Seite und ihre Dateien: index.html umgeschrieben (no-cache), versionierte Dateien dauerhaft im Cache, sonst
+        Nachfrage per ETag (304). Texte gzip, wenn der Browser es kann. Gibt False zurück, wenn es keine Datei ist."""
+        rel = url.path.lstrip("/") or "index.html"
+        if rel == "index.html":
+            body, ctype, etag = index_html(), "text/html; charset=utf-8", None
+        else:
+            full = self.translate_path(url.path)
+            if not os.path.isfile(full) or not os.path.realpath(full).startswith(os.path.realpath(ROOT) + os.sep):
+                return False
+            st = os.stat(full)
+            etag = '"%x-%x"' % (st.st_mtime_ns, st.st_size)
+            if self.headers.get("If-None-Match") == etag:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", "no-cache")
+                self._cache_set = True
+                self.end_headers()
+                return True
+            with open(full, "rb") as f:
+                body = f.read()
+            ctype = self.guess_type(full)
+        ext = os.path.splitext(rel)[1].lower()
+        versioned = "v=" in url.query
+        gz = ext in STATIC_GZIP and "gzip" in (self.headers.get("Accept-Encoding") or "") and len(body) > 1024
+        if gz:
+            k = (rel, len(body), hash(body) if rel == "index.html" else etag)
+            if k not in _gzip_cache:
+                if len(_gzip_cache) > 400:
+                    _gzip_cache.clear()
+                _gzip_cache[k] = gzip.compress(body, 6)
+            body = _gzip_cache[k]
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        if gz:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
+        if etag:
+            self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "public, max-age=31536000, immutable" if versioned else "no-cache")
+        self._cache_set = True
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        return True
 
     def log_message(self, fmt, *args):
         # Adressen der Drucker sind unkritisch, Abfragen aber häufig – nur Fehler und API-Aufrufe loggen
@@ -173,6 +252,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
             return
+        url = urllib.parse.urlparse(self.path)
+        if not url.path.startswith("/api/") and os.environ.get("KONFIGURATOR_CACHE", "1") != "0" and self._static(url):
+            return
         super().do_HEAD()
 
     def do_GET(self):
@@ -223,6 +305,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                               "plate_%s.gcode" % m.group(2) if m.group(3) == "gcode" else None)
         if url.path.startswith("/api/"):
             return self._json(404, {"error": "unbekannt", "kind": "not_found"})
+        if os.environ.get("KONFIGURATOR_CACHE", "1") != "0" and self._static(url):
+            return None
         return super().do_GET()
 
     def _camera(self, host):

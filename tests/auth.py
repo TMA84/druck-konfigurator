@@ -2,6 +2,9 @@
 Anmeldeseite, Anmeldung mit Cookie, falsche PIN, Sperre nach 5 Fehlversuchen (429), /api/health bleibt offen,
 Home-Assistant-Ingress nur vom Supervisor-Proxy. Aufruf: python tests/auth.py (ohne Drucker)."""
 import functools
+import gzip
+import re
+import urllib.error
 import http.client
 import http.server
 import json
@@ -177,6 +180,28 @@ check("Server-Warteschlange groß genug", serve.Server.request_queue_size >= 64,
 with ThreadPoolExecutor(max_workers=100) as ex:
     results = list(ex.map(_burst, range(100)))
 check("100 gleichzeitige Verbindungen: alle beantwortet", all(results), "%d/100" % sum(results))
+
+# Dateien der Seite: index.html mit ?v=, versionierte Dateien dauerhaft im Cache, sonst ETag/304, Texte gzip
+import urllib.request as _ur
+def _get(path, headers=None):
+    req = _ur.Request("http://127.0.0.1:%d%s" % (PORT, path), headers=headers or {})
+    try:
+        with _ur.urlopen(req) as r:
+            return r.status, dict(r.headers), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), b""
+if not serve.auth_pin():
+    st_, h, body = _get("/")
+    html_ = gzip.decompress(body).decode() if h.get("Content-Encoding") == "gzip" else body.decode()
+    check("index.html: eigene Skripte mit ?v=", 'src="js/app.js?v=' in html_ and h.get("Cache-Control") == "no-cache", h.get("Cache-Control"))
+    v = re.search(r'js/app.js\?v=([0-9a-f]+)', html_).group(1)
+    st_, h, body = _get("/js/app.js?v=" + v, {"Accept-Encoding": "gzip"})
+    check("versioniert: dauerhaft im Cache, gzip", "immutable" in h.get("Cache-Control", "") and h.get("Content-Encoding") == "gzip" and b"loadFiles" in gzip.decompress(body), h)
+    st_, h, _b = _get("/js/app.js")
+    st2, h2, _b2 = _get("/js/app.js", {"If-None-Match": h.get("ETag", "")})
+    check("ohne Version: ETag, Nachfrage → 304", h.get("Cache-Control") == "no-cache" and st2 == 304, (h.get("ETag"), st2))
+    check("API weiter ohne Cache", _get("/api/health")[1].get("Cache-Control") == "no-store")
+    check("kein Zugriff außerhalb des Ordners", _get("/../../etc/passwd")[0] in (400, 403, 404))
 
 srv.shutdown()
 print("%d ok, %d fehlgeschlagen" % (passed, failed))
