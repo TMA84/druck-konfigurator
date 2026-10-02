@@ -554,6 +554,12 @@ class Server(http.server.ThreadingHTTPServer):
     request_queue_size = 128
     daemon_threads = True
 
+    def handle_error(self, request, client_address):
+        # Browser hat die Verbindung geschlossen (Kamera zu, Seite neu geladen): kein Fehlerbericht im Protokoll
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
+
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("KONFIGURATOR_PORT", "8765"))
