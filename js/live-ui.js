@@ -287,10 +287,15 @@ function lvHeadSet(st, cur, L, T) {
   const p = st.position, age = st.position_age_s, now = performance.now(), h = lv.hs;
   const real = livePosOn() && p && age != null && age < LV_POS_FRESH_S && Number.isFinite(+p.x);
   if (real) {
-    const x = +p.x - lv.cx, y = +p.y - lv.cy, z = +p.z, key = x + ',' + y + ',' + z, li = lvLayerByZ(z);
+    /* Schicht aus der Kopfhöhe nur, wenn wirklich gedruckt wird (ab Schicht 1) und die Höhe zum Modell passt – beim Bett
+       vermessen/Aufheizen steht der Kopf mitten über dem Bett (S1: Z ≈ 380 mm); das rastete auf der obersten Schicht
+       ein, der 3D-Fortschritt zeigte das Modell fertig (2026-10-03). Sonst: Schicht laut Drucker, Kopf trotzdem echt. */
+    const x = +p.x - lv.cx, y = +p.y - lv.cy, z = +p.z, key = x + ',' + y + ',' + z;
+    const topZ = lv.data.layers[lv.data.layers.length - 1][0], plausible = L >= 1 && z <= topZ + 2;
+    const li = plausible ? lvLayerByZ(z) : cur;
     if (h && h.real && h.key === key) return h.info;              // nichts Neues – weiterfahren wie bisher
     const t0 = now - Math.min(8, Math.max(0, +age || 0)) * 1000;   // Zeitpunkt der Messung
-    const tr = li >= 0 ? lvTrack(li) : null, same = h && h.snapped && h.li === li;
+    const tr = plausible && li >= 0 ? lvTrack(li) : null, same = h && h.snapped && h.li === li;
     const sn = tr && tr.len > 0 ? lvSnap(tr, x, y, same ? h.s0 + h.v * Math.min(10, (t0 - h.t0) / 1000) : null) : null;
     let hs;
     if (sn && sn.dist <= LV_SNAP_MM) {
@@ -464,7 +469,8 @@ function liveUpdate(st) {
   if (li !== lv.shown || !!head !== (lv.shownDone != null)) lvColour(li, head ? lv.data.layers[li][1] : null);
   lv.at = { li, frac: onPath ? head.frac : 0.5 };   // für die eigene Restzeit (lvRemaining)
   const z = lv.data.layers[li] ? lv.data.layers[li][0] : 0;
-  $('wbLiveInfo').textContent = (onPath ? t('Schicht {l} von {n} ({p} %) · Z {z} mm', { l: li + 1, n, p: Math.round(head.frac * 100), z: de(z, 2) })
+  $('wbLiveInfo').textContent = (!(L >= 1) ? t('Vorbereitung vor der ersten Schicht') + (job.status ? ' (' + t(job.status) + ')' : '')
+    : onPath ? t('Schicht {l} von {n} ({p} %) · Z {z} mm', { l: li + 1, n, p: Math.round(head.frac * 100), z: de(z, 2) })
     : t('Schicht {l} von {n} · Z {z} mm', { l: L || cur + 1, n: T || n, z: de(z, 2) })) +
     (head ? ' · ' + (head.real ? t('Kopf: echte Position') : t('Kopf: geschätzt')) : '');
 }

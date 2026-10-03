@@ -537,3 +537,7 @@ I18N.add({
  "von dir gesetzt – sonst Orca-Standard": "set by you – otherwise Orca default",
  "Werksprofil": "factory profile"
 });
+
+I18N.add({
+ "Vorbereitung vor der ersten Schicht": "Preparing before the first layer"
+});
