@@ -157,11 +157,17 @@ function compute(I,geom,ctx){
   const capNote=(v,lw)=>{const c=Math.floor(maxVol/(layer*lw));return v>c?t('effektiv ca. {v} mm/s (Grenze {max} mm³/s)',{v:c,max:de(maxVol,1)}):''};
   const sp_outer=take('sp_outer',o==='watertight'?Math.round(m.outer[pi]*WATERTIGHT_OUTER_FACTOR):m.outer[pi]),sp_inner=take('sp_inner',m.inner[pi]),sp_fill=take('sp_fill',m.fill[pi]);
   const nOuter=capNote(sp_outer,N.lwo),nInner=capNote(sp_inner,N.lw),nFill=capNote(sp_fill,N.lw);
-  const accelTxt=m.accel>0?de(m.accel,0)+' mm/s²':t('Werksprofil beibehalten');
-  const accelNote=m.accel>0?'':t('bei Ringing reduzieren');
-  const retr=de(m.retrLen,1)+' mm / '+de(m.retrSpeed,0)+' mm/s';
-  // Rückzug bleibt beim Orca-Standard (Filament- bzw. Druckerprofil); der Wert aus den S1-Tests ist nur Richtwert
-  const retrRow=['Rückzug',t('Orca-Standard'),t('Richtwert {v} (am S1 getestet)',{v:retr})];
+  const sp_travel=take('sp_travel',m.travel),sp_first=take('sp_first',m.first),accel=take('accel',+m.accel||0);
+  const accelTxt=accel>0?de(accel,0)+' mm/s²':t('Werksprofil beibehalten');
+  const accelNote=accel>0?'':t('bei Ringing reduzieren');
+  /* Rückzug bleibt beim Orca-Standard (Filament- bzw. Druckerprofil des Slots) – außer du setzt ihn unter „Werte für
+     diesen Auftrag“ (2026-10-03); der Wert aus den S1-Tests ist sonst nur Richtwert */
+  sugg.retr_len=m.retrLen;sugg.retr_speed=m.retrSpeed;
+  const retrSet=has('retr_len')||has('retr_speed');
+  const retr=retrSet?{len:+(has('retr_len')?ov.retr_len:m.retrLen),speed:+(has('retr_speed')?ov.retr_speed:m.retrSpeed)}:null;
+  const retrTxt=de(m.retrLen,1)+' mm / '+de(m.retrSpeed,0)+' mm/s';
+  const retrRow=retr?['Rückzug',de(retr.len,1)+' mm / '+de(retr.speed,0)+' mm/s',t('von dir gesetzt – sonst Orca-Standard'),true]
+    :['Rückzug',t('Orca-Standard'),t('Richtwert {v} (am S1 getestet)',{v:retrTxt})];
   const enclosed=m.kind==='abs'||m.kind==='asa';
 
   // Stützen
@@ -211,16 +217,16 @@ function compute(I,geom,ctx){
 
   // Übersicht; angepasste Werte bekommen den Vorschlag als Hinweis und eine Markierung (4. Feld)
   const changed=Object.keys(sugg).filter(k=>has(k)&&String(ov[k])!==String(sugg[k]));
-  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'?v+' %':/^sp_/.test(k)?v+' mm/s':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
+  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'?de(v,1)+' mm':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
   const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));return c.length?[row[0],row[1],[t('angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]:row};
   const rows=[
     mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
     mark(['layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(N.fl,2)+' mm']),
-    mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill'],['Füllung / Travel',sp_fill+' / '+m.travel+' mm/s',nFill]),
+    mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill','sp_travel'],['Füllung / Travel',sp_fill+' / '+sp_travel+' mm/s',nFill]),
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
     mark(['fan'],['Lüfter',m.fan+' %',fanNote]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
-    ['Beschleunigung',accelTxt,accelNote],retrRow,mark(['support'],['Support',t(sup)]),mark(['brim'],['Brim',t(brim),brimNote])
+    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim'],['Brim',t(brim),brimNote])
   ];
 
   const supZ=supportZGap(layer,m.kind,tpu);
@@ -233,9 +239,9 @@ function compute(I,geom,ctx){
       ['Wandlinien',base.wr&&soft?base.wr:w],['Obere Schichten',tt],['Untere Schichten',b],
       ['Fülldichte',base.ir&&soft?base.ir:inf+' %'],['Füllmuster',t(pattern)],['Lückenfüllung',t('Überall')]]],
     ['Geschwindigkeit',[
-      ['Erste Schicht',m.first+' mm/s'],['Füllung erste Schicht',Math.max(m.first,tpu?20:m.first)+' mm/s'],['Außenwand',sp_outer+' mm/s',nOuter],['Innere Wand',sp_inner+' mm/s',nInner],
-      ['Füllung',sp_fill+' mm/s',nFill],['Obere Fläche',top+' mm/s'],['Lückenfüllung',m.gap+' mm/s'],['Travel',m.travel+' mm/s'],
-      ['Beschleunigung',accelTxt,accelNote]].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
+      mark(['sp_first'],['Erste Schicht',sp_first+' mm/s']),['Füllung erste Schicht',Math.max(sp_first,tpu?20:sp_first)+' mm/s'],['Außenwand',sp_outer+' mm/s',nOuter],['Innere Wand',sp_inner+' mm/s',nInner],
+      ['Füllung',sp_fill+' mm/s',nFill],['Obere Fläche',top+' mm/s'],['Lückenfüllung',m.gap+' mm/s'],mark(['sp_travel'],['Travel',sp_travel+' mm/s']),
+      mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
     ['Stützen',supOn?[
       ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
       ['Nur auf Druckplatte',t('Ein, zuerst testen')],['Kleine Überhänge entfernen',t(sp.small)],['Raft',t('0 Schichten')],
@@ -301,7 +307,7 @@ function compute(I,geom,ctx){
   if(o==='thin')warn.push(t('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.'));
 
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
-    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,dSel,top,pattern,
+    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer:N.fl,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)

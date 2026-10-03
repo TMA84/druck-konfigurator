@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Neu
+- **Tempo und Rückzug einstellbar:** Unter **Werte für diesen Auftrag** zusätzlich erste Schicht, Travel, Beschleunigung und **Rückzug** (Länge, Geschwindigkeit). Rückzug schreibt das Tool nur, wenn du ihn setzt – sonst bleibt das Orca-Profil des Slots. Jede Karte bei den Druckwerten hat **✎ anpassen** und öffnet den Dialog beim passenden Abschnitt.
 - **Druck zeitlich planen** (Sendedialog → **Später starten**): Startzeit bis 14 Tage voraus, optional **vorher trocknen** – das Trocknen endet zum Druckstart. Bestätigung „Bett frei, richtige Druckplatte“ nötig; der Server startet zur Zeit, auch ohne offene Seite, nach erneuter Prüfung (Drucker frei, Filament passt) – sonst nicht, mit Grund. Anzeige und **Absagen** in der Werkbank, in Home Assistant „Geplanter Start“ und „Geplanter Druck“.
 
 ## [10.11.2] – 2026-10-02

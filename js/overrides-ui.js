@@ -13,6 +13,10 @@ const OV_FIELDS = [
   ['w', t('Wandlinien'), '', 1, 12, 1, t('Struktur')], ['t', t('Obere Schichten'), '', 0, 30, 1, t('Struktur')], ['b', t('Untere Schichten'), '', 0, 30, 1, t('Struktur')],
   ['inf', t('Fülldichte'), '%', 0, 100, 5, t('Struktur')], ['pattern', t('Füllmuster'), '', 0, 0, 0, t('Struktur'), OV_PATTERNS],
   ['sp_outer', t('Außenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_inner', t('Innenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_fill', t('Füllung'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')],
+  ['sp_first', t('Erste Schicht'), 'mm/s', 5, 300, 5, t('Geschwindigkeit')], ['sp_travel', t('Travel'), 'mm/s', 50, 1000, 10, t('Geschwindigkeit')],
+  ['accel', t('Beschleunigung (0 = Werksprofil)'), 'mm/s²', 0, 20000, 500, t('Geschwindigkeit')],
+  // Rückzug: nur wenn gesetzt, sonst das Orca-Profil des Slots
+  ['retr_len', t('Rückzug Länge'), 'mm', 0, 10, 0.1, t('Rückzug')], ['retr_speed', t('Rückzug Geschwindigkeit'), 'mm/s', 5, 150, 5, t('Rückzug')],
   ['fan', t('Lüfter'), '%', 0, 100, 5, t('Kühlung & Haftung')],
   ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
@@ -32,7 +36,7 @@ function renderOverrideBar() {
   $('ovReset').classList.toggle('hidden', !n);
 }
 
-function openOverrideDialog() {
+function openOverrideDialog(focusGroup) {
   const p = ovPart(), r = lastResult; if (!p || !r) return;
   const sugg = r.suggested || {}, own = p.overrides || {};
   let group = '';
@@ -49,6 +53,8 @@ function openOverrideDialog() {
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2); $('ovAll').checked = false;
   $('ovTitle').textContent = t('Werte anpassen') + (project.parts.length > 1 ? ' · ' + p.name : '');
   $('ovDlg').showModal();
+  // aus dem Datenblatt („✎ anpassen“): zum Abschnitt springen
+  if (typeof focusGroup === 'string') { const g = [...$('ovRows').querySelectorAll('.ov-group')].find(x => x.textContent === focusGroup); if (g) { g.scrollIntoView({ block: 'start' }); const i = g.nextElementSibling && g.nextElementSibling.querySelector('[data-ov]'); if (i) i.focus(); } }
 }
 $('ovRows').addEventListener('input', e => {
   const el = e.target.closest('[data-ov]'); if (!el) return;

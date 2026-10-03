@@ -539,6 +539,9 @@ async function runSmoke(opts={}){
     const li=document.querySelector('#slotPanelList [data-slot-pick="1"]');ok(!!li,'Filament-Slots anklickbar');
     // Werte je Auftrag: nur kritische Bereiche
     setTab('settings');$('ovOpen').click();await wait(50);
+    ok(!!$('ovRows').querySelector('[data-ov="retr_len"]')&&!!$('ovRows').querySelector('[data-ov="sp_travel"]')&&!!$('ovRows').querySelector('[data-ov="accel"]'),'Werte anpassen: Travel, Beschleunigung, Rückzug');
+    $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
+    ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
     crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
     ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');

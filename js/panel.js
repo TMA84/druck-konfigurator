@@ -63,7 +63,9 @@ function update(){
     [t('Aufbau'),null]];
   const known=new Set(SPEC_GROUPS.flatMap(g=>g[1]||[]));
   $('settings').innerHTML=SPEC_GROUPS.map(([title,keys])=>{const rows=r.rows.filter(x=>keys?keys.includes(x[0]):!known.has(x[0]));
-    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('');
+    // „✎ anpassen“: Werte für diesen Auftrag, gleich beim passenden Abschnitt
+    const ovGroup={[t('Temperatur & Kühlung')]:t('Temperatur'),[t('Tempo')]:t('Geschwindigkeit'),[t('Aufbau')]:t('Struktur')}[title];
+    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+(ovGroup&&project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(ovGroup)+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('');
   // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
   const oo=store.settings.orderOpen||{};
   $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
@@ -362,3 +364,5 @@ $('orderedOnlyOv').addEventListener('change',()=>{
   $('orderedSettings').classList.toggle('only-ov',on);
   if(on)$('orderedSettings').querySelectorAll('.has-ov').forEach(d=>{d.open=true});
 });
+
+$('settings').addEventListener('click',e=>{const b=e.target.closest('[data-ov-group]');if(b&&typeof openOverrideDialog==='function')openOverrideDialog(b.dataset.ovGroup)});

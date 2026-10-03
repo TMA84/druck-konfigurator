@@ -530,3 +530,10 @@ I18N.add({
  "Absagen": "Cancel",
  "Ausblenden": "Hide",
 });
+
+I18N.add({
+ "✎ anpassen": "✎ adjust",
+ "Rückzug": "Retraction",
+ "von dir gesetzt – sonst Orca-Standard": "set by you – otherwise Orca default",
+ "Werksprofil": "factory profile"
+});

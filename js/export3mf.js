@@ -158,6 +158,11 @@ function plannedChanges(r, slot, liveSlots) {
   fil(t('Lüfter erste Schicht aus'), 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   if (isNum(r.m.zhop)) fil(t('Z-Hop'), 'filament_z_hop', numStr(r.m.zhop));
+  // Rückzug nur, wenn du ihn für diesen Auftrag gesetzt hast (r.retr) – sonst das Orca-Profil des Slots
+  if (r.retr) {
+    fil(t('Rückzug Länge'), 'filament_retraction_length', numStr(r.retr.len));
+    fil(t('Rückzug Geschwindigkeit'), 'filament_retraction_speed', numStr(r.retr.speed));
+  }
   if (r.m.pa !== null && r.m.pa !== undefined && r.m.pa !== '') {
     fil(t('Pressure Advance'), 'pressure_advance', numStr(r.m.pa));
     fil(t('Pressure Advance aktiv'), 'enable_pressure_advance', 1);
@@ -176,11 +181,12 @@ function plannedChanges(r, slot, liveSlots) {
   proc(t('Innere massive Füllung'), 'internal_solid_infill_speed', r.sp_fill);
   proc(t('Obere Fläche'), 'top_surface_speed', r.top);
   proc(t('Lückenfüllung'), 'gap_infill_speed', r.m.gap);
-  proc(t('Erste Schicht Geschwindigkeit'), 'initial_layer_speed', r.m.first);
-  proc(t('Travel'), 'travel_speed', r.m.travel);
+  proc(t('Erste Schicht Geschwindigkeit'), 'initial_layer_speed', r.sp_first ?? r.m.first);
+  proc(t('Travel'), 'travel_speed', r.sp_travel ?? r.m.travel);
   // Beschleunigung nur, wenn das Datenblatt sie vorgibt (TPU 800 mm/s²); sonst bleibt das Werksprofil.
   // Druckbewegungen werden begrenzt, Travel und erste Schicht (500 mm/s² in den Vorlagen) bleiben.
-  if (Number(r.m.accel) > 0) ACCEL_KEYS.forEach(([label, key]) => proc(label, key, numStr(r.m.accel)));
+  const accel = r.accel ?? r.m.accel;
+  if (Number(accel) > 0) ACCEL_KEYS.forEach(([label, key]) => proc(label, key, numStr(accel)));
   proc(t('Stützen'), 'enable_support', r.supOn ? 1 : 0);
   if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
   const [brimType, brimWidth] = orcaBrim(r.brim);
