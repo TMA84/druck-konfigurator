@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.12.0] – 2026-10-03
 
 ### Neu
 - **Tempo und Rückzug einstellbar:** Unter **Werte für diesen Auftrag** zusätzlich erste Schicht, Travel, Beschleunigung und **Rückzug** (Länge, Geschwindigkeit). Rückzug schreibt das Tool nur, wenn du ihn setzt – sonst bleibt das Orca-Profil des Slots. Jede Karte bei den Druckwerten hat **✎ anpassen** und öffnet den Dialog beim passenden Abschnitt.
