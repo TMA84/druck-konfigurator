@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.12.2] – 2026-10-03
 
 ### Behoben
 - **3D-Fortschritt zeigte beim Bett vermessen das Modell fertig:** Mit „Echte Kopfposition“ nahm das Tool die Schicht aus der Kopfhöhe – beim Vermessen steht der Kopf aber hoch über dem Bett (S1: Z ≈ 380 mm), das ergab die oberste Schicht. Jetzt zählt die Kopfhöhe erst ab Schicht 1 und nur, wenn sie zum Modell passt; davor steht „Vorbereitung vor der ersten Schicht“.
