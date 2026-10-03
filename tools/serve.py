@@ -51,6 +51,7 @@ import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
 import printqueue  # noqa: E402
+import schedule  # noqa: E402
 import progress_image  # noqa: E402
 import slicer  # noqa: E402
 import spools  # noqa: E402
@@ -82,7 +83,7 @@ STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
 _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
-QUIET_GET = {"/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
+QUIET_GET = {"/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 
 
@@ -182,7 +183,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json(200, fn())
         except (anycubic_lan.LanError, slicer.SliceError) as e:
             self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
-        except printqueue.QueueError as e:
+        except (printqueue.QueueError, schedule.ScheduleError) as e:
             self._json(409, {"error": str(e), "kind": "bad_request"})
         except (ValueError, KeyError) as e:
             self._json(400, {"error": "Ungültige Anfrage: " + str(e), "kind": "bad_request"})
@@ -290,6 +291,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._api(spools.api_get)
         if url.path == "/api/queue":
             return self._api(lambda: printqueue.api_get(st=printer_now()))
+        if url.path == "/api/schedule":
+            return self._api(schedule.api_get)
         if url.path == "/api/spools/export":           # ganzer Spulenstand als Datei (Umzug Mac ↔ Home Assistant)
             name, body = spools.api_export()
             self.send_response(200)
@@ -385,6 +388,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
             return self._api(lambda: printqueue.api_post(json.loads(self.rfile.read(length) or b"{}"), st=printer_now()))
+        if path == "/api/schedule":
+            # Druck planen / absagen (tools/schedule.py); der G-Code wird mit Vorschaubild in den Datenordner kopiert
+            if ctype != "application/json" or length > MAX_BODY:
+                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
+            req = json.loads(self.rfile.read(length) or b"{}")
+
+            def gcode_for(job, plate):
+                gcode = slicer.job_file(job, plate, "gcode")
+                if gcode:
+                    with_thumbnail(job, plate, gcode)
+                return gcode, slicer.job_file(job, plate, "preview") if gcode else None
+            return self._api(lambda: schedule.api_post(req, gcode_for, on_cancel=lambda plan: scheduled_dry(False, 0, 0)))
         if path == "/api/anycubic/print":
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
@@ -510,6 +525,28 @@ def _stem(name):
     return re.sub(r"(\.(gcode|3mf|gco|g))+$", "", base, flags=re.I)
 
 
+def scheduled_start(plan):
+    """Geplanten Druck starten (schedule.Runner – die Prüfungen sind schon gelaufen)."""
+    host = printer_host()
+    if not host:
+        raise anycubic_lan.LanError("Kein Drucker eingestellt", "unreachable")
+    gcode, prev = os.path.join(plan["file"], "plate.gcode"), os.path.join(plan["file"], "plate.preview")
+    name = plan["name"] + "_Platte" + str(plan["plate"]) + ".gcode"
+    res = anycubic_lan.print_gcode(host, gcode, name, plan.get("options") or {})
+    remember_print(res.get("filename") or name, "", plan["plate"], gcode_path=gcode, preview_path=prev)
+    print("Geplanter Druck gestartet: " + name, flush=True)
+
+
+def scheduled_dry(on, temp, minutes):
+    """Trocknen in allen ACE-Einheiten (geplanter Druck)."""
+    host, st = printer_host(), printer_now()
+    if not host or not st or not st.get("ace"):
+        raise anycubic_lan.LanError("Keine ACE gefunden", "unreachable")
+    boxes = [{"id": b["id"], "drying_status": {"status": 1 if on else 0, "target_temp": temp, "duration": minutes}} for b in st["ace"]]
+    anycubic_lan.command(host, "multiColorBox", "setDry", {"multi_color_box": boxes})
+    print("Geplanter Druck: Trocknen %s (%d °C, %d min)" % ("gestartet" if on else "beendet", temp, minutes), flush=True)
+
+
 def with_thumbnail(job, plate, gcode):
     """Vorschaubild in den G-Code, wenn Orca keins geschrieben hat (tools/gcode_thumbnail.py) – Fehler nie weiterreichen."""
     try:
@@ -520,17 +557,19 @@ def with_thumbnail(job, plate, gcode):
         print("Vorschaubild nicht eingesetzt: " + (str(e) or type(e).__name__), flush=True)
 
 
-def remember_print(filename, job, plate):
+def remember_print(filename, job, plate, gcode_path=None, preview_path=None):
+    """Vorschau und Objekte für 3D-Fortschritt und Überspringen aufheben – aus dem Slice-Auftrag oder (geplanter Druck)
+    aus den angegebenen Dateien."""
     try:
-        prev = slicer.job_file(job, plate, "preview")
-        if not prev:
+        prev = preview_path or slicer.job_file(job, plate, "preview")
+        if not prev or not os.path.isfile(prev):
             return
         d = _printed_dir()
         os.makedirs(d, exist_ok=True)
         key = re.sub(r"[^\w.\-]+", "_", _stem(filename))[:120] or "druck"
         shutil.copyfile(prev, os.path.join(d, key + ".preview"))
         # Objekte des G-Codes (zum Überspringen im Tab ④)
-        gcode = slicer.job_file(job, plate, "gcode")
+        gcode = gcode_path or slicer.job_file(job, plate, "gcode")
         if gcode:
             with open(os.path.join(d, key + ".objects.json"), "w", encoding="utf-8") as f:
                 json.dump(gcode_preview.read_objects(gcode), f)
@@ -601,10 +640,13 @@ def main():
         global WATCHER
         WATCHER = printqueue.Watcher(anycubic_lan, printer_host).start()   # Warteschlange: fertige Platten erkennen
         print("Warteschlange: " + printqueue.data_file(), flush=True)
+        schedule.Runner(printer_now, scheduled_start, scheduled_dry).start()   # geplanter Druck (tools/schedule.py)
+        print("Geplanter Druck: " + schedule.data_file(), flush=True)
         try:
             _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get,
                                     image_fn=progress_image.ProgressImages(printed_preview),
-                                    control_fn=lambda action: anycubic_lan.command(printer_host() or "", "print", action, {}))
+                                    control_fn=lambda action: anycubic_lan.command(printer_host() or "", "print", action, {}),
+                                    plan_fn=lambda: schedule.api_get().get("plan"))
             if note:
                 print(note, flush=True)
         except Exception as e:   # MQTT darf den Start nie verhindern

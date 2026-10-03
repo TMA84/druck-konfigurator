@@ -199,6 +199,12 @@ qv["queue"]["items"][0]["state"] = "wait"
 fc = ha_mqtt.filament_check(qv, sv)
 check("Filament knapp: Warteschlange braucht 650 g, Spule 500 g", fc[0] == "Slot 1: Warteschlange braucht noch ≈ 650 g, auf der Spule ≈ 500 g", fc)
 check("Filament reicht: nichts", ha_mqtt.filament_check(None, {"low_g": 100, "spools": [{"slot": 0, "remaining_g": 800}]}) == [])
+pl_ = {"state": "drying", "start_at": 1800000000, "note": None}
+p2 = ha_mqtt.payload(None, None, plan=pl_)
+check("Geplanter Druck: Start als Zeitpunkt, Zustand", p2["schedule_start"] == "2027-01-15T08:00:00+00:00" and p2["schedule_state"] == "trocknet", (p2["schedule_start"], p2["schedule_state"]))
+p3 = ha_mqtt.payload(None, None, plan=dict(pl_, state="failed", note="Nicht gestartet: Slot 1 leer"))
+check("Geplanter Druck fehlgeschlagen: kein Start, Grund", p3["schedule_start"] is None and p3["schedule_state"] == "nicht gestartet" and "Slot 1" in p3["schedule_note"])
+check("Kein Plan: keiner", ha_mqtt.payload(None, None)["schedule_state"] == "keiner")
 p_ = ha_mqtt.payload(None, qv, spool_view=sv)
 check("Stand: filament_low ON mit Text", p_["filament_low"] == "ON" and "Slot 1" in p_["filament_note"], p_.get("filament_note"))
 
@@ -241,7 +247,7 @@ s1 = json.loads(disc("sensor", "slot1_remaining")[1])
 check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attributes_topic"] == "dk_test/slot/1" and s1["unit_of_measurement"] == "g"
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
-check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 2 + 4, sorted(set(uids)))
+check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4, sorted(set(uids)))
 mc = json.loads(disc("sensor", "month_cost_eur")[1])
 check("Kosten diesen Monat: monetary EUR", mc["device_class"] == "monetary" and mc["unit_of_measurement"] == "EUR" and mc["state_class"] == "total"
       and mc["value_template"] == "{{ value_json.month_cost_eur }}", mc)

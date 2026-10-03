@@ -427,6 +427,8 @@ Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder 
 3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
 4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
 
+**Später starten:** Unter **Später starten** im Sendedialog legst du eine Startzeit fest (bis 14 Tage voraus), optional **Vorher trocknen** (Temperatur und Dauer – Vorgabe je Filament, z. B. PLA 45 °C, PETG 55 °C; das Trocknen endet zum Druckstart). Weil der Druck dann ohne dich startet, musst du bestätigen, dass das Bett frei ist und die richtige Druckplatte liegt. Der Server führt den Plan aus, auch ohne offene Seite, und prüft vor dem Start noch einmal: Drucker verbunden und frei, in jedem Slot das Filament, für das geslict wurde – sonst startet er **nicht** und nennt den Grund (in der Werkbank unter **Geplanter Druck** und in Home Assistant). Ein Plan zur Zeit; **Absagen** beendet auch ein schon laufendes Trocknen. Der G-Code wird beim Planen aufgehoben – du kannst danach weiter slicen.
+
 **Mehrere Platten nacheinander:** **Alle Platten nacheinander …** legt im Tab **Drucker** eine **Warteschlange** in der empfohlenen Reihenfolge an. Du startest jede Platte selbst (**Drucken …**, mit derselben Slot-Prüfung). Ist sie fertig, meldet das Tool **„Platte 2 fertig – Bett abräumen“** – als Hinweis, mit ● im Fenstertitel und, wenn du es erlaubst, als Browser-Benachrichtigung (nur über `localhost` oder HTTPS). Danach mit einem Klick die nächste. Das Tool startet nie von selbst: Das Bett muss vorher leer sein. Oben steht die Restzeit aller Platten; **Überspringen**, **Nochmal** und **Beenden** (ein laufender Druck läuft weiter).
 
 Die Warteschlange liegt **auf dem Server**: Er erkennt „Platte fertig“ auch, wenn keine Seite offen ist, und jede geöffnete Seite zeigt denselben Stand. Mit dem Home-Assistant-Add-on kommt die Meldung auch aufs Handy (siehe [Home Assistant](#home-assistant)).
@@ -449,6 +451,8 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | **Bett abräumen** (an/aus) | an, sobald eine Platte der Warteschlange fertig ist – bis die nächste startet |
 | Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
+
+**Geplanter Druck** (`sensor.druck_konfigurator_schedule_start` = Startzeit, `…_schedule_state` = geplant / trocknet / gestartet / nicht gestartet / abgesagt, Grund im Attribut `schedule_note`).
 
 **Druck pausieren / fortsetzen** (`button.druck_konfigurator_pause`, `…_resume`): nur, wenn du in den Add-on-Einstellungen **Steuern aus Home Assistant** einschaltest (Standard aus) – damit steuert Home Assistant den Drucker. Abbrechen geht nie über Home Assistant; ohne laufenden Druck lehnt der Drucker den Befehl ab.
 

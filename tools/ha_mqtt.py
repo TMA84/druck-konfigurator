@@ -51,6 +51,9 @@ ENTITIES = [
     ("bed_clear", "binary_sensor", "Bett abräumen", None, None, None, "mdi:printer-3d-nozzle-alert"),
     # Spule unter der Warnschwelle oder die wartenden Platten der Warteschlange brauchen mehr, als im Slot ist
     ("filament_low", "binary_sensor", "Filament knapp", None, "problem", None, "mdi:printer-3d-nozzle-alert"),
+    # geplanter Druck (tools/schedule.py)
+    ("schedule_start", "sensor", "Geplanter Start", None, "timestamp", None, "mdi:calendar-clock"),
+    ("schedule_state", "sensor", "Geplanter Druck", None, None, None, "mdi:calendar-check"),
     # Druckhistorie der Filamentverwaltung (tools/spools.py stats): laufender Monat, beginnt am 1. wieder bei 0
     ("month_filament_g", "sensor", "Filament diesen Monat", "g", "weight", "total", "mdi:printer-3d-nozzle"),
     ("month_cost_eur", "sensor", "Filamentkosten diesen Monat", "EUR", "monetary", "total", "mdi:cash"),
@@ -130,7 +133,10 @@ def filament_check(queue, spool_view):
     return out
 
 
-def payload(st, queue, now=None, spool_view=None):
+SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
+
+
+def payload(st, queue, now=None, spool_view=None, plan=None):
     """Werte für <base>/state. st = anycubic_lan.status (oder None), queue = printqueue.api_get(), spool_view = spools.api_get()."""
     now = now or time.time()
     job = (st or {}).get("job") or {}
@@ -145,6 +151,9 @@ def payload(st, queue, now=None, spool_view=None):
             "queue_state": sm.get("text") or "keine", "queue_remaining_min": round((sm.get("remaining_s") or 0) / 60),
             "plates": "%d/%d" % (sm.get("done") or 0, sm.get("total") or 0), "plates_done": sm.get("done") or 0,
             "filament_low": "ON" if filament_check(queue, spool_view) else "OFF", "filament_note": "; ".join(filament_check(queue, spool_view)) or None,
+            "schedule_start": datetime.datetime.fromtimestamp(int(plan["start_at"]), datetime.timezone.utc).isoformat(timespec="seconds")
+            if plan and plan.get("state") in ("wait", "drying") else None,
+            "schedule_state": SCHEDULE_STATE.get((plan or {}).get("state"), "keiner"), "schedule_note": (plan or {}).get("note"),
             "plates_total": sm.get("total") or 0, "queue_current": sm.get("current"), "queue_next": sm.get("next"),
             "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view))
 
@@ -169,8 +178,9 @@ def slot_payloads(st, spool_view):
 class Publisher:
     """Hintergrund-Thread mit stehender Verbindung zum Broker. Verbindet neu, wenn der Broker weg war."""
 
-    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S, image_fn=None, control_fn=None):
+    def __init__(self, cfg, status_fn, queue_fn, spools_fn, loop_s=LOOP_S, every_s=STATE_EVERY_S, image_fn=None, control_fn=None, plan_fn=None):
         self.cfg, self.status_fn, self.queue_fn, self.spools_fn, self.image_fn = cfg, status_fn, queue_fn, spools_fn, image_fn
+        self.plan_fn = plan_fn
         self.control_fn = control_fn if cfg.get("control") else None   # nur, wenn ausdrücklich eingeschaltet
         self.loop_s, self.every_s = loop_s, every_s
         b = cfg["base"]
@@ -224,7 +234,7 @@ class Publisher:
                 c["icon"] = icon
             if comp == "binary_sensor":
                 c.update(payload_on="ON", payload_off="OFF")
-            if key in ("printer_state", "queue_state", "month_prints", "filament_low"):
+            if key in ("printer_state", "queue_state", "month_prints", "filament_low", "schedule_state"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
         if self.image_fn:
@@ -305,7 +315,7 @@ class Publisher:
             return False
         st = self.status_fn()
         spool_view = self.spools_fn()
-        state = payload(st, self.queue_fn(), now, spool_view)
+        state = payload(st, self.queue_fn(), now, spool_view, self.plan_fn() if self.plan_fn else None)
         slots = slot_payloads(st, spool_view)
         dev = self.device(st)
         key = (dev["name"], dev.get("sw_version"), tuple(slots))
@@ -343,13 +353,13 @@ class Publisher:
             time.sleep(self.loop_s)
 
 
-def start(status_fn, queue_fn, spools_fn, env=None, image_fn=None, control_fn=None):
+def start(status_fn, queue_fn, spools_fn, env=None, image_fn=None, control_fn=None, plan_fn=None):
     """Aus serve.py: startet den Publisher, wenn MQTT_HOST gesetzt ist. Gibt (Publisher|None, Meldung) zurück."""
     cfg = config_from_env(env)
     if not cfg:
         return None, None
     if not AVAILABLE:
         return None, "Home Assistant (MQTT): braucht paho-mqtt (pip install -r requirements.txt) – aus"
-    p = Publisher(cfg, status_fn, queue_fn, spools_fn, image_fn=image_fn, control_fn=control_fn).start()
+    p = Publisher(cfg, status_fn, queue_fn, spools_fn, image_fn=image_fn, control_fn=control_fn, plan_fn=plan_fn).start()
     return p, "Home Assistant (MQTT): %s:%d, Themen %s/…, Discovery %s/…%s" % (cfg["host"], cfg["port"], cfg["base"], cfg["prefix"],
                                                                          ", Pausieren/Fortsetzen aus Home Assistant erlaubt" if cfg["control"] and control_fn else "")

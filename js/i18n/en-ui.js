@@ -498,3 +498,35 @@ I18N.add({
 I18N.add({
  "{n} Objekt(e) im Projekt auf „nicht drucken“ oder neben den Platten – weggelassen, wie in Bambu Studio/OrcaSlicer.": "{n} object(s) set to „don't print“ or placed beside the plates – left out, as in Bambu Studio/OrcaSlicer."
 });
+
+I18N.add({
+ "geplant": "scheduled",
+ "gestartet": "started",
+ "nicht gestartet": "not started",
+ "abgesagt": "cancelled",
+ "Es ist schon ein Druck geplant – erst in der Werkbank absagen.": "A print is already scheduled – cancel it in the workbench first.",
+ "Startzeit liegt nicht in der Zukunft.": "The start time is not in the future.",
+ "Trocknen: 35–70 °C, 0,5–24 h.": "Drying: 35–70 °C, 0.5–24 h.",
+ "Zum Trocknen ist bis zum Start zu wenig Zeit.": "Not enough time to dry before the start.",
+ "Bitte bestätigen: Bett frei, richtige Druckplatte liegt – gestartet wird ohne dich.": "Please confirm: bed clear, correct build plate in place – it will start without you.",
+ "Trocknen ab {d}, ": "Drying from {d}, ",
+ "Start {s}, fertig ≈ {e}.": "Start {s}, done ≈ {e}.",
+ "Vor dem Start prüft der Server: Drucker frei, Filament passt – sonst startet er nicht.": "Before starting the server checks: printer free, filament matches – otherwise it won't start.",
+ "Plane …": "Scheduling …",
+ "Druck geplant: Start {s}": "Print scheduled: start {s}",
+ "Nicht geplant: {msg}": "Not scheduled: {msg}",
+ "Planen": "Schedule",
+ "Trotzdem planen": "Schedule anyway",
+ "Start {s}": "Start {s}",
+ "in {t}": "in {t}",
+ "trocknen {c} °C, {h} h": "drying {c} °C, {h} h",
+ "ab {d}": "from {d}",
+ "Geplanten Druck absagen? Läuft das Trocknen schon, wird es beendet.": "Cancel the scheduled print? If drying is running it will be stopped.",
+ "Später starten": "Start later",
+ "Zu einer bestimmten Zeit starten": "Start at a set time",
+ "Vorher trocknen": "Dry first",
+ "Bett ist frei, richtige Druckplatte liegt": "Bed is clear, correct build plate in place",
+ "Geplanter Druck": "Scheduled print",
+ "Absagen": "Cancel",
+ "Ausblenden": "Hide",
+});

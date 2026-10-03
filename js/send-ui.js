@@ -18,6 +18,7 @@ async function openSendDialog(plate, opts) {
   if (!host) { toast(t('Erst unter ⚙ Einstellungen → Drucker-Verbindung den Drucker einrichten')); return; }
   $('sendPlate').innerHTML = s.plates.map(p => '<option value="' + p.plate + '">' + t('Platte {n}', { n: p.plate }) + ' · ' + duration(p.time_s) + ' · ' + de(p.total_g, 1) + ' g</option>').join('');
   if (plate) $('sendPlate').value = String(plate);
+  if (typeof sendLaterReset === 'function') sendLaterReset();
   $('sendPlate').disabled = !!o.onStarted;   // aus der Warteschlange: genau diese Platte
   $('sendSub').textContent = sendCtx.name + ' → ' + host;
   $('sendState').textContent = t('Frage den Drucker ab …'); $('sendState').className = 'note';
@@ -54,6 +55,13 @@ function renderSendDialog() {
     (p && typeof spoolShortage === 'function' && spoolShortage(p.grams).length ? '<p class="note bad">' + esc(spoolShortagePrefix(spoolShortage(p.grams)) + ' ' + spoolShortageText(spoolShortage(p.grams))) + '</p>' : '') +
     (warn ? '<p class="note bad">' + t('{n} Slot(s) passen nicht zum G-Code. Temperaturen im G-Code gelten für das geslicte Material – erst Filament tauschen oder neu slicen.', { n: warn }) +
       (!sendCtx.onStarted && project ? ' <button type="button" class="btn sec" data-send-adopt>' + esc(t('Filament aus der ACE übernehmen und neu slicen')) + '</button>' : '') + '</p>' : '');
+  // später starten (js/schedule-ui.js): Drucker muss jetzt nicht frei sein, der Server prüft zur Startzeit
+  const later = typeof sendLaterState === 'function' ? sendLaterState(p) : null;
+  if (later) {
+    $('sendGo').disabled = !later.ok; $('sendGo').textContent = warn ? t('Trotzdem planen') : t('Planen');
+    if (later.why) $('sendLaterInfo').textContent = later.why + ' ' + $('sendLaterInfo').textContent;
+    return;
+  }
   $('sendGo').disabled = !free;
   $('sendGo').textContent = warn ? t('Trotzdem drucken') : t('Jetzt drucken');
 }
@@ -80,6 +88,8 @@ $('sendDlg').addEventListener('click', e => {
   if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted });
 });
 $('sendGo').addEventListener('click', async () => {
+  const later = typeof sendLaterState === 'function' ? sendLaterState(sendCtx.slice.plates.find(x => x.plate === +$('sendPlate').value)) : null;
+  if (later) { if (later.ok) sendSchedule(later); return; }
   const plate = +$('sendPlate').value, host = printerHost(SEND_PRINTER), btn = $('sendGo');
   btn.disabled = true; btn.textContent = t('Lade hoch …');
   try {

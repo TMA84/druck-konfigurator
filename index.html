@@ -245,6 +245,10 @@
     </header>
     <pre id="wbRawOut" class="wb-raw hidden"></pre>
 
+    <section id="schedCard" class="wb-card wb-sched hidden" aria-labelledby="schedT">
+      <div class="wb-queue-head"><h3 id="schedT" class="wb-eyebrow">Geplanter Druck</h3><span id="schedSum" class="muted small"></span><button class="linkbtn" type="button" id="schedCancel">Absagen</button><button class="linkbtn hidden" type="button" id="schedDismiss">Ausblenden</button></div>
+      <p id="schedNote" class="note small hidden"></p>
+    </section>
     <section id="queueCard" class="wb-card wb-queue hidden" aria-labelledby="queueT">
       <div class="wb-queue-head"><h3 id="queueT" class="wb-eyebrow">Warteschlange</h3><span id="queueSum" class="muted small"></span><button class="linkbtn" type="button" id="queueEnd">Beenden</button></div>
       <div id="queueBanner" class="wb-queue-banner hidden" role="status"></div>
@@ -533,6 +537,16 @@
       <label class="wb-toggle"><input type="checkbox" id="sendFlow"> Flusskalibrierung</label>
       <label class="wb-toggle"><input type="checkbox" id="sendLapse"> Zeitraffer aufnehmen</label>
     </div>
+    <div class="ed-group" id="sendLaterBox"><h4>Später starten</h4>
+      <label class="wb-toggle"><input type="checkbox" id="sendLater"> Zu einer bestimmten Zeit starten</label>
+      <div id="sendLaterRows" class="send-later hidden">
+        <div class="ed-row"><label for="sendAt">Start</label><div class="ed-in"><input type="datetime-local" id="sendAt"></div></div>
+        <label class="wb-toggle"><input type="checkbox" id="sendDry"> Vorher trocknen</label>
+        <div id="sendDryRow" class="ed-row hidden"><label for="sendDryTemp">Trocknen</label><div class="ed-in send-dry"><input type="number" id="sendDryTemp" min="35" max="70" step="1"> °C <input type="number" id="sendDryH" min="0.5" max="24" step="0.5"> h</div></div>
+        <label class="wb-toggle"><input type="checkbox" id="sendBedOk"> Bett ist frei, richtige Druckplatte liegt</label>
+        <p id="sendLaterInfo" class="muted small"></p>
+      </div>
+    </div>
     <p class="muted small">Das Tool lädt den G-Code dieser Platte auf den Drucker und startet ihn – genau der Stand der letzten Kostenberechnung. Bett frei? Richtige Druckplatte? Filament in den Slots?</p>
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="sendGo">Jetzt drucken</button></div></dialog>
@@ -688,6 +702,7 @@
 <script src="js/skip-ui.js"></script>
 <script src="js/send-ui.js"></script>
 <script src="js/queue-ui.js"></script>
+<script src="js/schedule-ui.js"></script>
 <script src="js/spools-ui.js"></script>
 <script src="js/history-ui.js"></script>
 <script src="js/printer-picker.js"></script>

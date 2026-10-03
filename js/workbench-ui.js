@@ -42,6 +42,7 @@ async function wbPoll() {
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
   if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)
   wbCamAuto();   // Warteschlange (js/queue-ui.js)
+  if (typeof schedPoll === 'function') schedPoll();   // geplanter Druck (js/schedule-ui.js)
   wb.timer = setTimeout(wbPoll, WB_POLL_MS);
 }
 

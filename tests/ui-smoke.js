@@ -568,6 +568,23 @@ async function runSmoke(opts={}){
       ok(/kein Auftrag/.test($('sendState').textContent)&&!!$('sendState').querySelector('[data-send-refresh]')&&$('sendGo').disabled,'Senden: „busy“ ohne Auftrag – Hinweis aufs Display, erneut abfragen, Senden gesperrt');
       ok(!!$('sendMap').querySelector('[data-send-adopt]')&&/anderes Material/.test($('sendMap').textContent),'Senden: PETG↔PLA – „Filament aus der ACE übernehmen und neu slicen“');
       sendInfo={...sendInfo,state:'free'};renderSendDialog();ok(/bereit/.test($('sendState').textContent)&&!$('sendGo').disabled,'Senden: frei – bereit');
+      // Später starten: Drucker darf jetzt beschäftigt sein, Bestätigung „Bett frei“ nötig, Anfrage mit Zeit, Trocknen, Filament
+      { const of=window.fetch,posts=[];window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/schedule')){if(o&&o.method==='POST'){const b=JSON.parse(o.body);posts.push(b);
+          return Promise.resolve(new Response(JSON.stringify({plan:{id:'x',name:'t',plate:1,state:'wait',start_at:b.start_at,dry:b.dry&&{...b.dry,start_at:b.start_at-b.dry.minutes*60,sent:false},note:null}}),{status:200,headers:{'Content-Type':'application/json'}}))}
+          return Promise.resolve(new Response('{"plan":null}',{status:200,headers:{'Content-Type':'application/json'}}))}return of(u,o)};
+        sendInfo={...sendInfo,state:'busy'};sendLaterReset();await wait(100);
+        $('sendLater').checked=true;$('sendLater').dispatchEvent(new Event('input'));
+        ok(!$('sendLaterRows').classList.contains('hidden')&&$('sendGo').disabled&&/Bett frei/.test($('sendLaterInfo').textContent),'Später starten: ohne Bestätigung „Bett frei“ gesperrt');
+        const at=new Date(Date.now()+5*3600e3);at.setSeconds(0,0);$('sendAt').value=at.getFullYear()+'-'+String(at.getMonth()+1).padStart(2,'0')+'-'+String(at.getDate()).padStart(2,'0')+'T'+String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0');
+        $('sendDry').checked=true;$('sendDry').dispatchEvent(new Event('input'));$('sendDryH').value='2';$('sendBedOk').checked=true;$('sendBedOk').dispatchEvent(new Event('input'));
+        ok(!$('sendGo').disabled&&$('sendGo').textContent.includes('planen')||$('sendGo').textContent==='Planen'||$('sendGo').textContent==='Trotzdem planen','Später starten: Drucker beschäftigt, trotzdem planbar');
+        ok($('sendDryTemp').value==='55'&&/Trocknen ab/.test($('sendLaterInfo').textContent),'Trocknen: Vorgabe 55 °C für PETG, Beginn angezeigt');
+        $('sendGo').click();await wait(300);
+        const b=posts[0]||{};ok(b.action==='create'&&b.start_at===Math.round(at.getTime()/1000)&&b.dry&&b.dry.minutes===120&&b.dry.temp===55&&b.bed_clear===true&&JSON.stringify(b.wants)==='[{"tool":2,"type":"PETG"}]','Planen: Startzeit, Trocknen 2 h, Filament je Werkzeug gesendet');
+        schedRender();ok(!$('schedCard').classList.contains('hidden')&&/geplant/.test($('schedSum').textContent)&&/trocknen 55/.test($('schedSum').textContent)&&!$('schedCancel').classList.contains('hidden'),'Werkbank: geplanter Druck mit Trocknen und „Absagen“');
+        sched.v={plan:{id:'x',name:'t',plate:1,state:'failed',start_at:b.start_at,note:'Nicht gestartet: Slot 3 leer'}};schedRender();
+        ok($('schedNote').classList.contains('bad')&&/Slot 3/.test($('schedNote').textContent)&&!$('schedDismiss').classList.contains('hidden'),'Werkbank: nicht gestartet mit Grund, „Ausblenden“');
+        sched.v=null;schedRender();window.fetch=of;if($('sendDlg').open)$('sendDlg').close(); }
       { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials,tab=document.body.dataset.tab;let adopted=0,resliced=0;
         store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:[null,{type:'PLA',colour:'#00FF00',override:true},{type:'PETG',colour:'#FFFFFF',override:true},null]};
         window.runCosts=async()=>{resliced++};window.openSendDialog=()=>{};window.adoptSlotMaterials=()=>{adopted++};

@@ -1143,3 +1143,8 @@ html.embed-3d .wb-live { height: 100vh; max-height: none; min-height: 0; }
 /* In der 3D-Ansicht oben statt unten – unten liegt die Leiste mit Überhangwinkel und Maßen (verdeckte sie sonst) */
 body[data-tab="3d"] .toast { bottom: auto; top: 186px; transform: translate(-50%, -20px); }
 body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
+
+/* Später starten (Sendedialog) und geplanter Druck (Werkbank) */
+.send-later { display: grid; gap: 6px; margin-top: 6px; }
+.send-dry input { width: 64px; }
+.wb-sched .wb-queue-head { flex-wrap: wrap; }
