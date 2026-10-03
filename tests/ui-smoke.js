@@ -565,7 +565,7 @@ async function runSmoke(opts={}){
       lv.data=d0;lv.at=at0;if(pr0!=null)store.settings.prepS=pr0;else delete store.settings.prepS;persist(); }
     // Sendedialog ohne Drucker: „busy“ ohne Auftrag (nach Abbruch) und PETG im G-Code ↔ PLA in der ACE – nur Anzeige, nichts gesendet
     { const ctx0=sendCtx,info0=sendInfo;
-      sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:[null,null,{kind:'petg',name:'PETG'}],name:'t',onStarted:null};
+      sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:{2:{kind:'petg',name:'PETG'}},name:'t',onStarted:null};   // wie costState.materials: Objekt Slot → Filament
       sendInfo={state:'busy',printing:false,job:null,ace:[{id:0,slots:[{index:0,type:'ASA',present:true},{index:1,type:'PLA',present:true},{index:2,type:'PLA',present:true,colour:'#EFF0F1'},{index:3,type:'ABS',present:true}]}]};
       $('sendPlate').innerHTML='<option value="1">1</option>';renderSendDialog();
       ok(/kein Auftrag/.test($('sendState').textContent)&&!!$('sendState').querySelector('[data-send-refresh]')&&$('sendGo').disabled,'Senden: „busy“ ohne Auftrag – Hinweis aufs Display, erneut abfragen, Senden gesperrt');

@@ -22,7 +22,8 @@ const schedBusy = () => !!(sched.v && sched.v.plan && ['wait', 'drying'].include
 function sendLaterReset() {
   const d = new Date(Date.now() + 3600e3); d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
   $('sendLater').checked = false; $('sendAt').value = localInput(d); $('sendDry').checked = false; $('sendBedOk').checked = false;
-  const kinds = (sendCtx.materials || []).filter(Boolean).map(m => m.kind);
+  // materials: Objekt Slot → Filament (letzte Kostenberechnung bzw. Warteschlange), keine Liste
+  const kinds = Object.values(sendCtx.materials || {}).filter(Boolean).map(m => m.kind);
   $('sendDryTemp').value = String(Math.max(...kinds.map(k => DRY_DEFAULT_C[k] || 45), 45)); $('sendDryH').value = '4';
   $('sendLaterBox').classList.toggle('hidden', !!sendCtx.onStarted);   // aus der Warteschlange: nicht planbar
   schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && renderSendDialog());
