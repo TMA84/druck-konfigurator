@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.12.1] – 2026-10-03
 
 ### Behoben
 - **„An Drucker senden“ öffnete sich nicht (10.12.0):** Der neue Teil „Später starten“ las die Filamente als Liste, nach dem Slicen sind sie aber ein Objekt je Slot – der Fehler brach das Öffnen ab. Behoben; ein Fehler in diesem Zusatzteil verhindert das Senden künftig nie mehr.
