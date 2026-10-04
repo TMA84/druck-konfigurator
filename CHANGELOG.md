@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **ABS/ASA: Brim löste sich vom Teil.** Das Kobra-S1-Profil lässt 0,1 mm Spalt zwischen Brim und Teil, und der Brim folgte nicht dem durch die Elefantenfuß-Kompensation eingezogenen Umriss. Jetzt folgt jeder Brim dem kompensierten Umriss, bei ABS/ASA ohne Spalt – die innerste Brim-Linie überlappt die Außenwand 0,35 statt 0,27 mm (gemessen im G-Code).
+
 ## [10.14.0] – 2026-10-04
 
 ### Neu

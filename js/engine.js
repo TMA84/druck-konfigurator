@@ -212,7 +212,7 @@ function compute(I,geom,ctx){
   if(geom){
     const foot=Math.max(1,geom.bedArea),slender=geom.z/Math.sqrt(foot),big=Math.max(geom.x,geom.y);
     if(foot<150||slender>4){brim='5–8 mm';brimNote=t('kleine Aufstandsfläche erkannt ({area} mm²)',{area:de(foot,0)})}
-    else if(enclosed&&(big>80||(s1&&S1P.brim))){brim='5 mm';brimNote=t('ABS/ASA neigt zum Verziehen')}
+    else if(enclosed&&(big>80||(s1&&S1P.brim))){brim='5 mm';brimNote=t('ABS/ASA neigt zum Verziehen – ohne Spalt am Teil')}
     else if(big>110&&!tpu){brimNote=t('großes flaches Teil: wenn Ecken abheben, 3–5 mm Brim oder Mausohren')}
   }
   if(o==='tire'&&tpu&&brim==='Nicht nötig'){brim='0–5 mm';brimNote=t('bei Haftungsproblemen')}

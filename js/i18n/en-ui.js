@@ -576,3 +576,9 @@ I18N.add({
  "Gehäuse warm halten ({kind})": "keep the enclosure warm ({kind})",
  "ABS/ASA neigt zum Verziehen": "ABS/ASA tends to warp"
 });
+
+I18N.add({
+ "Brim am kompensierten Umriss": "Brim along compensated outline",
+ "Brim-Abstand zum Teil": "Brim gap to part",
+ "ABS/ASA neigt zum Verziehen – ohne Spalt am Teil": "ABS/ASA tends to warp – no gap to the part"
+});

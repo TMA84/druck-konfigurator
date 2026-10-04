@@ -195,6 +195,13 @@ function plannedChanges(r, slot, liveSlots) {
   const [brimType, brimWidth] = orcaBrim(r.brim);
   proc(t('Brim'), 'brim_type', brimType);
   if (brimWidth) proc(t('Brim-Breite'), 'brim_width', brimWidth);
+  /* Brim muss am Teil hängen: das Kobra-S1-Profil lässt 0,1 mm Spalt (brim_object_gap), und die Elefantenfuß-Kompensation
+     (0,075 mm) zieht die erste Schicht des Teils zusätzlich nach innen – bei ABS/ASA riss der Brim dort ab und das Teil
+     löste sich (2026-10-04). Daher: Brim folgt dem kompensierten Umriss, bei ABS/ASA ohne Spalt. */
+  if (brimType !== 'no_brim') {
+    proc(t('Brim am kompensierten Umriss'), 'brim_use_efc_outline', 1);
+    if (r.m.kind === 'abs' || r.m.kind === 'asa') proc(t('Brim-Abstand zum Teil'), 'brim_object_gap', 0);
+  }
   if (SEAM_ORCA[r.seam]) proc(t('Nahtposition'), 'seam_position', SEAM_ORCA[r.seam]);
   if (r.o === 'watertight') {  // Lücken zwischen den Bahnen sind die typischen Undichtigkeiten
     proc(t('Lückenfüllung'), 'gap_fill_target', 'everywhere');
@@ -279,7 +286,7 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
    Travel und Erste-Schicht-Geschwindigkeit gelten für die ganze Platte und bleiben global. */
 const OBJECT_KEYS = new Set(['wall_loops', 'sparse_infill_density', 'sparse_infill_pattern', 'top_shell_layers', 'bottom_shell_layers',
   'outer_wall_speed', 'inner_wall_speed', 'sparse_infill_speed', 'internal_solid_infill_speed', 'top_surface_speed', 'gap_infill_speed',
-  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'seam_position', 'gap_fill_target', 'ensure_vertical_shell_thickness']);
+  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'brim_object_gap', 'seam_position', 'gap_fill_target', 'ensure_vertical_shell_thickness']);
 const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(k);
 
 // Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config
