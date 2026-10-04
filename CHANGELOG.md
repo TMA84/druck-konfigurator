@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.13.0] – 2026-10-04
 
 ### Behoben
 - **Werte für diesen Auftrag: Kommastellen gingen verloren** – alles außer der Schichthöhe wurde ganzzahlig gespeichert (1,3 mm Rückzug → 1 mm). Jetzt auf die Schrittweite des Felds gerundet.
