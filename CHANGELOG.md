@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Angepasste Werte als Standard:** Im Dialog „Werte für diesen Auftrag“ **Als Standard für {Filament} merken** – gilt je Drucker und Filament als neuer Vorschlag, der Werkswert bleibt daneben sichtbar; **Standard zurücksetzen** stellt die Werkswerte wieder her. Werte für den einzelnen Auftrag haben Vorrang.
+
 ## [10.15.0] – 2026-10-04
 
 ### Neu

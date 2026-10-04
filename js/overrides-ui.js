@@ -42,24 +42,32 @@ function renderOverrideBar() {
   const diff = r && r.changed ? r.changed.length : 0;
   $('ovInfo').textContent = !p ? t('Zuerst ein Modell laden.') : n ? t(n > 1 ? '{n} Werte angepasst' : '{n} Wert angepasst', { n }) + (diff < n ? ' ' + t('({n} davon wie der Vorschlag)', { n: n - diff }) : '') + (project.parts.length > 1 ? ' – ' + t('für „{name}“', { name: p.name }) : '') : t('Vorschlag unverändert.');
   $('ovReset').classList.toggle('hidden', !n);
+  // eigene Standardwerte für dieses Filament (js/engine.js ovDefaults)
+  const nDef = r && r.ovDefaults ? Object.keys(r.ovDefaults).length : 0;
+  if (p && nDef) $('ovInfo').textContent += (n ? ' · ' : '') + t('{n} eigene Standardwerte ({mat})', { n: nDef, mat: r.m.name });
 }
 
 function openOverrideDialog(focusGroup) {
   const p = ovPart(), r = lastResult; if (!p || !r) return;
-  const sugg = r.suggested || {}, own = p.overrides || {};
+  const sugg = r.suggested || {}, own = p.overrides || {}, def = r.ovDefaults || {};
   let group = '';
   $('ovRows').innerHTML = OV_FIELDS.filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
     const head = grp !== group ? '<div class="ov-group">' + esc(grp) + '</div>' : ''; group = grp;
     const input = opts
       ? '<select data-ov="' + k + '"><option value="">' + t('– Vorschlag –') + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
-      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
+      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(def[k] ?? sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
     return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + '</span>' +
-      '<span class="ov-sugg">' + t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</span>' + input +
+      '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
+        : t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') })) + '</span>' + input +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
   }).join('');
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2); $('ovAll').checked = false;
   $('ovTitle').textContent = t('Werte anpassen') + (project.parts.length > 1 ? ' · ' + p.name : '');
+  const nDef = Object.keys(def).length;
+  $('ovDefSave').textContent = t('Als Standard für {mat} merken', { mat: r.m.name });
+  $('ovDefReset').classList.toggle('hidden', !nDef);
+  $('ovDefInfo').textContent = nDef ? t('{n} eigene Standardwerte für {mat} auf diesem Drucker aktiv.', { n: nDef, mat: r.m.name }) : '';
   $('ovDlg').showModal();
   // aus dem Datenblatt („✎ anpassen“): zum Abschnitt springen
   if (typeof focusGroup === 'string') { const g = [...$('ovRows').querySelectorAll('.ov-group')].find(x => x.textContent === focusGroup); if (g) { g.scrollIntoView({ block: 'start' }); const i = g.nextElementSibling && g.nextElementSibling.querySelector('[data-ov]'); if (i) i.focus(); } }
@@ -93,7 +101,8 @@ $('ovRows').addEventListener('click', e => {
 });
 $('ovClear').addEventListener('click', () => $('ovRows').querySelectorAll('[data-ov]').forEach(el => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }));
 
-$('ovSave').addEventListener('click', () => {
+// Eingaben des Dialogs → {Schlüssel: Wert} oder null (ungültige Eingabe gemeldet)
+function ovCollect() {
   const out = {}, bad = [];
   for (const f of OV_FIELDS) {
     const [k, label, , min, max, step, , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el ? el.value.trim() : '';
@@ -106,7 +115,11 @@ $('ovSave').addEventListener('click', () => {
     const dec = step > 0 && step < 1 ? Math.min(3, String(step).split('.')[1].length) : 0;
     out[k] = Math.round(v * 10 ** dec) / 10 ** dec;
   }
-  if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return; }
+  if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return null; }
+  return out;
+}
+$('ovSave').addEventListener('click', () => {
+  const out = ovCollect(); if (!out) return;
   const p = ovPart(), value = Object.keys(out).length ? out : null;
   const targets = $('ovAll').checked ? project.parts : samePlacements(p);
   targets.forEach(x => { x.overrides = value ? { ...value } : null; });
@@ -115,6 +128,24 @@ $('ovSave').addEventListener('click', () => {
   toast(value ? t('{n} Wert(e) angepasst', { n: Object.keys(out).length }) + (targets.length > 1 ? ' ' + t('für {n} Teile', { n: targets.length }) : '') : t('Vorschlag wird verwendet'));
 });
 $('ovOpen').addEventListener('click', openOverrideDialog);
+/* Als Standard merken: die eingetragenen Werte gelten ab jetzt für dieses Filament auf diesem Drucker (js/engine.js
+   ovDefaults) – als neuer Vorschlag; die Anpassungen dieses Teils fallen weg (sie stecken jetzt im Standard) */
+const ovMatName = () => lastResult && lastResult.m ? lastResult.m.name : '';
+$('ovDefSave').addEventListener('click', () => {
+  const out = ovCollect(), r = lastResult; if (!out || !r) return;
+  if (!Object.keys(out).length) { toast(t('Keine Werte eingetragen – nichts zu merken')); return; }
+  const all = store.settings.ovDefaults || (store.settings.ovDefaults = {});
+  all[r.defKey] = { ...(all[r.defKey] || {}), ...out };
+  const p = ovPart(); samePlacements(p).forEach(x => { x.overrides = null; });
+  persist(); $('ovDlg').close(); update();
+  toast(t('{n} Wert(e) als Standard für {mat} gemerkt', { n: Object.keys(out).length, mat: ovMatName() }));
+});
+$('ovDefReset').addEventListener('click', () => {
+  const r = lastResult; if (!r || !store.settings.ovDefaults || !store.settings.ovDefaults[r.defKey]) return;
+  if (!confirm(t('Eigene Standardwerte für {mat} löschen? Danach gelten wieder die Werkswerte.', { mat: ovMatName() }))) return;
+  delete store.settings.ovDefaults[r.defKey]; persist(); $('ovDlg').close(); update();
+  toast(t('Werkswerte für {mat} wieder aktiv', { mat: ovMatName() }));
+});
 $('ovReset').addEventListener('click', () => {
   const p = ovPart(); if (!p) return;
   samePlacements(p).forEach(x => { x.overrides = null; });

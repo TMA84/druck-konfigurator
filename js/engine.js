@@ -110,7 +110,10 @@ function compute(I,geom,ctx){
   const ob=OBJ[o],tpu=m.kind==='tpu',sp=supportProfile(sl,tpu);
   /* Anpassungen für diesen Auftrag (I.overrides, je Teil): ersetzen den berechneten Vorschlag an der Stelle,
      an der er entsteht – Datenblatt, 3MF, Slicen und Kosten nutzen dann dieselben Werte. sugg = Vorschlag. */
-  const ov=I.overrides||{},sugg={},has=k=>ov[k]!==undefined&&ov[k]!==null&&ov[k]!=='';
+  /* Eigene Standardwerte je Drucker und Filament (store.settings.ovDefaults["kobra_s1|abs"], „Als Standard merken“):
+     wirken wie Anpassungen, Werte für diesen Auftrag haben Vorrang; sugg bleibt der Werkswert (2026-10-04) */
+  const defKey=printer.id+'|'+mk,myDef=((ctx.settings||{}).ovDefaults||{})[defKey]||{},ovUser=I.overrides||{};
+  const ov=Object.assign({},myDef,ovUser),sugg={},has=k=>ov[k]!==undefined&&ov[k]!==null&&ov[k]!=='';
   const take=(k,v)=>{sugg[k]=v;return has(k)?ov[k]:v};
   /* Kobra S1 (geschlossen, mit Hilfs- und Abluftlüfter): Vorgaben je Filamentart (2026-10-04) – ABS/ASA warm halten
      (Hilfslüfter aus, Abluft fast zu, Bett 100 °C, 10 min vorwärmen, immer Brim), PETG weniger Luft. Das Orca-Profil
@@ -234,7 +237,10 @@ function compute(I,geom,ctx){
   // Übersicht; angepasste Werte bekommen den Vorschlag als Hinweis und eine Markierung (4. Feld)
   const changed=Object.keys(sugg).filter(k=>has(k)&&String(ov[k])!==String(sugg[k]));
   const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'||k==='fan_aux'||k==='fan_box'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'||k==='zhop'?de(v,1)+' mm':k==='first_layer'||k==='brim_gap'?de(v,2)+' mm':k==='max_vol'?de(v,1)+' mm³/s':k==='nozzle_first'?v+' °C':k==='flow'?de(v,2):k==='pa'?de(v,3):k==='fan_first'?v+' %':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
-  const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));return c.length?[row[0],row[1],[t('angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]:row};
+  const userSet=k=>ovUser[k]!==undefined&&ovUser[k]!==null&&ovUser[k]!=='';
+  const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));if(!c.length)return row;
+    const own=c.every(k=>!userSet(k));   // nur aus deinen Standardwerten
+    return [row[0],row[1],[t(own?'dein Standard – Werk {v}':'angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]};
   const rows=[
     mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
     mark(['layer','first_layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(firstLayer,2)+' mm']),
@@ -328,5 +334,5 @@ function compute(I,geom,ctx){
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer,nozzleFirst,brimGap,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
-    suggested:sugg,changed};
+    suggested:sugg,changed,ovDefaults:myDef,defKey};
 }

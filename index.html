@@ -557,7 +557,8 @@
 <dialog id="ovDlg" aria-labelledby="ovTitle"><div class="ed-head"><h2 id="ovTitle">Werte für diesen Auftrag anpassen</h2><div class="muted" id="ovSub">Der Vorschlag steht links. Trägst du einen Wert ein, gilt er statt des Vorschlags – im Datenblatt, in der 3MF, beim Slicen und für die Kosten. Leer = Vorschlag.</div></div>
   <div class="ed-body"><div id="ovRows"></div>
     <label class="wb-toggle hidden" id="ovAllRow"><input type="checkbox" id="ovAll"> Für alle Teile des Projekts übernehmen</label></div>
-  <div class="ed-foot"><button class="btn sec" type="button" id="ovClear">Alle leeren (Vorschlag)</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="ovSave">Übernehmen</button></div></dialog>
+  <p id="ovDefInfo" class="muted small ov-def-info"></p>
+  <div class="ed-foot"><button class="linkbtn hidden" type="button" id="ovDefReset">Standard zurücksetzen</button><button class="btn sec" type="button" id="ovDefSave">Als Standard merken</button><button class="btn sec" type="button" id="ovClear">Alle leeren (Vorschlag)</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="ovSave">Übernehmen</button></div></dialog>
 
 <dialog id="spoolDlg" class="spool-dlg" aria-labelledby="spoolDlgTitle"><div class="ed-head"><h2 id="spoolDlgTitle">Spulen &amp; Restmengen</h2><div class="muted">Der Server erkennt die Spulen in der ACE (RFID, Typ, Farbe) und zieht den Verbrauch jedes Drucks ab – auch bei Drucken aus anderen Programmen. Restmenge = Füllgewicht − Verbrauch − Spülabfall.</div></div>
   <div class="ed-body" id="spoolBody"></div>

@@ -552,6 +552,16 @@ async function runSmoke(opts={}){
       const sg=lastResult.suggested;ok(keys.filter(k=>k!=='pa').every(k=>sg[k]!==undefined&&sg[k]!==null&&sg[k]!==''),'jeder Wert hat einen Vorschlag');
       const nz=$('ovRows').querySelector('[data-ov="nozzle"]');nz.value='300';nz.dispatchEvent(new Event('input',{bubbles:true}));
       ok(/Herstellerbereich/.test(nz.closest('.ov-row').textContent),'Warnung: Düse außerhalb des Herstellerbereichs');nz.value='';nz.dispatchEvent(new Event('input',{bubbles:true})); }
+    // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
+    { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
+      bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;
+      ok(store.settings.ovDefaults&&store.settings.ovDefaults[key]&&store.settings.ovDefaults[key].bed===fac+5&&lastResult.m.bed===fac+5,'Als Standard gemerkt: Heizbett '+(fac+5)+' für '+key);
+      const p=project.parts[project.selected];ok(!p.overrides,'Teil-Anpassung steckt jetzt im Standard');
+      ok($('settings').textContent.includes('dein Standard'),'Datenblatt: „dein Standard – Werk …“');
+      $('ovOpen').click();await wait(50);ok(/Standard/.test($('ovRows').querySelector('[data-ov="bed"]').closest('.ov-row').textContent)&&!$('ovDefReset').classList.contains('hidden'),'Dialog: Standard und Werk, „Standard zurücksetzen“');
+      const oc=window.confirm;window.confirm=()=>true;$('ovDefReset').click();await wait(80);window.confirm=oc;
+      ok(!(store.settings.ovDefaults||{})[key]&&lastResult.m.bed===fac,'Standard zurückgesetzt: wieder Werkswert');
+      store.settings.ovDefaults=JSON.parse(d0)||undefined;persist();$('ovOpen').click();await wait(50); }
     $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
     ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');

@@ -597,3 +597,21 @@ I18N.add({
  "außerhalb des Herstellerbereichs {r}": "outside the manufacturer range {r}",
  "deutlich anders als der Vorschlag ({s})": "far from the suggestion ({s})"
 });
+
+I18N.add({
+ "Als Standard merken": "Save as default",
+ "Als Standard für {mat} merken": "Save as default for {mat}",
+ "Standard zurücksetzen": "Reset default",
+ "Standard {v}": "default {v}",
+ "Werk {v}": "factory {v}",
+ "dein Standard – Werk {v}": "your default – factory {v}",
+ "Keine Werte eingetragen – nichts zu merken": "No values entered – nothing to save",
+ "{n} Wert(e) als Standard für {mat} gemerkt": "{n} value(s) saved as default for {mat}",
+ "Eigene Standardwerte für {mat} löschen? Danach gelten wieder die Werkswerte.": "Delete your defaults for {mat}? The factory values apply again afterwards.",
+ "Werkswerte für {mat} wieder aktiv": "Factory values active again for {mat}",
+ "{n} eigene Standardwerte für {mat} auf diesem Drucker aktiv.": "{n} own default(s) for {mat} active on this printer."
+});
+
+I18N.add({
+ "{n} eigene Standardwerte ({mat})": "{n} own defaults ({mat})"
+});

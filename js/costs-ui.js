@@ -49,7 +49,7 @@ function sliceSigs() {
   if (!tpl) return null;
   const plan = exportPlan(costDefaultSlot()), lay = projectLayout(tpl), src = plan.jobs.find(j => j.r === plan.r) || plan.jobs[0];
   const global = JSON.stringify([project.printSeq || 'layer', typeof packGapMm !== 'undefined' ? packGapMm : 8, lastResult.printer.id, lastResult.dSel, $('nozM').value, aceFlush(), acePurgeOwn(), exportSlots(tpl), plan.slot,
-    src.part.input, src.part.overrides || null, project.threemf ? project.threemf.designMap || null : null,
+    src.part.input, src.part.overrides || null, store.settings.ovDefaults || null, project.threemf ? project.threemf.designMap || null : null,
     // welche Filamente in welchen Slots landen – als Menge, damit eine weitere Kopie nicht alle Platten ändert
     [...new Set(plan.jobs.map(j => JSON.stringify([j.part.input && j.part.input.material, j.slot, (j.bodies || []).map(b => b.slot), typeof extraSlots === 'function' ? extraSlots(j.part) : []])))].sort()]);
   const plates = Array.from({ length: lay.count }, (_, k) => JSON.stringify(plan.jobs.filter((j, i) => lay.plateOf[i] === k + 1)
