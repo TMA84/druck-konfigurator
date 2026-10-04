@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.16.0] – 2026-10-04
 
 ### Behoben
 - **Angepasste Werte wurden bei mehreren Teilen teils nicht gedruckt:** Werte, die Orca je Filament-Slot (Düse, Bett, Lüfter, Rückzug, Fluss, Z-Hop …) oder für die ganze Platte (Schichthöhe, erste Schicht, Travel, Beschleunigung) führt, kamen nur aus dem ersten Teil – am zweiten Teil gesetzt gingen sie verloren. Jetzt verteilt der Dialog sie auf alle Teile mit demselben Slot bzw. alle Teile und sagt das am Feld („gilt für die ganze Platte“).
