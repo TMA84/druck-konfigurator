@@ -547,6 +547,11 @@ async function runSmoke(opts={}){
       const pcl=plannedChanges(lastResult,0),pv=k=>(pcl.find(c=>c.key===k)||{}).value;
       ok(pv('filament_retraction_length')==='1.3'&&pv('during_print_exhaust_fan_speed')==='10'&&pv('additional_cooling_fan_speed')!=null,'Export Kobra S1: Rückzug, Gehäuselüfter 10, Hilfslüfter mit Vorgabe');
       delete po.retr_len;delete po.fan_box;update();await wait(50);$('ovOpen').click();await wait(50); }
+    { const keys=['nozzle_first','first_layer','seam','sp_top','sp_gap','max_vol','flow','pa','zhop','fan_first','brim_gap'];
+      const miss=keys.filter(k=>!$('ovRows').querySelector('[data-ov="'+k+'"]'));ok(!miss.length,'Werte anpassen: alle geschriebenen Werte einstellbar'+(miss.length?' – fehlt '+miss.join(','):''));
+      const sg=lastResult.suggested;ok(keys.filter(k=>k!=='pa').every(k=>sg[k]!==undefined&&sg[k]!==null&&sg[k]!==''),'jeder Wert hat einen Vorschlag');
+      const nz=$('ovRows').querySelector('[data-ov="nozzle"]');nz.value='300';nz.dispatchEvent(new Event('input',{bubbles:true}));
+      ok(/Herstellerbereich/.test(nz.closest('.ov-row').textContent),'Warnung: Düse außerhalb des Herstellerbereichs');nz.value='';nz.dispatchEvent(new Event('input',{bubbles:true})); }
     $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
     ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');

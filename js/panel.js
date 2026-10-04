@@ -366,3 +366,18 @@ $('orderedOnlyOv').addEventListener('change',()=>{
 });
 
 $('settings').addEventListener('click',e=>{const b=e.target.closest('[data-ov-group]');if(b&&typeof openOverrideDialog==='function')openOverrideDialog(b.dataset.ovGroup)});
+
+/* Datenblatt und Orca-Reihenfolge: Zeile anklicken → „Werte für diesen Auftrag“ bei diesem Wert (2026-10-04) */
+const ROW_OV={'Düse':'nozzle','Heizbett':'bed','Lüfter':'fan','Lüfter Folgeschichten':'fan','Lüfter erste Schicht':'fan_first','Hilfs- / Gehäuselüfter':'fan_aux',
+  'Schichthöhe / erste Schicht':'layer','Schichthöhe':'layer','Höhe der ersten Schicht':'first_layer','Nahtposition':'seam',
+  'Wandlinien':'w','Obere / untere Schichten':'t','Obere Schichten':'t','Untere Schichten':'b','Fülldichte / Muster':'inf','Fülldichte':'inf','Füllmuster':'pattern',
+  'Außenwand / Innenwand':'sp_outer','Außenwand':'sp_outer','Innere Wand':'sp_inner','Füllung / Travel':'sp_fill','Füllung':'sp_fill','Travel':'sp_travel',
+  'Erste Schicht':'sp_first','Obere Fläche':'sp_top','Lückenfüllung':'sp_gap','Beschleunigung':'accel','Rückzug':'retr_len',
+  'Max. Volumenstrom':'max_vol','Maximale Volumengeschwindigkeit':'max_vol','Durchflussverhältnis':'flow','Pressure Advance':'pa','Z-Hop':'zhop',
+  'Support':'support','Stützstrukturen':'support','Nur kritische Bereiche':'critical','Brim':'brim'};
+const ROW_OV_T=Object.fromEntries(Object.entries(ROW_OV).map(([k,v])=>[t(k),v]));
+['settings','orderedSettings'].forEach(id=>$(id).addEventListener('click',e=>{
+  if(e.target.closest('[data-ov-group],.help,a,button'))return;
+  const row=e.target.closest('.setting'),b=row&&row.querySelector('b');if(!b||typeof openOverrideDialog!=='function'||!project)return;
+  const key=ROW_OV_T[b.firstChild?b.firstChild.textContent.trim():''];if(key)openOverrideDialog({key});
+}));

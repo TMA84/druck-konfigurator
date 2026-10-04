@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Neu
+- **Alle Werte anpassbar, immer mit Vorschlag:** „Werte für diesen Auftrag“ deckt jetzt alles ab, was das Tool in den Druck schreibt – neu: Düse erste Schicht, Höhe der ersten Schicht, Nahtposition, obere Fläche, Lückenfüllung, max. Volumenstrom, Durchflussverhältnis, Pressure Advance, Z-Hop, Lüfter erste Schicht, Brim-Abstand. Neben jedem Feld der Vorschlag (= was ohne Eingabe gedruckt wird); Warnung am Feld bei Düse außerhalb des Herstellerbereichs oder > 30 % Abweichung. Zeile im Datenblatt anklicken öffnet den Dialog bei diesem Wert.
+
 ### Behoben
 - **ABS/ASA: Brim löste sich vom Teil.** Das Kobra-S1-Profil lässt 0,1 mm Spalt zwischen Brim und Teil, und der Brim folgte nicht dem durch die Elefantenfuß-Kompensation eingezogenen Umriss. Jetzt folgt jeder Brim dem kompensierten Umriss, bei ABS/ASA ohne Spalt – die innerste Brim-Linie überlappt die Außenwand 0,35 statt 0,27 mm (gemessen im G-Code).
 

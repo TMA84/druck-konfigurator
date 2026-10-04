@@ -6,7 +6,7 @@
 
 const ORCA_KIND = { pla: 'PLA', petg: 'PETG', abs: 'ABS', asa: 'ASA', tpu: 'TPU' };
 const BED_TEMP_KEYS = ['hot_plate_temp', 'textured_plate_temp', 'cool_plate_temp', 'eng_plate_temp'];
-const SEAM_ORCA = { Hinten: 'back', Ausgerichtet: 'aligned' };
+const SEAM_ORCA = { Hinten: 'back', Ausgerichtet: 'aligned', 'Nächste': 'nearest', 'Zufällig': 'random' };
 const ACCEL_KEYS = [[t('Beschleunigung Standard'), 'default_acceleration'], [t('Beschleunigung Außenwand'), 'outer_wall_acceleration'],
   [t('Beschleunigung Innenwand'), 'inner_wall_acceleration'], [t('Beschleunigung massive Füllung'), 'internal_solid_infill_acceleration'],
   [t('Beschleunigung Füllung'), 'sparse_infill_acceleration'], [t('Beschleunigung obere Fläche'), 'top_surface_acceleration']];
@@ -141,7 +141,7 @@ function plannedChanges(r, slot, liveSlots) {
 
   fil(t('Filamenttyp'), 'filament_type', ORCA_KIND[r.m.kind] || 'PLA');
   fil(t('Düse'), 'nozzle_temperature', r.nozzle);
-  fil(t('Düse erste Schicht'), 'nozzle_temperature_initial_layer', r.nozzle);
+  fil(t('Düse erste Schicht'), 'nozzle_temperature_initial_layer', r.nozzleFirst ?? r.nozzle);
   // Empfohlener Bereich des Filaments – sonst bleibt der PLA-Bereich der Vorlage (190–240 °C) stehen, und Orca
   // verweigert Mehrfarbdrucke mit ASA/ABS/PETG („nozzle temperatures are incompatible“, beobachtet 2026-09-28)
   const [lo, hi] = nozzleRange(r);
@@ -156,6 +156,7 @@ function plannedChanges(r, slot, liveSlots) {
   // bewusst nicht: er hängt von Filament, Temperatur und Extruder ab, das Orca-Filamentprofil des Slots
   // bringt passende Werte mit (Entscheidung des Nutzers 2026-09-26, bisherige Standardwerte passten).
   fil(t('Lüfter erste Schicht aus'), 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
+  if (Number(r.m.fanFirst) > 0) fil(t('Lüfter erste Schicht'), 'first_x_layer_fan_speed', numStr(r.m.fanFirst));
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   if (isNum(r.m.zhop)) fil(t('Z-Hop'), 'filament_z_hop', numStr(r.m.zhop));
   // Hilfs- und Gehäuselüfter (Kobra S1) nur, wenn du sie für diesen Auftrag gesetzt hast – sonst das Profil (60 %)
@@ -200,7 +201,7 @@ function plannedChanges(r, slot, liveSlots) {
      löste sich (2026-10-04). Daher: Brim folgt dem kompensierten Umriss, bei ABS/ASA ohne Spalt. */
   if (brimType !== 'no_brim') {
     proc(t('Brim am kompensierten Umriss'), 'brim_use_efc_outline', 1);
-    if (r.m.kind === 'abs' || r.m.kind === 'asa') proc(t('Brim-Abstand zum Teil'), 'brim_object_gap', 0);
+    proc(t('Brim-Abstand zum Teil'), 'brim_object_gap', numStr(r.brimGap ?? ((r.m.kind === 'abs' || r.m.kind === 'asa') ? 0 : 0.1)));
   }
   if (SEAM_ORCA[r.seam]) proc(t('Nahtposition'), 'seam_position', SEAM_ORCA[r.seam]);
   if (r.o === 'watertight') {  // Lücken zwischen den Bahnen sind die typischen Undichtigkeiten

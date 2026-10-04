@@ -582,3 +582,18 @@ I18N.add({
  "Brim-Abstand zum Teil": "Brim gap to part",
  "ABS/ASA neigt zum Verziehen – ohne Spalt am Teil": "ABS/ASA tends to warp – no gap to the part"
 });
+
+I18N.add({
+ "Düse erste Schicht": "Nozzle first layer",
+ "Höhe der ersten Schicht": "First layer height",
+ "Nächste": "Nearest",
+ "Zufällig": "Random",
+ "Abstand {g} mm": "gap {g} mm",
+ "Lüfter erste Schicht": "Fan first layer",
+ "Filament": "Filament"
+});
+
+I18N.add({
+ "außerhalb des Herstellerbereichs {r}": "outside the manufacturer range {r}",
+ "deutlich anders als der Vorschlag ({s})": "far from the suggestion ({s})"
+});

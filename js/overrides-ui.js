@@ -8,21 +8,27 @@ const OV_BRIMS = ['Nicht nötig', '3 mm', '5 mm', '8 mm', '10 mm'];
 // Muster- und Brim-Werte bleiben deutsch (export3mf.js ordnet sie Orca-Werten zu); angezeigt wird t(Wert).
 // [Schlüssel, Beschriftung, Einheit, min, max, Schritt, Gruppe] – Auswahllisten statt Zahl bei options
 const OV_FIELDS = [
-  ['nozzle', t('Düse'), '°C', 150, 300, 5, t('Temperatur')], ['bed', t('Heizbett'), '°C', 0, 110, 5, t('Temperatur')],
-  ['layer', t('Schichthöhe'), 'mm', 0.04, 0.6, 0.02, t('Qualität')],
+  ['nozzle', t('Düse'), '°C', 150, 300, 5, t('Temperatur')], ['nozzle_first', t('Düse erste Schicht'), '°C', 150, 300, 5, t('Temperatur')],
+  ['bed', t('Heizbett'), '°C', 0, 110, 5, t('Temperatur')],
+  ['layer', t('Schichthöhe'), 'mm', 0.04, 0.6, 0.02, t('Qualität')], ['first_layer', t('Höhe der ersten Schicht'), 'mm', 0.08, 0.6, 0.02, t('Qualität')],
+  ['seam', t('Nahtposition'), '', 0, 0, 0, t('Qualität'), ['Hinten', 'Ausgerichtet', 'Nächste', 'Zufällig']],
   ['w', t('Wandlinien'), '', 1, 12, 1, t('Struktur')], ['t', t('Obere Schichten'), '', 0, 30, 1, t('Struktur')], ['b', t('Untere Schichten'), '', 0, 30, 1, t('Struktur')],
   ['inf', t('Fülldichte'), '%', 0, 100, 5, t('Struktur')], ['pattern', t('Füllmuster'), '', 0, 0, 0, t('Struktur'), OV_PATTERNS],
   ['sp_outer', t('Außenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_inner', t('Innenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_fill', t('Füllung'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')],
   ['sp_first', t('Erste Schicht'), 'mm/s', 5, 300, 5, t('Geschwindigkeit')], ['sp_travel', t('Travel'), 'mm/s', 50, 1000, 10, t('Geschwindigkeit')],
+  ['sp_top', t('Obere Fläche'), 'mm/s', 10, 400, 5, t('Geschwindigkeit')], ['sp_gap', t('Lückenfüllung'), 'mm/s', 10, 400, 5, t('Geschwindigkeit')],
   ['accel', t('Beschleunigung (0 = Werksprofil)'), 'mm/s²', 0, 20000, 500, t('Geschwindigkeit')],
+  ['max_vol', t('Max. Volumenstrom'), 'mm³/s', 1, 60, 0.5, t('Filament')], ['flow', t('Durchflussverhältnis'), '', 0.8, 1.2, 0.01, t('Filament')],
+  ['pa', t('Pressure Advance'), '', 0, 0.2, 0.005, t('Filament')], ['zhop', t('Z-Hop'), 'mm', 0, 2, 0.1, t('Filament')],
   // Rückzug: nur wenn gesetzt, sonst das Orca-Profil des Slots
   ['retr_len', t('Rückzug Länge'), 'mm', 0, 10, 0.1, t('Rückzug')], ['retr_speed', t('Rückzug Geschwindigkeit'), 'mm/s', 5, 150, 5, t('Rückzug')],
-  ['fan', t('Lüfter (Bauteil)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
+  ['fan', t('Lüfter (Bauteil)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_first', t('Lüfter erste Schicht'), '%', 0, 100, 5, t('Kühlung & Haftung')],
   // nur Kobra S1 (Orca-Profil mit Hilfs- und Abluftlüfter) – bei anderen Druckern ausgeblendet (ovFieldsFor)
   ['fan_aux', t('Hilfslüfter (seitlich)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_box', t('Gehäuselüfter (Abluft)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
   ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
-  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS]
+  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS],
+  ['brim_gap', t('Brim-Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Kühlung & Haftung')]
 ];
 const ovPart = () => project && project.parts[project.selected];
 const ovCount = p => p && p.overrides ? Object.keys(p.overrides).length : 0;
@@ -57,11 +63,29 @@ function openOverrideDialog(focusGroup) {
   $('ovDlg').showModal();
   // aus dem Datenblatt („✎ anpassen“): zum Abschnitt springen
   if (typeof focusGroup === 'string') { const g = [...$('ovRows').querySelectorAll('.ov-group')].find(x => x.textContent === focusGroup); if (g) { g.scrollIntoView({ block: 'start' }); const i = g.nextElementSibling && g.nextElementSibling.querySelector('[data-ov]'); if (i) i.focus(); } }
+  // aus einer Zeile des Datenblatts: genau dieses Feld
+  else if (focusGroup && focusGroup.key) { const i = $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]'); if (i) { i.closest('.ov-row').scrollIntoView({ block: 'center' }); i.focus(); i.closest('.ov-row').classList.add('ov-focus'); } }
+}
+/* Warnung am Feld (sperrt nichts): Düse außerhalb des Herstellerbereichs der Spule, sonst > 30 % vom Vorschlag entfernt –
+   der Vorschlag ist der erprobte Stand, × setzt darauf zurück */
+function ovWarn(k, v) {
+  const r = lastResult, sugg = (r && r.suggested) || {}, s = +sugg[k];
+  if (!r || !Number.isFinite(v)) return '';
+  if (k === 'nozzle' || k === 'nozzle_first') {
+    const m = /(\d+)\s*[–-]\s*(\d+)/.exec(r.m.range || '');
+    if (m && (v < +m[1] || v > +m[2])) return t('außerhalb des Herstellerbereichs {r}', { r: r.m.range });
+  }
+  if (Number.isFinite(s) && s > 0 && Math.abs(v - s) / s > 0.3) return t('deutlich anders als der Vorschlag ({s})', { s: de(s, s < 1 ? 3 : s < 10 ? 2 : 0) });
+  return '';
 }
 $('ovRows').addEventListener('input', e => {
   const el = e.target.closest('[data-ov]'); if (!el) return;
   const row = el.closest('.ov-row'), set = el.value !== '';
   row.classList.toggle('set', set); row.querySelector('.ov-x').hidden = !set;
+  let w = row.querySelector('.ov-warn');
+  const msg = set && el.tagName === 'INPUT' ? ovWarn(el.dataset.ov, num(el.value)) : '';
+  if (msg && !w) { w = document.createElement('small'); w.className = 'ov-warn'; row.appendChild(w); }
+  if (w) { w.textContent = msg; w.hidden = !msg; }
 });
 $('ovRows').addEventListener('click', e => {
   const x = e.target.closest('[data-ov-x]'); if (!x) return;
@@ -79,7 +103,7 @@ $('ovSave').addEventListener('click', () => {
     if (isNaN(v) || v < min || v > max) { bad.push(label + ' (' + de(min, min < 1 ? 2 : 0) + '–' + de(max, 0) + ')'); continue; }
     // auf die Schrittweite des Felds runden (Schichthöhe 0,02 mm, Rückzug 0,1 mm – bisher wurde alles außer der
     // Schichthöhe ganzzahlig, aus 1,3 mm Rückzug wurde 1 mm)
-    const dec = step > 0 && step < 1 ? Math.min(2, String(step).split('.')[1].length) : 0;
+    const dec = step > 0 && step < 1 ? Math.min(3, String(step).split('.')[1].length) : 0;
     out[k] = Math.round(v * 10 ** dec) / 10 ** dec;
   }
   if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return; }

@@ -137,10 +137,14 @@ function compute(I,geom,ctx){
   const selFamily=(NOZZLE_MATERIALS[mSel]||NOZZLE_MATERIALS.steel_hardened).thermalFamily;
   let volF=N.v/R.v,tOff=0;
   if(selFamily!==refFamily){if(selFamily==='steel'){tOff=+S.steelOffset;volF*=+S.steelVol}else{tOff=-S.steelOffset;volF/=+S.steelVol}}
-  const maxVol=Math.round(m.maxVol*volF*10)/10;
+  const maxVol=take('max_vol',Math.round(m.maxVol*volF*10)/10);
+  // Filament-Werte: Vorschlag = Profil (alles unter „Werte für diesen Auftrag“ einstellbar, 2026-10-04)
+  m.flow=take('flow',m.flow);m.zhop=take('zhop',m.zhop);m.gap=take('sp_gap',m.gap);m.fanFirst=take('fan_first',+m.fanFirst||0);
+  if(m.pa!=null&&m.pa!==''||has('pa'))m.pa=take('pa',m.pa);
   // Wasserdicht: etwas heißer für besser verschmelzende Schichten, langsamere Außenwand
   const wtBoost=o==='watertight'?WATERTIGHT_TEMP_BOOST:0;
   const nozzle=take('nozzle',Math.round(m.nozzle[pi]+tOff+wtBoost));
+  const nozzleFirst=take('nozzle_first',nozzle),firstLayer=take('first_layer',N.fl);
   const nozLabel=de(+dSel,dSel==='0.25'?2:1)+' mm '+NOZZLE_MATERIALS[mSel].label;
 
   // Schichthöhe
@@ -163,6 +167,7 @@ function compute(I,geom,ctx){
 
   // Geschwindigkeiten (Slicer-Wert + effektive Grenze durch Volumenstrom)
   let top=m.top;if(o==='multicolor'||o==='precision'||g==='quality')top=Math.min(top,tpu?20:40);
+  top=take('sp_top',top);
   const capNote=(v,lw)=>{const c=Math.floor(maxVol/(layer*lw));return v>c?t('effektiv ca. {v} mm/s (Grenze {max} mm³/s)',{v:c,max:de(maxVol,1)}):''};
   const sp_outer=take('sp_outer',o==='watertight'?Math.round(m.outer[pi]*WATERTIGHT_OUTER_FACTOR):m.outer[pi]),sp_inner=take('sp_inner',m.inner[pi]),sp_fill=take('sp_fill',m.fill[pi]);
   const nOuter=capNote(sp_outer,N.lwo),nInner=capNote(sp_inner,N.lw),nFill=capNote(sp_fill,N.lw);
@@ -217,20 +222,22 @@ function compute(I,geom,ctx){
   }
   if(o==='tire'&&tpu&&brim==='Nicht nötig'){brim='0–5 mm';brimNote=t('bei Haftungsproblemen')}
   sugg.brim=brim;
+  // Abstand Brim ↔ Teil: ABS/ASA ohne Spalt (sonst reißt der Brim ab), sonst 0,1 mm wie im Orca-Profil
+  const brimGap=take('brim_gap',enclosed?0:0.1);
   if(has('brim')){brim=ov.brim;brimNote=''}
 
   // Naht
   const round=['tire','dumpling','case','decor','overhang'].includes(o);
-  const seam=round?'Ausgerichtet':'Hinten';
+  const seam=take('seam',round?'Ausgerichtet':'Hinten');
   const fanNote=tpu?'30–45 %':enclosed?t('niedrig halten'):'';
 
   // Übersicht; angepasste Werte bekommen den Vorschlag als Hinweis und eine Markierung (4. Feld)
   const changed=Object.keys(sugg).filter(k=>has(k)&&String(ov[k])!==String(sugg[k]));
-  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'||k==='fan_aux'||k==='fan_box'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'?de(v,1)+' mm':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
+  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'||k==='fan_aux'||k==='fan_box'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'||k==='zhop'?de(v,1)+' mm':k==='first_layer'||k==='brim_gap'?de(v,2)+' mm':k==='max_vol'?de(v,1)+' mm³/s':k==='nozzle_first'?v+' °C':k==='flow'?de(v,2):k==='pa'?de(v,3):k==='fan_first'?v+' %':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
   const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));return c.length?[row[0],row[1],[t('angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]:row};
   const rows=[
     mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
-    mark(['layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(N.fl,2)+' mm']),
+    mark(['layer','first_layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(firstLayer,2)+' mm']),
     mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill','sp_travel'],['Füllung / Travel',sp_fill+' / '+sp_travel+' mm/s',nFill]),
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
@@ -242,15 +249,15 @@ function compute(I,geom,ctx){
   const supZ=supportZGap(layer,m.kind,tpu);
   const ordered=[
     ['Qualität',[
-      ['Schichthöhe',de(layer,2)+' mm'],['Höhe der ersten Schicht',de(N.fl,2)+' mm'],['Linienbreite Standard',de(N.lw,2)+' mm'],['Linienbreite erste Schicht',de(N.lwf,2)+' mm'],
+      ['Schichthöhe',de(layer,2)+' mm'],mark(['first_layer'],['Höhe der ersten Schicht',de(firstLayer,2)+' mm']),['Linienbreite Standard',de(N.lw,2)+' mm'],['Linienbreite erste Schicht',de(N.lwf,2)+' mm'],
       ['Linienbreite Außenwand',de(N.lwo,2)+' mm'],['Linienbreite Innenwand',de(N.lw,2)+' mm'],['Elefantenfußkompensation',enclosed?de(0.15,2)+' mm':de(0.1,1)+' mm'],
-      ['Nahtposition',t(seam)],['Glätten',t('Keine'),o==='decor'?t('nur bei großen flachen Oberseiten „Obere Oberfläche“'):'']]],
+      mark(['seam'],['Nahtposition',t(seam)]),['Glätten',t('Keine'),o==='decor'?t('nur bei großen flachen Oberseiten „Obere Oberfläche“'):'']]],
     ['Struktur',[
       ['Wandlinien',base.wr&&soft?base.wr:w],['Obere Schichten',tt],['Untere Schichten',b],
       ['Fülldichte',base.ir&&soft?base.ir:inf+' %'],['Füllmuster',t(pattern)],['Lückenfüllung',t('Überall')]]],
     ['Geschwindigkeit',[
       mark(['sp_first'],['Erste Schicht',sp_first+' mm/s']),['Füllung erste Schicht',Math.max(sp_first,tpu?20:sp_first)+' mm/s'],['Außenwand',sp_outer+' mm/s',nOuter],['Innere Wand',sp_inner+' mm/s',nInner],
-      ['Füllung',sp_fill+' mm/s',nFill],['Obere Fläche',top+' mm/s'],['Lückenfüllung',m.gap+' mm/s'],mark(['sp_travel'],['Travel',sp_travel+' mm/s']),
+      ['Füllung',sp_fill+' mm/s',nFill],mark(['sp_top'],['Obere Fläche',top+' mm/s']),mark(['sp_gap'],['Lückenfüllung',m.gap+' mm/s']),mark(['sp_travel'],['Travel',sp_travel+' mm/s']),
       mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
     ['Stützen',supOn?[
       ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
@@ -280,10 +287,10 @@ function compute(I,geom,ctx){
   const dryNeed=tpu||m.kind==='petg'||m.abrasive;
   ordered.push(['Material / Filament',[
     ['Profilname',esc(m.name)],['Düse',nozzle+' °C',t('erste und weitere Schichten')],['Herstellerbereich',esc(m.range)||t('Angabe auf der Rolle')],
-    ['Heizbett',m.bed+' °C',esc(t(m.bedNote))],['Lüfter erste Schicht',m.fanFirst+' %'],['Lüfter Folgeschichten',m.fan+' %',fanNote],
-    ['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s'],['Durchflussverhältnis',de(m.flow,2)]]
-    .concat(m.pa!=null&&m.pa!==''?[['Pressure Advance',de(m.pa,3)]]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
-  ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],['Brim',t(brim),brimNote],['Z-Hop',de(m.zhop,1)+' mm'],['Erste Schicht beobachten',t('Ja')]]]);
+    ['Heizbett',m.bed+' °C',esc(t(m.bedNote))],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
+    mark(['max_vol'],['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s']),mark(['flow'],['Durchflussverhältnis',de(m.flow,2)])]
+    .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
+  ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],mark(['brim','brim_gap'],['Brim',t(brim)+(brim!=='Nicht nötig'?' · '+t('Abstand {g} mm',{g:de(brimGap,2)}):''),brimNote]),mark(['zhop'],['Z-Hop',de(m.zhop,1)+' mm']),['Erste Schicht beobachten',t('Ja')]]]);
   // Für diesen Auftrag angepasste Werte auch in der Slicer-Reihenfolge markieren (wie in der Übersicht)
   const ORDER_KEYS={'Schichthöhe':['layer'],'Wandlinien':['w'],'Obere Schichten':['t'],'Untere Schichten':['b'],'Fülldichte':['inf'],'Füllmuster':['pattern'],
     'Außenwand':['sp_outer'],'Innere Wand':['sp_inner'],'Füllung':['sp_fill'],'Düse':['nozzle'],'Heizbett':['bed'],'Lüfter Folgeschichten':['fan'],'Brim':['brim'],'Stützstrukturen':['support']};
@@ -319,7 +326,7 @@ function compute(I,geom,ctx){
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
-    maxVol,firstLayer:N.fl,brim,seam,supZ,
+    maxVol,firstLayer,nozzleFirst,brimGap,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
     suggested:sugg,changed};
 }
