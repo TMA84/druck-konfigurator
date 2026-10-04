@@ -541,3 +541,18 @@ I18N.add({
 I18N.add({
  "Vorbereitung vor der ersten Schicht": "Preparing before the first layer"
 });
+
+I18N.add({
+ "Bett vorwärmen (z. B. ABS/ASA, Haube zu)": "Preheat bed (e.g. ABS/ASA, hood closed)",
+ "Vorwärmen": "Preheat",
+ "Vorwärmen: 40–110 °C, 1–60 min.": "Preheat: 40–110 °C, 1–60 min.",
+ "Drucker ist nicht frei – zum Vorwärmen muss er frei sein.": "The printer is busy – it has to be free to preheat.",
+ "Zum Vorwärmen ist bis zum Start zu wenig Zeit.": "Not enough time to preheat before the start.",
+ "Vorwärmen ab {d}, ": "Preheat from {d}, ",
+ "Bett jetzt auf {c} °C, nach {m} min Druckstart. ": "Bed to {c} °C now, print starts after {m} min. ",
+ "Bett heizt vor – Druckstart um {s}": "Bed preheating – print starts at {s}",
+ "heizt vor": "preheating",
+ "vorwärmen {c} °C, {m} min": "preheat {c} °C, {m} min",
+ "Vorwärmen und drucken": "Preheat and print",
+ "Trotzdem vorwärmen und drucken": "Preheat and print anyway"
+});

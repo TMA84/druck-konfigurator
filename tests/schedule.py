@@ -108,5 +108,45 @@ check("abgesagt, Trocknen beendet", pl["state"] == "cancelled" and len(stopped) 
 check("nach Absage startet nichts", sc.Runner(lambda: FREE, start, dry, path=path).step(NOW + 4 * 3600) is False and not any(c[0] == "start" for c in calls))
 fails("Absagen ohne Plan", lambda: sc.api_post({"action": "cancel"}, None, path, NOW), "Kein geplanter Druck")
 
+# Vorwärmen: Bett heiß ab Start − Dauer, nur bei freiem Drucker; Absage/Fehler → Heizung aus
+heats = []
+heat = lambda on, bed: heats.append((on, bed))
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+fails("Vorwärmen: Temperatur zu hoch", lambda: sc.api_post(dict(base, preheat={"bed": 130, "minutes": 10}), gfor, path, NOW), "Betttemperatur")
+fails("Vorwärmen: zu lang", lambda: sc.api_post(dict(base, preheat={"bed": 105, "minutes": 90}), gfor, path, NOW), "Dauer")
+v = sc.api_post(dict(base, preheat={"bed": 105, "minutes": 10}, dry={"temp": 55, "minutes": 60}), gfor, path, NOW)
+check("geplant mit Vorwärmen 10 min vor Start", v["plan"]["preheat"]["start_at"] == NOW + 3 * 3600 - 600 and v["plan"]["heat_in_s"] == 3 * 3600 - 600, v["plan"])
+r = sc.Runner(lambda: FREE, start, dry, path=path, heat_fn=heat)
+calls.clear()
+r.step(NOW + 2 * 3600 + 5)
+check("erst trocknen (1 h vorher), noch nicht heizen", calls == [("dry", True, 55, 60)] and heats == [], (calls, heats))
+r.step(NOW + 3 * 3600 - 590)
+check("10 min vorher: Bett auf 105 °C", heats == [(True, 105)] and sc.api_get(path)["plan"]["state"] == "heating", heats)
+r.step(NOW + 3 * 3600 + 1)
+check("dann gestartet, Heizung bleibt an (G-Code übernimmt)", calls[-1][0] == "start" and heats == [(True, 105)], (calls, heats))
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+# Drucker beim Vorwärmen noch beschäftigt: nicht heizen, Plan scheitert mit Grund
+heats.clear()
+sc.api_post(dict(base, preheat={"bed": 100, "minutes": 10}), gfor, path, NOW)
+sc.Runner(lambda: dict(FREE, printing=True), start, dry, path=path, heat_fn=heat).step(NOW + 3 * 3600 - 590)
+pl = sc.api_get(path)["plan"]
+check("Drucker druckt beim Vorwärmen: nicht geheizt, failed", heats == [] and pl["state"] == "failed" and "Nicht vorgewärmt" in pl["note"], (heats, pl))
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+# vorgewärmt, aber zur Startzeit falsches Filament → Heizung aus
+heats.clear()
+sc.api_post(dict(base, preheat={"bed": 100, "minutes": 10}, wants=[{"tool": 0, "type": "PETG"}]), gfor, path, NOW)
+r = sc.Runner(lambda: FREE, start, dry, path=path, heat_fn=heat)
+r.step(NOW + 3 * 3600 - 590); r.step(NOW + 3 * 3600 + 1)
+check("nach Vorwärmen nicht gestartet: Heizung aus", heats == [(True, 100), (False, 0)] and sc.api_get(path)["plan"]["state"] == "failed", heats)
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+# sofort mit Vorwärmen: Start = jetzt + Dauer
+v = sc.api_post(dict(base, start_at=NOW + 10 * 60 + 20, preheat={"bed": 105, "minutes": 10}), gfor, path, NOW)
+check("jetzt mit Vorwärmen: Heizen sofort fällig", v["plan"]["heat_in_s"] == 20, v["plan"])
+heats.clear()
+sc.Runner(lambda: FREE, start, dry, path=path, heat_fn=heat).step(NOW + 21)
+stopped = []
+sc.api_post({"action": "cancel"}, None, path, NOW + 60, on_cancel=lambda plan: stopped.append(plan["preheat"]["sent"]))
+check("Absage nach Vorwärmen: on_cancel (Heizung aus)", heats == [(True, 105)] and stopped == [True], (heats, stopped))
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

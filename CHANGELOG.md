@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Bett vorwärmen** vor dem Druck (Sendedialog → „Vor dem Druck“, z. B. ABS/ASA): Temperatur und Dauer; „Vorwärmen und drucken“ heizt sofort und startet nach der Dauer, mit „Später starten“ direkt vor der Startzeit. Ausgeführt vom Server, nach erneuter Prüfung; bei Absage oder wenn der Druck nicht startet, geht die Heizung wieder aus.
+
 ## [10.12.2] – 2026-10-03
 
 ### Behoben

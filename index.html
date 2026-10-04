@@ -536,6 +536,9 @@
       <label class="wb-toggle"><input type="checkbox" id="sendLevel" checked> Bett automatisch vermessen (empfohlen)</label>
       <label class="wb-toggle"><input type="checkbox" id="sendFlow"> Flusskalibrierung</label>
       <label class="wb-toggle"><input type="checkbox" id="sendLapse"> Zeitraffer aufnehmen</label>
+      <label class="wb-toggle"><input type="checkbox" id="sendHeat"> Bett vorwärmen (z. B. ABS/ASA, Haube zu)</label>
+      <div id="sendHeatRow" class="ed-row hidden"><label for="sendHeatBed">Vorwärmen</label><div class="ed-in send-dry"><input type="number" id="sendHeatBed" min="40" max="110" step="5"> °C <input type="number" id="sendHeatMin" min="1" max="60" step="1"> min</div></div>
+      <p id="sendHeatInfo" class="muted small"></p>
     </div>
     <div class="ed-group" id="sendLaterBox"><h4>Später starten</h4>
       <label class="wb-toggle"><input type="checkbox" id="sendLater"> Zu einer bestimmten Zeit starten</label>

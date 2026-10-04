@@ -133,7 +133,7 @@ def filament_check(queue, spool_view):
     return out
 
 
-SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
+SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "heating": "heizt vor", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
 
 
 def payload(st, queue, now=None, spool_view=None, plan=None):
@@ -152,7 +152,7 @@ def payload(st, queue, now=None, spool_view=None, plan=None):
             "plates": "%d/%d" % (sm.get("done") or 0, sm.get("total") or 0), "plates_done": sm.get("done") or 0,
             "filament_low": "ON" if filament_check(queue, spool_view) else "OFF", "filament_note": "; ".join(filament_check(queue, spool_view)) or None,
             "schedule_start": datetime.datetime.fromtimestamp(int(plan["start_at"]), datetime.timezone.utc).isoformat(timespec="seconds")
-            if plan and plan.get("state") in ("wait", "drying") else None,
+            if plan and plan.get("state") in ("wait", "drying", "heating") else None,
             "schedule_state": SCHEDULE_STATE.get((plan or {}).get("state"), "keiner"), "schedule_note": (plan or {}).get("note"),
             "plates_total": sm.get("total") or 0, "queue_current": sm.get("current"), "queue_next": sm.get("next"),
             "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view))

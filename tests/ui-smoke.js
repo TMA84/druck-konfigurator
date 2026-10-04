@@ -587,6 +587,14 @@ async function runSmoke(opts={}){
         schedRender();ok(!$('schedCard').classList.contains('hidden')&&/geplant/.test($('schedSum').textContent)&&/trocknen 55/.test($('schedSum').textContent)&&!$('schedCancel').classList.contains('hidden'),'Werkbank: geplanter Druck mit Trocknen und „Absagen“');
         sched.v={plan:{id:'x',name:'t',plate:1,state:'failed',start_at:b.start_at,note:'Nicht gestartet: Slot 3 leer'}};schedRender();
         ok($('schedNote').classList.contains('bad')&&/Slot 3/.test($('schedNote').textContent)&&!$('schedDismiss').classList.contains('hidden'),'Werkbank: nicht gestartet mit Grund, „Ausblenden“');
+        // Vorwärmen sofort: Drucker frei, Start = jetzt + Dauer, Bett aus den Druckwerten
+        posts.length=0;sched.v=null;sendInfo={...sendInfo,state:'free',printing:false};sendLaterReset();await wait(100);
+        $('sendHeat').checked=true;$('sendHeat').dispatchEvent(new Event('input'));$('sendHeatBed').value='105';$('sendHeatBed').dispatchEvent(new Event('input'));
+        ok(!$('sendHeatRow').classList.contains('hidden')&&/vorwärmen und drucken/i.test($('sendGo').textContent)&&!$('sendGo').disabled&&/105 °C/.test($('sendHeatInfo').textContent),'Vorwärmen: „Vorwärmen und drucken“, Hinweis mit Temperatur');
+        const t0=Date.now()/1000;$('sendGo').click();await wait(300);const h=posts[0]||{};
+        ok(h.preheat&&h.preheat.bed===105&&h.preheat.minutes===10&&h.bed_clear===true&&!h.dry&&Math.abs(h.start_at-(t0+620))<5,'Vorwärmen sofort: Plan mit Start in 10 min, ohne Trocknen');
+        sendInfo={...sendInfo,state:'busy'};sched.v=null;sendLaterReset();await wait(100);$('sendHeat').checked=true;$('sendHeat').dispatchEvent(new Event('input'));
+        ok($('sendGo').disabled&&/nicht frei/.test($('sendHeatInfo').textContent),'Vorwärmen sofort: Drucker beschäftigt → gesperrt');
         sched.v=null;schedRender();window.fetch=of;if($('sendDlg').open)$('sendDlg').close(); }
       { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials,tab=document.body.dataset.tab;let adopted=0,resliced=0;
         store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:[null,{type:'PLA',colour:'#00FF00',override:true},{type:'PETG',colour:'#FFFFFF',override:true},null]};

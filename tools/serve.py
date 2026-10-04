@@ -399,7 +399,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if gcode:
                     with_thumbnail(job, plate, gcode)
                 return gcode, slicer.job_file(job, plate, "preview") if gcode else None
-            return self._api(lambda: schedule.api_post(req, gcode_for, on_cancel=lambda plan: scheduled_dry(False, 0, 0)))
+            return self._api(lambda: schedule.api_post(req, gcode_for, on_cancel=scheduled_cancel))
         if path == "/api/anycubic/print":
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
@@ -547,6 +547,23 @@ def scheduled_dry(on, temp, minutes):
     print("Geplanter Druck: Trocknen %s (%d °C, %d min)" % ("gestartet" if on else "beendet", temp, minutes), flush=True)
 
 
+def scheduled_heat(on, bed):
+    """Bett vorwärmen bzw. Heizung aus (geplanter Druck)."""
+    host = printer_host()
+    if not host:
+        raise anycubic_lan.LanError("Kein Drucker eingestellt", "unreachable")
+    anycubic_lan.command(host, "tempature", "set", {"type": 1, "target_hotbed_temp": int(bed) if on else 0, "target_nozzle_temp": 0})
+    print("Geplanter Druck: Bett %s" % ("auf %d °C" % bed if on else "aus"), flush=True)
+
+
+def scheduled_cancel(plan):
+    """Absagen: laufendes Trocknen beenden, Bettheizung aus."""
+    if (plan.get("dry") or {}).get("sent"):
+        scheduled_dry(False, 0, 0)
+    if (plan.get("preheat") or {}).get("sent"):
+        scheduled_heat(False, 0)
+
+
 def with_thumbnail(job, plate, gcode):
     """Vorschaubild in den G-Code, wenn Orca keins geschrieben hat (tools/gcode_thumbnail.py) – Fehler nie weiterreichen."""
     try:
@@ -640,7 +657,7 @@ def main():
         global WATCHER
         WATCHER = printqueue.Watcher(anycubic_lan, printer_host).start()   # Warteschlange: fertige Platten erkennen
         print("Warteschlange: " + printqueue.data_file(), flush=True)
-        schedule.Runner(printer_now, scheduled_start, scheduled_dry).start()   # geplanter Druck (tools/schedule.py)
+        schedule.Runner(printer_now, scheduled_start, scheduled_dry, heat_fn=scheduled_heat).start()   # geplanter Druck (tools/schedule.py)
         print("Geplanter Druck: " + schedule.data_file(), flush=True)
         try:
             _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get,

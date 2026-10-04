@@ -60,8 +60,10 @@ function renderSendDialog() {
   let later = null;
   try { later = typeof sendLaterState === 'function' ? sendLaterState(p) : null; } catch (e) { console.error(e); }
   if (later) {
-    $('sendGo').disabled = !later.ok; $('sendGo').textContent = warn ? t('Trotzdem planen') : t('Planen');
-    if (later.why) $('sendLaterInfo').textContent = later.why + ' ' + $('sendLaterInfo').textContent;
+    $('sendGo').disabled = !later.ok;
+    $('sendGo').textContent = later.now ? (warn ? t('Trotzdem vorwärmen und drucken') : t('Vorwärmen und drucken')) : warn ? t('Trotzdem planen') : t('Planen');
+    const info = $(later.now ? 'sendHeatInfo' : 'sendLaterInfo');
+    if (later.why) info.textContent = later.why + ' ' + info.textContent;
     return;
   }
   $('sendGo').disabled = !free;
