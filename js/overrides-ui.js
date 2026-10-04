@@ -30,6 +30,13 @@ const OV_FIELDS = [
   ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS],
   ['brim_gap', t('Brim-Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Kühlung & Haftung')]
 ];
+/* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte
+   (Prozess). Slot- und Plattenwerte wirkten bisher nur am ersten Teil des Slots bzw. des Projekts – bei mehreren Teilen
+   gingen sie am gewählten Teil still verloren (2026-10-04, Probedruck). Jetzt verteilt sie der Dialog selbst. */
+const OV_SCOPE = { layer: 'plate', first_layer: 'plate', sp_first: 'plate', sp_travel: 'plate', accel: 'plate',
+  nozzle: 'slot', nozzle_first: 'slot', bed: 'slot', fan: 'slot', fan_first: 'slot', fan_aux: 'slot', fan_box: 'slot',
+  max_vol: 'slot', flow: 'slot', pa: 'slot', zhop: 'slot', retr_len: 'slot', retr_speed: 'slot' };
+const ovSlotOf = q => q.slot ?? (typeof costDefaultSlot === 'function' ? costDefaultSlot() : 0);
 const ovPart = () => project && project.parts[project.selected];
 const ovCount = p => p && p.overrides ? Object.keys(p.overrides).length : 0;
 const ovFmt = (f, v) => f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
@@ -57,7 +64,9 @@ function openOverrideDialog(focusGroup) {
     const input = opts
       ? '<select data-ov="' + k + '"><option value="">' + t('– Vorschlag –') + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
       : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(def[k] ?? sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
-    return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + '</span>' +
+    const sc = project.parts.length > 1 ? OV_SCOPE[k] : null;
+    const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
+    return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
       '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
         : t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') })) + '</span>' + input +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
@@ -120,12 +129,23 @@ function ovCollect() {
 }
 $('ovSave').addEventListener('click', () => {
   const out = ovCollect(); if (!out) return;
-  const p = ovPart(), value = Object.keys(out).length ? out : null;
-  const targets = $('ovAll').checked ? project.parts : samePlacements(p);
-  targets.forEach(x => { x.overrides = value ? { ...value } : null; });
+  const p = ovPart(), base = $('ovAll').checked ? project.parts : samePlacements(p), touched = new Set();
+  for (const q of project.parts) {
+    const next = { ...(q.overrides || {}) };
+    for (const f of OV_FIELDS) {
+      const k = f[0], sc = OV_SCOPE[k] || 'object';
+      if (!(sc === 'plate' || base.includes(q) || (sc === 'slot' && ovSlotOf(q) === ovSlotOf(p)))) continue;
+      const before = JSON.stringify(next[k]);
+      if (k in out) next[k] = out[k]; else delete next[k];
+      if (JSON.stringify(next[k]) !== before) touched.add(q);
+    }
+    q.overrides = Object.keys(next).length ? next : null;
+  }
+  base.forEach(q => touched.add(q));
   $('ovDlg').close();
   update();
-  toast(value ? t('{n} Wert(e) angepasst', { n: Object.keys(out).length }) + (targets.length > 1 ? ' ' + t('für {n} Teile', { n: targets.length }) : '') : t('Vorschlag wird verwendet'));
+  const n = Object.keys(out).length;
+  toast(n ? t('{n} Wert(e) angepasst', { n }) + (touched.size > 1 ? ' ' + t('für {n} Teile', { n: touched.size }) : '') : t('Vorschlag wird verwendet'));
 });
 $('ovOpen').addEventListener('click', openOverrideDialog);
 /* Als Standard merken: die eingetragenen Werte gelten ab jetzt für dieses Filament auf diesem Drucker (js/engine.js

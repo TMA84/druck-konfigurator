@@ -615,3 +615,8 @@ I18N.add({
 I18N.add({
  "{n} eigene Standardwerte ({mat})": "{n} own defaults ({mat})"
 });
+
+I18N.add({
+ "gilt für die ganze Platte": "applies to the whole plate",
+ "gilt für alle Teile mit Slot {n}": "applies to all parts on slot {n}"
+});

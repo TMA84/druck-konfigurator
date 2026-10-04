@@ -585,6 +585,17 @@ async function runSmoke(opts={}){
       lv.at={li:10,frac:0};const done=5557*10/21,r2=lvRemaining({job:{name:'P1',layer:11,elapsed_min:Math.round((420+done)/60)}});
       ok(Math.abs(r2.pace-1)<0.03,'Tempo ohne Vorbereitung gerechnet: kein Aufschlag ('+r2.pace.toFixed(3)+')');
       lv.data=d0;lv.at=at0;if(pr0!=null)store.settings.prepS=pr0;else delete store.settings.prepS;persist(); }
+    // Mehrere Teile: Anpassung am ZWEITEN Teil – Slot-/Plattenwerte gelten trotzdem (Probedruck 2026-10-04: gingen verloren)
+    { const keep=project.parts.map(q=>q.overrides);project.parts.forEach(q=>{q.overrides=null});
+      if(project.parts.length>1){selectPart(1);await wait(50);setTab('settings');$('ovOpen').click();await wait(50);
+        const set=(k,v)=>{const el=$('ovRows').querySelector('[data-ov="'+k+'"]');el.value=String(v)};set('bed',63);set('sp_first',25);set('w',5);
+        ok(/ganze Platte/.test($('ovRows').querySelector('[data-ov="sp_first"]').closest('.ov-row').textContent),'Dialog: „gilt für die ganze Platte“ bei erster Schicht');
+        $('ovSave').click();await wait(80);
+        const plan=exportPlan(costDefaultSlot()),pc=plannedChanges(plan.r,plan.slot),v=k=>(pc.find(c=>c.key===k)||{}).value;
+        ok(v('hot_plate_temp')==='63'&&v('initial_layer_speed')==='25','Am 2. Teil angepasst: Bett 63 und erste Schicht 25 im Export (globale Werte)');
+        ok(project.parts[1].overrides.w===5&&!(project.parts[0].overrides||{}).w,'Wände nur am 2. Teil (je Teil)');
+        selectPart(0);await wait(30);}
+      project.parts.forEach((q,i)=>{q.overrides=keep[i]});update();await wait(30); }
     // Kobra-S1-Vorgaben je Filament: ABS → Hilfslüfter 0, Abluft 10, Bett ≥ 100, Brim 5 mm, 10 min vorwärmen
     { const m0=$('material').value;setTab('settings');sel('material','abs');await wait(80);const r=lastResult;
       ok(r.fans2&&r.fans2.aux===0&&r.fans2.box===10&&r.m.bed>=100&&r.preheatMin===10&&/5 mm/.test(r.brim||''),'Kobra S1 + ABS: Hilfslüfter 0, Abluft 10, Bett '+r.m.bed+', Brim '+r.brim+', vorwärmen 10 min');
