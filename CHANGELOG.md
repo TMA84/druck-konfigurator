@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.15.0] – 2026-10-04
 
 ### Neu
 - **Alle Werte anpassbar, immer mit Vorschlag:** „Werte für diesen Auftrag“ deckt jetzt alles ab, was das Tool in den Druck schreibt – neu: Düse erste Schicht, Höhe der ersten Schicht, Nahtposition, obere Fläche, Lückenfüllung, max. Volumenstrom, Durchflussverhältnis, Pressure Advance, Z-Hop, Lüfter erste Schicht, Brim-Abstand. Neben jedem Feld der Vorschlag (= was ohne Eingabe gedruckt wird); Warnung am Feld bei Düse außerhalb des Herstellerbereichs oder > 30 % Abweichung. Zeile im Datenblatt anklicken öffnet den Dialog bei diesem Wert.
