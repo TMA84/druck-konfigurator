@@ -64,7 +64,7 @@ jobs:
           set -u
           failed=""
           # slice.py prüft ohne OrcaSlicer nur den G-Code-Parser (echtes Slicen im Job orca)
-          for t in lan spools printqueue schedule ha_mqtt progress_image printed preview slice auth; do
+          for t in lan spools printqueue schedule prefs ha_mqtt progress_image printed preview slice auth; do
             echo "::group::$t.py"
             python "tests/$t.py" || failed="$failed $t.py"
             echo "::endgroup::"

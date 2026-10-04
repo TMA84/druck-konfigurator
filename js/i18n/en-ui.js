@@ -620,3 +620,7 @@ I18N.add({
  "gilt für die ganze Platte": "applies to the whole plate",
  "gilt für alle Teile mit Slot {n}": "applies to all parts on slot {n}"
 });
+
+I18N.add({
+ "Standardwerte nicht auf dem Server gespeichert: {msg}": "Defaults not saved on the server: {msg}"
+});

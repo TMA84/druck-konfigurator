@@ -8,7 +8,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - **Angepasste Werte wurden bei mehreren Teilen teils nicht gedruckt:** Werte, die Orca je Filament-Slot (Düse, Bett, Lüfter, Rückzug, Fluss, Z-Hop …) oder für die ganze Platte (Schichthöhe, erste Schicht, Travel, Beschleunigung) führt, kamen nur aus dem ersten Teil – am zweiten Teil gesetzt gingen sie verloren. Jetzt verteilt der Dialog sie auf alle Teile mit demselben Slot bzw. alle Teile und sagt das am Feld („gilt für die ganze Platte“).
 
 ### Neu
-- **Angepasste Werte als Standard:** Im Dialog „Werte für diesen Auftrag“ **Als Standard für {Filament} merken** – gilt je Drucker und Filament als neuer Vorschlag, der Werkswert bleibt daneben sichtbar; **Standard zurücksetzen** stellt die Werkswerte wieder her. Werte für den einzelnen Auftrag haben Vorrang.
+- **Angepasste Werte als Standard:** Im Dialog „Werte für diesen Auftrag“ **Als Standard für {Filament} merken** – gilt je Drucker und Filament als neuer Vorschlag, der Werkswert bleibt daneben sichtbar; **Standard zurücksetzen** stellt die Werkswerte wieder her. Werte für den einzelnen Auftrag haben Vorrang. Gespeichert **auf dem Server** – gelten in jedem Browser (Mac, iPhone, Home Assistant); vorhandene Werte aus dem Browser werden einmal übernommen.
 
 ## [10.15.0] – 2026-10-04
 

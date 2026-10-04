@@ -157,13 +157,13 @@ $('ovDefSave').addEventListener('click', () => {
   const all = store.settings.ovDefaults || (store.settings.ovDefaults = {});
   all[r.defKey] = { ...(all[r.defKey] || {}), ...out };
   const p = ovPart(); samePlacements(p).forEach(x => { x.overrides = null; });
-  persist(); $('ovDlg').close(); update();
+  persist(); prefsPush(); $('ovDlg').close(); update();
   toast(t('{n} Wert(e) als Standard für {mat} gemerkt', { n: Object.keys(out).length, mat: ovMatName() }));
 });
 $('ovDefReset').addEventListener('click', () => {
   const r = lastResult; if (!r || !store.settings.ovDefaults || !store.settings.ovDefaults[r.defKey]) return;
   if (!confirm(t('Eigene Standardwerte für {mat} löschen? Danach gelten wieder die Werkswerte.', { mat: ovMatName() }))) return;
-  delete store.settings.ovDefaults[r.defKey]; persist(); $('ovDlg').close(); update();
+  delete store.settings.ovDefaults[r.defKey]; persist(); prefsPush(); $('ovDlg').close(); update();
   toast(t('Werkswerte für {mat} wieder aktiv', { mat: ovMatName() }));
 });
 $('ovReset').addEventListener('click', () => {
@@ -172,3 +172,23 @@ $('ovReset').addEventListener('click', () => {
   update(); toast(t('Anpassungen zurückgenommen – Vorschlag gilt'));
 });
 $('ovDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+/* Standardwerte auf dem Server (tools/prefs.py, /api/prefs) – gelten in jedem Browser (Mac, iPhone, Home Assistant).
+   Beim Start vom Server holen; liegen dort noch keine, aber im Browser, werden sie einmal hochgeladen. Ohne Server
+   (Datei per Doppelklick) bleiben sie wie bisher im Browser. */
+let prefsOnServer = false;
+async function prefsPush() {
+  if (!prefsOnServer) return;
+  try { await lanApi('api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'ovDefaults', value: store.settings.ovDefaults || {} }) }); }
+  catch (e) { toast(t('Standardwerte nicht auf dem Server gespeichert: {msg}', { msg: t(e.message) })); }
+}
+async function prefsPull() {
+  let srv;
+  try { srv = await lanApi('api/prefs'); } catch (e) { return; }
+  prefsOnServer = true;
+  const remote = srv.ovDefaults || {}, local = store.settings.ovDefaults || {};
+  if (Object.keys(remote).length) {
+    if (JSON.stringify(remote) !== JSON.stringify(local)) { store.settings.ovDefaults = remote; persist(); if (typeof update === 'function') update(); }
+  } else if (Object.keys(local).length) prefsPush();   // bisher nur im Browser – einmal hochladen
+}
+window.addEventListener('load', prefsPull);

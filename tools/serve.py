@@ -50,6 +50,7 @@ import anycubic_lan  # noqa: E402
 import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
+import prefs  # noqa: E402
 import printqueue  # noqa: E402
 import schedule  # noqa: E402
 import progress_image  # noqa: E402
@@ -83,7 +84,7 @@ STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
 _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
-QUIET_GET = {"/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
+QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 
 
@@ -183,7 +184,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json(200, fn())
         except (anycubic_lan.LanError, slicer.SliceError) as e:
             self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
-        except (printqueue.QueueError, schedule.ScheduleError) as e:
+        except (printqueue.QueueError, schedule.ScheduleError, prefs.PrefsError) as e:
             self._json(409, {"error": str(e), "kind": "bad_request"})
         except (ValueError, KeyError) as e:
             self._json(400, {"error": "Ungültige Anfrage: " + str(e), "kind": "bad_request"})
@@ -293,6 +294,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._api(lambda: printqueue.api_get(st=printer_now()))
         if url.path == "/api/schedule":
             return self._api(schedule.api_get)
+        if url.path == "/api/prefs":
+            return self._api(prefs.api_get)
         if url.path == "/api/spools/export":           # ganzer Spulenstand als Datei (Umzug Mac ↔ Home Assistant)
             name, body = spools.api_export()
             self.send_response(200)
@@ -388,6 +391,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
             return self._api(lambda: printqueue.api_post(json.loads(self.rfile.read(length) or b"{}"), st=printer_now()))
+        if path == "/api/prefs":
+            # eigene Standardwerte für alle Browser (tools/prefs.py)
+            if ctype != "application/json" or length > MAX_BODY:
+                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
+            body = json.loads(self.rfile.read(length) or b"{}")
+            return self._api(lambda: prefs.api_post(body))
         if path == "/api/schedule":
             # Druck planen / absagen (tools/schedule.py); der G-Code wird mit Vorschaubild in den Datenordner kopiert
             if ctype != "application/json" or length > MAX_BODY:

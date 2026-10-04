@@ -32,6 +32,7 @@ async function runSmoke(opts={}){
 
   // Ohne Live-Abfrage beginnen: die Prüfungen bis Abschnitt 13 erwarten die Slots der Vorlage
   const savedHosts=store.settings.printerHosts;store.settings.printerHosts={};slotState={printer:null,live:null,note:''};
+  if(typeof prefsOnServer!=='undefined')prefsOnServer=false;   // Standardwerte nicht in den echten Datenordner schreiben
 
   /* 0) Haftungsausschluss beim ersten Start (Test lädt mit leerem Speicher) */
   ok($('disclaimerDlg').open,'Haftungsausschluss beim ersten Start sichtbar');
