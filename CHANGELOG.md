@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.14.0] – 2026-10-04
 
 ### Neu
 - **Kobra-S1-Vorgaben je Filament:** PLA Hilfs-/Gehäuselüfter 60/60 %, PETG 30/40 %, ABS/ASA Hilfslüfter aus, Gehäuselüfter 10 %, Bett ≥ 100 °C, immer 5 mm Brim, 10 min Vorwärmen schon angehakt; TPU 30/60 %. Überschreibbar unter „Werte für diesen Auftrag“.
