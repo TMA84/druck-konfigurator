@@ -158,6 +158,9 @@ function plannedChanges(r, slot, liveSlots) {
   fil(t('Lüfter erste Schicht aus'), 'close_fan_the_first_x_layers', Number(r.m.fanFirst) > 0 ? 0 : 1);
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   if (isNum(r.m.zhop)) fil(t('Z-Hop'), 'filament_z_hop', numStr(r.m.zhop));
+  // Hilfs- und Gehäuselüfter (Kobra S1) nur, wenn du sie für diesen Auftrag gesetzt hast – sonst das Profil (60 %)
+  if (r.fans2 && r.fans2.aux != null) fil(t('Hilfslüfter'), 'additional_cooling_fan_speed', numStr(r.fans2.aux));
+  if (r.fans2 && r.fans2.box != null) fil(t('Gehäuselüfter (Abluft)'), 'during_print_exhaust_fan_speed', numStr(r.fans2.box));
   // Rückzug nur, wenn du ihn für diesen Auftrag gesetzt hast (r.retr) – sonst das Orca-Profil des Slots
   if (r.retr) {
     fil(t('Rückzug Länge'), 'filament_retraction_length', numStr(r.retr.len));

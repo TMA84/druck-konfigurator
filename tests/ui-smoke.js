@@ -540,6 +540,12 @@ async function runSmoke(opts={}){
     // Werte je Auftrag: nur kritische Bereiche
     setTab('settings');$('ovOpen').click();await wait(50);
     ok(!!$('ovRows').querySelector('[data-ov="retr_len"]')&&!!$('ovRows').querySelector('[data-ov="sp_travel"]')&&!!$('ovRows').querySelector('[data-ov="accel"]'),'Werte anpassen: Travel, Beschleunigung, Rückzug');
+    { const rl=$('ovRows').querySelector('[data-ov="retr_len"]'),fa=$('ovRows').querySelector('[data-ov="fan_aux"]'),fb=$('ovRows').querySelector('[data-ov="fan_box"]');
+      ok(!!fa&&!!fb,'Kobra S1: Hilfs- und Gehäuselüfter im Dialog');
+      rl.value='1.3';fb.value='10';$('ovSave').click();await wait(80);const po=project.parts[project.selected].overrides||{};
+      ok(po.retr_len===1.3&&po.fan_box===10&&lastResult.retr&&lastResult.retr.len===1.3&&lastResult.fans2&&lastResult.fans2.box===10,'Rückzug 1,3 mm bleibt 1,3 (nicht gerundet), Gehäuselüfter 10 %');
+      const pc=plannedChanges(lastResult,0).map(c=>c.key);ok(pc.includes('filament_retraction_length')&&pc.includes('during_print_exhaust_fan_speed')&&!pc.includes('additional_cooling_fan_speed'),'Export: Rückzug und Gehäuselüfter, Hilfslüfter nicht (nicht gesetzt)');
+      delete po.retr_len;delete po.fan_box;update();await wait(50);$('ovOpen').click();await wait(50); }
     $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
     ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');

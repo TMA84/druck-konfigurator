@@ -59,7 +59,7 @@ function update(){
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
   // Werte in drei Karten: Temperatur & Kühlung, Tempo, Aufbau (unbekannte Zeilen kommen zum Aufbau)
-  const SPEC_GROUPS=[[t('Temperatur & Kühlung'),['Düse','Heizbett','Lüfter']],[t('Tempo'),['Außenwand / Innenwand','Füllung / Travel','Max. Volumenstrom','Beschleunigung','Rückzug']],
+  const SPEC_GROUPS=[[t('Temperatur & Kühlung'),['Düse','Heizbett','Lüfter','Hilfs- / Gehäuselüfter']],[t('Tempo'),['Außenwand / Innenwand','Füllung / Travel','Max. Volumenstrom','Beschleunigung','Rückzug']],
     [t('Aufbau'),null]];
   const known=new Set(SPEC_GROUPS.flatMap(g=>g[1]||[]));
   $('settings').innerHTML=SPEC_GROUPS.map(([title,keys])=>{const rows=r.rows.filter(x=>keys?keys.includes(x[0]):!known.has(x[0]));

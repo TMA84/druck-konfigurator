@@ -556,3 +556,12 @@ I18N.add({
  "Vorwärmen und drucken": "Preheat and print",
  "Trotzdem vorwärmen und drucken": "Preheat and print anyway"
 });
+
+I18N.add({
+ "Lüfter (Bauteil)": "Fan (part cooling)",
+ "Hilfslüfter (seitlich)": "Auxiliary fan (side)",
+ "Gehäuselüfter (Abluft)": "Chamber fan (exhaust)",
+ "Hilfslüfter": "Auxiliary fan",
+ "Hilfs- / Gehäuselüfter": "Auxiliary / chamber fan",
+ "Kobra-S1-Profil": "Kobra S1 profile"
+});

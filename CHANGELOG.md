@@ -4,7 +4,11 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Behoben
+- **Werte für diesen Auftrag: Kommastellen gingen verloren** – alles außer der Schichthöhe wurde ganzzahlig gespeichert (1,3 mm Rückzug → 1 mm). Jetzt auf die Schrittweite des Felds gerundet.
+
 ### Neu
+- **Hilfs- und Gehäuselüfter einstellbar** (Kobra S1, „Werte für diesen Auftrag“): seitlicher Hilfslüfter und Gehäuselüfter/Abluft während des Drucks; geschrieben nur, wenn gesetzt (sonst Profil, je 60 %). „Lüfter“ heißt dort jetzt „Lüfter (Bauteil)“.
 - **Bett vorwärmen** vor dem Druck (Sendedialog → „Vor dem Druck“, z. B. ABS/ASA): Temperatur und Dauer; „Vorwärmen und drucken“ heizt sofort und startet nach der Dauer, mit „Später starten“ direkt vor der Startzeit. Ausgeführt vom Server, nach erneuter Prüfung; bei Absage oder wenn der Druck nicht startet, geht die Heizung wieder aus.
 
 ## [10.12.2] – 2026-10-03

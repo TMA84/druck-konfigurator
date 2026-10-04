@@ -17,7 +17,9 @@ const OV_FIELDS = [
   ['accel', t('Beschleunigung (0 = Werksprofil)'), 'mm/s²', 0, 20000, 500, t('Geschwindigkeit')],
   // Rückzug: nur wenn gesetzt, sonst das Orca-Profil des Slots
   ['retr_len', t('Rückzug Länge'), 'mm', 0, 10, 0.1, t('Rückzug')], ['retr_speed', t('Rückzug Geschwindigkeit'), 'mm/s', 5, 150, 5, t('Rückzug')],
-  ['fan', t('Lüfter'), '%', 0, 100, 5, t('Kühlung & Haftung')],
+  ['fan', t('Lüfter (Bauteil)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
+  // nur Kobra S1 (Orca-Profil mit Hilfs- und Abluftlüfter) – bei anderen Druckern ausgeblendet (ovFieldsFor)
+  ['fan_aux', t('Hilfslüfter (seitlich)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_box', t('Gehäuselüfter (Abluft)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
   ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
   ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS]
@@ -40,7 +42,7 @@ function openOverrideDialog(focusGroup) {
   const p = ovPart(), r = lastResult; if (!p || !r) return;
   const sugg = r.suggested || {}, own = p.overrides || {};
   let group = '';
-  $('ovRows').innerHTML = OV_FIELDS.map(f => {
+  $('ovRows').innerHTML = OV_FIELDS.filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
     const head = grp !== group ? '<div class="ov-group">' + esc(grp) + '</div>' : ''; group = grp;
     const input = opts
@@ -70,12 +72,15 @@ $('ovClear').addEventListener('click', () => $('ovRows').querySelectorAll('[data
 $('ovSave').addEventListener('click', () => {
   const out = {}, bad = [];
   for (const f of OV_FIELDS) {
-    const [k, label, , min, max, , , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el.value.trim();
+    const [k, label, , min, max, step, , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el ? el.value.trim() : '';
     if (!s) continue;
     if (opts) { out[k] = s; continue; }
     const v = num(s);
     if (isNaN(v) || v < min || v > max) { bad.push(label + ' (' + de(min, min < 1 ? 2 : 0) + '–' + de(max, 0) + ')'); continue; }
-    out[k] = k === 'layer' ? Math.round(v * 100) / 100 : Math.round(v);
+    // auf die Schrittweite des Felds runden (Schichthöhe 0,02 mm, Rückzug 0,1 mm – bisher wurde alles außer der
+    // Schichthöhe ganzzahlig, aus 1,3 mm Rückzug wurde 1 mm)
+    const dec = step > 0 && step < 1 ? Math.min(2, String(step).split('.')[1].length) : 0;
+    out[k] = Math.round(v * 10 ** dec) / 10 ** dec;
   }
   if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return; }
   const p = ovPart(), value = Object.keys(out).length ? out : null;

@@ -114,6 +114,11 @@ function compute(I,geom,ctx){
   const take=(k,v)=>{sugg[k]=v;return has(k)?ov[k]:v};
   if(has('bed')||has('fan'))m=Object.assign({},m);
   m.bed=take('bed',m.bed);m.fan=take('fan',m.fan);
+  /* Hilfslüfter (seitlich) und Gehäuselüfter/Abluft: nur der Kobra S1 hat sie im Orca-Profil (additional_cooling_fan_speed,
+     during_print_exhaust_fan_speed, je 60 %). Geschrieben werden sie nur, wenn du sie setzt (2026-10-04). */
+  const FAN_PROFILE=60,fans2=printer.id==='kobra_s1';
+  const fanAux=fans2?take('fan_aux',FAN_PROFILE):null,fanBox=fans2?take('fan_box',FAN_PROFILE):null;
+  const fans2Set=fans2&&(has('fan_aux')||has('fan_box'))?{aux:has('fan_aux')?+ov.fan_aux:null,box:has('fan_box')?+ov.fan_box:null}:null;
   const effectiveStatus=(m.status==='tested'&&!printer.testedOK)?'generic':m.status;
   const short=m.name;
   const base=Object.assign({},tpu?ob.tpu:ob.pla);
@@ -217,7 +222,7 @@ function compute(I,geom,ctx){
 
   // Übersicht; angepasste Werte bekommen den Vorschlag als Hinweis und eine Markierung (4. Feld)
   const changed=Object.keys(sugg).filter(k=>has(k)&&String(ov[k])!==String(sugg[k]));
-  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'?de(v,1)+' mm':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
+  const fmtS=k=>{const v=sugg[k];return k==='layer'?de(v,2)+' mm':k==='nozzle'||k==='bed'?v+' °C':k==='inf'||k==='fan'||k==='fan_aux'||k==='fan_box'?v+' %':/^sp_/.test(k)||k==='retr_speed'?v+' mm/s':k==='accel'?(v>0?v+' mm/s²':t('Werksprofil')):k==='retr_len'?de(v,1)+' mm':k==='support'||k==='critical'?(v==='on'?t('an'):t('aus')):t(String(v))};
   const mark=(keys,row)=>{const c=keys.filter(k=>changed.includes(k));return c.length?[row[0],row[1],[t('angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]:row};
   const rows=[
     mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
@@ -225,7 +230,8 @@ function compute(I,geom,ctx){
     mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill','sp_travel'],['Füllung / Travel',sp_fill+' / '+sp_travel+' mm/s',nFill]),
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
-    mark(['fan'],['Lüfter',m.fan+' %',fanNote]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
+    mark(['fan'],['Lüfter',m.fan+' %',fanNote]),
+    ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',fans2Set?'':t('Kobra-S1-Profil')])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
     mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim'],['Brim',t(brim),brimNote])
   ];
 
@@ -307,7 +313,7 @@ function compute(I,geom,ctx){
   if(o==='thin')warn.push(t('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.'));
 
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
-    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,dSel,top,pattern,
+    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer:N.fl,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
