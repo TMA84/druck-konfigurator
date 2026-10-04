@@ -112,13 +112,17 @@ function compute(I,geom,ctx){
      an der er entsteht – Datenblatt, 3MF, Slicen und Kosten nutzen dann dieselben Werte. sugg = Vorschlag. */
   const ov=I.overrides||{},sugg={},has=k=>ov[k]!==undefined&&ov[k]!==null&&ov[k]!=='';
   const take=(k,v)=>{sugg[k]=v;return has(k)?ov[k]:v};
-  if(has('bed')||has('fan'))m=Object.assign({},m);
-  m.bed=take('bed',m.bed);m.fan=take('fan',m.fan);
-  /* Hilfslüfter (seitlich) und Gehäuselüfter/Abluft: nur der Kobra S1 hat sie im Orca-Profil (additional_cooling_fan_speed,
-     during_print_exhaust_fan_speed, je 60 %). Geschrieben werden sie nur, wenn du sie setzt (2026-10-04). */
-  const FAN_PROFILE=60,fans2=printer.id==='kobra_s1';
-  const fanAux=fans2?take('fan_aux',FAN_PROFILE):null,fanBox=fans2?take('fan_box',FAN_PROFILE):null;
-  const fans2Set=fans2&&(has('fan_aux')||has('fan_box'))?{aux:has('fan_aux')?+ov.fan_aux:null,box:has('fan_box')?+ov.fan_box:null}:null;
+  /* Kobra S1 (geschlossen, mit Hilfs- und Abluftlüfter): Vorgaben je Filamentart (2026-10-04) – ABS/ASA warm halten
+     (Hilfslüfter aus, Abluft fast zu, Bett 100 °C, 10 min vorwärmen, immer Brim), PETG weniger Luft. Das Orca-Profil
+     hat für beide Lüfter 60 %. Alles lässt sich unter „Werte für diesen Auftrag“ überschreiben. */
+  const s1=printer.id==='kobra_s1',S1P={pla:{aux:60,box:60},petg:{aux:30,box:40},abs:{aux:0,box:10,bed:100,preheat:10,brim:true},
+    asa:{aux:0,box:10,bed:100,preheat:10,brim:true},tpu:{aux:30,box:60}}[m.kind]||{aux:60,box:60};
+  m=Object.assign({},m);
+  m.bed=take('bed',s1&&S1P.bed?Math.max(m.bed,S1P.bed):m.bed);m.fan=take('fan',m.fan);
+  const fans2=s1,fanAux=s1?take('fan_aux',S1P.aux):null,fanBox=s1?take('fan_box',S1P.box):null;
+  // Kobra S1: Hilfs- und Gehäuselüfter immer schreiben (Vorgabe je Filament oder dein Wert)
+  const fans2Set=s1?{aux:+fanAux,box:+fanBox}:null;
+  const preheatMin=s1&&S1P.preheat?S1P.preheat:0;
   const effectiveStatus=(m.status==='tested'&&!printer.testedOK)?'generic':m.status;
   const short=m.name;
   const base=Object.assign({},tpu?ob.tpu:ob.pla);
@@ -208,7 +212,7 @@ function compute(I,geom,ctx){
   if(geom){
     const foot=Math.max(1,geom.bedArea),slender=geom.z/Math.sqrt(foot),big=Math.max(geom.x,geom.y);
     if(foot<150||slender>4){brim='5–8 mm';brimNote=t('kleine Aufstandsfläche erkannt ({area} mm²)',{area:de(foot,0)})}
-    else if(enclosed&&big>80){brim='5 mm';brimNote=t('ABS/ASA neigt bei größeren Teilen zum Verziehen')}
+    else if(enclosed&&(big>80||(s1&&S1P.brim))){brim='5 mm';brimNote=t('ABS/ASA neigt zum Verziehen')}
     else if(big>110&&!tpu){brimNote=t('großes flaches Teil: wenn Ecken abheben, 3–5 mm Brim oder Mausohren')}
   }
   if(o==='tire'&&tpu&&brim==='Nicht nötig'){brim='0–5 mm';brimNote=t('bei Haftungsproblemen')}
@@ -231,7 +235,7 @@ function compute(I,geom,ctx){
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
     mark(['fan'],['Lüfter',m.fan+' %',fanNote]),
-    ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',fans2Set?'':t('Kobra-S1-Profil')])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
+    ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',S1P.box<=20?t('Gehäuse warm halten ({kind})',{kind:KIND_LABEL[m.kind]||m.kind}):''])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
     mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim'],['Brim',t(brim),brimNote])
   ];
 
@@ -313,7 +317,7 @@ function compute(I,geom,ctx){
   if(o==='thin')warn.push(t('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.'));
 
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
-    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,dSel,top,pattern,
+    nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer:N.fl,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)

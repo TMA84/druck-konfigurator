@@ -95,7 +95,8 @@ function wbRender() {
   $('wbName').textContent = st.name || st.model || 'Kobra S1';
   $('wbMeta').textContent = [st.name && st.model && st.name !== st.model ? st.model : '', st.firmware ? 'Firmware ' + st.firmware : '', st.ip || wbHost()].filter(Boolean).join(' · ');
   const state = $('wbState');
-  state.textContent = wb.err ? t('nicht erreichbar') : job ? (job.paused ? t('pausiert') : t(job.status || job.state || 'aktiv')) : st.state === 'free' ? t('bereit') : st.state || '?';
+  const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, planLabel = plan && { heating: t('heizt vor'), drying: t('trocknet') }[plan.state];
+  state.textContent = wb.err ? t('nicht erreichbar') : job ? (job.paused ? t('pausiert') : t(job.status || job.state || 'aktiv')) : planLabel || (st.state === 'free' ? t('bereit') : st.state || '?');
   state.className = 'wb-pill' + (job && !job.paused ? ' live' : '');
   const light = (st.lights || [])[0];
   $('wbLight').disabled = !light; if (light && document.activeElement !== $('wbLight')) $('wbLight').checked = light.status === 1;
@@ -115,7 +116,14 @@ function wbRender() {
       '<div title="' + esc(remTip) + '"><dt>' + t('Fertig um') + '</dt><dd>' + (remMin != null && !job.paused ? wbClock(remMin) : '–') + '</dd></div>' +
       '<div title="' + esc(remTip) + '"><dt>' + t('Verbleibend') + '</dt><dd>' + wbMin(remMin) + (own && job.remaining_min != null ? '<small class="wb-printer-rem">' + esc(t('Drucker: {m}', { m: wbMin(job.remaining_min) })) + '</small>' : '') + '</dd></div><div><dt>' + t('Gedruckt') + '</dt><dd>' + wbMin(job.elapsed_min) + '</dd></div>' +
       (job.filament_mm ? '<div><dt>' + t('Filament bisher') + '</dt><dd>' + de(job.filament_mm / 1000, 1) + ' m</dd></div>' : '') + '</dl>';
-  } else $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + t('Kein Druck aktiv. Drucken lässt sich aus dem Schritt <b>③ Slicen &amp; Kosten</b>.') + '</p>';
+  } else {
+    // kein Druck, aber ein Plan läuft (js/schedule-ui.js): heizt vor / trocknet / wartet – statt „Kein Druck aktiv“
+    const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, active = plan && ['wait', 'drying', 'heating'].includes(plan.state);
+    const msg = !active ? t('Kein Druck aktiv. Drucken lässt sich aus dem Schritt <b>③ Slicen &amp; Kosten</b>.')
+      : esc(t({ heating: 'Bett heizt vor – Druck startet um {s}', drying: 'Filament trocknet – Druck startet um {s}', wait: 'Druck geplant – Start um {s}' }[plan.state], { s: schedWhen(plan.start_at) })) +
+        (plan.start_at > Date.now() / 1000 ? ' (' + esc(t('in {t}', { t: duration(plan.start_at - Date.now() / 1000) })) + ')' : '') + '<br><small>' + esc(plan.name) + ' · ' + esc(t('Platte {n}', { n: plan.plate })) + '</small>';
+    $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + msg + '</p>';
+  }
   $('wbPause').disabled = !job || job.paused; $('wbResume').disabled = !job || !job.paused; $('wbStop').disabled = !job;
   $('wbPause').classList.toggle('hidden', !job || job.paused); $('wbResume').classList.toggle('hidden', !(job && job.paused)); $('wbStop').classList.toggle('hidden', !job);
   if (typeof skRender === 'function') skRender(st);   // Objekte überspringen (js/skip-ui.js)

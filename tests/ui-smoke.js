@@ -544,7 +544,8 @@ async function runSmoke(opts={}){
       ok(!!fa&&!!fb,'Kobra S1: Hilfs- und Gehäuselüfter im Dialog');
       rl.value='1.3';fb.value='10';$('ovSave').click();await wait(80);const po=project.parts[project.selected].overrides||{};
       ok(po.retr_len===1.3&&po.fan_box===10&&lastResult.retr&&lastResult.retr.len===1.3&&lastResult.fans2&&lastResult.fans2.box===10,'Rückzug 1,3 mm bleibt 1,3 (nicht gerundet), Gehäuselüfter 10 %');
-      const pc=plannedChanges(lastResult,0).map(c=>c.key);ok(pc.includes('filament_retraction_length')&&pc.includes('during_print_exhaust_fan_speed')&&!pc.includes('additional_cooling_fan_speed'),'Export: Rückzug und Gehäuselüfter, Hilfslüfter nicht (nicht gesetzt)');
+      const pcl=plannedChanges(lastResult,0),pv=k=>(pcl.find(c=>c.key===k)||{}).value;
+      ok(pv('filament_retraction_length')==='1.3'&&pv('during_print_exhaust_fan_speed')==='10'&&pv('additional_cooling_fan_speed')!=null,'Export Kobra S1: Rückzug, Gehäuselüfter 10, Hilfslüfter mit Vorgabe');
       delete po.retr_len;delete po.fan_box;update();await wait(50);$('ovOpen').click();await wait(50); }
     $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
     ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
@@ -569,6 +570,11 @@ async function runSmoke(opts={}){
       lv.at={li:10,frac:0};const done=5557*10/21,r2=lvRemaining({job:{name:'P1',layer:11,elapsed_min:Math.round((420+done)/60)}});
       ok(Math.abs(r2.pace-1)<0.03,'Tempo ohne Vorbereitung gerechnet: kein Aufschlag ('+r2.pace.toFixed(3)+')');
       lv.data=d0;lv.at=at0;if(pr0!=null)store.settings.prepS=pr0;else delete store.settings.prepS;persist(); }
+    // Kobra-S1-Vorgaben je Filament: ABS → Hilfslüfter 0, Abluft 10, Bett ≥ 100, Brim 5 mm, 10 min vorwärmen
+    { const m0=$('material').value;setTab('settings');sel('material','abs');await wait(80);const r=lastResult;
+      ok(r.fans2&&r.fans2.aux===0&&r.fans2.box===10&&r.m.bed>=100&&r.preheatMin===10&&/5 mm/.test(r.brim||''),'Kobra S1 + ABS: Hilfslüfter 0, Abluft 10, Bett '+r.m.bed+', Brim '+r.brim+', vorwärmen 10 min');
+      sel('material','petg');await wait(80);ok(lastResult.fans2.aux===30&&lastResult.fans2.box===40&&!lastResult.preheatMin,'Kobra S1 + PETG: Hilfslüfter 30, Abluft 40, kein Vorwärmen');
+      sel('material',m0);await wait(50); }
     // Sendedialog ohne Drucker: „busy“ ohne Auftrag (nach Abbruch) und PETG im G-Code ↔ PLA in der ACE – nur Anzeige, nichts gesendet
     { const ctx0=sendCtx,info0=sendInfo;
       sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4]}]},materials:{2:{kind:'petg',name:'PETG'}},name:'t',onStarted:null};   // wie costState.materials: Objekt Slot → Filament

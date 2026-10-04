@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Kobra-S1-Vorgaben je Filament:** PLA Hilfs-/Gehäuselüfter 60/60 %, PETG 30/40 %, ABS/ASA Hilfslüfter aus, Gehäuselüfter 10 %, Bett ≥ 100 °C, immer 5 mm Brim, 10 min Vorwärmen schon angehakt; TPU 30/60 %. Überschreibbar unter „Werte für diesen Auftrag“.
+
+### Behoben
+- **Werkbank, geplanter Druck:** Die Karte war eine schmale Spalte mit abgeschnittenem Text; jetzt eine Zeile über die ganze Breite. Der Druckauftrag zeigt „Bett heizt vor – Druck startet um …“ statt „Kein Druck aktiv“, oben steht „heizt vor“ / „trocknet“.
+
 ## [10.13.0] – 2026-10-04
 
 ### Behoben

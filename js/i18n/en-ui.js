@@ -565,3 +565,14 @@ I18N.add({
  "Hilfs- / Gehäuselüfter": "Auxiliary / chamber fan",
  "Kobra-S1-Profil": "Kobra S1 profile"
 });
+
+I18N.add({
+ "Bett heizt vor – Druck startet um {s}": "Bed preheating – print starts at {s}",
+ "Filament trocknet – Druck startet um {s}": "Filament drying – print starts at {s}",
+ "Druck geplant – Start um {s}": "Print scheduled – starts at {s}"
+});
+
+I18N.add({
+ "Gehäuse warm halten ({kind})": "keep the enclosure warm ({kind})",
+ "ABS/ASA neigt zum Verziehen": "ABS/ASA tends to warp"
+});

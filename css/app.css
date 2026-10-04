@@ -1147,4 +1147,7 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 /* Später starten (Sendedialog) und geplanter Druck (Werkbank) */
 .send-later { display: grid; gap: 6px; margin-top: 6px; }
 .send-dry input { width: 64px; }
-.wb-sched .wb-queue-head { flex-wrap: wrap; }
+.wb-sched { grid-column: 1 / -1; }
+.wb-sched.hidden { display: none; }
+.wb-sched .wb-queue-head { flex-wrap: wrap; align-items: baseline; }
+.wb-sched #schedSum { flex: 1 1 auto; min-width: 0; }

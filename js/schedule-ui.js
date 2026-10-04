@@ -14,6 +14,7 @@ const schedWhen = ts => { const d = new Date(ts * 1000), today = new Date().toDa
 async function schedLoad() {
   try { sched.v = await lanApi('api/schedule'); sched.at = Date.now(); } catch (e) { /* ohne Server: kein Plan */ }
   schedRender();
+  if (typeof wb !== 'undefined' && wb.st && !wb.st.job && typeof wbRender === 'function') wbRender();   // Druckauftrag: „heizt vor …“
   return sched.v;
 }
 const schedBusy = () => !!(sched.v && sched.v.plan && ['wait', 'drying', 'heating'].includes(sched.v.plan.state));
@@ -28,8 +29,10 @@ function sendLaterReset() {
   $('sendLaterBox').classList.toggle('hidden', !!sendCtx.onStarted);   // aus der Warteschlange: nicht planbar
   // Vorwärmen: Bett wie in den Druckwerten (mit Anpassung), 10 min
   const bed = lastResult && lastResult.m ? +lastResult.m.bed : 0;
-  $('sendHeat').checked = false; $('sendHeatBed').value = String(Math.min(110, Math.max(40, bed || 100))); $('sendHeatMin').value = '10';
-  $('sendHeat').closest('label').classList.toggle('hidden', !!sendCtx.onStarted); $('sendHeatRow').classList.add('hidden');
+  // Kobra-S1-Vorgabe (js/engine.js preheatMin): ABS/ASA 10 min vorwärmen – schon angehakt
+  const pre = lastResult && lastResult.preheatMin > 0 && !sendCtx.onStarted ? lastResult.preheatMin : 0;
+  $('sendHeat').checked = pre > 0; $('sendHeatBed').value = String(Math.min(110, Math.max(40, bed || 100))); $('sendHeatMin').value = String(pre || 10);
+  $('sendHeat').closest('label').classList.toggle('hidden', !!sendCtx.onStarted); $('sendHeatRow').classList.toggle('hidden', !pre);
   schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && renderSendDialog());
 }
 // Zustand für den Knopf: null = jetzt drucken; sonst {ok, why, req}
@@ -92,9 +95,10 @@ function schedRender() {
   if (!p) return;
   const active = ['wait', 'drying', 'heating'].includes(p.state), now = Date.now() / 1000;
   const label = { wait: t('geplant'), drying: t('trocknet'), heating: t('heizt vor'), started: t('gestartet'), failed: t('nicht gestartet'), cancelled: t('abgesagt') }[p.state] || p.state;
-  $('schedSum').textContent = p.name + ' · ' + t('Platte {n}', { n: p.plate }) + ' · ' + label + ' · ' + t('Start {s}', { s: schedWhen(p.start_at) }) +
+  $('schedSum').textContent = label + ' · ' + t('Start {s}', { s: schedWhen(p.start_at) }) +
     (active && p.start_at > now ? ' (' + t('in {t}', { t: duration(p.start_at - now) }) + ')' : '') +
     (p.preheat ? ' · ' + t('vorwärmen {c} °C, {m} min', { c: p.preheat.bed, m: p.preheat.minutes }) : '') +
+    ' · ' + p.name + ' · ' + t('Platte {n}', { n: p.plate }) +
     (p.dry ? ' · ' + t('trocknen {c} °C, {h} h', { c: p.dry.temp, h: de(p.dry.minutes / 60, p.dry.minutes % 60 ? 1 : 0) }) + (active && !p.dry.sent ? ' ' + t('ab {d}', { d: schedWhen(p.dry.start_at) }) : '') : '');
   $('schedCancel').classList.toggle('hidden', !active); $('schedDismiss').classList.toggle('hidden', active);
   $('schedNote').textContent = p.note || ''; $('schedNote').classList.toggle('hidden', !p.note);

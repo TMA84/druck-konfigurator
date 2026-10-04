@@ -250,6 +250,8 @@ Links wählst du in Gruppen: **Filament** (mit den Farben des Herstellers), **Wa
 
 **Handy:** Unter 640 px Breite ist die Kopfzeile kompakt, im Tab ① steht die 3D-Ansicht oben, Dialoge und Auswahllisten nutzen die ganze Breite.
 
+**Kobra-S1-Vorgaben je Filament:** Für den Kobra S1 (geschlossen, mit Hilfs- und Abluftlüfter) gibt das Tool je Filamentart passende Werte vor – PLA: Hilfs-/Gehäuselüfter 60/60 %; PETG: 30/40 %; **ABS/ASA**: Hilfslüfter aus, Gehäuselüfter 10 % (Wärme im Gehäuse halten), Bett mindestens 100 °C, immer 5 mm Brim und im Sendedialog schon angehakt **10 min Bett vorwärmen**; TPU: 30/60 %. Alles lässt sich unter „Werte für diesen Auftrag“ ändern.
+
 ### Werte für diesen Auftrag anpassen
 
 Die Werte im Datenblatt sind ein **Vorschlag**. Willst du für diesen Druck etwas anders – z. B. mehr Wände, eine andere Füllung oder Stützen erzwingen –, klick über dem Datenblatt auf **✎ Werte für diesen Auftrag anpassen**:
