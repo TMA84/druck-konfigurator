@@ -708,3 +708,9 @@ I18N.add({
  "außen und in Löchern": "outer and inside holes",
  "Brim: außen, Löcher und Schriften frei": "Brim: outer, holes and lettering kept clear",
 });
+I18N.add({
+ "außen und in großen Löchern": "outer and in large holes",
+ "Brim-Breite innen": "Inner brim width",
+ "innen {w} mm": "inside {w} mm",
+ "Brim: außen und in großen Löchern": "Brim: outer and in large holes",
+});

@@ -195,7 +195,8 @@ function plannedChanges(r, slot, liveSlots) {
   if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
   let [brimType, brimWidth] = orcaBrim(r.brim);
   // Brim-Art: auto/außen = outer_only (auto setzt je Objekt mit Löchern gesetzte Mausohren, build3mfFiles), sonst wie gewählt
-  if (brimType !== 'no_brim') brimType = { ears: 'brim_ears', inner: 'outer_and_inner' }[r.brimKind] || 'outer_only';
+  // „inner“ = außen + nur große Löcher: ebenfalls über gesetzte Ohren (build3mfFiles), global daher outer_only
+  if (brimType !== 'no_brim') brimType = { ears: 'brim_ears' }[r.brimKind] || 'outer_only';
   proc(t('Brim'), 'brim_type', brimType);
   if (brimWidth) proc(t('Brim-Breite'), 'brim_width', brimWidth);
   /* Brim muss am Teil hängen: das Kobra-S1-Profil lässt 0,1 mm Spalt (brim_object_gap), und die Elefantenfuß-Kompensation
@@ -772,12 +773,12 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   const ears = [];
   objs.forEach((o, i) => {
     const pr = items[i].r || r, [bt, bw] = orcaBrim(pr.brim);
-    if (bt === 'no_brim' || (pr.brimKind && pr.brimKind !== 'auto') || typeof brimEarPoints !== 'function') return;
+    if (bt === 'no_brim' || (pr.brimKind && !['auto', 'inner'].includes(pr.brimKind)) || typeof brimEarPoints !== 'function') return;
     const g = o.g, center = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, (g.mn[2] + g.mx[2]) / 2];
-    const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], Number(bw));
+    const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], Number(bw), pr.brimKind === 'inner' ? Number(pr.brimInner) || 0 : 0);
     if (!pts) return;
     ears.push({ id: i + 1, pts, r: Number(bw) });
-    o.overrides = o.overrides.filter(c => c.key !== 'brim_type').concat([{ label: t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }]);
+    o.overrides = o.overrides.filter(c => c.key !== 'brim_type').concat([{ label: pr.brimKind === 'inner' ? t('Brim: außen und in großen Löchern') : t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }]);
   });
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {

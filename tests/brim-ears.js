@@ -27,6 +27,14 @@ check('Loch 2 mm vom Rand: keine Ohren in Lochnähe', near.every(p => !(p[1] < -
 // vertiefte Beschriftung (negatives Teil) durch die Platte = Loch
 const neg = brimEarPoints([vol(box(0, 0, 40, 40))], [vol(box(15, 15, 25, 25, 4))], C, 0, 5);
 check('durchgehende Gravur zählt als Loch', Array.isArray(neg) && neg.length >= 4, neg);
+// innerer Brim nur in großen Löchern: 20-mm-Loch bekommt Ohren (Radius innen), 4-mm-Loch keine
+const two = [vol(box(0, 0, 60, 10), box(0, 30, 60, 40), box(0, 10, 5, 30), box(25, 10, 40, 30), box(44, 10, 60, 30), box(40, 10, 44, 18), box(40, 22, 44, 30))];
+const C2 = [30, 20, 1.5], inn = brimEarPoints(two, [], C2, 0, 5, 3), inR = (inn || []).filter(p => p[3] === 3);
+check('innen: Ohren an den Ecken des großen Lochs', inR.length >= 4 && inR.every(p => p[0] + 30 >= 4.5 && p[0] + 30 <= 25.5 && p[1] + 20 >= 9.5 && p[1] + 20 <= 30.5), inR);
+check('innen: nichts am kleinen Loch', !(inn || []).some(p => Math.abs(p[0] + 30 - 42) < 4 && Math.abs(p[1] + 20 - 20) < 4));
+check('außen weiter mit Brim-Breite', (inn || []).some(p => p[3] === 5));
+check('ohne Innenbreite: kein innerer Brim', !(brimEarPoints(two, [], C2, 0, 5, 0) || []).some(p => p[3] !== 5));
+check('Insel im Loch: dort kein innerer Brim', !(brimEarPoints([frame, island], [], C, 0, 5, 1.5) || []).some(p => p[3] === 1.5));
 const f = brimEarFile([{ id: 1, pts: [[-20, -20, -1.5]], r: 5 }]);
 check('Datei im Orca-Format 0', f === 'brim_points_format_version=0\nobject_id=1|-20.0000 -20.0000 -1.5000 5.0000\n', JSON.stringify(f));
 console.log(passed + '/' + (passed + failed) + ' bestanden');

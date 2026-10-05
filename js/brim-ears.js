@@ -40,9 +40,11 @@ function rasterFill(grid, segs, val) {
 }
 
 /* vols: [{pos}] (positive Körper), negs: [{pos}] (abgezogene Teile), center: Objektmitte (wie meshModelXML), mnZ: Unterseite,
-   r: Ohrradius = Brim-Breite. Ergebnis: [[x,y,z], …] in Objektkoordinaten, oder null, wenn die erste Schicht keine Löcher hat
-   (dann genügt der normale äußere Brim). */
-function brimEarPoints(vols, negs, center, mnZ, r) {
+   r: Ohrradius außen = Brim-Breite; inner: Brim-Breite innen (0 = kein innerer Brim). Ergebnis: [[x,y,z,radius], …] in
+   Objektkoordinaten, oder null, wenn die erste Schicht keine Löcher hat (dann genügt der normale äußere Brim).
+   Innen nur in großen Löchern (lichte Weite ≥ 3 × Innenbreite, es bleibt also ein freier Kern) und nur dort, wo im Umkreis
+   des Ohrs weder eine Insel noch ein anderes Loch liegt – Orca füllt sonst jedes Loch im Ohr (Schnittmenge Ohr ∩ Löcher). */
+function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
   const z = mnZ + 0.1, c = EAR_CELL_MM;
   const pos = vols.map(v => sectionSegments(v.pos, z)), neg = (negs || []).map(v => sectionSegments(v.pos, z));
   const all = pos.flat();
@@ -78,6 +80,32 @@ function brimEarPoints(vols, negs, center, mnZ, r) {
       const pp = jj * w + ii; if (dist[pp] > d + 1) { dist[pp] = d + 1; q.push(pp); }
     }
   }
+  // Löcher einzeln (4er-Nachbarschaft) mit lichter Weite (Abstand zum Rand, Breitensuche von allen Nicht-Loch-Zellen)
+  const isHole = p => !m[p] && !out[p], hid = new Int32Array(N).fill(-1), holeR = [];
+  for (let p0 = 0; p0 < N; p0++) {
+    if (!isHole(p0) || hid[p0] >= 0) continue;
+    const id = holeR.length; holeR.push(0); const s2 = [p0]; hid[p0] = id;
+    while (s2.length) { const p = s2.pop(), i = p % w, j = (p - i) / w;
+      for (const pp of [i > 0 ? p - 1 : -1, i < w - 1 ? p + 1 : -1, j > 0 ? p - w : -1, j < h - 1 ? p + w : -1]) if (pp >= 0 && isHole(pp) && hid[pp] < 0) { hid[pp] = id; s2.push(pp); } }
+  }
+  if (inner > 0) {
+    const din = new Uint16Array(N).fill(65535), q2 = [];
+    for (let p = 0; p < N; p++) if (!isHole(p)) { din[p] = 0; q2.push(p); }
+    for (let qi = 0; qi < q2.length; qi++) { const p = q2[qi], d = din[p], i = p % w, j = (p - i) / w;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue;
+        const pp = jj * w + ii; if (din[pp] > d + 1) { din[pp] = d + 1; q2.push(pp); } } }
+    for (let p = 0; p < N; p++) if (hid[p] >= 0) holeR[hid[p]] = Math.max(holeR[hid[p]], din[p] * c);
+  }
+  // Inseln: Teilflächen, die nicht an „außen“ grenzen (z. B. das Innere eines Buchstabens)
+  const fid = new Int32Array(N).fill(-1), isl = new Uint8Array(N);
+  for (let p0 = 0; p0 < N; p0++) {
+    if (!m[p0] || fid[p0] >= 0) continue;
+    const comp = [p0]; fid[p0] = p0; let touches = false;
+    for (let k = 0; k < comp.length; k++) { const p = comp[k], i = p % w, j = (p - i) / w;
+      for (const pp of [i > 0 ? p - 1 : -1, i < w - 1 ? p + 1 : -1, j > 0 ? p - w : -1, j < h - 1 ? p + w : -1]) {
+        if (pp < 0) continue; if (out[pp]) touches = true; if (m[pp] && fid[pp] < 0) { fid[pp] = p0; comp.push(pp); } } }
+    if (!touches) for (const p of comp) isl[p] = 1;
+  }
   // Ohren nur auf Ecken des Außenumrisses: Orca 2.4.2 setzt ein Ohr auf die nächstgelegene Umrissecke (geprüft: ein Punkt
   // mitten auf einer Kante landete an der Ecke eines Lochs). Ecken = Endpunkte der Schnittstrecken; schärfste zuerst,
   // dann im Abstand r/2 ausgedünnt (auf Rundungen eine fast durchgehende Kette); Ecken näher als r an einem Loch entfallen.
@@ -89,28 +117,41 @@ function brimEarPoints(vols, negs, center, mnZ, r) {
     }
   }
   const cell = (x, y) => { const i = Math.floor((x - x0) / c), j = Math.floor((y - y0) / c); return i < 0 || j < 0 || i >= w || j >= h ? -1 : j * w + i; };
-  const cand = [];
+  const cand = [], innerCand = [];
   for (const v of corners.values()) {
     const p = cell(v.x, v.y); if (p < 0) continue;
     const i = p % w, j = (p - i) / w;
     let outside = false, nearHole = false;
     for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < w && jj < h && out[jj * w + ii]) outside = true; }
-    if (!outside) continue;
-    if (dist[p] * c < r + 0.5) nearHole = true;
-    if (nearHole) continue;
     // Schärfe: 1 − cos des Winkels zwischen den beiden Kanten (gerade Fortsetzung = 0, Spitze = 2)
     const [d1, d2] = v.dirs; const sharp = d1 && d2 ? 1 + (d1[0] * d2[0] + d1[1] * d2[1]) : 0;
+    if (!outside) {
+      // Lochecke: innerer Brim, wenn das Loch groß genug ist und im Ohr keine Insel / kein anderes Loch liegt
+      if (!(inner > 0) || isl[p]) continue;
+      let own = -1;
+      for (let dj = -2; dj <= 2 && own < 0; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < w && jj < h && hid[jj * w + ii] >= 0) { own = hid[jj * w + ii]; break; } }
+      if (own < 0 || holeR[own] < 1.5 * inner) continue;
+      const R = Math.ceil((inner + 0.5) / c); let ok = true;
+      for (let dj = -R; dj <= R && ok; dj++) for (let di = -R; di <= R; di++) {
+        if (di * di + dj * dj > R * R) continue; const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue;
+        const pp = jj * w + ii; if (isl[pp] || (hid[pp] >= 0 && hid[pp] !== own)) { ok = false; break; }
+      }
+      if (ok) innerCand.push([v.x, v.y, sharp]);
+      continue;
+    }
+    if (dist[p] * c < r + 0.5) nearHole = true;
+    if (nearHole) continue;
     cand.push([v.x, v.y, sharp]);
   }
-  cand.sort((a, b) => b[2] - a[2]);
-  const step = Math.max(c, r / 2), pts = [];
-  for (const [x, y] of cand) if (!pts.some(q => Math.hypot(q[0] - x, q[1] - y) < step)) pts.push([x, y]);
-  return pts.length ? pts.map(([x, y]) => [x - center[0], y - center[1], mnZ - center[2]]) : null;
+  const pts = [], thin = (list, rad) => { list.sort((a, b) => b[2] - a[2]); const step = Math.max(c, rad / 2);
+    for (const [x, y] of list) if (!pts.some(q => q[3] === rad && Math.hypot(q[0] - x, q[1] - y) < step)) pts.push([x, y, 0, rad]); };
+  thin(cand, r); if (inner > 0) thin(innerCand, inner);
+  return pts.length ? pts.map(([x, y, , rad]) => [x - center[0], y - center[1], mnZ - center[2], rad]) : null;
 }
 
-// Inhalt von Metadata/brim_ear_points.txt: [{id: Objektindex 1-basiert, pts, r}]
+// Inhalt von Metadata/brim_ear_points.txt: [{id: Objektindex 1-basiert, pts: [[x,y,z,radius?]], r: Radius, wo pts keinen hat}]
 function brimEarFile(list) {
   const f = v => (Math.round(v * 1e4) / 1e4).toFixed(4);
-  const rows = list.filter(o => o.pts && o.pts.length).map(o => 'object_id=' + o.id + '|' + o.pts.map(p => f(p[0]) + ' ' + f(p[1]) + ' ' + f(p[2]) + ' ' + f(o.r)).join(' '));
+  const rows = list.filter(o => o.pts && o.pts.length).map(o => 'object_id=' + o.id + '|' + o.pts.map(p => f(p[0]) + ' ' + f(p[1]) + ' ' + f(p[2]) + ' ' + f(p[3] ?? o.r)).join(' '));
   return rows.length ? 'brim_points_format_version=0\n' + rows.join('\n') + '\n' : '';
 }
