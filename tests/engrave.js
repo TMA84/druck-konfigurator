@@ -13,7 +13,7 @@ const fflate = require('../vendor/fflate.min.js');
 const ROOT = path.join(__dirname, '..');
 const ORCA = process.env.ORCA || (process.platform === 'darwin' ? '/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer' : 'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe');
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'font-hershey', 'engrave', 'export3mf', 'purge'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'font-hershey', 'engrave', 'brim-ears', 'export3mf', 'purge'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({HERSHEY_SIMPLEX, textStrokes, textSolid, textMesh, topFace, faceAnchor, coplanarRegion, anchorToOrig, textWarnings, unknownChars, makeGeom, rotatePositions, rotateAxis, compute, getMat, store, exportTemplate, build3mf})', ctx);
 

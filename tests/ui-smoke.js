@@ -567,6 +567,11 @@ async function runSmoke(opts={}){
     { const c=$('settings').querySelector('[data-ovk="x:elefant_foot_compensation"]');ok(!!c&&/0[,.]075/.test(c.textContent)&&!c.classList.contains('ov'),'Druckwerte: Elefantenfuß 0,075 mm aus dem Profil');
       $('ovDlg').close();c.click();await wait(50);ok($('ovDlg').open&&document.activeElement===$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]'),'Klick auf die Kachel: Dialog beim Wert');
       $('ovDlg').close();$('ovOpen').click();await wait(50); }
+    // Brim: nur noch eine Stelle – Breite und Art nebeneinander, keine „Brim-Art“ mehr unter den weiteren Orca-Einstellungen
+    { const b=$('ovRows').querySelector('[data-ov="brim"]'),k=$('ovRows').querySelector('[data-ov="brim_kind"]');
+      ok(!!k&&!$('ovRows').querySelector('[data-ov="x:brim_type"]'),'Brim-Art einmal (neben Brim), nicht doppelt');
+      ok(b&&k&&b.closest('.ov-row').nextElementSibling===k.closest('.ov-row'),'Brim-Art direkt unter Brim');
+      ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: außen – Löcher und Schriften frei'); }
     // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
     { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;

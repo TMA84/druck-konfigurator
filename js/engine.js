@@ -1,4 +1,6 @@
 'use strict';
+// Brim-Arten (Werte für diesen Auftrag): auto = außen, Löcher/Schriften frei (gesetzte Mausohren, js/brim-ears.js)
+const BRIM_KINDS={auto:'außen – Löcher und Schriften frei',outer:'außen ringsum (Orca, auch um Inseln in Löchern)',ears:'Mausohren an den Ecken',inner:'außen und in Löchern'};
 /* Rechenkern – aus v4 übernommen. Einziger Unterschied: Eingaben kommen als
    Parameter statt aus dem DOM, damit tests/compare-v4.js ihn gegen v4 prüfen kann. */
 
@@ -230,6 +232,10 @@ function compute(I,geom,ctx){
   // Abstand Brim ↔ Teil: ABS/ASA ohne Spalt (sonst reißt der Brim ab), sonst 0,1 mm wie im Orca-Profil
   const brimGap=take('brim_gap',enclosed?0:0.1);
   if(has('brim')){brim=ov.brim;brimNote=''}
+  // Brim-Art (2026-10-05): „auto“ = außen, Löcher und Schriften bleiben frei (js/brim-ears.js); ältere Anpassung x:brim_type übernehmen
+  sugg.brim_kind='auto';
+  const oldKind={outer_only:'outer',brim_ears:'ears',outer_and_inner:'inner'}[ov['x:brim_type']];
+  const brimKind=has('brim_kind')?ov.brim_kind:oldKind||'auto';
 
   // Naht
   const round=['tire','dumpling','case','decor','overhang'].includes(o);
@@ -251,7 +257,7 @@ function compute(I,geom,ctx){
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
     mark(['fan'],['Lüfter',m.fan+' %',fanNote]),
     ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',S1P.box<=20?t('Gehäuse warm halten ({kind})',{kind:KIND_LABEL[m.kind]||m.kind}):''])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
-    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim'],['Brim',t(brim),brimNote])
+    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim','brim_kind'],['Brim',t(brim),brim!=='Nicht nötig'&&brimKind!=='auto'?t(BRIM_KINDS[brimKind]||''):brimNote])
   ];
 
   const supZ=supportZGap(layer,m.kind,tpu);
@@ -336,7 +342,7 @@ function compute(I,geom,ctx){
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
-    maxVol,firstLayer,nozzleFirst,brimGap,brim,seam,supZ,
+    maxVol,firstLayer,nozzleFirst,brimGap,brim,brimKind,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
     suggested:sugg,changed,ovDefaults:myDef,defKey,
     // weitere Orca-Einstellungen (js/orca-extra.js), angepasst oder aus deinem Standard: {orca_key: Wert}

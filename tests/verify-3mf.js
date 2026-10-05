@@ -14,7 +14,7 @@ const ORCA = process.env.ORCA || 'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verify3mf-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'export3mf', 'purge'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'brim-ears', 'export3mf', 'purge'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({compute,getMat,store,parseSTL,makeGeom,exportTemplate,widenTemplate,build3mf,arrangeParts,footprint,plannedChanges,findHoles,estimateColourChanges,aceChangeSeconds})', ctx);
 

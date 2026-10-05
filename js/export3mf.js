@@ -193,7 +193,9 @@ function plannedChanges(r, slot, liveSlots) {
   if (Number(accel) > 0) ACCEL_KEYS.forEach(([label, key]) => proc(label, key, numStr(accel)));
   proc(t('Stützen'), 'enable_support', r.supOn ? 1 : 0);
   if (r.supOn) supportChanges(r).forEach(([label, key, v]) => proc(label, key, v));
-  const [brimType, brimWidth] = orcaBrim(r.brim);
+  let [brimType, brimWidth] = orcaBrim(r.brim);
+  // Brim-Art: auto/außen = outer_only (auto setzt je Objekt mit Löchern gesetzte Mausohren, build3mfFiles), sonst wie gewählt
+  if (brimType !== 'no_brim') brimType = { ears: 'brim_ears', inner: 'outer_and_inner' }[r.brimKind] || 'outer_only';
   proc(t('Brim'), 'brim_type', brimType);
   if (brimWidth) proc(t('Brim-Breite'), 'brim_width', brimWidth);
   /* Brim muss am Teil hängen: das Kobra-S1-Profil lässt 0,1 mm Spalt (brim_object_gap), und die Elefantenfuß-Kompensation
@@ -765,6 +767,18 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   const nFil = settings.filament_settings_id.length;
   const objs = items.map((p, i) => { const tv = textVolumes(i + 1, p), paint = typeof paintAttrsFn === 'function' && p.part ? paintAttrsFn(p.part, {}, nFil) : null; return { g: p.geom, k: i + 1, id: n + i + 1, name: xmlEsc(p.geom.name), hz: coord(p.geom.z / 2), place: places[i],
     extruder: partSlot(p) + 1, overrides: p.r ? objectOverrides(settings, p.r, p.part) : [], mods: tv.negs.concat(holeMods(i + 1, p.holes)), vols: bodyVolumes(p.geom, p.bodies, i + 1, paint).concat(tv.vols) }; });
+  // Brim „auto“: Teile mit Löchern/Schriften in der ersten Schicht bekommen statt des Rundum-Brims eine Ohrenkette am
+  // Außenrand (js/brim-ears.js) – sonst zieht Orca den Brim um Inseln in den Öffnungen und schließt sie
+  const ears = [];
+  objs.forEach((o, i) => {
+    const pr = items[i].r || r, [bt, bw] = orcaBrim(pr.brim);
+    if (bt === 'no_brim' || (pr.brimKind && pr.brimKind !== 'auto') || typeof brimEarPoints !== 'function') return;
+    const g = o.g, center = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, (g.mn[2] + g.mx[2]) / 2];
+    const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], Number(bw));
+    if (!pts) return;
+    ears.push({ id: i + 1, pts, r: Number(bw) });
+    o.overrides = o.overrides.filter(c => c.key !== 'brim_type').concat([{ label: t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }]);
+  });
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {
     '[Content_Types].xml': XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="png" ContentType="image/png"/>\n <Default Extension="gcode" ContentType="text/x.gcode"/>\n</Types>\n',
@@ -786,6 +800,7 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
     'Metadata/filament_sequence.json': JSON.stringify(Object.fromEntries(Array.from({ length: plateCount }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }])))
   };
   objs.forEach(o => { files[objectPath(o.k).slice(1)] = meshModelXML(o.g, o.vols, o.mods); });
+  if (ears.length) files['Metadata/brim_ear_points.txt'] = brimEarFile(ears);
   return { files, changes, plateCount, objectChanges, notes };
 }
 

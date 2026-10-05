@@ -19,7 +19,7 @@ const ORCA = process.env.ORCA || '/Applications/OrcaSlicer.app/Contents/MacOS/Or
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'arrange3mf-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'holes', 'export3mf', 'import'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'holes', 'brim-ears', 'export3mf', 'import'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({importModels, makeGeom, compute, getMat, store, exportTemplate, build3mfFromProject, layout3mf, ownPlaced, bedSize})', ctx);
 

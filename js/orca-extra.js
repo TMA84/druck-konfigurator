@@ -28,9 +28,8 @@ const ORCA_EXTRA = [
   ['top_surface_pattern', 'Muster obere Fläche', 'Oberflächen', null, 0, 0, [['monotonicline', 'Monoton (Linien)'], ['monotonic', 'Monoton'], ['rectilinear', 'Linien'], ['alignedrectilinear', 'Linien ausgerichtet'], ['concentric', 'Konzentrisch'], ['hilbertcurve', 'Hilbert-Kurve'], ['archimedeanchords', 'Archimedisch'], ['octagramspiral', 'Achtstern-Spirale']], 'object'],
   ['bottom_surface_pattern', 'Muster untere Fläche', 'Oberflächen', null, 0, 0, [['monotonic', 'Monoton'], ['monotonicline', 'Monoton (Linien)'], ['rectilinear', 'Linien'], ['alignedrectilinear', 'Linien ausgerichtet'], ['concentric', 'Konzentrisch'], ['hilbertcurve', 'Hilbert-Kurve'], ['archimedeanchords', 'Archimedisch'], ['octagramspiral', 'Achtstern-Spirale']], 'object'],
   ['only_one_wall_top', 'Nur eine Wand oben', 'Oberflächen', null, 0, 0, [['1', 'an'], ['0', 'aus']], 'object'],
-  ['brim_type', 'Brim-Art', 'Haftung', null, 0, 0, [['outer_only', 'außen'], ['inner_only', 'innen'], ['outer_and_inner', 'außen und innen'], ['brim_ears', 'Mausohren'], ['auto_brim', 'automatisch'], ['no_brim', 'kein Brim']], 'object'],
-  ['skirt_loops', 'Skirt-Runden', 'Haftung', null, 0, 10, 1, 'plate'],
-  ['raft_layers', 'Raft-Schichten', 'Haftung', null, 0, 10, 1, 'object'],
+  ['skirt_loops', 'Skirt-Runden', 'Kühlung & Haftung', null, 0, 10, 1, 'plate'],
+  ['raft_layers', 'Raft-Schichten', 'Kühlung & Haftung', null, 0, 10, 1, 'object'],
   ['enable_prime_tower', 'Prime-Turm (Mehrfarbig)', 'Sonstiges', null, 0, 0, [['1', 'an'], ['0', 'aus']], 'plate'],
   ['bridge_speed', 'Brücken-Tempo', 'Sonstiges', 'mm/s', 5, 300, 5, 'object']
 ];

@@ -15,7 +15,7 @@ const HAVE_ORCA = fs.existsSync(ORCA);
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'paintorca-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'paint', 'export3mf'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'paint', 'brim-ears', 'export3mf'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({ makeGeom, compute, getMat, store, exportTemplate, build3mf, paintApply, paintCode, paintBrushCircle })', ctx);
 

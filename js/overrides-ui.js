@@ -28,6 +28,7 @@ const OV_FIELDS = [
   ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
   ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS],
+  ['brim_kind', t('Brim-Art'), '', 0, 0, 0, t('Kühlung & Haftung'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
   ['brim_gap', t('Brim-Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Kühlung & Haftung')]
 ];
 /* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte
@@ -42,7 +43,9 @@ const ovPart = () => project && project.parts[project.selected];
 function ovFields() {
   const extra = typeof ORCA_EXTRA === 'undefined' ? [] : ORCA_EXTRA.map(f => ['x:' + f[0], t(f[1]), f[3] || '', f[4], f[5], Array.isArray(f[6]) ? 0 : f[6], t(f[2]),
     Array.isArray(f[6]) ? f[6].map(([v, l]) => [v, t(l)]) : undefined]);
-  return OV_FIELDS.concat(extra);
+  const out = OV_FIELDS.slice();
+  for (const f of extra) { let at = -1; out.forEach((g, i) => { if (g[6] === f[6]) at = i; }); if (at >= 0) out.splice(at + 1, 0, f); else out.push(f); }
+  return out;
 }
 const ovScope = k => k.startsWith('x:') ? (typeof ORCA_EXTRA_BY_KEY !== 'undefined' && ORCA_EXTRA_BY_KEY[k.slice(2)] ? ORCA_EXTRA_BY_KEY[k.slice(2)][7] : 'object') : OV_SCOPE[k];
 /* Vorschlag für eine weitere Orca-Einstellung: was ohne Eingabe gedruckt würde – der berechnete Wert, wenn das Tool ihn
@@ -56,7 +59,7 @@ function extraSuggestion(r, key) {
   } catch (e) { return undefined; }
 }
 const ovCount = p => p && p.overrides ? Object.keys(p.overrides).length : 0;
-const ovFmt = (f, v) => f[0].startsWith('x:') && typeof extraLabel === 'function' ? extraLabel(f[0].slice(2), v) : f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
+const ovFmt = (f, v) => Array.isArray(f[7]) && Array.isArray(f[7][0]) && !f[0].startsWith('x:') ? ((f[7].find(o => String(o[0]) === String(v)) || [, String(v)])[1]) : f[0].startsWith('x:') && typeof extraLabel === 'function' ? extraLabel(f[0].slice(2), v) : f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
 
 // Leiste über dem Datenblatt: Knopf, wie viele Werte angepasst sind, alle zurücknehmen
 function renderOverrideBar() {

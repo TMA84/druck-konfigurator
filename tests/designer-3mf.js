@@ -13,7 +13,7 @@ const ORCA = process.env.ORCA || '/Applications/OrcaSlicer.app/Contents/MacOS/Or
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'designer3mf-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'font-hershey', 'engrave', 'paint', 'export3mf', 'import'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'orient', 'holes', 'font-hershey', 'engrave', 'paint', 'brim-ears', 'export3mf', 'import'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext(`({ importModels, makeGeom, compute, getMat, store, exportTemplate, build3mfFromProject, partGeom, rotateAxis,
   topFace, anchorToOrig, anchorUnscaled, paintStates, setPrintSequence, clearanceOf, IDENTITY3, paintTree, paintCode, paintApply, paintBrushSphere, paintTreeStates })`, ctx);

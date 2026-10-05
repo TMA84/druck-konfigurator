@@ -701,3 +701,10 @@ I18N.add({
  "Ja – wenige normale Stützen": "Yes – a few normal supports",
  "Ja – normale Stützen (angepasst)": "Yes – normal supports (adjusted)",
 });
+I18N.add({
+ "außen – Löcher und Schriften frei": "outer – holes and lettering kept clear",
+ "außen ringsum (Orca, auch um Inseln in Löchern)": "outer all around (Orca, also around islands in holes)",
+ "Mausohren an den Ecken": "mouse ears at the corners",
+ "außen und in Löchern": "outer and inside holes",
+ "Brim: außen, Löcher und Schriften frei": "Brim: outer, holes and lettering kept clear",
+});
