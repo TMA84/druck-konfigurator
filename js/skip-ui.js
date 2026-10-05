@@ -14,7 +14,7 @@ function skLabel(o, all) {
   return copies > 1 ? t('{name} (Kopie {n})', { name: base, n: +m[3] + 1 }) : base;
 }
 async function skLoad(name) {
-  sk.name = name; sk.objects = null; sk.loading = true; skClearLines();
+  sk.name = name; sk.objects = null; sk.loading = true; sk.triedAt = Date.now(); skClearLines();
   try {
     const r = await fetch('api/printing/objects?name=' + encodeURIComponent(name));
     if (sk.name === name && r.ok) sk.objects = await r.json();
@@ -26,7 +26,8 @@ function skRender(st) {
   const box = $('wbObjects'), job = st && st.job;
   if (!box) return;
   if (!job || !job.name) { box.classList.add('hidden'); box.innerHTML = ''; box.dataset.html = ''; sk.name = null; sk.objects = null; sk.sel = sk.ask = -1; skClearLines(); return; }
-  if (job.name !== sk.name && !sk.loading) { skLoad(job.name); return; }
+  // Objektliste fehlte (zu früh gefragt): alle 20 s erneut
+  if (!sk.loading && (job.name !== sk.name || (!sk.objects && Date.now() - (sk.triedAt || 0) > 20000))) { skLoad(job.name); return; }
   const objs = sk.objects;
   if (!objs || objs.length < 2) { box.classList.add('hidden'); box.innerHTML = ''; box.dataset.html = ''; return; }
   const skipped = new Set(job.skipped || []), left = objs.length - objs.filter(o => skipped.has(o.id)).length;

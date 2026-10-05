@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **3D-Fortschritt fehlte bei geplanten Drucken (z. B. mit Vorwärmen):** Der Server legte Vorschau und Objekte erst nach dem Start ab; die Seite hatte da schon nachgefragt, „keine Vorschau“ bekommen und es nie wieder versucht. Jetzt legt der Server sie vor dem Start ab, und die Seite fragt alle 20 s erneut, solange sie fehlen (auch die Objektliste zum Überspringen).
+
 ## [10.16.0] – 2026-10-04
 
 ### Behoben

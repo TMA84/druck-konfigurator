@@ -597,6 +597,14 @@ async function runSmoke(opts={}){
         ok(project.parts[1].overrides.w===5&&!(project.parts[0].overrides||{}).w,'Wände nur am 2. Teil (je Teil)');
         selectPart(0);await wait(30);}
       project.parts.forEach((q,i)=>{q.overrides=keep[i]});update();await wait(30); }
+    // 3D-Fortschritt: Vorschau beim ersten Abruf noch nicht da (geplanter Start) – die Seite fragt später erneut
+    { const of=window.fetch;let calls=0;const tiny=new Uint8Array([71,67,80,86,51]);
+      window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/printing/preview')){calls++;return Promise.resolve(new Response('{}',{status:404}))}return of(u,o)};
+      const st={connected:true,printing:true,job:{name:'Spaet_Platte1',layer:1,layers:10}};lv.name=null;lv.missing=false;
+      liveUpdate(st);await wait(200);ok(lv.missing&&calls===1,'Vorschau fehlt beim ersten Abruf');
+      liveUpdate(st);await wait(100);ok(calls===1,'nicht sofort erneut gefragt');
+      lv.missingAt=Date.now()-30000;liveUpdate(st);await wait(200);ok(calls===2,'nach 20 s erneut gefragt');
+      window.fetch=of;lv.name=null;lv.missing=false; }
     // Kobra-S1-Vorgaben je Filament: ABS → Hilfslüfter 0, Abluft 10, Bett ≥ 100, Brim 5 mm, 10 min vorwärmen
     { const m0=$('material').value;setTab('settings');sel('material','abs');await wait(80);const r=lastResult;
       ok(r.fans2&&r.fans2.aux===0&&r.fans2.box===10&&r.m.bed>=100&&r.preheatMin===10&&/5 mm/.test(r.brim||''),'Kobra S1 + ABS: Hilfslüfter 0, Abluft 10, Bett '+r.m.bed+', Brim '+r.brim+', vorwärmen 10 min');

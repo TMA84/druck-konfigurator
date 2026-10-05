@@ -420,8 +420,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     raise slicer.SliceError("Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen", "bad_request")
                 name = re.sub(r"[^\w.\-]+", "_", str(req.get("name") or "druck"))[:80] + "_Platte" + str(int(req["plate"])) + ".gcode"
                 with_thumbnail(str(req.get("job", "")), str(req.get("plate", "")), gcode)   # Bild fürs Display des Druckers
+                # Vorschau und Objekte VOR dem Start ablegen – sobald der Drucker den Auftrag meldet, fragt die Seite danach
+                remember_print(name, str(req.get("job", "")), int(req["plate"]))
                 res = anycubic_lan.print_gcode(req["host"], gcode, name, req.get("options") or {})
-                remember_print(res.get("filename") or name, str(req.get("job", "")), int(req["plate"]))
+                if res.get("filename") and res["filename"] != name:
+                    remember_print(res["filename"], str(req.get("job", "")), int(req["plate"]))
                 return res
             return self._api(send)
         if path != "/api/anycubic/command":
@@ -541,8 +544,12 @@ def scheduled_start(plan):
         raise anycubic_lan.LanError("Kein Drucker eingestellt", "unreachable")
     gcode, prev = os.path.join(plan["file"], "plate.gcode"), os.path.join(plan["file"], "plate.preview")
     name = plan["name"] + "_Platte" + str(plan["plate"]) + ".gcode"
+    # Vorschau und Objekte VOR dem Start ablegen (2026-10-05: geplanter ASA-Druck ohne 3D-Fortschritt – die Seite hatte
+    # schon nachgefragt, bevor die Vorschau da war, und es danach nicht mehr versucht)
+    remember_print(name, "", plan["plate"], gcode_path=gcode, preview_path=prev)
     res = anycubic_lan.print_gcode(host, gcode, name, plan.get("options") or {})
-    remember_print(res.get("filename") or name, "", plan["plate"], gcode_path=gcode, preview_path=prev)
+    if res.get("filename") and res["filename"] != name:
+        remember_print(res["filename"], "", plan["plate"], gcode_path=gcode, preview_path=prev)
     print("Geplanter Druck gestartet: " + name, flush=True)
 
 

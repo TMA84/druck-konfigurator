@@ -425,18 +425,19 @@ function lvGhostApply() {
   lvRender();
 }
 
+const LV_RETRY_MS = 20000;
 async function lvLoad(name) {
   lv.name = name; lv.data = null; lv.missing = false; lv.loading = true;
   $('wbLiveNote').textContent = t('Lade 3D-Ansicht …'); $('wbLiveNote').classList.remove('hidden');
   try {
     const r = await fetch('api/printing/preview?name=' + encodeURIComponent(name));
     if (lv.name !== name) return;
-    if (!r.ok) { lv.missing = true; return; }
+    if (!r.ok) { lv.missing = true; lv.missingAt = Date.now(); return; }
     lv.data = parsePreview(await r.arrayBuffer());
     if (!lvInit()) { lv.missing = true; return; }
     lvResize(); lvBuild();
     if (typeof skDrawLines === 'function' && wb.st && wb.st.job) skDrawLines(new Set(wb.st.job.skipped || []));
-  } catch (e) { lv.missing = true; }
+  } catch (e) { lv.missing = true; lv.missingAt = Date.now(); }
   finally { lv.loading = false; if (wb.st) liveUpdate(wb.st); }
 }
 
@@ -451,7 +452,8 @@ function liveUpdate(st) {
     $('wbLiveInfo').textContent = '';
     return;
   }
-  if (job.name !== lv.name && !lv.loading) { lvLoad(job.name); return; }
+  // fehlte die Vorschau, alle 20 s erneut fragen (der Server legt sie beim Start ab – ein früher Abruf kam zu früh)
+  if (!lv.loading && (job.name !== lv.name || (lv.missing && Date.now() - (lv.missingAt || 0) > LV_RETRY_MS))) { lvLoad(job.name); return; }
   if (lv.loading) return;
   if (lv.missing || !lv.data) {
     $('wbLiveNote').textContent = t('Für diesen Druck gibt es keine 3D-Ansicht – sie steht nur für Drucke bereit, die aus dem Tool gestartet wurden.');
