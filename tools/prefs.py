@@ -12,9 +12,9 @@ import threading
 
 KEYS = ("ovDefaults",)
 MAX_ENTRIES = 200          # Drucker × Filamente
-MAX_FIELDS = 60
+MAX_FIELDS = 120         # alle Felder des Dialogs (berechnete und weitere Orca-Einstellungen)
 _KEY_RE = re.compile(r"^[\w.\-]{1,40}\|[\w.\-+ ]{1,60}$")
-_FIELD_RE = re.compile(r"^[a-z_]{1,24}$")
+_FIELD_RE = re.compile(r"^(x:)?[a-z_]{1,40}$")   # x:<orca_key> = weitere Orca-Einstellung (js/orca-extra.js)
 _lock = threading.Lock()
 
 

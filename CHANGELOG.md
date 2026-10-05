@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Neu
+- **Weitere Orca-Einstellungen anpassbar** (rund 30): Stützen-Typ und -Stil, Überhangwinkel, Abstände, Kontaktschichten, Grundmuster, Astdurchmesser; Elefantenfuß-Kompensation, Wandgenerator (Arachne), Wandreihenfolge, präzise Außenwand, Linienbreiten, Loch-/Konturkompensation; Bügeln, Oberflächenmuster, nur eine Wand oben; Brim-Art (Mausohren …), Skirt, Raft; Prime-Turm, Brücken-Tempo. Vorschlag = was ohne Eingabe gedruckt würde (Rechnung bzw. Druckerprofil), geschrieben nur, wenn gesetzt; auch als Standard merkbar.
+
 ### Behoben
 - **3D-Fortschritt fehlte bei geplanten Drucken (z. B. mit Vorwärmen):** Der Server legte Vorschau und Objekte erst nach dem Start ab; die Seite hatte da schon nachgefragt, „keine Vorschau“ bekommen und es nie wieder versucht. Jetzt legt der Server sie vor dem Start ab, und die Seite fragt alle 20 s erneut, solange sie fehlen (auch die Objektliste zum Überspringen).
 

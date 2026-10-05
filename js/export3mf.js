@@ -208,6 +208,8 @@ function plannedChanges(r, slot, liveSlots) {
     proc(t('Lückenfüllung'), 'gap_fill_target', 'everywhere');
     proc(t('Vertikale Schalendicke sicherstellen'), 'ensure_vertical_shell_thickness', 'ensure_all');
   }
+  // weitere Orca-Einstellungen (js/orca-extra.js): zuletzt – gewinnen gegen berechnete Werte (z. B. Stützen-Typ)
+  for (const [k, v] of Object.entries(r.extraOv || {})) proc(typeof ORCA_EXTRA_BY_KEY !== 'undefined' && ORCA_EXTRA_BY_KEY[k] ? t(ORCA_EXTRA_BY_KEY[k][1]) : k, k, v);
   return f.map(([label, key, value, index]) => ({ label, key, value, perSlot: index !== null, index }));
 }
 
@@ -287,7 +289,8 @@ function buildProjectSettings(tpl, r, slot, liveSlots, extra = [], machine = [])
    Travel und Erste-Schicht-Geschwindigkeit gelten für die ganze Platte und bleiben global. */
 const OBJECT_KEYS = new Set(['wall_loops', 'sparse_infill_density', 'sparse_infill_pattern', 'top_shell_layers', 'bottom_shell_layers',
   'outer_wall_speed', 'inner_wall_speed', 'sparse_infill_speed', 'internal_solid_infill_speed', 'top_surface_speed', 'gap_infill_speed',
-  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'brim_object_gap', 'seam_position', 'gap_fill_target', 'ensure_vertical_shell_thickness']);
+  'enable_support', 'raft_layers', 'brim_type', 'brim_width', 'brim_object_gap', 'seam_position',
+  'wall_sequence', 'ironing_type', 'top_surface_pattern', 'bottom_surface_pattern', 'only_one_wall_top', 'bridge_speed', 'gap_fill_target', 'ensure_vertical_shell_thickness']);
 const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(k);
 
 // Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config

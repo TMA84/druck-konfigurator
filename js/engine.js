@@ -296,6 +296,8 @@ function compute(I,geom,ctx){
     ['Heizbett',m.bed+' °C',esc(t(m.bedNote))],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
     mark(['max_vol'],['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s']),mark(['flow'],['Durchflussverhältnis',de(m.flow,2)])]
     .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
+  {const xo=typeof extraOverrides==='function'?extraOverrides(ov):{};const xk=Object.keys(xo);
+   if(xk.length)ordered.push(['Weitere Orca-Einstellungen',xk.map(k=>[ORCA_EXTRA_BY_KEY[k][1],esc(extraLabel(k,xo[k])),t(userSet('x:'+k)?'angepasst':'dein Standard'),true])])}
   ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],mark(['brim','brim_gap'],['Brim',t(brim)+(brim!=='Nicht nötig'?' · '+t('Abstand {g} mm',{g:de(brimGap,2)}):''),brimNote]),mark(['zhop'],['Z-Hop',de(m.zhop,1)+' mm']),['Erste Schicht beobachten',t('Ja')]]]);
   // Für diesen Auftrag angepasste Werte auch in der Slicer-Reihenfolge markieren (wie in der Übersicht)
   const ORDER_KEYS={'Schichthöhe':['layer'],'Wandlinien':['w'],'Obere Schichten':['t'],'Untere Schichten':['b'],'Fülldichte':['inf'],'Füllmuster':['pattern'],
@@ -334,5 +336,7 @@ function compute(I,geom,ctx){
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
     maxVol,firstLayer,nozzleFirst,brimGap,brim,seam,supZ,
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
-    suggested:sugg,changed,ovDefaults:myDef,defKey};
+    suggested:sugg,changed,ovDefaults:myDef,defKey,
+    // weitere Orca-Einstellungen (js/orca-extra.js), angepasst oder aus deinem Standard: {orca_key: Wert}
+    extraOv:typeof extraOverrides==='function'?extraOverrides(ov):{}};
 }

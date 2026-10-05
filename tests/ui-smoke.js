@@ -553,6 +553,16 @@ async function runSmoke(opts={}){
       const sg=lastResult.suggested;ok(keys.filter(k=>k!=='pa').every(k=>sg[k]!==undefined&&sg[k]!==null&&sg[k]!==''),'jeder Wert hat einen Vorschlag');
       const nz=$('ovRows').querySelector('[data-ov="nozzle"]');nz.value='300';nz.dispatchEvent(new Event('input',{bubbles:true}));
       ok(/Herstellerbereich/.test(nz.closest('.ov-row').textContent),'Warnung: Düse außerhalb des Herstellerbereichs');nz.value='';nz.dispatchEvent(new Event('input',{bubbles:true})); }
+    // Weitere Orca-Einstellungen: Stützen-Typ, Elefantenfuß – Vorschlag aus Rechnung bzw. Profil, geschrieben nur wenn gesetzt
+    { const st=$('ovRows').querySelector('[data-ov="x:support_type"]'),ef=$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]');
+      ok(!!st&&!!ef,'Werte anpassen: Stützen-Typ und Elefantenfuß-Kompensation');
+      ok(/0,075|0.075/.test(ef.closest('.ov-row').textContent),'Elefantenfuß: Vorschlag aus dem Profil (0,075 mm)');
+      const before=plannedChanges(lastResult,0).map(c=>c.key);ok(!before.includes('elefant_foot_compensation'),'ohne Eingabe nicht geschrieben');
+      st.value='normal(auto)';ef.value='0.15';$('ovSave').click();await wait(80);
+      const pc=plannedChanges(lastResult,0),last=k=>pc.filter(c=>c.key===k).pop();
+      ok(last('support_type')&&last('support_type').value==='normal(auto)'&&last('elefant_foot_compensation').value==='0.15','gesetzt: Stützen-Typ normal(auto), Elefantenfuß 0,15 im Export (zuletzt)');
+      ok($('orderedSettings').textContent.includes('Weitere Orca-Einstellungen'),'Orca-Reihenfolge: „Weitere Orca-Einstellungen“');
+      const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);$('ovOpen').click();await wait(50); }
     // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
     { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;

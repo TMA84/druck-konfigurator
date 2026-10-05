@@ -38,8 +38,25 @@ const OV_SCOPE = { layer: 'plate', first_layer: 'plate', sp_first: 'plate', sp_t
   max_vol: 'slot', flow: 'slot', pa: 'slot', zhop: 'slot', retr_len: 'slot', retr_speed: 'slot' };
 const ovSlotOf = q => q.slot ?? (typeof costDefaultSlot === 'function' ? costDefaultSlot() : 0);
 const ovPart = () => project && project.parts[project.selected];
+/* Alle Felder des Dialogs: berechnete Werte (OV_FIELDS) und weitere Orca-Einstellungen (js/orca-extra.js, Schlüssel „x:…“) */
+function ovFields() {
+  const extra = typeof ORCA_EXTRA === 'undefined' ? [] : ORCA_EXTRA.map(f => ['x:' + f[0], t(f[1]), f[3] || '', f[4], f[5], Array.isArray(f[6]) ? 0 : f[6], t(f[2]),
+    Array.isArray(f[6]) ? f[6].map(([v, l]) => [v, t(l)]) : undefined]);
+  return OV_FIELDS.concat(extra);
+}
+const ovScope = k => k.startsWith('x:') ? (typeof ORCA_EXTRA_BY_KEY !== 'undefined' && ORCA_EXTRA_BY_KEY[k.slice(2)] ? ORCA_EXTRA_BY_KEY[k.slice(2)][7] : 'object') : OV_SCOPE[k];
+/* Vorschlag für eine weitere Orca-Einstellung: was ohne Eingabe gedruckt würde – der berechnete Wert, wenn das Tool ihn
+   setzt (z. B. Stützen), sonst der Wert aus dem Druckerprofil */
+function extraSuggestion(r, key) {
+  try {
+    const own = plannedChanges({ ...r, extraOv: {} }, 0, null).filter(c => c.key === key && !c.perSlot).pop();
+    if (own) return own.value;
+    const tpl = exportTemplate(r.printer.id, r.dSel), v = tpl && tpl.settings ? tpl.settings[key] : undefined;
+    return Array.isArray(v) ? v[0] : v;
+  } catch (e) { return undefined; }
+}
 const ovCount = p => p && p.overrides ? Object.keys(p.overrides).length : 0;
-const ovFmt = (f, v) => f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
+const ovFmt = (f, v) => f[0].startsWith('x:') && typeof extraLabel === 'function' ? extraLabel(f[0].slice(2), v) : f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
 
 // Leiste über dem Datenblatt: Knopf, wie viele Werte angepasst sind, alle zurücknehmen
 function renderOverrideBar() {
@@ -56,15 +73,16 @@ function renderOverrideBar() {
 
 function openOverrideDialog(focusGroup) {
   const p = ovPart(), r = lastResult; if (!p || !r) return;
-  const sugg = r.suggested || {}, own = p.overrides || {}, def = r.ovDefaults || {};
+  const sugg = { ...(r.suggested || {}) }, own = p.overrides || {}, def = r.ovDefaults || {};
   let group = '';
-  $('ovRows').innerHTML = OV_FIELDS.filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
+  for (const f of ovFields()) if (f[0].startsWith('x:')) { const v = extraSuggestion(r, f[0].slice(2)); if (v !== undefined) sugg[f[0]] = /^-?\d+(\.\d+)?$/.test(String(v)) && !f[7] ? +v : String(v); }
+  $('ovRows').innerHTML = ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
     const head = grp !== group ? '<div class="ov-group">' + esc(grp) + '</div>' : ''; group = grp;
     const input = opts
       ? '<select data-ov="' + k + '"><option value="">' + t('– Vorschlag –') + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
       : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(def[k] ?? sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
-    const sc = project.parts.length > 1 ? OV_SCOPE[k] : null;
+    const sc = project.parts.length > 1 ? ovScope(k) : null;
     const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
     return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
       '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
@@ -113,7 +131,7 @@ $('ovClear').addEventListener('click', () => $('ovRows').querySelectorAll('[data
 // Eingaben des Dialogs → {Schlüssel: Wert} oder null (ungültige Eingabe gemeldet)
 function ovCollect() {
   const out = {}, bad = [];
-  for (const f of OV_FIELDS) {
+  for (const f of ovFields()) {
     const [k, label, , min, max, step, , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el ? el.value.trim() : '';
     if (!s) continue;
     if (opts) { out[k] = s; continue; }
@@ -132,8 +150,8 @@ $('ovSave').addEventListener('click', () => {
   const p = ovPart(), base = $('ovAll').checked ? project.parts : samePlacements(p), touched = new Set();
   for (const q of project.parts) {
     const next = { ...(q.overrides || {}) };
-    for (const f of OV_FIELDS) {
-      const k = f[0], sc = OV_SCOPE[k] || 'object';
+    for (const f of ovFields()) {
+      const k = f[0], sc = ovScope(k) || 'object';
       if (!(sc === 'plate' || base.includes(q) || (sc === 'slot' && ovSlotOf(q) === ovSlotOf(p)))) continue;
       const before = JSON.stringify(next[k]);
       if (k in out) next[k] = out[k]; else delete next[k];
