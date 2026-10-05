@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.17.0] – 2026-10-05
 
 ### Neu
 - **Weitere Orca-Einstellungen anpassbar** (rund 30): Stützen-Typ und -Stil, Überhangwinkel, Abstände, Kontaktschichten, Grundmuster, Astdurchmesser; Elefantenfuß-Kompensation, Wandgenerator (Arachne), Wandreihenfolge, präzise Außenwand, Linienbreiten, Loch-/Konturkompensation; Bügeln, Oberflächenmuster, nur eine Wand oben; Brim-Art (Mausohren …), Skirt, Raft; Prime-Turm, Brücken-Tempo. Vorschlag = was ohne Eingabe gedruckt würde (Rechnung bzw. Druckerprofil), geschrieben nur, wenn gesetzt; auch als Standard merkbar.
