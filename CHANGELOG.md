@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.18.1] – 2026-10-05
 
 ### Behoben
 - **Brim schloss Schriften und kleine Öffnungen:** Orca zieht den äußeren Brim auch um jede Insel in einem Durchbruch (das Innere von Buchstaben, Stege in Öffnungen) – mit der Orca-CLI nachgestellt. Neue Brim-Art „außen – Löcher und Schriften frei“ (Vorschlag): Teile mit Löchern in der ersten Schicht bekommen gesetzte Mausohren auf den Ecken des Außenumrisses (Orca „painted“, `Metadata/brim_ear_points.txt`), Ecken nahe an Löchern bleiben frei; geprüft: 0 Brim-Bahnen im Loch, runde Teile mit durchgehendem Rand. Ohne Löcher bleibt der normale Brim.
