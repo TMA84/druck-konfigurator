@@ -36,6 +36,16 @@ function currentInput(){
 
 // Kennwert-Kachel für die Übersicht; die ersten Zeilen (Temperaturen, Schichthöhe) sind hervorgehoben.
 const KEY_ROWS=['Düse','Heizbett','Schichthöhe / erste Schicht'];
+/* Vierte Karte: weitere Orca-Einstellungen (js/orca-extra.js) – die wichtigsten immer, dazu alles, was du gesetzt hast.
+   Wert = deine Anpassung (hervorgehoben) bzw. was ohne Eingabe gedruckt würde; anklicken öffnet den Dialog bei dem Wert. */
+const EXTRA_SHOWN=['support_type','support_style','elefant_foot_compensation','wall_generator','wall_sequence','ironing_type','brim_type','line_width'];
+function extraCard(r){
+  if(typeof ORCA_EXTRA==='undefined'||typeof extraSuggestion!=='function')return '';
+  const set=r.extraOv||{},keys=ORCA_EXTRA.map(f=>f[0]).filter(k=>k in set||(EXTRA_SHOWN.includes(k)&&(!/^support_(type|style)$/.test(k)||r.supOn)));
+  const cells=keys.map(k=>{const v=k in set?set[k]:extraSuggestion(r,k);if(v===undefined||v==='')return '';
+    return '<div class="spec-cell'+(k in set?' ov':'')+'" data-ovk="x:'+esc(k)+'"><span class="k">'+esc(t(ORCA_EXTRA_BY_KEY[k][1]))+'</span><span class="v">'+esc(extraLabel(k,v))+'</span></div>'}).join('');
+  return cells?'<section class="spec-group spec-extra"><h3 class="spec-title">'+esc(t('Weitere Orca-Einstellungen'))+(project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(t('Stützen'))+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+cells+'</div></section>':'';
+}
 function specCell(x){
   const h=helpFor(x[0],getMat($('material').value).kind);
   return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])?' key':'')+(x[3]?' ov':'')+'"><span class="k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
@@ -65,7 +75,7 @@ function update(){
   $('settings').innerHTML=SPEC_GROUPS.map(([title,keys])=>{const rows=r.rows.filter(x=>keys?keys.includes(x[0]):!known.has(x[0]));
     // „✎ anpassen“: Werte für diesen Auftrag, gleich beim passenden Abschnitt
     const ovGroup={[t('Temperatur & Kühlung')]:t('Temperatur'),[t('Tempo')]:t('Geschwindigkeit'),[t('Aufbau')]:t('Struktur')}[title];
-    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+(ovGroup&&project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(ovGroup)+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('');
+    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+(ovGroup&&project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(ovGroup)+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('')+extraCard(r);
   // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
   const oo=store.settings.orderOpen||{};
   $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
@@ -75,7 +85,7 @@ function update(){
   $('orderedSettings').classList.toggle('only-ov',$('orderedOnlyOv').checked);
   $('title').textContent=r.m.name+' – '+t(r.ob.label)+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
-    esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src))+' '+t('Düse: {noz}.',{noz:esc(r.nozLabel)});
+    esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src));
   orcaFilamentJson=buildOrcaFilamentJSON(r);
   orcaProcessJson=buildOrcaProcessJSON(r);
   $('orcaNote').innerHTML=orcaWarningText(r);
@@ -84,7 +94,7 @@ function update(){
   // Hinweise: Anzahl im Titel; offen, solange es etwas zu beachten gibt (Warnungen), sonst zu
   { const n=r.warn.length,s=$('hintsFold').querySelector('summary'); s.textContent=n?t('Hinweise ({n})',{n}):t('Hinweise');
     if(!$('hintsFold').dataset.touched)$('hintsFold').open=n>0; }
-  $('checks').innerHTML=t('<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse {noz} · Bett reinigen · erste Schicht beobachten',{noz:esc(r.nozLabel)})+(r.dryNeed&&r.m.dry?' · '+esc(t(r.m.dry)):'')+(geom?'<br>'+t('STL-Maße und Überhanganalyse ({th}°) wurden berücksichtigt.',{th:r.a.th}):'');
+  $('checks').innerHTML=t('<b>Vor dem Druck:</b> Filamentprofil prüfen · Düse {noz} · Bett reinigen · erste Schicht beobachten',{noz:esc(r.nozLabel)})+(r.dryNeed&&r.m.dry?' · '+esc(t(r.m.dry)):'');
   // Die Anleitung für den Slicer braucht nur, wer von Hand einstellt – der 3MF-Export trägt die Werte selbst ein
   $('supportGuide').innerHTML='<h3>'+t('Stützen-Empfehlung')+'</h3><b>'+esc(t(r.sup))+'</b><br>'+esc(r.supNeed)+
     '<details class="sup-howto"><summary>'+t('In {slicer} von Hand einstellen',{slicer:esc(r.printer.slicer)})+'</summary><p>'+
@@ -92,6 +102,8 @@ function update(){
       crit:r.supCritical?t('<i>nur kritische Bereiche</i> einschalten – stützt nur Spitzen und Auskragungen. Fehlen in der Vorschau Stützen unter normalen Überhängen, unter <b>Werte für diesen Auftrag anpassen</b> ausschalten.')
         :t('<i>nur kritische Bereiche</i> ausgeschaltet lassen – so stützt der Slicer auch normale Überhänge.')}):t('Im Slicer <i>Stützstrukturen aktivieren</i> ausgeschaltet lassen und in der Vorschau kurz kontrollieren, ob keine Bahnen frei in der Luft hängen.'))+
     '</p><p class="muted small">'+t('Beim 3MF-Export und beim Slicen im Tool sind diese Werte schon eingetragen.')+'</p></details>';
+  // keine Überhänge: die Zeile „Support“ in der Karte Aufbau genügt
+  $('supportGuide').classList.toggle('hidden',r.sup==='Nicht nötig');
   if(r.a){const txt=r.a.level==='none'?t('Keine relevanten Überhänge über {th}° (Bodenfläche ausgenommen).',{th:r.a.th}):t('Über {th}°: ca. {area} mm² ({pct} % der Oberfläche, Bodenfläche ausgenommen).',{th:r.a.th,area:de(r.a.flagged,0),pct:de(r.a.ratio*100,1)});document.querySelectorAll('.oh-info').forEach(el=>{el.textContent=txt})}
   lastResult=r;
   if(typeof renderPartList==='function')renderPartList();
@@ -378,6 +390,7 @@ const ROW_OV={'Düse':'nozzle','Heizbett':'bed','Lüfter':'fan','Lüfter Folgesc
 const ROW_OV_T=Object.fromEntries(Object.entries(ROW_OV).map(([k,v])=>[t(k),v]));
 ['settings','orderedSettings'].forEach(id=>$(id).addEventListener('click',e=>{
   if(e.target.closest('[data-ov-group],.help,a,button'))return;
+  const xc=e.target.closest('[data-ovk]');if(xc&&project&&typeof openOverrideDialog==='function'){openOverrideDialog({key:xc.dataset.ovk});return;}
   const row=e.target.closest('.setting'),b=row&&row.querySelector('b');if(!b||typeof openOverrideDialog!=='function'||!project)return;
   const key=ROW_OV_T[b.firstChild?b.firstChild.textContent.trim():''];if(key)openOverrideDialog({key});
 }));

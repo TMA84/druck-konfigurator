@@ -1158,3 +1158,11 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .ov-row.ov-focus { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .ov-row .ov-warn { grid-column: 1 / -1; color: var(--bad, #c0392b); font-size: 11.5px; }
 .ov-row .ov-scope { display: block; font-size: 10.5px; }
+
+/* Karte „Weitere Orca-Einstellungen“: ganze Breite, kompakte Werte, anklickbar */
+.spec-group.spec-extra { grid-column: 1 / -1; }
+.spec-extra .spec-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.spec-group.spec-extra .spec-cell .v { font-size: 15px; }
+#settings [data-ovk] { cursor: pointer; }
+#settings [data-ovk]:hover { background: var(--paper-2); }
+.spec-group .spec-cell.ov { padding-left: 9px; }

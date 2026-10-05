@@ -696,3 +696,8 @@ I18N.add({
  "angepasst": "adjusted",
  "dein Standard": "your default",
 });
+I18N.add({
+ "Ja – normale Stützen": "Yes – normal supports",
+ "Ja – wenige normale Stützen": "Yes – a few normal supports",
+ "Ja – normale Stützen (angepasst)": "Yes – normal supports (adjusted)",
+});

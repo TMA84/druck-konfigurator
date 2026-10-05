@@ -563,6 +563,10 @@ async function runSmoke(opts={}){
       ok(last('support_type')&&last('support_type').value==='normal(auto)'&&last('elefant_foot_compensation').value==='0.15','gesetzt: Stützen-Typ normal(auto), Elefantenfuß 0,15 im Export (zuletzt)');
       ok($('orderedSettings').textContent.includes('Weitere Orca-Einstellungen'),'Orca-Reihenfolge: „Weitere Orca-Einstellungen“');
       const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);$('ovOpen').click();await wait(50); }
+    // Karte „Weitere Orca-Einstellungen“: Elefantenfuß aus dem Profil, angepasst hervorgehoben, Klick öffnet den Dialog
+    { const c=$('settings').querySelector('[data-ovk="x:elefant_foot_compensation"]');ok(!!c&&/0[,.]075/.test(c.textContent)&&!c.classList.contains('ov'),'Druckwerte: Elefantenfuß 0,075 mm aus dem Profil');
+      $('ovDlg').close();c.click();await wait(50);ok($('ovDlg').open&&document.activeElement===$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]'),'Klick auf die Kachel: Dialog beim Wert');
+      $('ovDlg').close();$('ovOpen').click();await wait(50); }
     // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
     { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;

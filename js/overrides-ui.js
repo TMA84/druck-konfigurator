@@ -64,7 +64,7 @@ function renderOverrideBar() {
   $('ovOpen').disabled = !p;
   $('ovOpen').title = p ? '' : t('Zuerst ein Modell laden');
   const diff = r && r.changed ? r.changed.length : 0;
-  $('ovInfo').textContent = !p ? t('Zuerst ein Modell laden.') : n ? t(n > 1 ? '{n} Werte angepasst' : '{n} Wert angepasst', { n }) + (diff < n ? ' ' + t('({n} davon wie der Vorschlag)', { n: n - diff }) : '') + (project.parts.length > 1 ? ' – ' + t('für „{name}“', { name: p.name }) : '') : t('Vorschlag unverändert.');
+  $('ovInfo').textContent = !p ? t('Zuerst ein Modell laden.') : n ? t(n > 1 ? '{n} Werte angepasst' : '{n} Wert angepasst', { n }) + (diff < n ? ' ' + t('({n} davon wie der Vorschlag)', { n: n - diff }) : '') + (project.parts.length > 1 ? ' – ' + t('für „{name}“', { name: p.name }) : '') : '';
   $('ovReset').classList.toggle('hidden', !n);
   // eigene Standardwerte für dieses Filament (js/engine.js ovDefaults)
   const nDef = r && r.ovDefaults ? Object.keys(r.ovDefaults).length : 0;

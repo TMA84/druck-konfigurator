@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Druckwerte: Karte „Weitere Orca-Einstellungen“** – Stützen-Typ/-Stil (wenn gestützt wird), Elefantenfuß, Wandgenerator, Wandreihenfolge, Bügeln, Brim-Art, Linienbreite und alles, was du zusätzlich gesetzt hast; angepasste Werte hervorgehoben, Kachel anklicken öffnet den Dialog bei dem Wert.
+
+### Geändert
+- Weniger Hinweise in den Druckwerten: Düse (steht oben), „Vorschlag unverändert“, „STL-Maße … berücksichtigt“ entfallen; die Stützen-Empfehlung erscheint nur noch, wenn es Überhänge gibt.
+- Stützen-Typ „Normal“ heißt auch in der Karte Aufbau so (statt „Baumstützen“); angepasste Kacheln schneiden den Text nicht mehr an.
+
 ## [10.17.0] – 2026-10-05
 
 ### Neu
