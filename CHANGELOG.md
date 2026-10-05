@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.18.0] – 2026-10-05
 
 ### Neu
 - **Druckwerte: Karte „Weitere Orca-Einstellungen“** – Stützen-Typ/-Stil (wenn gestützt wird), Elefantenfuß, Wandgenerator, Wandreihenfolge, Bügeln, Brim-Art, Linienbreite und alles, was du zusätzlich gesetzt hast; angepasste Werte hervorgehoben, Kachel anklicken öffnet den Dialog bei dem Wert.
