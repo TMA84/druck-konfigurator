@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Brim fehlte an langen geraden Kanten** (und neben Schlitzen nahe am Rand): Orca rückt gesetzte Mausohren auf den nächsten Eckpunkt des Umrisses, solange „Brim am kompensierten Umriss“ an ist – Ohren auf Kanten landeten an Lochecken (im Orca-2.4.2-Quelltext nachgelesen). Für Teile mit gesetzten Ohren ist das jetzt aus, und die Ohren bilden eine dichte Kette entlang des ganzen Außenrands (bzw. Lochrands bei Brim innen). Neben Löchern werden die Ohren kleiner statt wegzufallen (mindestens 0,3 mm Abstand zum Loch). Mit der Orca-CLI geprüft: Rahmen und Platte mit Schlitz 2 mm vom Rand – alle Kanten mit Brim, 0 Bahnen im Loch/Schlitz.
+
 ## [10.19.0] – 2026-10-06
 
 ### Geändert

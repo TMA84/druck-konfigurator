@@ -778,7 +778,10 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
     const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], bt === 'no_brim' ? 0 : Number(bw), inner);
     if (!pts) return;
     ears.push({ id: i + 1, pts, r: Number(bw) || inner });
-    const own = [{ label: inner ? t('Brim: außen und in großen Löchern') : t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }];
+    const own = [{ label: inner ? t('Brim: außen und in großen Löchern') : t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false },
+      // sonst rückt Orca 2.4 jedes gesetzte Ohr auf den nächsten Eckpunkt des Umrisses (geprüft 2026-10-06: Ohren auf
+      // geraden Kanten landeten an Lochecken, der Brim fehlte auf den Kanten)
+      { label: t('Brim am kompensierten Umriss'), key: 'brim_use_efc_outline', value: '0', perSlot: false }];
     // nur innen: Orca begrenzt den inneren Brim auf brim_width – dann die Innenbreite
     if (bt === 'no_brim') own.push({ label: t('Brim-Breite'), key: 'brim_width', value: numStr(inner), perSlot: false });
     o.overrides = o.overrides.filter(c => !own.some(x => x.key === c.key)).concat(own);

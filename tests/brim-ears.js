@@ -23,7 +23,9 @@ check('kein Ohr näher als 5 mm am Loch', pts.every(p => Math.max(Math.abs(p[0])
 check('z knapp unter der Unterseite (Orca verwirft Ohren über dem Bett)', pts.every(p => Math.abs(p[2] - (-1.55)) < 1e-9));
 // Loch nahe am Rand: Ecken dort entfallen
 const near = brimEarPoints([vol(box(0, 0, 40, 2), box(0, 6, 40, 40), box(0, 2, 15, 6), box(25, 2, 40, 6))], [], C, 0, 5);
-check('Loch 2 mm vom Rand: keine Ohren in Lochnähe', near.every(p => !(p[1] < -10 && Math.abs(p[0]) < 12)), near);
+// Loch y −18…−14 (Objekt), Rand y −20: Ohren dort kleiner, sie reichen nicht ins Loch
+check('Loch 2 mm vom Rand: Ohren dort klein genug', near.every(p => !(p[1] < -10 && Math.abs(p[0]) < 12) || p[3] <= Math.hypot(Math.max(0, Math.abs(p[0]) - 5), Math.max(0, p[1] - -18, -14 - p[1])) - 0.4), near);
+check('Loch 2 mm vom Rand: dort trotzdem Brim (kleine Ohren)', near.some(p => p[1] < -10 && Math.abs(p[0]) < 12 && p[3] < 5), near);
 // vertiefte Beschriftung (negatives Teil) durch die Platte = Loch
 const neg = brimEarPoints([vol(box(0, 0, 40, 40))], [vol(box(15, 15, 25, 25, 4))], C, 0, 5);
 check('durchgehende Gravur zählt als Loch', Array.isArray(neg) && neg.length >= 4, neg);
@@ -33,7 +35,7 @@ const C2 = [30, 20, 1.5], inn = brimEarPoints(two, [], C2, 0, 5, 3), inR = (inn 
 check('innen: Ohren an den Ecken des großen Lochs', inR.length >= 4 && inR.every(p => p[0] + 30 >= 4.5 && p[0] + 30 <= 25.5 && p[1] + 20 >= 9.5 && p[1] + 20 <= 30.5), inR);
 check('innen: nichts am kleinen Loch', !(inn || []).some(p => Math.abs(p[0] + 30 - 42) < 4 && Math.abs(p[1] + 20 - 20) < 4));
 check('außen weiter mit Brim-Breite', (inn || []).some(p => p[3] === 5));
-check('ohne Innenbreite: kein innerer Brim', !(brimEarPoints(two, [], C2, 0, 5, 0) || []).some(p => p[3] !== 5));
+check('ohne Innenbreite: kein innerer Brim (alle Ohren am Außenrand)', (brimEarPoints(two, [], C2, 0, 5, 0) || []).every(p => Math.abs(Math.abs(p[0]) - 30) < 0.6 || Math.abs(Math.abs(p[1]) - 20) < 0.6));
 check('Insel im Loch: dort kein innerer Brim', !(brimEarPoints([frame, island], [], C, 0, 5, 1.5) || []).some(p => p[3] === 1.5));
 const only = brimEarPoints(two, [], C2, 0, 0, 3);
 check('nur innen: Ohren nur im großen Loch', only && only.length >= 3 && only.every(p => p[3] === 3 && p[0] + 30 > 4 && p[0] + 30 < 26), only);

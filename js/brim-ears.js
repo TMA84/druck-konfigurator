@@ -4,11 +4,13 @@
    (mit der Orca-CLI geprüft: 10-mm-Loch mit Insel, Brim 5 mm → 167 Brim-Bahnpunkte im Loch).
    Abhilfe: Brim-Art „painted“ mit gesetzten Mausohren (Metadata/brim_ear_points.txt, Format 0: „object_id=k|x y z r …“
    in Objektkoordinaten) auf den Ecken des Außenumrisses der ersten Schicht (bei runden Umrissen fast durchgehend);
-   Ecken, die näher als der Ohrradius an einem Loch liegen, entfallen (geprüft: 0 Brim-Bahnen im Loch).
+   nahe an Löchern werden die Ohren kleiner (es bleiben mindestens 0,3 mm zum Loch; kleinstes Ohr 1 mm), damit sie nicht hineinreichen.
    Erste Schicht: Schnitt 0,1 mm über der Unterseite, gerastert (0,25 mm); Löcher = leere Flächen, die nicht nach außen
    offen sind. Vertiefte Beschriftung (negative Teile) wird abgezogen. */
 const EAR_CELL_MM = 0.25;
 const EAR_Z_BELOW_MM = 0.05;
+const EAR_MIN_MM = 1;     // kleinstes Ohr nahe an Löchern
+const EAR_LINE_MM = 0.4;  // Linienabstand, den Orca vom Ohrradius abzieht
 
 // Schnitt der Dreiecke (pos: 9 Werte je Dreieck) mit der Ebene z → Strecken [x1,y1,x2,y2]
 function sectionSegments(pos, z) {
@@ -107,9 +109,9 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
         if (pp < 0) continue; if (out[pp]) touches = true; if (m[pp] && fid[pp] < 0) { fid[pp] = p0; comp.push(pp); } } }
     if (!touches) for (const p of comp) isl[p] = 1;
   }
-  // Ohren nur auf Ecken des Außenumrisses: Orca 2.4.2 setzt ein Ohr auf die nächstgelegene Umrissecke (geprüft: ein Punkt
-  // mitten auf einer Kante landete an der Ecke eines Lochs). Ecken = Endpunkte der Schnittstrecken; schärfste zuerst,
-  // dann im Abstand r/2 ausgedünnt (auf Rundungen eine fast durchgehende Kette); Ecken näher als r an einem Loch entfallen.
+  // Ohrenkette: Ecken des Umrisses zuerst (Schärfe als Vorrang), dann Randzellen dazwischen. Orca setzt die Ohren genau
+  // dorthin, solange „Brim am kompensierten Umriss“ aus ist (sonst rückt es sie auf den nächsten Eckpunkt – build3mfFiles
+  // schaltet es für diese Teile ab).
   const corners = new Map(), vk = (x, y) => Math.round(x * 100) + ',' + Math.round(y * 100);
   for (const [ax, ay, bx, by] of all) {
     const d = [bx - ax, by - ay], l = Math.hypot(d[0], d[1]) || 1;
@@ -118,35 +120,45 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
     }
   }
   const cell = (x, y) => { const i = Math.floor((x - x0) / c), j = Math.floor((y - y0) / c); return i < 0 || j < 0 || i >= w || j >= h ? -1 : j * w + i; };
+  const nb4 = p => { const i = p % w, j = (p - i) / w; return [i > 0 ? p - 1 : -1, i < w - 1 ? p + 1 : -1, j > 0 ? p - w : -1, j < h - 1 ? p + w : -1]; };
+  const near = (p, test, rr) => { const i = p % w, j = (p - i) / w; for (let dj = -rr; dj <= rr; dj++) for (let di = -rr; di <= rr; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < w && jj < h && test(jj * w + ii)) return jj * w + ii; } return -1; };
   const cand = [], innerCand = [];
+  const consider = (x, y, p, prio) => {
+    if (!m[p] && near(p, q => m[q], 1) < 0) return;
+    if (near(p, q => out[q], 2) >= 0) {
+      if (!(r > 0)) return;
+      // nahe an einem Loch: kleineres Ohr (reicht nicht ins Loch), unter 1 mm keins
+      // Orca zieht vom Radius eine Linienbreite ab (size_ear = Radius − Abstand − Linienabstand); 0,3 mm bleiben zum Loch frei
+      const rad = Math.min(r, Math.floor((dist[p] * c + EAR_LINE_MM - 0.3) * 2) / 2);
+      if (rad >= EAR_MIN_MM) cand.push([x, y, prio, rad]);
+      return;
+    }
+    // Lochrand: innerer Brim, wenn das Loch groß genug ist und im Ohr keine Insel / kein anderes Loch liegt
+    if (!(inner > 0) || isl[p]) return;
+    const hc = near(p, q => hid[q] >= 0, 2); if (hc < 0) return;
+    const own = hid[hc]; if (holeR[own] < 1.5 * inner) return;
+    const R = Math.ceil((inner + 0.5) / c), i = p % w, j = (p - i) / w;
+    for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
+      if (di * di + dj * dj > R * R) continue; const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue;
+      const pp = jj * w + ii; if (isl[pp] || (hid[pp] >= 0 && hid[pp] !== own)) return;
+    }
+    innerCand.push([x, y, prio, inner]);
+  };
   for (const v of corners.values()) {
     const p = cell(v.x, v.y); if (p < 0) continue;
-    const i = p % w, j = (p - i) / w;
-    let outside = false, nearHole = false;
-    for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < w && jj < h && out[jj * w + ii]) outside = true; }
-    // Schärfe: 1 − cos des Winkels zwischen den beiden Kanten (gerade Fortsetzung = 0, Spitze = 2)
+    // Schärfe: 1 − cos des Winkels zwischen den beiden Kanten (gerade Fortsetzung = 0, Spitze = 2); Ecken vor Randzellen
     const [d1, d2] = v.dirs; const sharp = d1 && d2 ? 1 + (d1[0] * d2[0] + d1[1] * d2[1]) : 0;
-    if (!outside) {
-      // Lochecke: innerer Brim, wenn das Loch groß genug ist und im Ohr keine Insel / kein anderes Loch liegt
-      if (!(inner > 0) || isl[p]) continue;
-      let own = -1;
-      for (let dj = -2; dj <= 2 && own < 0; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < w && jj < h && hid[jj * w + ii] >= 0) { own = hid[jj * w + ii]; break; } }
-      if (own < 0 || holeR[own] < 1.5 * inner) continue;
-      const R = Math.ceil((inner + 0.5) / c); let ok = true;
-      for (let dj = -R; dj <= R && ok; dj++) for (let di = -R; di <= R; di++) {
-        if (di * di + dj * dj > R * R) continue; const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue;
-        const pp = jj * w + ii; if (isl[pp] || (hid[pp] >= 0 && hid[pp] !== own)) { ok = false; break; }
-      }
-      if (ok) innerCand.push([v.x, v.y, sharp]);
-      continue;
-    }
-    if (!(r > 0) || dist[p] * c < r + 0.5) nearHole = true;
-    if (nearHole) continue;
-    cand.push([v.x, v.y, sharp]);
+    if (sharp > 0.05) consider(v.x, v.y, p, 1 + sharp);
   }
-  const pts = [], thin = (list, rad) => { list.sort((a, b) => b[2] - a[2]); const step = Math.max(c, rad / 2);
-    for (const [x, y] of list) if (!pts.some(q => q[3] === rad && Math.hypot(q[0] - x, q[1] - y) < step)) pts.push([x, y, 0, rad]); };
-  if (r > 0) thin(cand, r); if (inner > 0) thin(innerCand, inner);
+  for (let p = 0; p < N; p++) {
+    if (!m[p] || !nb4(p).some(q => q >= 0 && !m[q])) continue;
+    const i = p % w, j = (p - i) / w; consider(x0 + (i + 0.5) * c, y0 + (j + 0.5) * c, p, 0);
+  }
+  // ausdünnen: schärfste Ecken zuerst, Abstand halber Radius (der kleinere von beiden)
+  const pts = [], thin = (list, kind) => { list.sort((a, b) => b[2] - a[2]); const acc = [];
+    for (const [x, y, , rad] of list) if (!acc.some(q => Math.hypot(q[0] - x, q[1] - y) < Math.max(c, Math.min(rad, q[3]) / 2))) acc.push([x, y, kind, rad]);
+    pts.push(...acc); };
+  thin(cand, 'o'); if (inner > 0) thin(innerCand, 'i');
   // z etwas unter der Unterseite: Orca verwirft Ohren mit Weltkoordinate z > 0, und die Rundung auf 4 Stellen konnte sonst
   // knapp darüber landen (2026-10-06: Teil 2,667 mm hoch → z = +0,00004 → gar kein Brim, nur mit Raft)
   return pts.length ? pts.map(([x, y, , rad]) => [x - center[0], y - center[1], mnZ - center[2] - EAR_Z_BELOW_MM, rad]) : null;
