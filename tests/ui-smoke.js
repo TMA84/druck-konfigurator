@@ -571,7 +571,10 @@ async function runSmoke(opts={}){
     { const b=$('ovRows').querySelector('[data-ov="brim"]'),k=$('ovRows').querySelector('[data-ov="brim_kind"]');
       ok(!!k&&!$('ovRows').querySelector('[data-ov="x:brim_type"]'),'Brim-Art einmal (neben Brim), nicht doppelt');
       ok(b&&k&&b.closest('.ov-row').nextElementSibling===k.closest('.ov-row'),'Brim-Art direkt unter Brim');
-      ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: außen – Löcher und Schriften frei'); }
+      ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: außen – Löcher und Schriften frei');
+      const bi=$('ovRows').querySelector('[data-ov="brim_inner"]');
+      ok(bi&&bi.tagName==='SELECT'&&[...bi.options].map(o=>o.value).join()===',0,2,3,5','Brim innen: Auswahl aus / 2 / 3 / 5 mm');
+      ok(/große Löcher/.test(bi.closest('.ov-row').textContent)&&/Vorschlag aus/.test(bi.closest('.ov-row').textContent),'Brim innen: nur große Löcher, Vorschlag aus'); }
     // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
     { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;

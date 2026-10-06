@@ -49,7 +49,7 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
   const z = mnZ + 0.1, c = EAR_CELL_MM;
   const pos = vols.map(v => sectionSegments(v.pos, z)), neg = (negs || []).map(v => sectionSegments(v.pos, z));
   const all = pos.flat();
-  if (!all.length || !(r > 0)) return null;
+  if (!all.length || !(r > 0 || inner > 0)) return null;
   let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity;
   for (const [ax, ay, bx, by] of all) { mnx = Math.min(mnx, ax, bx); mny = Math.min(mny, ay, by); mxx = Math.max(mxx, ax, bx); mxy = Math.max(mxy, ay, by); }
   const pad = 2 * c, x0 = mnx - pad, y0 = mny - pad, w = Math.ceil((mxx - mnx + 2 * pad) / c), h = Math.ceil((mxy - mny + 2 * pad) / c);
@@ -140,13 +140,13 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
       if (ok) innerCand.push([v.x, v.y, sharp]);
       continue;
     }
-    if (dist[p] * c < r + 0.5) nearHole = true;
+    if (!(r > 0) || dist[p] * c < r + 0.5) nearHole = true;
     if (nearHole) continue;
     cand.push([v.x, v.y, sharp]);
   }
   const pts = [], thin = (list, rad) => { list.sort((a, b) => b[2] - a[2]); const step = Math.max(c, rad / 2);
     for (const [x, y] of list) if (!pts.some(q => q[3] === rad && Math.hypot(q[0] - x, q[1] - y) < step)) pts.push([x, y, 0, rad]); };
-  thin(cand, r); if (inner > 0) thin(innerCand, inner);
+  if (r > 0) thin(cand, r); if (inner > 0) thin(innerCand, inner);
   // z etwas unter der Unterseite: Orca verwirft Ohren mit Weltkoordinate z > 0, und die Rundung auf 4 Stellen konnte sonst
   // knapp darüber landen (2026-10-06: Teil 2,667 mm hoch → z = +0,00004 → gar kein Brim, nur mit Raft)
   return pts.length ? pts.map(([x, y, , rad]) => [x - center[0], y - center[1], mnZ - center[2] - EAR_Z_BELOW_MM, rad]) : null;

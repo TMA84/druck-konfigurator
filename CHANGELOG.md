@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Brim innen als eigene Auswahl** (aus / 2 / 3 / 5 mm, Vorschlag aus) statt Brim-Art „außen und in großen Löchern“ plus Zahlenfeld: gilt nur für große Löcher (mindestens dreifache Breite), kleine Löcher, Schlitze, Schriften und Inseln bleiben frei; auch ohne äußeren Brim möglich. Frühere Einstellungen werden übernommen. Mit der Orca-CLI geprüft (20-mm-Loch mit Brim, 4-mm-Loch frei, nur innen ohne Außenrand).
+
 ## [10.18.2] – 2026-10-06
 
 ### Behoben

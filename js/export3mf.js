@@ -772,13 +772,16 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
   // Außenrand (js/brim-ears.js) – sonst zieht Orca den Brim um Inseln in den Öffnungen und schließt sie
   const ears = [];
   objs.forEach((o, i) => {
-    const pr = items[i].r || r, [bt, bw] = orcaBrim(pr.brim);
-    if (bt === 'no_brim' || (pr.brimKind && !['auto', 'inner'].includes(pr.brimKind)) || typeof brimEarPoints !== 'function') return;
+    const pr = items[i].r || r, [bt, bw] = orcaBrim(pr.brim), inner = Number(pr.brimInner) || 0;
+    if ((bt === 'no_brim' && !inner) || (pr.brimKind && pr.brimKind !== 'auto') || typeof brimEarPoints !== 'function') return;
     const g = o.g, center = [(g.mn[0] + g.mx[0]) / 2, (g.mn[1] + g.mx[1]) / 2, (g.mn[2] + g.mx[2]) / 2];
-    const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], Number(bw), pr.brimKind === 'inner' ? Number(pr.brimInner) || 0 : 0);
+    const pts = brimEarPoints(o.vols, o.mods.filter(m => m.subtype === 'negative_part'), center, g.mn[2], bt === 'no_brim' ? 0 : Number(bw), inner);
     if (!pts) return;
-    ears.push({ id: i + 1, pts, r: Number(bw) });
-    o.overrides = o.overrides.filter(c => c.key !== 'brim_type').concat([{ label: pr.brimKind === 'inner' ? t('Brim: außen und in großen Löchern') : t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }]);
+    ears.push({ id: i + 1, pts, r: Number(bw) || inner });
+    const own = [{ label: inner ? t('Brim: außen und in großen Löchern') : t('Brim: außen, Löcher und Schriften frei'), key: 'brim_type', value: 'painted', perSlot: false }];
+    // nur innen: Orca begrenzt den inneren Brim auf brim_width – dann die Innenbreite
+    if (bt === 'no_brim') own.push({ label: t('Brim-Breite'), key: 'brim_width', value: numStr(inner), perSlot: false });
+    o.overrides = o.overrides.filter(c => !own.some(x => x.key === c.key)).concat(own);
   });
   const objectChanges = objs.filter(o => o.overrides.length).map(o => ({ name: o.g.name, changes: o.overrides }));
   const files = {

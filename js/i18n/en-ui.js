@@ -714,3 +714,7 @@ I18N.add({
  "innen {w} mm": "inside {w} mm",
  "Brim: außen und in großen Löchern": "Brim: outer and in large holes",
 });
+I18N.add({
+ "Brim innen (nur große Löcher)": "Inner brim (large holes only)",
+ "innen {w} mm (nur große Löcher)": "inside {w} mm (large holes only)",
+});

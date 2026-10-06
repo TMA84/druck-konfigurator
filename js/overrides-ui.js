@@ -29,7 +29,7 @@ const OV_FIELDS = [
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
   ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS],
   ['brim_kind', t('Brim-Art'), '', 0, 0, 0, t('Kühlung & Haftung'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
-  ['brim_inner', t('Brim-Breite innen'), 'mm', 1, 10, 0.5, t('Kühlung & Haftung')],
+  ['brim_inner', t('Brim innen (nur große Löcher)'), '', 0, 0, 0, t('Kühlung & Haftung'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
   ['brim_gap', t('Brim-Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Kühlung & Haftung')]
 ];
 /* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte

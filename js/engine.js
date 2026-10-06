@@ -1,6 +1,8 @@
 'use strict';
 // Brim-Arten (Werte für diesen Auftrag): auto = außen, Löcher/Schriften frei (gesetzte Mausohren, js/brim-ears.js)
-const BRIM_KINDS={auto:'außen – Löcher und Schriften frei',outer:'außen ringsum (Orca, auch um Inseln in Löchern)',ears:'Mausohren an den Ecken',inner:'außen und in großen Löchern'};
+const BRIM_KINDS={auto:'außen – Löcher und Schriften frei',outer:'außen ringsum (Orca, auch um Inseln in Löchern)',ears:'Mausohren an den Ecken'};
+// Brim innen (eigene Auswahl): nur in großen Löchern, kleine Löcher und Schriften bleiben frei (js/brim-ears.js)
+const BRIM_INNER=[['0','aus'],['2','2 mm'],['3','3 mm'],['5','5 mm']];
 /* Rechenkern – aus v4 übernommen. Einziger Unterschied: Eingaben kommen als
    Parameter statt aus dem DOM, damit tests/compare-v4.js ihn gegen v4 prüfen kann. */
 
@@ -234,12 +236,12 @@ function compute(I,geom,ctx){
   if(has('brim')){brim=ov.brim;brimNote=''}
   // Brim-Art (2026-10-05): „auto“ = außen, Löcher und Schriften bleiben frei (js/brim-ears.js); ältere Anpassung x:brim_type übernehmen
   sugg.brim_kind='auto';
-  const oldKind={outer_only:'outer',brim_ears:'ears',outer_and_inner:'inner'}[ov['x:brim_type']];
-  const brimKind=has('brim_kind')?ov.brim_kind:oldKind||'auto';
-  // Brim innen (nur bei „außen und in großen Löchern“): eigene Breite, Vorschlag höchstens 3 mm
-  const brimW=Number((/^(\d+(?:[.,]\d+)?)/.exec(brim)||[0,0])[1].toString().replace(',','.'))||0;
-  sugg.brim_inner=Math.min(3,brimW||3);
-  const brimInner=has('brim_inner')?+ov.brim_inner:sugg.brim_inner;
+  // ältere Anpassungen übernehmen: x:brim_type (10.17) und Brim-Art „außen und in großen Löchern“ (10.18.1)
+  const oldKind={outer_only:'outer',brim_ears:'ears'}[ov['x:brim_type']];
+  const wasInner=ov.brim_kind==='inner'||ov['x:brim_type']==='outer_and_inner';
+  const brimKind=has('brim_kind')&&ov.brim_kind!=='inner'?ov.brim_kind:oldKind||'auto';
+  sugg.brim_inner='0';
+  const brimInner=has('brim_inner')?(+ov.brim_inner||0):wasInner?3:0;
 
   // Naht
   const round=['tire','dumpling','case','decor','overhang'].includes(o);
@@ -261,7 +263,7 @@ function compute(I,geom,ctx){
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
     mark(['fan'],['Lüfter',m.fan+' %',fanNote]),
     ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',S1P.box<=20?t('Gehäuse warm halten ({kind})',{kind:KIND_LABEL[m.kind]||m.kind}):''])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
-    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim','brim_kind'],['Brim',t(brim),brim!=='Nicht nötig'&&brimKind!=='auto'?t(BRIM_KINDS[brimKind]||'')+(brimKind==='inner'?' · '+t('innen {w} mm',{w:de(brimInner,1)}):''):brimNote])
+    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim','brim_kind','brim_inner'],['Brim',t(brim),[brim!=='Nicht nötig'&&brimKind!=='auto'?t(BRIM_KINDS[brimKind]||''):'',brimInner>0&&brimKind==='auto'?t('innen {w} mm (nur große Löcher)',{w:de(brimInner,1)}):''].filter(Boolean).join(' · ')||brimNote])
   ];
 
   const supZ=supportZGap(layer,m.kind,tpu);
