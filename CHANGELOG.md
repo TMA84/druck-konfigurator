@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.18.2] – 2026-10-06
 
 ### Behoben
 - **Kein Brim (nur mit Raft):** Die gesetzten Mausohren lagen je nach Teilhöhe durch Rundung minimal über dem Bett (z. B. +0,00004 mm bei 2,667 mm Höhe) – Orca verwirft solche Ohren, es gab gar keinen Brim. Die Ohren liegen jetzt 0,05 mm unter der Unterseite; mit der Orca-CLI nachgestellt und geprüft.
