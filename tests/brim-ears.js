@@ -20,7 +20,7 @@ check('Rahmen mit Insel: Ohren gesetzt', Array.isArray(pts) && pts.length >= 4, 
 check('alle Ohren am Außenrand (|x| oder |y| ≈ 20)', pts.every(p => Math.abs(Math.abs(p[0]) - 20) < 0.6 || Math.abs(Math.abs(p[1]) - 20) < 0.6), pts);
 check('alle vier Außenecken', [[-20, -20], [20, -20], [20, 20], [-20, 20]].every(([x, y]) => pts.some(p => Math.hypot(p[0] - x, p[1] - y) < 0.6)));
 check('kein Ohr näher als 5 mm am Loch', pts.every(p => Math.max(Math.abs(p[0]), Math.abs(p[1])) - 5 > 5));
-check('z = Unterseite (Objektkoordinaten)', pts.every(p => p[2] === -1.5));
+check('z knapp unter der Unterseite (Orca verwirft Ohren über dem Bett)', pts.every(p => Math.abs(p[2] - (-1.55)) < 1e-9));
 // Loch nahe am Rand: Ecken dort entfallen
 const near = brimEarPoints([vol(box(0, 0, 40, 2), box(0, 6, 40, 40), box(0, 2, 15, 6), box(25, 2, 40, 6))], [], C, 0, 5);
 check('Loch 2 mm vom Rand: keine Ohren in Lochnähe', near.every(p => !(p[1] < -10 && Math.abs(p[0]) < 12)), near);

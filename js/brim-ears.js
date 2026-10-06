@@ -8,6 +8,7 @@
    Erste Schicht: Schnitt 0,1 mm über der Unterseite, gerastert (0,25 mm); Löcher = leere Flächen, die nicht nach außen
    offen sind. Vertiefte Beschriftung (negative Teile) wird abgezogen. */
 const EAR_CELL_MM = 0.25;
+const EAR_Z_BELOW_MM = 0.05;
 
 // Schnitt der Dreiecke (pos: 9 Werte je Dreieck) mit der Ebene z → Strecken [x1,y1,x2,y2]
 function sectionSegments(pos, z) {
@@ -146,7 +147,9 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
   const pts = [], thin = (list, rad) => { list.sort((a, b) => b[2] - a[2]); const step = Math.max(c, rad / 2);
     for (const [x, y] of list) if (!pts.some(q => q[3] === rad && Math.hypot(q[0] - x, q[1] - y) < step)) pts.push([x, y, 0, rad]); };
   thin(cand, r); if (inner > 0) thin(innerCand, inner);
-  return pts.length ? pts.map(([x, y, , rad]) => [x - center[0], y - center[1], mnZ - center[2], rad]) : null;
+  // z etwas unter der Unterseite: Orca verwirft Ohren mit Weltkoordinate z > 0, und die Rundung auf 4 Stellen konnte sonst
+  // knapp darüber landen (2026-10-06: Teil 2,667 mm hoch → z = +0,00004 → gar kein Brim, nur mit Raft)
+  return pts.length ? pts.map(([x, y, , rad]) => [x - center[0], y - center[1], mnZ - center[2] - EAR_Z_BELOW_MM, rad]) : null;
 }
 
 // Inhalt von Metadata/brim_ear_points.txt: [{id: Objektindex 1-basiert, pts: [[x,y,z,radius?]], r: Radius, wo pts keinen hat}]
