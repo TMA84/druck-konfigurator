@@ -39,6 +39,11 @@ check('ohne Innenbreite: kein innerer Brim (alle Ohren am Außenrand)', (brimEar
 check('Insel im Loch: dort kein innerer Brim', !(brimEarPoints([frame, island], [], C, 0, 5, 1.5) || []).some(p => p[3] === 1.5));
 const only = brimEarPoints(two, [], C2, 0, 0, 3);
 check('nur innen: Ohren nur im großen Loch', only && only.length >= 3 && only.every(p => p[3] === 3 && p[0] + 30 > 4 && p[0] + 30 < 26), only);
+const all = brimEarPoints(two, [], C2, 0, 5, 3, 'all'), smallE = (all || []).filter(p => Math.abs(p[0] + 30 - 42) < 3 && Math.abs(p[1] + 20 - 20) < 3);
+check('alle Löcher: auch das 4-mm-Loch bekommt Ohren', smallE.length > 0, all);
+check('alle Löcher: Ohren im 4-mm-Loch klein genug, Mitte bleibt frei', smallE.every(p => p[3] - 0.4 < 2 - 0.25), smallE);
+const cor = brimEarPoints(two, [], C2, 0, 5, 3, 'corners'), corBig = (cor || []).filter(p => p[0] + 30 > 4 && p[0] + 30 < 26 && p[1] + 20 > 9 && p[1] + 20 < 31 && p[3] <= 3);
+check('nur Lochecken: im großen Loch nur an den 4 Ecken', corBig.length === 4, corBig);
 const f = brimEarFile([{ id: 1, pts: [[-20, -20, -1.5]], r: 5 }]);
 check('Datei im Orca-Format 0', f === 'brim_points_format_version=0\nobject_id=1|-20.0000 -20.0000 -1.5000 5.0000\n', JSON.stringify(f));
 console.log(passed + '/' + (passed + failed) + ' bestanden');

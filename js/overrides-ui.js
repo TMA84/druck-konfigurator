@@ -31,7 +31,8 @@ const OV_FIELDS = [
   // Brim (2026-10-07): außen und innen getrennt an/aus, Form außen, Abstand; darunter, was in Orca geschrieben wird (ovBrimInfo)
   ['brim', t('Brim außen'), '', 0, 0, 0, t('Brim'), OV_BRIMS.map(([v, l]) => [v, t(l)])],
   ['brim_kind', t('Form außen'), '', 0, 0, 0, t('Brim'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
-  ['brim_inner', t('Brim innen (nur große Löcher)'), '', 0, 0, 0, t('Brim'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
+  ['brim_inner', t('Brim innen'), '', 0, 0, 0, t('Brim'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
+  ['brim_inner_kind', t('Form innen'), '', 0, 0, 0, t('Brim'), Object.entries(BRIM_INNER_KINDS).map(([v, l]) => [v, t(l)])],
   ['brim_gap', t('Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Brim')]
 ];
 /* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte
@@ -134,17 +135,25 @@ function ovBrimInfo() {
   const box = $('ovBrimInfo'); if (!box) return;
   const val = k => { const el = $('ovRows').querySelector('[data-ov="' + k + '"]'); return el && el.value !== '' ? el.value : ovBrimSugg[k]; };
   const outer = String(val('brim') || 'Nicht nötig'), w = Number((/^(\d+(?:[.,]\d+)?)/.exec(outer) || [0, 0])[1].toString().replace(',', '.')) || 0;
-  const kind = val('brim_kind') || 'auto', inner = Number(val('brim_inner')) || 0, gap = val('brim_gap'), holes = ovBrimHasHoles();
+  const kind = val('brim_kind') || 'auto', inner = Number(val('brim_inner')) || 0, ik = val('brim_inner_kind') || 'large', gap = val('brim_gap'), holes = ovBrimHasHoles();
   const code = s => '<code>' + esc(s) + '</code>', lines = [];
+  const innerTxt = { large: t('innen: Ohrenkette {w} mm nur in Löchern ab {min} mm Weite; kleine Löcher, Schlitze und Schriften bleiben frei', { w: de(inner, 0), min: de(inner * 3, 0) }),
+    all: t('innen: Ohrenkette bis {w} mm in allen Löchern, in kleinen Löchern kleiner – die Mitte bleibt frei', { w: de(inner, 0) }),
+    corners: t('innen: Ohren bis {w} mm nur an Lochecken, in kleinen Löchern kleiner', { w: de(inner, 0) }) }[ik];
   if (!w && !inner) lines.push(t('Kein Brim:') + ' ' + code('brim_type = no_brim'));
+  else if (inner && ik === 'orca') {
+    lines.push(code('brim_type = ' + (w ? 'outer_and_inner' : 'inner_only')) + ' · ' + code('brim_width = ' + String(w || inner)) + ' – ' + t('Orca füllt jedes Loch bis zur Brim-Breite: kleine Löcher, Schlitze und Schriften laufen zu'));
+    if (w && kind !== 'outer') lines.push(t('außen: Orcas Brim ringsum (die Form außen gilt hier nicht)'));
+    if (w && inner !== w) lines.push(t('Orca kennt nur eine Brim-Breite – es gilt {w} mm für außen und innen', { w: de(w, 0) }));
+  }
   else if (kind === 'auto' && holes) {
     lines.push(t('Dieses Teil hat Löcher oder Schriften in der ersten Schicht →') + ' ' + code('brim_type = painted') + ' · ' + code('brim_use_efc_outline = 0') + ' · ' + t('gesetzte Ohren in {f}', { f: code('brim_ear_points.txt') }));
     if (w) lines.push(t('außen: Ohrenkette {w} mm entlang des Außenrands, neben Löchern kleiner', { w: de(w, 0) }));
-    if (inner) lines.push(t('innen: Ohrenkette {w} mm nur in Löchern ab {min} mm Weite; kleine Löcher, Schlitze und Schriften bleiben frei', { w: de(inner, 0), min: de(inner * 3, 0) }));
+    if (inner) lines.push(innerTxt);
   } else {
     if (w) lines.push(code('brim_type = ' + (kind === 'ears' ? 'brim_ears' : 'outer_only')) + ' · ' + code('brim_width = ' + de(w, 0).replace(',', '.')) +
       (kind === 'outer' ? ' – ' + t('zieht den Brim auch um Inseln in Löchern') : kind === 'ears' ? ' – ' + t('Orca setzt Ohren an spitze Ecken') : ' – ' + t('keine Löcher: normaler Brim')));
-    if (inner) lines.push(kind === 'auto' ? t('innen: dieses Teil hat keine Löcher – kein innerer Brim') : t('innen: wirkt nur mit Form „Ohrenkette“'));
+    if (inner) lines.push(kind === 'auto' ? t('innen: dieses Teil hat keine Löcher – kein innerer Brim') : t('innen: wirkt nur mit Form außen „Ohrenkette“ oder Form innen „Orca innen ringsum“'));
   }
   if (w || inner) lines.push(code('brim_object_gap = ' + String(gap ?? '').replace(',', '.')));
   box.innerHTML = '<b>' + t('In Orca:') + '</b> ' + lines.join('<br>');

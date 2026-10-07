@@ -47,7 +47,9 @@ function rasterFill(grid, segs, val) {
    Objektkoordinaten, oder null, wenn die erste Schicht keine Löcher hat (dann genügt der normale äußere Brim).
    Innen nur in großen Löchern (lichte Weite ≥ 3 × Innenbreite, es bleibt also ein freier Kern) und nur dort, wo im Umkreis
    des Ohrs weder eine Insel noch ein anderes Loch liegt – Orca füllt sonst jedes Loch im Ohr (Schnittmenge Ohr ∩ Löcher). */
-function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
+/* innerMode: large = nur Löcher ab dreifacher Innenbreite; all = alle Löcher, Ohren dort so klein, dass die Mitte frei bleibt;
+   corners = wie all, aber nur an Lochecken */
+function brimEarPoints(vols, negs, center, mnZ, r, inner = 0, innerMode = 'large') {
   const z = mnZ + 0.1, c = EAR_CELL_MM;
   const pos = vols.map(v => sectionSegments(v.pos, z)), neg = (negs || []).map(v => sectionSegments(v.pos, z));
   const all = pos.flat();
@@ -136,13 +138,21 @@ function brimEarPoints(vols, negs, center, mnZ, r, inner = 0) {
     // Lochrand: innerer Brim, wenn das Loch groß genug ist und im Ohr keine Insel / kein anderes Loch liegt
     if (!(inner > 0) || isl[p]) return;
     const hc = near(p, q => hid[q] >= 0, 2); if (hc < 0) return;
-    const own = hid[hc]; if (holeR[own] < 1.5 * inner) return;
-    const R = Math.ceil((inner + 0.5) / c), i = p % w, j = (p - i) / w;
+    const own = hid[hc];
+    let rad = inner;
+    if (innerMode === 'large') { if (holeR[own] < 1.5 * inner) return; }
+    else {
+      // Ohren von allen Seiten dürfen sich nicht treffen: wirksamer Radius (− Linienabstand) unter lichter Weite/2 − 0,3 mm
+      if (innerMode === 'corners' && !(prio >= 1)) return;
+      rad = Math.min(inner, Math.floor((holeR[own] - 0.3 + EAR_LINE_MM) * 2) / 2);
+      if (rad < EAR_MIN_MM) return;
+    }
+    const R = Math.ceil((rad + 0.5) / c), i = p % w, j = (p - i) / w;
     for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
       if (di * di + dj * dj > R * R) continue; const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= w || jj >= h) continue;
       const pp = jj * w + ii; if (isl[pp] || (hid[pp] >= 0 && hid[pp] !== own)) return;
     }
-    innerCand.push([x, y, prio, inner]);
+    innerCand.push([x, y, prio, rad]);
   };
   for (const v of corners.values()) {
     const p = cell(v.x, v.y); if (p < 0) continue;

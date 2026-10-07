@@ -738,3 +738,18 @@ I18N.add({
  "innen: wirkt nur mit Form „Ohrenkette“": "inner: only works with shape “ear chain”",
  "nur innen {w} mm": "inner only {w} mm",
 });
+I18N.add({
+ "Brim innen": "Inner brim",
+ "Form innen": "Inner shape",
+ "Ohrenkette – nur große Löcher": "Ear chain – large holes only",
+ "Ohrenkette – alle Löcher, Mitte bleibt frei": "Ear chain – all holes, centre stays open",
+ "Ohren nur an Lochecken": "Ears at hole corners only",
+ "Orca innen ringsum (füllt kleine Löcher ganz)": "Orca inner all around (fills small holes completely)",
+ "innen: {k}": "inner: {k}",
+ "innen: Ohrenkette bis {w} mm in allen Löchern, in kleinen Löchern kleiner – die Mitte bleibt frei": "inner: ear chain up to {w} mm in all holes, smaller in small holes – the centre stays open",
+ "innen: Ohren bis {w} mm nur an Lochecken, in kleinen Löchern kleiner": "inner: ears up to {w} mm at hole corners only, smaller in small holes",
+ "Orca füllt jedes Loch bis zur Brim-Breite: kleine Löcher, Schlitze und Schriften laufen zu": "Orca fills every hole up to the brim width: small holes, slots and lettering close up",
+ "außen: Orcas Brim ringsum (die Form außen gilt hier nicht)": "outer: Orca brim all around (the outer shape does not apply here)",
+ "Orca kennt nur eine Brim-Breite – es gilt {w} mm für außen und innen": "Orca has only one brim width – {w} mm applies to outer and inner",
+ "innen: wirkt nur mit Form außen „Ohrenkette“ oder Form innen „Orca innen ringsum“": "inner: only works with outer shape “ear chain” or inner shape “Orca inner all around”",
+});

@@ -580,7 +580,12 @@ async function runSmoke(opts={}){
       b.value='';b.dispatchEvent(new Event('input',{bubbles:true}));
       const bi=$('ovRows').querySelector('[data-ov="brim_inner"]');
       ok(bi&&bi.tagName==='SELECT'&&[...bi.options].map(o=>o.value).join()===',0,2,3,5','Brim innen: Auswahl aus / 2 / 3 / 5 mm');
-      ok(/große Löcher/.test(bi.closest('.ov-row').textContent)&&/Vorschlag aus/.test(bi.closest('.ov-row').textContent),'Brim innen: nur große Löcher, Vorschlag aus'); }
+      ok(/Vorschlag aus/.test(bi.closest('.ov-row').textContent),'Brim innen: Vorschlag aus');
+      const ik=$('ovRows').querySelector('[data-ov="brim_inner_kind"]');
+      ok(ik&&[...ik.options].map(o=>o.value).join()===',large,all,corners,orca','Form innen: große Löcher / alle Löcher / Lochecken / Orca');
+      bi.value='3';bi.dispatchEvent(new Event('input',{bubbles:true}));ik.value='orca';ik.dispatchEvent(new Event('input',{bubbles:true}));
+      ok(/laufen zu/.test($('ovBrimInfo').textContent),'Orca innen: Warnung, dass kleine Löcher zulaufen');
+      bi.value='';bi.dispatchEvent(new Event('input',{bubbles:true}));ik.value='';ik.dispatchEvent(new Event('input',{bubbles:true})); }
     // Als Standard merken: gilt für dieses Filament auf diesem Drucker als Vorschlag, Werkswert sichtbar, zurücksetzbar
     { const d0=JSON.stringify(store.settings.ovDefaults||null),bedIn=$('ovRows').querySelector('[data-ov="bed"]'),fac=lastResult.suggested.bed;
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;
