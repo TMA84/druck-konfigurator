@@ -89,7 +89,7 @@ const KEY_STRIP=[['Düse','nozzle'],['Heizbett','bed'],['Schichthöhe','layer'],
 function keyStrip(r){
   const rows=Object.fromEntries(r.ordered.flatMap(g=>g[1]).map(x=>[x[0],x]));
   return '<div class="key-strip">'+KEY_STRIP.filter(([l])=>rows[l]).map(([l,k])=>{const x=rows[l];
-    return '<div class="ks'+(x[3]?' ov':'')+'" data-ovk="'+k+'"><span class="ks-k">'+esc(t(l==='Stützstrukturen'?'Stützen':l))+'</span><span class="ks-v">'+x[1]+'</span></div>'}).join('')+'</div>';
+    return '<div class="ks'+(x[3]?' ov':'')+'" data-ovk="'+k+'"><span class="ks-k">'+esc(t(l==='Stützstrukturen'?'Stützen':l))+'</span><span class="ks-v">'+String(x[1]).split(' · ')[0]+'</span></div>'}).join('')+'</div>';
 }
 function specCell(x,key){
   const h=helpFor(x[0],getMat($('material').value).kind);

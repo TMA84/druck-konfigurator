@@ -4,6 +4,10 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Geändert
+- **Druckwerte ruhiger:** oben die wichtigsten Kennzahlen (Düse, Heizbett, Schichthöhe, Wandlinien, Fülldichte, Stützen, Brim), darunter je Thema eine Karte als Liste „Bezeichnung … Wert“ (rechtsbündig, angepasste Werte in Petrol, Notizen klein darunter) in einem festen Raster statt unterschiedlich hoher Kacheln.
+- **Abschnitt „Einstellungen in OrcaSlicer-Reihenfolge“ entfernt:** Er war fürs Eintippen von Hand gedacht – 3MF-Export und Slicen im Tool tragen alle Werte selbst ein, und die Druckwerte zeigen jetzt alles.
+
 ### Behoben
 - **Warteschlange: nächste Platte ließ sich nicht starten („Auftrag nicht mehr vorhanden“):** Der Server behielt nur die letzten 8 Slice-Aufträge im temporären Ordner – jedes weitere Slicen (auch das automatische für die Kosten) räumte den Auftrag der Warteschlange weg, ein Neustart sowieso. Jetzt kopiert der Server den Auftrag der Warteschlange beim Anlegen (und beim Abrufen einer bestehenden) mit allen Platten und Vorschauen in den Datenordner (`queue-jobs`) und räumt die Kopie erst weg, wenn die Warteschlange beendet oder ersetzt wird.
 
