@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.26.0] – 2026-10-07
 
 ### Geändert
 - **Neuer Name: Druckwerkstatt** (englisch: Print Workshop) – der Name ist mit dem Tool gewachsen. Geändert ist der angezeigte Name (Fenstertitel, Kopfzeile, Anmeldeseite, Handbuch, README, in Home Assistant Add-on-Name und Seitenleiste); Repository, Container-Image, Add-on-Kennung und das MQTT-Gerät in Home Assistant bleiben, damit Daten, Entitäten und Dashboards erhalten bleiben.
