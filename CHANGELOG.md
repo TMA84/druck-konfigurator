@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.21.0] – 2026-10-07
 
 ### Neu
 - **Form innen** für den inneren Brim: *Ohrenkette – nur große Löcher* (Vorschlag), *Ohrenkette – alle Löcher, Mitte bleibt frei* (auch kleine Löcher und Schlitze, Ohren dort so klein, dass die Mitte offen bleibt), *Ohren nur an Lochecken*, *Orca innen ringsum* (Orcas eigener innerer Brim, mit Warnung, dass kleine Löcher zulaufen). Die Zeile „In Orca“ zeigt die jeweilige Einstellung. Mit der Orca-CLI geprüft (4-mm-Loch: frei / Brim mit offener Mitte / zu).
