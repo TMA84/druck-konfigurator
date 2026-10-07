@@ -15,10 +15,10 @@ from array import array
 
 W, H = 640, 480
 MARGIN = 24
-BG = (29, 32, 38)
-BED = (70, 76, 88)
-GHOST = (96, 104, 118)
-DEFAULT_COLOURS = [(242, 166, 64), (90, 170, 240), (120, 200, 120), (220, 110, 110)]
+BG = (15, 20, 23)       # Graphit (Farbschema der Seite)
+BED = (44, 56, 62)
+GHOST = (90, 104, 112)
+DEFAULT_COLOURS = [(46, 196, 182), (90, 170, 240), (120, 200, 120), (220, 110, 110)]   # ohne Filamentfarbe: Petrol zuerst
 COS30, SIN30 = math.cos(math.pi / 6), 0.5
 
 

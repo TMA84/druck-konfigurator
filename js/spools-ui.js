@@ -64,8 +64,10 @@ async function spoolPost(body) {
 // Kleine Anzeige auf den ACE-Kacheln der Werkbank (js/workbench-ui.js)
 function spoolTileHTML(i) {
   const s = spoolInSlot(i); if (!s) return '';
-  return '<span class="wb-rest' + (spoolLow(s) ? ' low' : '') + '" title="' + esc(t('Restmenge laut Verbrauchszählung – ⚙ Einstellungen → Spulen & Restmengen')) + '"><i style="width:' + spoolPct(s).toFixed(0) + '%"></i></span>' +
-    '<small class="wb-rest-g">≈ ' + spoolGrams(s.remaining_g) + '</small>';
+  // anklickbar: öffnet die Spule im Dialog (Restmenge, „Neue Spule eingelegt“)
+  return '<button type="button" class="wb-rest-btn" data-spool-open="' + s.id + '" title="' + esc(t('Restmenge laut Verbrauchszählung – anklicken: Spule bearbeiten, neue Spule eingelegt')) + '">' +
+    '<span class="wb-rest' + (spoolLow(s) ? ' low' : '') + '"><i style="width:' + spoolPct(s).toFixed(0) + '%"></i></span>' +
+    '<small class="wb-rest-g">≈ ' + spoolGrams(s.remaining_g) + '</small></button>';
 }
 // Text für die Slot-Liste in ③
 const spoolSlotText = i => { const s = spoolInSlot(i); return s ? ' · ≈ ' + spoolGrams(s.remaining_g) : ''; };
@@ -217,6 +219,7 @@ function spoolRow(s) {
     spoolProfileHTML(s) +
     '<p class="muted small">' + t('Verbraucht bisher ≈ {used} (davon Spülabfall ≈ {purge}). Gewogen: Gewicht mit Spule minus Gewicht der leeren Spule.', { used: spoolGrams(used), purge: spoolGrams(s.purge_g || 0) }) + '</p>' +
     '<div class="spool-actions"><button type="button" class="btn" data-spool-save="' + s.id + '">' + t('Speichern') + '</button>' +
+    (s.slot != null ? '<button type="button" class="btn sec" data-spool-new="' + s.id + '" title="' + esc(t('Die ACE meldet bei gleicher Sorte und Farbe dieselben Werte – so beginnt die Zählung für die neue Spule von vorn; die alte wird archiviert.')) + '">' + t('Neue Spule eingelegt') + '</button>' : '') +
     (s.slot == null ? '<button type="button" class="btn sec" data-spool-arch="' + s.id + '">' + (s.archived ? t('Zurückholen') : t('Archivieren')) + '</button><button type="button" class="btn danger" data-spool-del="' + s.id + '">' + t('Löschen') + '</button>' : '') +
     '</div></div></li>';
 }
@@ -271,6 +274,10 @@ $('spoolBody').addEventListener('click', async e => {
       if (['net_g', 'remaining_g', 'price_per_kg'].some(k => k in req && req[k] !== null && isNaN(req[k]))) { toast(t('Bitte Zahlen eintragen')); return; }
       await spoolPost(req); spoolEdit = null; renderSpoolDialog(); toast(t('Spule gespeichert'));
     }
+    const nw = e.target.closest('[data-spool-new]');
+    if (nw) { const s = spoolData.spools.find(x => x.id === nw.dataset.spoolNew);
+      if (!confirm(t('Neue Spule in Slot {n} eingelegt? Die bisherige ({name}, ≈ {rest}) wird archiviert, die Zählung beginnt neu.', { n: s.slot + 1, name: spoolName(s), rest: spoolGrams(s.remaining_g) }))) return;
+      await spoolPost({ action: 'replace', id: s.id }); spoolEdit = null; renderSpoolDialog(); toast(t('Neue Spule in Slot {n} – bitte Füllgewicht bestätigen', { n: s.slot + 1 })); return; }
     if (ar) { const s = spoolData.spools.find(x => x.id === ar.dataset.spoolArch); await spoolPost({ action: 'update', id: s.id, archived: !s.archived }); spoolEdit = null; renderSpoolDialog(); }
     if (dl && confirm(t('Spule endgültig löschen?'))) { await spoolPost({ action: 'delete', id: dl.dataset.spoolDel }); spoolEdit = null; renderSpoolDialog(); }
   } catch (err) { toast(t(err.message)); }
@@ -304,3 +311,6 @@ $('spoolImportFile').addEventListener('change', async e => {
 $('spoolDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 ACTIONS.spools = openSpoolDialog;
 refreshSpools();
+
+// ACE-Kachel der Werkbank: Restmenge anklicken → Spule im Dialog
+document.addEventListener('click', e => { const b = e.target.closest('[data-spool-open]'); if (b && typeof openSpoolDialog === 'function') openSpoolDialog(b.dataset.spoolOpen); });

@@ -156,20 +156,38 @@ function lvBed() {
 }
 function lvHeadInit() {
   for (const k of ['head', 'gantry', 'bed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
-  const H = LV_HEAD, glass = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, depthWrite: false });
-  const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
-  // Kopf: Düse (Spitze = Position) und Gehäuse darüber
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, H.tip, 20), new THREE.MeshBasicMaterial({ color: 0x2ec4b6 }));
+  /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
+     sichtbar bleibt. Graphit-Gehäuse mit Petrol-Streifen, Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
+     Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
+  const H = LV_HEAD, mat = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.55, metalness: o.m ?? 0.1, transparent: (o.op ?? 1) < 1, opacity: o.op ?? 1, depthWrite: (o.op ?? 1) >= 1 });
+  const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
+  const rounded = (w, d, r) => { const sh = new THREE.Shape(), x = -w / 2, y = -d / 2;
+    sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.quadraticCurveTo(x + w, y, x + w, y + r); sh.lineTo(x + w, y + d - r); sh.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+    sh.lineTo(x + r, y + d); sh.quadraticCurveTo(x, y + d, x, y + d - r); sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y); return sh; };
+  const slab = (w, d, h, r, bevel) => new THREE.ExtrudeGeometry(rounded(w, d, r), { depth: h, bevelEnabled: !!bevel, bevelThickness: bevel || 0, bevelSize: bevel || 0, bevelSegments: 2, curveSegments: 8 });
+  // Düse (Spitze = Position), Heizblock, Gehäuse
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.2, H.tip, 24), mat(0xd4a93f, { m: 0.45, r: 0.35 }));
   tip.rotation.x = -Math.PI / 2; tip.position.z = H.tip / 2;
-  const boxG = new THREE.BoxGeometry(H.w, H.d, H.h), block = new THREE.Mesh(boxG, glass(0xe6e8ec)); block.position.z = H.tip + H.h / 2;
-  const blockE = edges(boxG, 0.75); blockE.position.copy(block.position);
-  lv.head = new THREE.Group(); lv.head.add(tip, block, blockE); lv.head.visible = false;
-  // Mechanik: X-Traverse (fährt in Y und Z mit), Y-Schienen (fahren in Z mit)
-  const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22;
-  const beamG = new THREE.BoxGeometry(bx1 - bx0 + 2 * m, LV_RAIL, LV_RAIL), beam = new THREE.Group();
-  beam.add(new THREE.Mesh(beamG, glass(0xb8bec8)), edges(beamG, 0.35)); beam.position.x = (bx0 + bx1) / 2;
-  const railG = new THREE.BoxGeometry(LV_RAIL, by1 - by0 + 2 * m, LV_RAIL), rails = [bx0 - m, bx1 + m].map(x => {
-    const r = new THREE.Group(); r.add(new THREE.Mesh(railG, glass(0xb8bec8)), edges(railG, 0.3)); r.position.set(x, (by0 + by1) / 2, 0); return r; });
+  const heat = new THREE.Mesh(new THREE.BoxGeometry(16, 14, 9), mat(0xb4bdc2, { m: 0.35, r: 0.4 })); heat.position.z = H.tip + 4.5;
+  const bodyH = H.h - 12, bodyG = slab(H.w - 4, H.d - 4, bodyH, 9, 2), body = new THREE.Mesh(bodyG, mat(0x3a4650, { r: 0.55, op: 0.55 }));
+  body.position.z = H.tip + 11;
+  const bodyE = edges(bodyG, 0.35); bodyE.position.copy(body.position);
+  const band = new THREE.Mesh(slab(H.w - 2.5, H.d - 2.5, 3, 9.5, 0), mat(0x2ec4b6, { r: 0.4, m: 0.1 })); band.position.z = H.tip + 15;
+  // Lüfter vorn (−Y): Ring und dunkle Scheibe
+  const fanR = Math.min(H.w, H.h) * 0.27, fan = new THREE.Group();
+  fan.add(new THREE.Mesh(new THREE.TorusGeometry(fanR, 1.6, 10, 40), mat(0x8f9aa1, { m: 0.5, r: 0.4 })), new THREE.Mesh(new THREE.CircleGeometry(fanR - 1, 40), mat(0x151b20, { r: 0.8, op: 0.6 })));
+  fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 1.2, H.tip + 11 + bodyH * 0.55);
+  lv.head = new THREE.Group(); lv.head.add(tip, heat, body, bodyE, band, fan); lv.head.visible = false;
+  // Mechanik: X-Traverse (fährt in Y und Z mit) mit Laufwagen, Y-Schienen (fahren in Z mit)
+  const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22, R = LV_RAIL;
+  const len = bx1 - bx0 + 2 * m, alu = mat(0xc4ccd1, { m: 0.3, r: 0.4, op: 0.85 }), beam = new THREE.Group();
+  const beamG = new THREE.BoxGeometry(len, R * 1.6, R * 1.6), slot = new THREE.Mesh(new THREE.BoxGeometry(len, R * 0.35, 0.6), mat(0x39444b, { r: 0.7, op: 0.82 }));
+  slot.position.z = R * 0.8 + 0.2;
+  beam.add(new THREE.Mesh(beamG, alu), edges(beamG, 0.18), slot);
+  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3, R * 2.2, 3, 0.8), mat(0x27313a, { r: 0.55, op: 0.9 })); car.position.set(sx * len / 2, 0, -R * 1.1); beam.add(car); }
+  beam.position.x = (bx0 + bx1) / 2;
+  const steel = mat(0xe3e8eb, { m: 0.35, r: 0.3, op: 0.9 }), rails = [bx0 - m, bx1 + m].map(x => {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.4, R * 0.4, by1 - by0 + 2 * m, 20), steel); rod.position.set(x, (by0 + by1) / 2, 0); return rod; });
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
   // Bett: Umriss auf Höhe 0
   const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));

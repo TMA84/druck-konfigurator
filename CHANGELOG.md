@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Geändert
+- **3D-Fortschritt: Druckkopf und Mechanik neu gestaltet** – abgerundetes, durchscheinendes Graphit-Gehäuse mit Petrol-Streifen, Lüfterring, Alu-Heizblock und Messingdüse; X-Traverse als Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen (statt Glaskästen).
+- Fortschrittsbalken des Drucks (und Fortschrittsbild für Home Assistant, Mal-Werkzeug) in Petrol statt Orange.
+
+### Neu
+- **„Neue Spule eingelegt“** (Spulen-Dialog, Restmenge auf der ACE-Kachel anklicken): Die ACE meldet für eine neue Spule gleicher Sorte und Farbe dieselben Werte – bisher zählte das Tool die alte weiter. Der Knopf archiviert die alte Spule und legt im Slot eine frische an (Füllgewicht, Marke, Preis übernommen; Füllgewicht wird wie bei jeder neuen Spule abgefragt).
 - **Druckwerte neu: Reiter + Tabelle, direkt bearbeitbar.** Oben die Kennzahlen, darunter die Werte-Tafel mit Reitern nach Thema (mit Zähler) und Suche; je Reiter eine Tabelle **Einstellung | Wert | Vorschlag**. Wert direkt ändern – gilt beim Verlassen des Felds, bei Enter oder bei der Auswahl, × setzt auf den Vorschlag zurück. Werte ohne Anpassung (z. B. Herstellerbereich, Profilname) stehen als Anzeigezeilen im passenden Reiter, Erklärungen per „?“. Der separate Dialog „Werte für diesen Auftrag anpassen“ und die Themenkacheln entfallen; „Als Standard merken“, „für alle Teile“ und die Zeile „In Orca“ beim Brim sind in der Tafel.
 
 ## [10.24.0] – 2026-10-07

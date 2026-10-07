@@ -771,3 +771,10 @@ I18N.add({
  "Werte für diesen Auftrag": "Values for this job",
  "Für {n} Teile übernommen": "Applied to {n} parts",
 });
+I18N.add({
+ "Neue Spule eingelegt": "New spool inserted",
+ "Neue Spule in Slot {n} eingelegt? Die bisherige ({name}, ≈ {rest}) wird archiviert, die Zählung beginnt neu.": "New spool inserted in slot {n}? The previous one ({name}, ≈ {rest}) will be archived and counting starts over.",
+ "Neue Spule in Slot {n} – bitte Füllgewicht bestätigen": "New spool in slot {n} – please confirm its weight",
+ "Die ACE meldet bei gleicher Sorte und Farbe dieselben Werte – so beginnt die Zählung für die neue Spule von vorn; die alte wird archiviert.": "The ACE reports the same values for the same type and colour – this restarts counting for the new spool; the old one is archived.",
+ "Restmenge laut Verbrauchszählung – anklicken: Spule bearbeiten, neue Spule eingelegt": "Remaining amount from usage tracking – click: edit spool, new spool inserted",
+});

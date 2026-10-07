@@ -651,7 +651,7 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-bigpct b { font-family: var(--f-display); font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent); }
 .wb-bigpct span { color: var(--ink-2); font-size: 14px; }
 .wb-progress { height: 12px; background: var(--rule); border-radius: 99px; overflow: hidden; }
-.wb-progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #f39a5e); transition: width .6s; }
+.wb-progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #9ff0e6)); transition: width .6s; }
 .wb-jobinfo { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; margin: 4px 0 0; }
 .wb-jobinfo div { display: flex; flex-direction: column; }
 .wb-jobinfo dt { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
@@ -1008,7 +1008,7 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .paint-panel.hidden { display: none; }
 .paint-panel .pt-head { display: flex; justify-content: space-between; align-items: center; }
 .paint-panel button { background: rgba(255,255,255,.06); color: var(--hud-ink); border: 1px solid var(--hud-border); border-radius: 6px; padding: 4px 8px; font: inherit; cursor: pointer; }
-.paint-panel button.primary { background: #d9642a; border-color: #d9642a; color: #fff; }
+.paint-panel button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .paint-panel .pt-tools { display: flex; flex-wrap: wrap; gap: 4px; }
 .paint-panel .pt-tools button.active, .paint-panel .pt-erase.active { background: #f0a371; border-color: #f0a371; color: #1d1d1d; }
 .paint-panel .pt-slots { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -1039,7 +1039,7 @@ details.order-group:not([open]) > summary.order-title::before { transform: rotat
 .paint-panel .pt-gap { display: grid; gap: 6px; }
 .paint-panel .pt-gap.hidden { display: none; }
 /* Farben des Herstellers (Tab ②, js/panel.js renderMatColours) */
-.badge.vendor { background: var(--accent-soft, #fbe7da); color: var(--accent, #d9642a); border: 1px solid var(--accent, #d9642a); }
+.badge.vendor { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
 .mat-colours { margin-top: 8px; display: grid; gap: 6px; font-size: 12.5px; }
 .mat-colours.hidden { display: none; }
 .mat-colours .mc-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 96px; overflow: auto; padding: 2px; }
@@ -1238,3 +1238,5 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 }
 /* bei der Suche die Themen als Zwischenüberschrift */
 .ov-panel.searching .ov-group:not([hidden]) { display: block; padding: 10px 16px 2px; }
+.wb-rest-btn { display: block; width: 100%; background: none; border: 0; padding: 0; margin: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.wb-rest-btn:hover .wb-rest-g { color: var(--accent); text-decoration: underline; }

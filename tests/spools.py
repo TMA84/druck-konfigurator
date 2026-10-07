@@ -364,5 +364,21 @@ spools.track(fin, job, -1, now=70000)
 spools.track(fin, dict(job, state="stoped", print_status=2), -1, now=70085)
 check("Gleicher Name nochmal gedruckt, dann abgebrochen: neuer Eintrag mit 85 s", len(fin["history"]) == 2 and fin["history"][1]["duration_s"] == 85, fin["history"][-1:])
 
+
+# Neue Spule gleicher Sorte/Farbe eingelegt: alte archiviert, frische im Slot, Füllgewicht übernommen
+st = {"spools": [], "history": []}
+sl = [{"index": 0, "type": "PLA", "colour": "#FFFFFF", "present": True, "sku": "AHPLWH-101", "rfid": True}]
+spools.sync_slots(st, sl, 1000)
+old = st["spools"][0]; old["used_g"] = 700.0; old["net_g"] = 1000.0; old["price_per_kg"] = 20.0
+check("ohne Knopf: gleiche Spule zählt weiter", spools.sync_slots(st, sl, 2000) == [] and st["spools"][0]["used_g"] == 700.0)
+spools.update(st, {"action": "replace", "id": old["id"]})
+new = next(x for x in st["spools"] if x["slot"] == 0)
+check("neue Spule im Slot, alte archiviert", new["id"] != old["id"] and old["archived"] and old["slot"] is None and new["used_g"] == 0 and new["needs_check"])
+check("Füllgewicht und Preis übernommen", new["net_g"] == 1000.0 and new["price_per_kg"] == 20.0 and new["sku"] == "AHPLWH-101")
+check("danach bleibt die neue zugeordnet", spools.sync_slots(st, sl, 3000) == [] and next(x for x in st["spools"] if x["slot"] == 0)["id"] == new["id"])
+try:
+    spools.update(st, {"action": "replace", "id": old["id"]}); check("archivierte Spule: Fehler", False)
+except ValueError:
+    check("archivierte Spule (nicht in der ACE): Fehler", True)
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

@@ -328,7 +328,7 @@ def add_plan(state, req, now=None):
 
 
 def update(state, req):
-    """Änderung von der Seite: {action: update|add|delete|config, …}. Gibt eine Meldung zurück oder wirft ValueError."""
+    """Änderung von der Seite: {action: update|add|delete|replace|config, …}. Gibt eine Meldung zurück oder wirft ValueError."""
     a = req.get("action")
     if a == "config":
         if "host" in req:
@@ -366,6 +366,21 @@ def update(state, req):
     sp = next((x for x in state["spools"] if x["id"] == req.get("id")), None)
     if not sp:
         raise ValueError("Spule nicht gefunden")
+    if a == "replace":
+        # Neue Spule gleicher Sorte/Farbe eingelegt (2026-10-07): die ACE meldet dieselben Werte – die alte Spule wäre
+        # sonst weitergezählt worden. Alte archivieren, im Slot eine frische anlegen (Füllgewicht/Marke/Preis übernommen,
+        # Seite fragt nach dem Füllgewicht wie bei jeder neuen Spule).
+        if sp.get("slot") is None:
+            raise ValueError("Spule steckt nicht in der ACE")
+        now = time.time()
+        slot = sp["slot"]
+        sp.update(slot=None, archived=True, last_seen=now)
+        new = new_spool({"type": sp["type"], "colour": sp["colour"], "sku": sp.get("sku") or "", "rfid": sp.get("rfid")}, slot, now)
+        for k in ("net_g", "brand", "name", "price_per_kg", "profile_id"):
+            if sp.get(k) not in (None, ""):
+                new[k] = sp[k]
+        state["spools"].append(new)
+        return "neue Spule"
     if a == "delete":
         if sp.get("slot") is not None:
             raise ValueError("Spule steckt noch in der ACE – erst herausnehmen")
