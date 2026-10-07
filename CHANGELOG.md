@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.25.0] – 2026-10-07
 
 ### Geändert
 - **3D-Fortschritt: Druckkopf und Mechanik neu gestaltet** – abgerundetes, durchscheinendes Graphit-Gehäuse mit Petrol-Streifen, Lüfterring, Alu-Heizblock und Messingdüse; X-Traverse als Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen (statt Glaskästen).
