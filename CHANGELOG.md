@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.27.0] – 2026-10-07
 
 ### Geändert
 - **3D-Fortschritt wie der Kobra S1:** weißer Druckkopf mit orangem Streifen (nur die Außenhaut) und schwarzem Lüfter, zwei X-Stangen und die Y-Stangen in Kupfer, schwarze Eckwagen, blaue Motoren an den hinteren Ecken, schlanker rauchiger Rahmen mit Z-Spindeln, schwarze PEI-Platte; Rahmen und Mechanik bewegen sich gemeinsam (relativ dazu fährt das Bett). Standardansicht etwas weiter weg (mindestens ~230 mm).
