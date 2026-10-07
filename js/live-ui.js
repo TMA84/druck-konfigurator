@@ -158,7 +158,7 @@ function lvBed() {
 function lvHeadInit() {
   for (const k of ['head', 'gantry', 'bed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
-     sichtbar bleibt. Graphit-Gehäuse mit Petrol-Streifen, Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
+     sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
   const H = LV_HEAD, mat = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.55, metalness: o.m ?? 0.1, transparent: (o.op ?? 1) < 1, opacity: o.op ?? 1, depthWrite: (o.op ?? 1) >= 1 });
   const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
@@ -173,12 +173,11 @@ function lvHeadInit() {
   const bodyH = H.h - 12, bodyG = slab(H.w - 4, H.d - 4, bodyH, 9, 2), body = new THREE.Mesh(bodyG, mat(0x3a4650, { r: 0.55, op: 0.55 }));
   body.position.z = H.tip + 11;
   const bodyE = edges(bodyG, 0.35); bodyE.position.copy(body.position);
-  const band = new THREE.Mesh(slab(H.w - 2.5, H.d - 2.5, 3, 9.5, 0), mat(0x2ec4b6, { r: 0.4, m: 0.1 })); band.position.z = H.tip + 15;
   // Lüfter vorn (−Y): Ring und dunkle Scheibe
   const fanR = Math.min(H.w, H.h) * 0.27, fan = new THREE.Group();
   fan.add(new THREE.Mesh(new THREE.TorusGeometry(fanR, 1.6, 10, 40), mat(0x8f9aa1, { m: 0.5, r: 0.4 })), new THREE.Mesh(new THREE.CircleGeometry(fanR - 1, 40), mat(0x151b20, { r: 0.8, op: 0.6 })));
   fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 1.2, H.tip + 11 + bodyH * 0.55);
-  lv.head = new THREE.Group(); lv.head.add(tip, heat, body, bodyE, band, fan); lv.head.visible = false;
+  lv.head = new THREE.Group(); lv.head.add(tip, heat, body, bodyE, fan); lv.head.visible = false;
   // Mechanik: X-Traverse (fährt in Y und Z mit) mit Laufwagen, Y-Schienen (fahren in Z mit)
   const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22, R = LV_RAIL;
   const len = bx1 - bx0 + 2 * m, alu = mat(0xc4ccd1, { m: 0.3, r: 0.4, op: 0.85 }), beam = new THREE.Group();

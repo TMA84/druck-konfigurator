@@ -6,6 +6,7 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ### Geändert
 - Handbuch, README und Handbuch-PDF auf den aktuellen Stand (Werte-Tafel, Brim außen/innen, 3D-Fortschritt, „Neue Spule eingelegt“, Warteschlange); alle Bilder neu aufgenommen. Der Bildgenerator stellt die Spulen jetzt immer nach (nie aus dem echten Datenordner).
+- 3D-Fortschritt: Petrol-Streifen am Druckkopf entfernt – er lag als Platte quer durch den Kopf und verdeckte das Teil.
 - 3D-Fortschritt: Bildausschnitt mindestens ~170 mm, damit der Druckkopf bei kleinen Teilen nicht das Bild füllt.
 
 ## [10.25.0] – 2026-10-07
