@@ -13,7 +13,22 @@ const lv = { prep: { job: null, s: null }, name: null, data: null, missing: fals
   hs: null, anim: 0, dirty: null, disp: null, lastTick: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
 const LV_POS_FRESH_S = 10;
 const livePosWanted = () => store.settings.livePos !== false && lv.mode === 'live';
-const LV_NOW = [0.95, 0.48, 0.2];
+const LV_NOW = [0.18, 0.77, 0.71];   // aktuelle Schicht: Petrol (Farbschema)
+/* Darstellung (2026-10-07): Bahnen als beleuchtete Raupen (je Bahn ein Quader mit Linienbreite × Schichthöhe, ein
+   InstancedMesh) statt 1-Pixel-Linien; über LV_FAT_MAX Bahnen die schnellen Linien wie bisher. */
+const LV_FAT_MAX = 600000, LV_LINE_W = 0.44;
+const lvCss = (v, f) => { const s = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return s || f; };
+// Hintergrund, Raster und Druckplatte passend zum Hell-/Dunkelmodus
+function lvTheme() {
+  if (!lv.scene) return;
+  const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  lv.scene.background = new THREE.Color(dark ? 0x0c1114 : 0xe9eff1);
+  if (lv.plate) lv.plate.material.color.setHex(dark ? 0x1d272d : 0xc9d4d9);
+  if (lv.grid) lv.grid.material.color.setHex(dark ? 0x2c393f : 0xaebcc2);
+  // Kanten von Kopf und Mechanik: hell auf dunklem, dunkel auf hellem Grund
+  for (const g of [lv.head, lv.gantry]) if (g) g.traverse(o => { if (o.isLineSegments) o.material.color.setHex(dark ? 0xffffff : 0x26343b); });
+  lvRender();
+}
 // Kommende Schichten: durchsichtig (Standard), ausgeblendet oder voll (wie früher, dunkelgrau)
 const LV_GHOST = { ghost: 0.02, off: 0, full: 1 };
 const lvGhostMode = () => (store.settings.liveGhost in LV_GHOST ? store.settings.liveGhost : 'ghost');
@@ -23,7 +38,11 @@ function lvInit() {
   lv.renderer = new THREE.WebGLRenderer({ antialias: true });
   lv.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   $('wbLiveStage').appendChild(lv.renderer.domElement);
-  lv.scene = new THREE.Scene(); lv.scene.background = new THREE.Color(0x14161a);
+  lv.scene = new THREE.Scene(); lv.scene.background = new THREE.Color(0x0c1114);
+  lv.scene.add(new THREE.HemisphereLight(0xffffff, 0x2a363d, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(0.6, -1, 1.4); lv.scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.18); fill.position.set(-1, 0.8, 0.6); lv.scene.add(fill);
+  new MutationObserver(lvTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   lv.camera = new THREE.PerspectiveCamera(40, 1, 0.5, 5000); lv.camera.up.set(0, 0, 1);
   lv.controls = new THREE.OrbitControls(lv.camera, lv.renderer.domElement);
   lv.controls.addEventListener('change', lvRender);
@@ -40,8 +59,20 @@ function lvResize() {
    setzt man ihn zweimal, bevor gezeichnet wird, geht der erste verloren (die Bahnen blieben schwarz). */
 function lvColourDirty(lo, hi) {
   const d = lv.dirty = lv.dirty ? [Math.min(lv.dirty[0], lo), Math.max(lv.dirty[1], hi)] : [lo, hi];
-  const attr = lv.mesh.geometry.attributes.color;
-  attr.updateRange.offset = d[0] * 6; attr.updateRange.count = (d[1] - d[0]) * 6; attr.needsUpdate = true;
+  const attr = lv.fat ? lv.mesh.instanceColor : lv.mesh.geometry.attributes.color, k = lv.fat ? 3 : 6;
+  attr.updateRange.offset = d[0] * k; attr.updateRange.count = (d[1] - d[0]) * k; attr.needsUpdate = true;
+}
+// Farbe einer Bahn setzen (Raupe: eine Farbe je Instanz, Linie: zwei Endpunkte)
+function lvPaint(i, c) {
+  if (lv.fat) { const a = lv.mesh.instanceColor.array, o = i * 3; a[o] = c[0]; a[o + 1] = c[1]; a[o + 2] = c[2]; return; }
+  const col = lv.mesh.geometry.attributes.color.array;
+  for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
+}
+// gedruckt bis Bahn end sichtbar, danach die blassen kommenden Schichten
+function lvRange(end) {
+  const n = lv.data.count;
+  if (lv.fat) lv.mesh.count = end; else lv.mesh.geometry.setDrawRange(0, end * 2);
+  lv.ghost.geometry.setDrawRange(end * 2, (n - end) * 2);
 }
 function lvDraw() {
   if (!lv.renderer) return;
@@ -72,14 +103,36 @@ function lvBuild() {
   // die Bahnen liegen nach Schichten sortiert, deshalb reicht je ein Bereich (drawRange)
   const posAttr = new THREE.BufferAttribute(pos, 3), g = new THREE.BufferGeometry(), gg = new THREE.BufferGeometry();
   g.setAttribute('position', posAttr); gg.setAttribute('position', posAttr);
-  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 6), 3));
-  lv.mesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true }));
+  lv.fat = n <= LV_FAT_MAX && typeof THREE.InstancedMesh === 'function';
+  if (lv.fat) {
+    // je Bahn ein Quader: Länge der Bahn (+ etwas, damit Ecken schließen) × Linienbreite × Schichthöhe, Oberkante auf z
+    const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0, -0.5);
+    lv.mesh = new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0 }), n);
+    const m = lv.mesh.instanceMatrix.array, w = LV_LINE_W;
+    d.layers.forEach(([z, start], li) => {
+      const end = li + 1 < d.layers.length ? d.layers[li + 1][1] : n, h = Math.max(0.05, Math.min(0.6, li ? z - d.layers[li - 1][0] : z));
+      for (let i = start; i < end; i++) {
+        const o = i * 6, dx = pos[o + 3] - pos[o], dy = pos[o + 4] - pos[o + 1], L = Math.hypot(dx, dy), c = L ? dx / L : 1, s = L ? dy / L : 0, sx = L + w * 0.5, q = i * 16;
+        m[q] = c * sx; m[q + 1] = s * sx; m[q + 2] = 0; m[q + 3] = 0;
+        m[q + 4] = -s * w; m[q + 5] = c * w; m[q + 6] = 0; m[q + 7] = 0;
+        m[q + 8] = 0; m[q + 9] = 0; m[q + 10] = h; m[q + 11] = 0;
+        m[q + 12] = (pos[o] + pos[o + 3]) / 2; m[q + 13] = (pos[o + 1] + pos[o + 4]) / 2; m[q + 14] = z; m[q + 15] = 1;
+      }
+    });
+    lv.mesh.instanceMatrix.needsUpdate = true;
+    lv.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+    lv.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    lv.mesh.frustumCulled = false; lv.mesh.count = 0;
+  } else {
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 6), 3));
+    lv.mesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true }));
+  }
   lv.ghost = new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: 0x9aa0a8, transparent: true, opacity: 0.07, depthWrite: false }));
   lv.ghost.renderOrder = 1;
   lv.scene.add(lv.mesh, lv.ghost);
   if (lv.grid) { lv.scene.remove(lv.grid); lv.grid.geometry.dispose(); lv.grid.material.dispose(); }
   const size = Math.max(bx1 - bx0, by1 - by0, 20), span = Math.ceil(size * 1.4 / 10) * 10;
-  lv.grid = new THREE.GridHelper(span, span / 10, 0x444444, 0x2c2c2c); lv.grid.rotation.x = Math.PI / 2; lv.scene.add(lv.grid);
+  lv.grid = new THREE.GridHelper(span, span / 10, 0xffffff, 0xffffff);   // Farbe setzt lvTheme lv.grid.rotation.x = Math.PI / 2; lv.grid.position.z = 0.01; lv.scene.add(lv.grid);
   const top = d.bbox[5] || 1;
   // Bett und Mechanik möglichst im Bild – bei kleinen Teilen höchstens 2,2 × Modellgröße, sonst wäre das Teil winzig
   const bed = lvBed(), frame = Math.max(size, Math.min(Math.max(bed.x1 - bed.x0, bed.y1 - bed.y0), size * 2.2));
@@ -87,6 +140,7 @@ function lvBuild() {
   lv.controls.target.set(0, 0, top / 3); lv.controls.update();
   lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null; lv.skip = null; lv.skipKey = null;
   lvHeadInit();
+  lvTheme();
 }
 
 /* Drucker-Mechanik ungefähr wie beim Kobra S1 (CoreXY, das Bett fährt nach unten): Kopf ≈ 56 × 48 × 70 mm (geschätzt, keine
@@ -105,7 +159,7 @@ function lvHeadInit() {
   const H = LV_HEAD, glass = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, depthWrite: false });
   const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
   // Kopf: Düse (Spitze = Position) und Gehäuse darüber
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, H.tip, 20), new THREE.MeshBasicMaterial({ color: 0xf27a33 }));
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, H.tip, 20), new THREE.MeshBasicMaterial({ color: 0x2ec4b6 }));
   tip.rotation.x = -Math.PI / 2; tip.position.z = H.tip / 2;
   const boxG = new THREE.BoxGeometry(H.w, H.d, H.h), block = new THREE.Mesh(boxG, glass(0xe6e8ec)); block.position.z = H.tip + H.h / 2;
   const blockE = edges(boxG, 0.75); blockE.position.copy(block.position);
@@ -119,8 +173,13 @@ function lvHeadInit() {
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
   // Bett: Umriss auf Höhe 0
   const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));
-  lv.bed = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(bedPts), new THREE.LineBasicMaterial({ color: 0x6b7280 }));
-  lv.scene.add(lv.head, lv.gantry, lv.bed);
+  lv.bed = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(bedPts), new THREE.LineBasicMaterial({ color: 0x5b6b73 }));
+  // gefüllte Druckplatte knapp unter den Bahnen
+  if (lv.plate) { lv.scene.remove(lv.plate); lv.plate.geometry.dispose(); lv.plate.material.dispose(); }
+  lv.plate = new THREE.Mesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), new THREE.MeshLambertMaterial({ color: 0x1d272d }));
+  lv.plate.position.set((bx0 + bx1) / 2, (by0 + by1) / 2, -0.03);
+  lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate);
+  lvTheme();
 }
 // Kopf und Mechanik an die Stelle p (Düsenspitze)
 function lvPlaceHead(p) {
@@ -386,17 +445,16 @@ function lvSkipSet(objs) {
 }
 function lvCurColour(i, split, withHead) { return lv.skip && lv.skip[i] ? LV_SKIP : !withHead || i < split ? LV_NOW : LV_PENDING; }
 function lvColour(cur, done) {
-  const d = lv.data, col = lv.mesh.geometry.attributes.color.array, cache = {};
+  const d = lv.data, cache = {};
   const start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, withHead = done != null;
   for (let i = 0; i < end; i++) {
     let c;
     if (i < start) { const k = d.a[2 * i + 1]; c = lv.skip && lv.skip[i] ? LV_SKIP : cache[k] || (cache[k] = lvVisible(hexToRgb01(toolColour(k)))); }
     else c = lvCurColour(i, done, withHead);
-    for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
+    lvPaint(i, c);
   }
   lvColourDirty(0, end);
-  lv.mesh.geometry.setDrawRange(0, end * 2);
-  lv.ghost.geometry.setDrawRange(end * 2, (d.count - end) * 2);
+  lvRange(end);
   lvGhostApply();
   lv.shown = cur; lv.shownDone = done;
 }
@@ -408,11 +466,8 @@ function lvColourTo(split) {
   split = Math.max(start, Math.min(end, split));
   const was = lv.shownDone;
   if (split === was) return;
-  const col = lv.mesh.geometry.attributes.color.array, [a, b] = split > was ? [was, split] : [split, was];
-  for (let i = a; i < b; i++) {
-    const c = lvCurColour(i, split, true);
-    for (let v = 0; v < 2; v++) { const o = (i * 2 + v) * 3; col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2]; }
-  }
+  const [a, b] = split > was ? [was, split] : [split, was];
+  for (let i = a; i < b; i++) lvPaint(i, lvCurColour(i, split, true));
   lvColourDirty(a, b);
   lv.shownDone = split;
 }

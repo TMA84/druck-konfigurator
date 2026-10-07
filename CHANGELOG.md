@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **3D-Fortschritt schöner:** Bahnen als beleuchtete Raupen (Linienbreite × Schichthöhe, ein Instanz-Objekt – flüssig auch bei großen Drucken) statt 1-Pixel-Linien; gefüllte Druckplatte, dezentes Raster, Hintergrund passend zu hell/dunkel; aktuelle Schicht und Düse in Petrol. Über 600 000 Bahnen bleibt es bei den schnellen Linien.
+- „Verbindung …“ und „Rohdaten“ in der Druckerleiste in hellem Petrol statt Orange.
+
 ## [10.23.0] – 2026-10-07
 
 ### Geändert

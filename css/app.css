@@ -632,7 +632,7 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-bar-main { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
 .wb-bar-main b { font-family: var(--f-display); font-size: 18px; letter-spacing: .01em; }
 .wb-bar-main .muted { color: #b9bcc2; }
-.wb-bar .linkbtn { color: #ffb489; }
+.wb-bar .linkbtn { color: var(--bar-link, #7fe0d6); }   /* helles Petrol auf der dunklen Leiste */
 .wb-bar-links { display: flex; gap: 14px; }
 .wb-light { color: #fff; }
 .wb-pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,.12); color: #e8e8e8; white-space: nowrap; }
