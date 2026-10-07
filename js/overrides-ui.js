@@ -14,26 +14,26 @@ const OV_FIELDS = [
   ['seam', t('Nahtposition'), '', 0, 0, 0, t('Qualität'), ['Hinten', 'Ausgerichtet', 'Nächste', 'Zufällig']],
   ['w', t('Wandlinien'), '', 1, 12, 1, t('Struktur')], ['t', t('Obere Schichten'), '', 0, 30, 1, t('Struktur')], ['b', t('Untere Schichten'), '', 0, 30, 1, t('Struktur')],
   ['inf', t('Fülldichte'), '%', 0, 100, 5, t('Struktur')], ['pattern', t('Füllmuster'), '', 0, 0, 0, t('Struktur'), OV_PATTERNS],
-  ['sp_outer', t('Außenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_inner', t('Innenwand'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')], ['sp_fill', t('Füllung'), 'mm/s', 10, 600, 5, t('Geschwindigkeit')],
-  ['sp_first', t('Erste Schicht'), 'mm/s', 5, 300, 5, t('Geschwindigkeit')], ['sp_travel', t('Travel'), 'mm/s', 50, 1000, 10, t('Geschwindigkeit')],
-  ['sp_top', t('Obere Fläche'), 'mm/s', 10, 400, 5, t('Geschwindigkeit')], ['sp_gap', t('Lückenfüllung'), 'mm/s', 10, 400, 5, t('Geschwindigkeit')],
-  ['accel', t('Beschleunigung (0 = Werksprofil)'), 'mm/s²', 0, 20000, 500, t('Geschwindigkeit')],
-  ['max_vol', t('Max. Volumenstrom'), 'mm³/s', 1, 60, 0.5, t('Filament')], ['flow', t('Durchflussverhältnis'), '', 0.8, 1.2, 0.01, t('Filament')],
+  ['sp_outer', t('Außenwand'), 'mm/s', 10, 600, 5, t('Tempo')], ['sp_inner', t('Innenwand'), 'mm/s', 10, 600, 5, t('Tempo')], ['sp_fill', t('Füllung'), 'mm/s', 10, 600, 5, t('Tempo')],
+  ['sp_first', t('Erste Schicht'), 'mm/s', 5, 300, 5, t('Tempo')], ['sp_travel', t('Travel'), 'mm/s', 50, 1000, 10, t('Tempo')],
+  ['sp_top', t('Obere Fläche'), 'mm/s', 10, 400, 5, t('Tempo')], ['sp_gap', t('Lückenfüllung'), 'mm/s', 10, 400, 5, t('Tempo')],
+  ['accel', t('Beschleunigung (0 = Werksprofil)'), 'mm/s²', 0, 20000, 500, t('Tempo')],
+  ['max_vol', t('Max. Volumenstrom'), 'mm³/s', 1, 60, 0.5, t('Tempo')], ['flow', t('Durchflussverhältnis'), '', 0.8, 1.2, 0.01, t('Filament')],
   ['pa', t('Pressure Advance'), '', 0, 0.2, 0.005, t('Filament')], ['zhop', t('Z-Hop'), 'mm', 0, 2, 0.1, t('Filament')],
   // Rückzug: nur wenn gesetzt, sonst das Orca-Profil des Slots
-  ['retr_len', t('Rückzug Länge'), 'mm', 0, 10, 0.1, t('Rückzug')], ['retr_speed', t('Rückzug Geschwindigkeit'), 'mm/s', 5, 150, 5, t('Rückzug')],
-  ['fan', t('Lüfter (Bauteil)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_first', t('Lüfter erste Schicht'), '%', 0, 100, 5, t('Kühlung & Haftung')],
+  ['retr_len', t('Rückzug Länge'), 'mm', 0, 10, 0.1, t('Filament')], ['retr_speed', t('Rückzug Geschwindigkeit'), 'mm/s', 5, 150, 5, t('Filament')],
+  ['fan', t('Lüfter (Bauteil)'), '%', 0, 100, 5, t('Kühlung')], ['fan_first', t('Lüfter erste Schicht'), '%', 0, 100, 5, t('Kühlung')],
   // nur Kobra S1 (Orca-Profil mit Hilfs- und Abluftlüfter) – bei anderen Druckern ausgeblendet (ovFieldsFor)
-  ['fan_aux', t('Hilfslüfter (seitlich)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_box', t('Gehäuselüfter (Abluft)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
-  ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
+  ['fan_aux', t('Hilfslüfter (seitlich)'), '%', 0, 100, 5, t('Kühlung')], ['fan_box', t('Gehäuselüfter (Abluft)'), '%', 0, 100, 5, t('Kühlung')],
+  ['support', t('Stützen'), '', 0, 0, 0, t('Stützen'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
-  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], 
+  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Stützen'), [['on', t('an')], ['off', t('aus')]]], 
   // Brim (2026-10-07): außen und innen getrennt an/aus, Form außen, Abstand; darunter, was in Orca geschrieben wird (ovBrimInfo)
-  ['brim', t('Brim außen'), '', 0, 0, 0, t('Brim'), OV_BRIMS.map(([v, l]) => [v, t(l)])],
-  ['brim_kind', t('Form außen'), '', 0, 0, 0, t('Brim'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
-  ['brim_inner', t('Brim innen'), '', 0, 0, 0, t('Brim'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
-  ['brim_inner_kind', t('Form innen'), '', 0, 0, 0, t('Brim'), Object.entries(BRIM_INNER_KINDS).map(([v, l]) => [v, t(l)])],
-  ['brim_gap', t('Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Brim')]
+  ['brim', t('Brim außen'), '', 0, 0, 0, t('Brim & Haftung'), OV_BRIMS.map(([v, l]) => [v, t(l)])],
+  ['brim_kind', t('Form außen'), '', 0, 0, 0, t('Brim & Haftung'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
+  ['brim_inner', t('Brim innen'), '', 0, 0, 0, t('Brim & Haftung'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
+  ['brim_inner_kind', t('Form innen'), '', 0, 0, 0, t('Brim & Haftung'), Object.entries(BRIM_INNER_KINDS).map(([v, l]) => [v, t(l)])],
+  ['brim_gap', t('Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Brim & Haftung')]
 ];
 /* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte
    (Prozess). Slot- und Plattenwerte wirkten bisher nur am ersten Teil des Slots bzw. des Projekts – bei mehreren Teilen
@@ -49,7 +49,9 @@ function ovFields() {
     Array.isArray(f[6]) ? f[6].map(([v, l]) => [v, t(l)]) : undefined]);
   const out = OV_FIELDS.slice();
   for (const f of extra) { let at = -1; out.forEach((g, i) => { if (g[6] === f[6]) at = i; }); if (at >= 0) out.splice(at + 1, 0, f); else out.push(f); }
-  return out;
+  // nach Thema (Reiter) ordnen, innerhalb des Themas Reihenfolge wie bisher
+  const ti = f => { const i = VALUE_THEMES.findIndex(th => t(th) === f[6]); return i < 0 ? VALUE_THEMES.length : i; };
+  return out.map((f, i) => [f, i]).sort((a, b) => ti(a[0]) - ti(b[0]) || a[1] - b[1]).map(x => x[0]);
 }
 const ovScope = k => k.startsWith('x:') ? (typeof ORCA_EXTRA_BY_KEY !== 'undefined' && ORCA_EXTRA_BY_KEY[k.slice(2)] ? ORCA_EXTRA_BY_KEY[k.slice(2)][7] : 'object') : OV_SCOPE[k];
 /* Vorschlag für eine weitere Orca-Einstellung: was ohne Eingabe gedruckt würde – der berechnete Wert, wenn das Tool ihn
@@ -85,19 +87,21 @@ function openOverrideDialog(focusGroup) {
   for (const f of ovFields()) if (f[0].startsWith('x:')) { const v = extraSuggestion(r, f[0].slice(2)); if (v !== undefined) sugg[f[0]] = /^-?\d+(\.\d+)?$/.test(String(v)) && !f[7] ? +v : String(v); }
   $('ovRows').innerHTML = ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
-    const head = grp !== group ? '<div class="ov-group">' + esc(grp) + '</div>' : ''; group = grp;
+    const head = grp !== group ? '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>' : ''; group = grp;
     const input = opts
       ? '<select data-ov="' + k + '"><option value="">' + t('– Vorschlag –') + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
       : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(def[k] ?? sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
     const sc = project.parts.length > 1 ? ovScope(k) : null;
     const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
-    return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
+    return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '" data-theme="' + esc(grp) + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
       '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
         : t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') })) + '</span>' + input +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
   }).join('');
   ovBrimSugg = sugg; ovBrimHoles = undefined;
-  { const last = $('ovRows').querySelector('[data-ov="brim_gap"]'); if (last) last.closest('.ov-row').insertAdjacentHTML('afterend', '<div id="ovBrimInfo" class="ov-brim-info muted small"></div>'); }
+  { const last = $('ovRows').querySelector('[data-ov="brim_gap"]'); if (last) last.closest('.ov-row').insertAdjacentHTML('afterend', '<div id="ovBrimInfo" class="ov-brim-info muted small" data-theme="' + esc(t('Brim & Haftung')) + '"></div>'); }
+  $('ovSearch').value = '';
+  ovTab(ovTabNow && $('ovRows').querySelector('[data-theme="' + CSS.escape(ovTabNow) + '"]') ? ovTabNow : t(VALUE_THEMES[0]));
   ovBrimInfo();
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2); $('ovAll').checked = false;
   $('ovTitle').textContent = t('Werte anpassen') + (project.parts.length > 1 ? ' · ' + p.name : '');
@@ -107,6 +111,8 @@ function openOverrideDialog(focusGroup) {
   $('ovDefInfo').textContent = nDef ? t('{n} eigene Standardwerte für {mat} auf diesem Drucker aktiv.', { n: nDef, mat: r.m.name }) : '';
   $('ovDlg').showModal();
   // aus dem Datenblatt („✎ anpassen“): zum Abschnitt springen
+  if (typeof focusGroup === 'string') ovTab(focusGroup);
+  else if (focusGroup && focusGroup.key) { const el = $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]'); if (el) ovTab(el.closest('.ov-row').dataset.theme); }
   if (typeof focusGroup === 'string') { const g = [...$('ovRows').querySelectorAll('.ov-group')].find(x => x.textContent === focusGroup); if (g) { g.scrollIntoView({ block: 'start' }); const i = g.nextElementSibling && g.nextElementSibling.querySelector('[data-ov]'); if (i) i.focus(); } }
   // aus einer Zeile des Datenblatts: genau dieses Feld
   else if (focusGroup && focusGroup.key) { const i = $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]'); if (i) { i.closest('.ov-row').scrollIntoView({ block: 'center' }); i.focus(); i.closest('.ov-row').classList.add('ov-focus'); } }
@@ -123,6 +129,28 @@ function ovWarn(k, v) {
   if (Number.isFinite(s) && s > 0 && Math.abs(v - s) / s > 0.3) return t('deutlich anders als der Vorschlag ({s})', { s: de(s, s < 1 ? 3 : s < 10 ? 2 : 0) });
   return '';
 }
+/* Reiter nach Thema (mit Zähler angepasster Werte) und Suche über alle Reiter (2026-10-07) */
+let ovTabNow = null;
+function ovTabsRender() {
+  const rows = [...$('ovRows').querySelectorAll('.ov-row')], themes = [...new Set(rows.map(r => r.dataset.theme))];
+  $('ovTabs').innerHTML = themes.map(th => { const n = rows.filter(r => r.dataset.theme === th && r.classList.contains('set')).length;
+    return '<button type="button" role="tab" class="ov-tab' + (th === ovTabNow ? ' on' : '') + '" data-tab="' + esc(th) + '" aria-selected="' + (th === ovTabNow) + '">' + esc(th) + (n ? ' <span class="ov-tab-n">' + n + '</span>' : '') + '</button>'; }).join('');
+}
+function ovTab(th) {
+  ovTabNow = th; const q = $('ovSearch').value.trim().toLowerCase();
+  $('ovRows').querySelectorAll('[data-theme]').forEach(el => {
+    const hit = q ? (el.classList.contains('ov-row') && (el.textContent + ' ' + el.dataset.theme).toLowerCase().includes(q)) : el.dataset.theme === th && !el.classList.contains('ov-group');
+    el.hidden = !hit;
+  });
+  // bei der Suche die Themen der Treffer als Überschrift zeigen
+  if (q) $('ovRows').querySelectorAll('.ov-group').forEach(g => { g.hidden = !$('ovRows').querySelector('.ov-row[data-theme="' + CSS.escape(g.dataset.theme) + '"]:not([hidden])'); });
+  $('ovNoHit').hidden = !q || !!$('ovRows').querySelector('.ov-row:not([hidden])');
+  ovTabsRender();
+  $('ovTabs').classList.toggle('searching', !!q);
+}
+$('ovTabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; $('ovSearch').value = ''; ovTab(b.dataset.tab); $('ovRows').scrollTop = 0; });
+$('ovSearch').addEventListener('input', () => ovTab(ovTabNow));
+
 /* Was beim Brim in Orca landet – für die Werte im Dialog (leer = Vorschlag) und dieses Teil (Löcher in der ersten Schicht?) */
 let ovBrimSugg = {}, ovBrimHoles;
 function ovBrimHasHoles() {
@@ -162,6 +190,7 @@ $('ovRows').addEventListener('change', e => { if (/^brim/.test((e.target.dataset
 $('ovRows').addEventListener('input', e => {
   const el = e.target.closest('[data-ov]'); if (!el) return;
   if (/^brim/.test(el.dataset.ov)) ovBrimInfo();
+  setTimeout(ovTabsRender, 0);
   const row = el.closest('.ov-row'), set = el.value !== '';
   row.classList.toggle('set', set); row.querySelector('.ov-x').hidden = !set;
   let w = row.querySelector('.ov-warn');

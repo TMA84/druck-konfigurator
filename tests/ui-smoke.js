@@ -563,6 +563,10 @@ async function runSmoke(opts={}){
       ok(last('support_type')&&last('support_type').value==='normal(auto)'&&last('elefant_foot_compensation').value==='0.15','gesetzt: Stützen-Typ normal(auto), Elefantenfuß 0,15 im Export (zuletzt)');
       ok($('orderedSettings').textContent.includes('Weitere Orca-Einstellungen'),'Orca-Reihenfolge: „Weitere Orca-Einstellungen“');
       const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);$('ovOpen').click();await wait(50); }
+    { const titles=[...$('settings').querySelectorAll('.th-card .spec-title')].map(h=>h.firstChild.textContent.trim());
+      ok(['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen'].every(x=>titles.includes(x)),'Druckwerte: Karten nach Thema '+titles.join('/'));
+      ok(!$('settings').querySelector('details'),'Druckwerte: nichts eingeklappt');
+      ok([...$('settings').querySelectorAll('.spec-cell .k')].filter(k=>k.textContent.replace('?','').trim()==='Rückzug').length===1,'Rückzug nur einmal'); }
     // Karte „Weitere Orca-Einstellungen“: Elefantenfuß aus dem Profil, angepasst hervorgehoben, Klick öffnet den Dialog
     { const c=$('settings').querySelector('[data-ovk="x:elefant_foot_compensation"]');ok(!!c&&/0[,.]075/.test(c.textContent)&&!c.classList.contains('ov'),'Druckwerte: Elefantenfuß 0,075 mm aus dem Profil');
       $('ovDlg').close();c.click();await wait(50);ok($('ovDlg').open&&document.activeElement===$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]'),'Klick auf die Kachel: Dialog beim Wert');
@@ -573,7 +577,7 @@ async function runSmoke(opts={}){
       ok(b&&k&&b.closest('.ov-row').nextElementSibling===k.closest('.ov-row'),'Form außen direkt unter Brim außen');
       ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: Ohrenkette – Löcher und Schriften frei');
       ok([...b.options].some(o=>o.value==='Nicht nötig'&&o.textContent==='aus'),'Brim außen: „aus“ wählbar');
-      ok(b.closest('.ov-row').previousElementSibling.textContent==='Brim','eigener Abschnitt „Brim“');
+      ok(b.closest('.ov-row').dataset.theme==='Brim & Haftung'&&b.closest('.ov-row').previousElementSibling.classList.contains('ov-group'),'eigener Abschnitt „Brim & Haftung“');
       ok(/In Orca:/.test($('ovBrimInfo').textContent)&&/brim_type/.test($('ovBrimInfo').textContent),'Brim: Zeile „In Orca“ mit den geschriebenen Werten');
       b.value='Nicht nötig';b.dispatchEvent(new Event('change',{bubbles:true}));const bi0=$('ovRows').querySelector('[data-ov="brim_inner"]');bi0.value='';bi0.dispatchEvent(new Event('change',{bubbles:true}));
       ok(/no_brim/.test($('ovBrimInfo').textContent),'außen und innen aus → no_brim');
@@ -596,8 +600,15 @@ async function runSmoke(opts={}){
       const oc=window.confirm;window.confirm=()=>true;$('ovDefReset').click();await wait(80);window.confirm=oc;
       ok(!(store.settings.ovDefaults||{})[key]&&lastResult.m.bed===fac,'Standard zurückgesetzt: wieder Werkswert');
       store.settings.ovDefaults=JSON.parse(d0)||undefined;persist();$('ovOpen').click();await wait(50); }
-    $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Geschwindigkeit"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
-    ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Geschwindigkeit');
+    $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Tempo"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
+    ok($('ovTabs').querySelector('.ov-tab.on')?.dataset.tab==='Tempo','Dialog: Reiter Tempo aktiv');
+    ok([...$('ovRows').querySelectorAll('.ov-row')].filter(r=>!r.hidden).every(r=>r.dataset.theme==='Tempo'),'Reiter zeigt nur Tempo-Werte');
+    $('ovSearch').value='brim';$('ovSearch').dispatchEvent(new Event('input'));
+    { const vis=[...$('ovRows').querySelectorAll('.ov-row')].filter(r=>!r.hidden);ok(vis.length>=5&&vis.every(r=>/brim/i.test(r.textContent+r.dataset.theme))&&vis.some(r=>r.dataset.theme!=='Tempo'),'Suche „brim“: Brim-Felder über alle Reiter'); }
+    $('ovSearch').value='';$('ovSearch').dispatchEvent(new Event('input'));
+    { const th=['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen','Oberflächen','Sonstiges'];ok([...$('ovTabs').querySelectorAll('[data-tab]')].map(b=>b.dataset.tab).join()===th.join(),'Reiter in Themenreihenfolge'); }
+    ovTab('Tempo');
+    ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Tempo');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
     crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
     ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');

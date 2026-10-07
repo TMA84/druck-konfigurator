@@ -36,19 +36,51 @@ function currentInput(){
 
 // Kennwert-Kachel für die Übersicht; die ersten Zeilen (Temperaturen, Schichthöhe) sind hervorgehoben.
 const KEY_ROWS=['Düse','Heizbett','Schichthöhe / erste Schicht'];
-/* Vierte Karte: weitere Orca-Einstellungen (js/orca-extra.js) – die wichtigsten immer, dazu alles, was du gesetzt hast.
-   Wert = deine Anpassung (hervorgehoben) bzw. was ohne Eingabe gedruckt würde; anklicken öffnet den Dialog bei dem Wert. */
-const EXTRA_SHOWN=['support_type','support_style','elefant_foot_compensation','wall_generator','wall_sequence','ironing_type','brim_type','line_width'];
-function extraCard(r){
-  if(typeof ORCA_EXTRA==='undefined'||typeof extraSuggestion!=='function')return '';
-  const set=r.extraOv||{},keys=ORCA_EXTRA.map(f=>f[0]).filter(k=>k in set||(EXTRA_SHOWN.includes(k)&&(!/^support_(type|style)$/.test(k)||r.supOn)));
-  const cells=keys.map(k=>{const v=k in set?set[k]:extraSuggestion(r,k);if(v===undefined||v==='')return '';
-    return '<div class="spec-cell'+(k in set?' ov':'')+'" data-ovk="x:'+esc(k)+'"><span class="k">'+esc(t(ORCA_EXTRA_BY_KEY[k][1]))+'</span><span class="v">'+esc(extraLabel(k,v))+'</span></div>'}).join('');
-  return cells?'<section class="spec-group spec-extra"><h3 class="spec-title">'+esc(t('Weitere Orca-Einstellungen'))+(project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(t('Stützen'))+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+cells+'</div></section>':'';
+/* Druckwerte als Kacheln nach Thema (2026-10-07): alle Werte sichtbar – Orca-Liste (r.ordered), Lüfter, weitere
+   Orca-Einstellungen (js/orca-extra.js); nichts eingeklappt. Angepasste Werte hervorgehoben, Kachel anklicken öffnet den
+   Dialog bei dem Wert, „✎ anpassen“ den Reiter des Themas. */
+const ROW_OV={'Düse':'nozzle','Heizbett':'bed','Lüfter':'fan','Lüfter Folgeschichten':'fan','Lüfter erste Schicht':'fan_first','Hilfs- / Gehäuselüfter':'fan_aux',
+  'Schichthöhe / erste Schicht':'layer','Schichthöhe':'layer','Höhe der ersten Schicht':'first_layer','Nahtposition':'seam',
+  'Wandlinien':'w','Obere / untere Schichten':'t','Obere Schichten':'t','Untere Schichten':'b','Fülldichte / Muster':'inf','Fülldichte':'inf','Füllmuster':'pattern',
+  'Außenwand / Innenwand':'sp_outer','Außenwand':'sp_outer','Innere Wand':'sp_inner','Füllung / Travel':'sp_fill','Füllung':'sp_fill','Travel':'sp_travel',
+  'Erste Schicht':'sp_first','Obere Fläche':'sp_top','Lückenfüllung':'sp_gap','Beschleunigung':'accel','Rückzug':'retr_len',
+  'Max. Volumenstrom':'max_vol','Maximale Volumengeschwindigkeit':'max_vol','Durchflussverhältnis':'flow','Pressure Advance':'pa','Z-Hop':'zhop',
+  'Support':'support','Stützstrukturen':'support','Nur kritische Bereiche':'critical','Brim':'brim',
+  'Lüfter erste Schicht':'fan_first','Hilfs- / Gehäuselüfter':'fan_aux','Maximale Volumengeschwindigkeit':'max_vol'};
+const ROW_OV_T=Object.fromEntries(Object.entries(ROW_OV).map(([k,v])=>[t(k),v]));
+const ORDER_THEME={'Qualität':'Qualität','Struktur':'Struktur','Geschwindigkeit':'Tempo','Stützen':'Stützen','Material / Filament':'Filament','Sonstiges':'Sonstiges'};
+const ROW_THEME={'Düse':'Temperatur','Heizbett':'Temperatur','Herstellerbereich':'Temperatur','Lüfter erste Schicht':'Kühlung','Lüfter Folgeschichten':'Kühlung',
+  'Hilfs- / Gehäuselüfter':'Kühlung','Maximale Volumengeschwindigkeit':'Tempo','Brim':'Brim & Haftung','Düsendurchmesser':'Sonstiges','Profilname':'Filament','Rückzug':'Filament'};
+// Zeilen der Orca-Liste, die als weitere Orca-Einstellung (mit eigenem Wert und Anpassung) gezeigt werden
+const ROW_AS_EXTRA={'Linienbreite Standard':'line_width','Linienbreite erste Schicht':'initial_layer_line_width','Linienbreite Außenwand':'outer_wall_line_width',
+  'Elefantenfußkompensation':'elefant_foot_compensation','Raft':'raft_layers','Glätten':'ironing_type'};
+const EXTRA_THEME={'Stützen':'Stützen','Qualität':'Qualität','Oberflächen':'Oberflächen','Brim & Haftung':'Brim & Haftung','Sonstiges':'Sonstiges'};
+// Werte der weiteren Orca-Einstellungen: deine Anpassung, sonst Rechnung des Tools, sonst Druckerprofil (einmal je update)
+function extraValues(r){
+  const set=r.extraOv||{},out={};if(typeof ORCA_EXTRA==='undefined')return out;
+  let pc=[],tpl=null;try{pc=plannedChanges({...r,extraOv:{}},0,null)}catch(e){}try{tpl=exportTemplate(r.printer.id,r.dSel)}catch(e){}
+  for(const f of ORCA_EXTRA){const k=f[0];if(k in set){out[k]=set[k];continue}
+    const c=pc.filter(c=>c.key===k&&!c.perSlot).pop();let v=c?c.value:tpl&&tpl.settings?tpl.settings[k]:undefined;if(Array.isArray(v))v=v[0];if(v!==undefined&&v!=='')out[k]=v}
+  return out;
 }
-function specCell(x){
+function themeCards(r){
+  const by=Object.fromEntries(VALUE_THEMES.map(th=>[th,[]])),seen=new Set();
+  const add=(th,x,key)=>{const id=th+'|'+x[0];if(seen.has(id))return;seen.add(id);(by[th]||by.Sonstiges).push([x,key])};
+  for(const [g,rows] of r.ordered){if(!ORDER_THEME[g])continue;
+    for(const x of rows){if(ROW_AS_EXTRA[x[0]])continue;add(ROW_THEME[x[0]]||ORDER_THEME[g],x,ROW_OV_T[t(x[0])]||null)}}
+  const aux=r.rows.find(x=>x[0]==='Hilfs- / Gehäuselüfter');if(aux)add('Kühlung',aux,'fan_aux');
+  const xv=extraValues(r),set=r.extraOv||{};
+  for(const f of (typeof ORCA_EXTRA==='undefined'?[]:ORCA_EXTRA)){const k=f[0];if(!(k in xv))continue;
+    if(/^(support_|tree_support)/.test(k)&&!r.supOn&&!(k in set))continue;   // Stützen-Details nur, wenn gestützt wird
+    add(EXTRA_THEME[f[2]]||'Sonstiges',[f[1],esc(extraLabel(k,xv[k])),'',k in set],'x:'+k)}
+  return VALUE_THEMES.filter(th=>by[th].length).map(th=>{const n=by[th].filter(([x])=>x[3]).length;
+    return '<section class="spec-group th-card"><h3 class="spec-title">'+esc(t(th))+(n?' <span class="ov-count">'+t('{n} angepasst',{n})+'</span>':'')+
+      (project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(t(th))+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3>'+
+      '<div class="spec-grid">'+by[th].map(([x,key])=>specCell(x,key)).join('')+'</div></section>'}).join('');
+}
+function specCell(x,key){
   const h=helpFor(x[0],getMat($('material').value).kind);
-  return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])?' key':'')+(x[3]?' ov':'')+'"><span class="k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
+  return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])||x[0]==='Schichthöhe'?' key':'')+(x[3]?' ov':'')+'"'+(key?' data-ovk="'+esc(key)+'"':'')+'><span class="k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
     '<span class="v">'+x[1]+'</span>'+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</div>';
 }
 
@@ -68,14 +100,8 @@ function update(){
   document.body.dataset.printer=r.printer.id;
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
-  // Werte in drei Karten: Temperatur & Kühlung, Tempo, Aufbau (unbekannte Zeilen kommen zum Aufbau)
-  const SPEC_GROUPS=[[t('Temperatur & Kühlung'),['Düse','Heizbett','Lüfter','Hilfs- / Gehäuselüfter']],[t('Tempo'),['Außenwand / Innenwand','Füllung / Travel','Max. Volumenstrom','Beschleunigung','Rückzug']],
-    [t('Aufbau'),null]];
-  const known=new Set(SPEC_GROUPS.flatMap(g=>g[1]||[]));
-  $('settings').innerHTML=SPEC_GROUPS.map(([title,keys])=>{const rows=r.rows.filter(x=>keys?keys.includes(x[0]):!known.has(x[0]));
-    // „✎ anpassen“: Werte für diesen Auftrag, gleich beim passenden Abschnitt
-    const ovGroup={[t('Temperatur & Kühlung')]:t('Temperatur'),[t('Tempo')]:t('Geschwindigkeit'),[t('Aufbau')]:t('Struktur')}[title];
-    return rows.length?'<section class="spec-group"><h3 class="spec-title">'+esc(title)+(ovGroup&&project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(ovGroup)+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3><div class="spec-grid">'+rows.map(specCell).join('')+'</div></section>':''}).join('')+extraCard(r);
+  // alle Werte als Kacheln nach Thema
+  $('settings').innerHTML=themeCards(r);
   // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
   const oo=store.settings.orderOpen||{};
   $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
@@ -380,14 +406,6 @@ $('orderedOnlyOv').addEventListener('change',()=>{
 $('settings').addEventListener('click',e=>{const b=e.target.closest('[data-ov-group]');if(b&&typeof openOverrideDialog==='function')openOverrideDialog(b.dataset.ovGroup)});
 
 /* Datenblatt und Orca-Reihenfolge: Zeile anklicken → „Werte für diesen Auftrag“ bei diesem Wert (2026-10-04) */
-const ROW_OV={'Düse':'nozzle','Heizbett':'bed','Lüfter':'fan','Lüfter Folgeschichten':'fan','Lüfter erste Schicht':'fan_first','Hilfs- / Gehäuselüfter':'fan_aux',
-  'Schichthöhe / erste Schicht':'layer','Schichthöhe':'layer','Höhe der ersten Schicht':'first_layer','Nahtposition':'seam',
-  'Wandlinien':'w','Obere / untere Schichten':'t','Obere Schichten':'t','Untere Schichten':'b','Fülldichte / Muster':'inf','Fülldichte':'inf','Füllmuster':'pattern',
-  'Außenwand / Innenwand':'sp_outer','Außenwand':'sp_outer','Innere Wand':'sp_inner','Füllung / Travel':'sp_fill','Füllung':'sp_fill','Travel':'sp_travel',
-  'Erste Schicht':'sp_first','Obere Fläche':'sp_top','Lückenfüllung':'sp_gap','Beschleunigung':'accel','Rückzug':'retr_len',
-  'Max. Volumenstrom':'max_vol','Maximale Volumengeschwindigkeit':'max_vol','Durchflussverhältnis':'flow','Pressure Advance':'pa','Z-Hop':'zhop',
-  'Support':'support','Stützstrukturen':'support','Nur kritische Bereiche':'critical','Brim':'brim'};
-const ROW_OV_T=Object.fromEntries(Object.entries(ROW_OV).map(([k,v])=>[t(k),v]));
 ['settings','orderedSettings'].forEach(id=>$(id).addEventListener('click',e=>{
   if(e.target.closest('[data-ov-group],.help,a,button'))return;
   const xc=e.target.closest('[data-ovk]');if(xc&&project&&typeof openOverrideDialog==='function'){openOverrideDialog({key:xc.dataset.ovk});return;}

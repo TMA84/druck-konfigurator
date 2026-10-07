@@ -11,9 +11,9 @@
   --rule: #d8d4ca;
   --rule-strong: #b9b3a6;
 
-  --accent: #b0440b;          /* Kobra S1 – WCAG AA auf Papier und mit Weiß */
+  --accent: #0b7a72;          /* Petrol – WCAG AA auf Papier und mit Weiß */
   --accent-ink: #fff;
-  --accent-soft: #fbe6d9;
+  --accent-soft: #e2f3f1;
 
   --ok: #1f7a4a;      --ok-soft: #e4f3ea;   --ok-rule: #a9d8bc;
   --warn: #8a5a00;    --warn-soft: #fcf1d9; --warn-rule: #ebcf92;
@@ -1168,3 +1168,26 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .spec-group .spec-cell.ov { padding-left: 9px; }
 .ov-brim-info { margin: 4px 0 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--paper-2); border-radius: 6px; line-height: 1.55; }
 .ov-brim-info code { font-size: 11.5px; }
+
+/* Anpassen-Dialog: Reiter nach Thema + Suche */
+.ov-nav { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 0 22px 10px; border-bottom: 1px solid var(--rule); }
+.ov-tabs { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.ov-tab { border: 1px solid var(--rule); background: var(--paper); color: var(--ink-2); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.ov-tab:hover { border-color: var(--accent-rule, var(--accent)); color: var(--ink); }
+.ov-tab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ov-tabs.searching .ov-tab.on { background: var(--paper); color: var(--ink-2); border-color: var(--rule); }
+.ov-tab-n { display: inline-block; min-width: 17px; padding: 0 5px; margin-left: 3px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; text-align: center; }
+.ov-tab.on .ov-tab-n { background: var(--accent-ink); color: var(--accent); }
+.ov-search { flex: 0 1 240px; min-width: 160px; padding: 6px 10px; font: inherit; font-size: 13px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--ink); }
+#ovRows .ov-group[hidden], #ovRows [data-theme][hidden] { display: none; }
+#ovDlg .ed-body { min-height: 340px; }
+/* Druckwerte: Kacheln nach Thema, alle sichtbar */
+#settings.spec { display: block; columns: 3 300px; column-gap: 14px; }
+#settings .spec-group.th-card { break-inside: avoid; margin-bottom: 14px; display: block; }
+#settings .spec-group.th-card .spec-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+#settings .th-card .spec-cell .v { font-size: 16px; }
+#settings .th-card .spec-cell.key .v { font-size: 19px; }
+#settings .th-card .spec-title { display: flex; align-items: center; gap: 8px; }
+#settings .th-card .spec-title .spec-edit { margin-left: auto; }
+#settings [data-ovk] { cursor: pointer; border-radius: 6px; }
+#settings [data-ovk]:hover { background: var(--paper-2); }

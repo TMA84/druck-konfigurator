@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Neues Farbschema Graphit + Petrol** (hell und dunkel): kühles Anthrazit bzw. helles Blaugrau mit Petrol als Akzent; der Snapmaker U1 bekommt Bernstein, damit er sich abhebt.
+- **Druckwerte: alle Werte als Kacheln nach Thema** – Temperatur, Kühlung, Tempo, Qualität, Struktur, Filament, Brim & Haftung, Stützen, Oberflächen, Sonstiges; nichts mehr eingeklappt, inkl. der weiteren Orca-Einstellungen, ohne Doppelungen. Jede Karte zeigt die Zahl angepasster Werte, Kachel anklicken öffnet die Anpassung bei dem Wert, „✎ anpassen“ den Reiter des Themas.
+- **Werte anpassen mit Reitern und Suche:** dieselben Themen als Reiter (mit Zähler angepasster Werte), Suchfeld über alle Reiter (findet auch über den Themennamen, z. B. „brim“, „lüfter“).
+
 ## [10.21.0] – 2026-10-07
 
 ### Neu

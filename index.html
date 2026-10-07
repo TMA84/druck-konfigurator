@@ -6,7 +6,7 @@
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<meta name="theme-color" content="#c2410c">
+<meta name="theme-color" content="#0b7a72">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/modern.css">
 <link rel="stylesheet" href="css/engrave.css">
@@ -555,7 +555,8 @@
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="sendGo">Jetzt drucken</button></div></dialog>
 
 <dialog id="ovDlg" aria-labelledby="ovTitle"><div class="ed-head"><h2 id="ovTitle">Werte für diesen Auftrag anpassen</h2><div class="muted" id="ovSub">Der Vorschlag steht links. Trägst du einen Wert ein, gilt er statt des Vorschlags – im Datenblatt, in der 3MF, beim Slicen und für die Kosten. Leer = Vorschlag.</div></div>
-  <div class="ed-body"><div id="ovRows"></div>
+  <div class="ov-nav"><div id="ovTabs" class="ov-tabs" role="tablist"></div><input type="search" id="ovSearch" class="ov-search" placeholder="Suchen … (z. B. Brim, Lüfter)" aria-label="Einstellungen durchsuchen"></div>
+  <div class="ed-body"><div id="ovRows"></div><p id="ovNoHit" class="muted small" hidden>Keine Einstellung gefunden.</p>
     <label class="wb-toggle hidden" id="ovAllRow"><input type="checkbox" id="ovAll"> Für alle Teile des Projekts übernehmen</label></div>
   <p id="ovDefInfo" class="muted small ov-def-info"></p>
   <div class="ed-foot"><button class="linkbtn hidden" type="button" id="ovDefReset">Standard zurücksetzen</button><button class="btn sec" type="button" id="ovDefSave">Als Standard merken</button><button class="btn sec" type="button" id="ovClear">Alle leeren (Vorschlag)</button><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="ovSave">Übernehmen</button></div></dialog>

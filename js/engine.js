@@ -1,4 +1,6 @@
 'use strict';
+// Themen für Druckwerte-Kacheln (js/panel.js) und Reiter des Anpassen-Dialogs (js/overrides-ui.js), in dieser Reihenfolge
+const VALUE_THEMES=['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen','Oberflächen','Sonstiges'];
 // Brim-Arten (Werte für diesen Auftrag): auto = außen, Löcher/Schriften frei (gesetzte Mausohren, js/brim-ears.js)
 const BRIM_KINDS={auto:'Ohrenkette – Löcher und Schriften frei',outer:'Orca ringsum (auch um Inseln in Löchern)',ears:'Orca-Mausohren nur an Ecken'};
 // Brim innen (eigene Auswahl): nur in großen Löchern, kleine Löcher und Schriften bleiben frei (js/brim-ears.js)

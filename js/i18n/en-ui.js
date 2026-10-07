@@ -753,3 +753,13 @@ I18N.add({
  "Orca kennt nur eine Brim-Breite – es gilt {w} mm für außen und innen": "Orca has only one brim width – {w} mm applies to outer and inner",
  "innen: wirkt nur mit Form außen „Ohrenkette“ oder Form innen „Orca innen ringsum“": "inner: only works with outer shape “ear chain” or inner shape “Orca inner all around”",
 });
+I18N.add({
+ "Kühlung": "Cooling",
+ "Brim & Haftung": "Brim & adhesion",
+ "Suchen … (z. B. Brim, Lüfter)": "Search … (e.g. brim, fan)",
+ "Einstellungen durchsuchen": "Search settings",
+ "Keine Einstellung gefunden.": "No setting found.",
+ "Temperatur": "Temperature",
+ "Qualität": "Quality",
+ "Struktur": "Strength",
+});
