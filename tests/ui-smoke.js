@@ -53,7 +53,6 @@ async function runSmoke(opts={}){
   ok([...$('nozM').options].map(o=>o.value).join()==='steel_stainless,steel_hardened','U1: Düsenmaterialien Edelstahl/gehärtet');
   ok($('matBadge').textContent==='Allgemeiner Startwert','U1: getestetes Profil gilt als allgemein');
   ok($('warning').innerHTML.includes('Snapmaker U1'),'U1: Warnhinweis „nicht gegengetestet“');
-  ok($('orderedTitle').textContent.includes('OrcaSlicer'),'U1: Slicer-Reihenfolge OrcaSlicer');
   const sw=document.querySelector('.printer-switch');sw.querySelector('[aria-checked="true"]').focus();
   sw.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));await wait(30);
   ok(document.body.dataset.printer==='kobra_s1','Pfeiltaste wechselt Drucker zurück');
@@ -221,7 +220,7 @@ async function runSmoke(opts={}){
   menuClick('editMat');ok($('editor').open,'Editor „Werte anpassen“ öffnet');
   $('ed_nozzle_1').value='219';$('edSave').click();
   ok($('matBadge').textContent==='Eigene Werte'&&$('material').selectedOptions[0].textContent.startsWith('★'),'Eigene Werte gespeichert (★, Badge)');
-  ok(document.querySelector('.spec-cell .v').textContent==='219 °C','Kennwert zeigt 219 °C');
+  ok(document.querySelector('#settings .ks .ks-v').textContent==='219 °C'&&document.querySelector('#settings .vl-row .vl-v').textContent==='219 °C','Kennwert zeigt 219 °C');
   menuClick('editMat');$('ed_maxVol').value='abc';$('edSave').click();
   ok(alerts.some(a=>a.includes('Volumengeschwindigkeit'))&&$('editor').open,'Ungültige Eingabe wird abgelehnt');
   $('edCancel').click();
@@ -561,12 +560,13 @@ async function runSmoke(opts={}){
       st.value='normal(auto)';ef.value='0.15';$('ovSave').click();await wait(80);
       const pc=plannedChanges(lastResult,0),last=k=>pc.filter(c=>c.key===k).pop();
       ok(last('support_type')&&last('support_type').value==='normal(auto)'&&last('elefant_foot_compensation').value==='0.15','gesetzt: Stützen-Typ normal(auto), Elefantenfuß 0,15 im Export (zuletzt)');
-      ok($('orderedSettings').textContent.includes('Weitere Orca-Einstellungen'),'Orca-Reihenfolge: „Weitere Orca-Einstellungen“');
+      ok(!$('orderedSettings'),'Abschnitt in Orca-Reihenfolge entfernt');
       const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);$('ovOpen').click();await wait(50); }
     { const titles=[...$('settings').querySelectorAll('.th-card .spec-title')].map(h=>h.firstChild.textContent.trim());
       ok(['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen'].every(x=>titles.includes(x)),'Druckwerte: Karten nach Thema '+titles.join('/'));
       ok(!$('settings').querySelector('details'),'Druckwerte: nichts eingeklappt');
-      ok([...$('settings').querySelectorAll('.spec-cell .k')].filter(k=>k.textContent.replace('?','').trim()==='Rückzug').length===1,'Rückzug nur einmal'); }
+      ok([...$('settings').querySelectorAll('.vl-row .vl-k')].filter(k=>k.textContent.replace('?','').trim()==='Rückzug').length===1,'Rückzug nur einmal');
+      ok($('settings').querySelectorAll('.key-strip .ks').length>=6,'Kennzahlen oben'); }
     // Karte „Weitere Orca-Einstellungen“: Elefantenfuß aus dem Profil, angepasst hervorgehoben, Klick öffnet den Dialog
     { const c=$('settings').querySelector('[data-ovk="x:elefant_foot_compensation"]');ok(!!c&&/0[,.]075/.test(c.textContent)&&!c.classList.contains('ov'),'Druckwerte: Elefantenfuß 0,075 mm aus dem Profil');
       $('ovDlg').close();c.click();await wait(50);ok($('ovDlg').open&&document.activeElement===$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]'),'Klick auf die Kachel: Dialog beim Wert');

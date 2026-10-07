@@ -76,7 +76,20 @@ function themeCards(r){
   return VALUE_THEMES.filter(th=>by[th].length).map(th=>{const n=by[th].filter(([x])=>x[3]).length;
     return '<section class="spec-group th-card"><h3 class="spec-title">'+esc(t(th))+(n?' <span class="ov-count">'+t('{n} angepasst',{n})+'</span>':'')+
       (project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(t(th))+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3>'+
-      '<div class="spec-grid">'+by[th].map(([x,key])=>specCell(x,key)).join('')+'</div></section>'}).join('');
+      '<div class="vl">'+by[th].map(([x,key])=>valueRow(x,key)).join('')+'</div></section>'}).join('');
+}
+// Zeile einer Themenkarte: Bezeichnung … Wert (rechtsbündig), Notiz klein darunter; angepasst = Petrol-Markierung
+function valueRow(x,key){
+  const h=helpFor(x[0],getMat($('material').value).kind);
+  return '<div class="vl-row'+(x[3]?' ov':'')+'"'+(key?' data-ovk="'+esc(key)+'"':'')+'><span class="vl-k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
+    '<span class="vl-v">'+x[1]+'</span>'+(x[2]?'<span class="vl-n">'+x[2]+'</span>':'')+'</div>';
+}
+// Kennzahlen oben: die wichtigsten Werte auf einen Blick (anklickbar wie die Zeilen)
+const KEY_STRIP=[['Düse','nozzle'],['Heizbett','bed'],['Schichthöhe','layer'],['Wandlinien','w'],['Fülldichte','inf'],['Stützstrukturen','support'],['Brim','brim']];
+function keyStrip(r){
+  const rows=Object.fromEntries(r.ordered.flatMap(g=>g[1]).map(x=>[x[0],x]));
+  return '<div class="key-strip">'+KEY_STRIP.filter(([l])=>rows[l]).map(([l,k])=>{const x=rows[l];
+    return '<div class="ks'+(x[3]?' ov':'')+'" data-ovk="'+k+'"><span class="ks-k">'+esc(t(l==='Stützstrukturen'?'Stützen':l))+'</span><span class="ks-v">'+x[1]+'</span></div>'}).join('')+'</div>';
 }
 function specCell(x,key){
   const h=helpFor(x[0],getMat($('material').value).kind);
@@ -91,8 +104,6 @@ function update(){
   const row=x=>rowHTML(x,r.m.kind);
   $('mainTitle').textContent=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
   document.title=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
-  $('orderedTitle').textContent=t('Einstellungen in {slicer}-Reihenfolge',{slicer:r.printer.slicer});
-  $('orderedIntro').innerHTML=t('Die Bezeichnungen orientieren sich an {slicer}. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.',{slicer:esc(r.printer.slicer)});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
   renderMatColours(r.m);
@@ -101,14 +112,7 @@ function update(){
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
   // alle Werte als Kacheln nach Thema
-  $('settings').innerHTML=themeCards(r);
-  // Abschnitte einzeln aufklappbar (Zustand gemerkt); angepasste Werte markiert, „nur Geändertes“ blendet den Rest aus
-  const oo=store.settings.orderOpen||{};
-  $('orderedSettings').innerHTML=r.ordered.map(g=>{const nOv=g[1].filter(x=>x[3]).length;
-    return '<details class="order-group'+(nOv?' has-ov':'')+'" data-order="'+esc(g[0])+'"'+(oo[g[0]]===false?'':' open')+'><summary class="order-title">'+t(g[0])+(nOv?' <span class="ov-count">'+t('{n} angepasst',{n:nOv})+'</span>':'')+'</summary><div class="order-body">'+g[1].map(row).join('')+'</div></details>'}).join('');
-  const nOvAll=r.ordered.reduce((s,g)=>s+g[1].filter(x=>x[3]).length,0);
-  $('orderedOnlyOv').disabled=!nOvAll;if(!nOvAll)$('orderedOnlyOv').checked=false;
-  $('orderedSettings').classList.toggle('only-ov',$('orderedOnlyOv').checked);
+  $('settings').innerHTML=keyStrip(r)+'<div class="th-grid">'+themeCards(r)+'</div>';
   $('title').textContent=r.m.name+' – '+t(r.ob.label)+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
     esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src));
@@ -392,21 +396,10 @@ $('orcaProcBtn').addEventListener('click',()=>{
   downloadJSON(orcaProcessJson,'druck-konfigurator-'+currentPrinter().id+'-process.json',$('orcaProcBtn'),label);
 });
 
-// Slicer-Reihenfolge: auf-/zugeklappte Abschnitte merken; „nur angepasste Werte“ blendet den Rest aus
-$('orderedSettings').addEventListener('toggle',e=>{
-  const d=e.target.closest&&e.target.closest('[data-order]');if(!d)return;
-  store.settings.orderOpen={...(store.settings.orderOpen||{}),[d.dataset.order]:d.open};persist();
-},true);
-$('orderedOnlyOv').addEventListener('change',()=>{
-  const on=$('orderedOnlyOv').checked;
-  $('orderedSettings').classList.toggle('only-ov',on);
-  if(on)$('orderedSettings').querySelectorAll('.has-ov').forEach(d=>{d.open=true});
-});
-
 $('settings').addEventListener('click',e=>{const b=e.target.closest('[data-ov-group]');if(b&&typeof openOverrideDialog==='function')openOverrideDialog(b.dataset.ovGroup)});
 
 /* Datenblatt und Orca-Reihenfolge: Zeile anklicken → „Werte für diesen Auftrag“ bei diesem Wert (2026-10-04) */
-['settings','orderedSettings'].forEach(id=>$(id).addEventListener('click',e=>{
+['settings'].forEach(id=>$(id).addEventListener('click',e=>{
   if(e.target.closest('[data-ov-group],.help,a,button'))return;
   const xc=e.target.closest('[data-ovk]');if(xc&&project&&typeof openOverrideDialog==='function'){openOverrideDialog({key:xc.dataset.ovk});return;}
   const row=e.target.closest('.setting'),b=row&&row.querySelector('b');if(!b||typeof openOverrideDialog!=='function'||!project)return;

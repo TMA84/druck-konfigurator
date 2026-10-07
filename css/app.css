@@ -1181,13 +1181,25 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .ov-search { flex: 0 1 240px; min-width: 160px; padding: 6px 10px; font: inherit; font-size: 13px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--ink); }
 #ovRows .ov-group[hidden], #ovRows [data-theme][hidden] { display: none; }
 #ovDlg .ed-body { min-height: 340px; }
-/* Druckwerte: Kacheln nach Thema, alle sichtbar */
-#settings.spec { display: block; columns: 3 300px; column-gap: 14px; }
-#settings .spec-group.th-card { break-inside: avoid; margin-bottom: 14px; display: block; }
-#settings .spec-group.th-card .spec-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
-#settings .th-card .spec-cell .v { font-size: 16px; }
-#settings .th-card .spec-cell.key .v { font-size: 19px; }
-#settings .th-card .spec-title { display: flex; align-items: center; gap: 8px; }
+/* Druckwerte (2026-10-07): Kennzahlen oben, darunter je Thema eine Karte als Liste „Bezeichnung … Wert“ */
+#settings.spec { display: block; border-top: 0; }
+#settings .key-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px; }
+#settings .ks { background: var(--sheet, var(--paper)); border: 1px solid var(--rule); border-radius: 10px; padding: 9px 12px; cursor: pointer; min-width: 0; }
+#settings .ks:hover { border-color: var(--accent-rule); }
+#settings .ks-k { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+#settings .ks-v { display: block; font-family: var(--f-display); font-size: 18px; font-weight: 650; color: var(--ink); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#settings .ks.ov { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+#settings .ks.ov .ks-v { color: var(--accent); }
+#settings .th-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; align-items: start; }
+#settings .th-card { padding: 10px 14px 6px; margin: 0; }
+#settings .th-card .spec-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 #settings .th-card .spec-title .spec-edit { margin-left: auto; }
-#settings [data-ovk] { cursor: pointer; border-radius: 6px; }
-#settings [data-ovk]:hover { background: var(--paper-2); }
+#settings .vl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; padding: 6px 6px; border-top: 1px solid var(--rule); cursor: default; border-radius: 4px; }
+#settings .vl-row:first-child { border-top: 0; }
+#settings .vl-row[data-ovk] { cursor: pointer; }
+#settings .vl-row[data-ovk]:hover { background: var(--paper-2); }
+#settings .vl-k { color: var(--ink-2); font-size: 13px; display: flex; align-items: center; gap: 4px; min-width: 0; }
+#settings .vl-v { font-weight: 600; font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+#settings .vl-n { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+#settings .vl-row.ov { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+#settings .vl-row.ov .vl-v { color: var(--accent); }
