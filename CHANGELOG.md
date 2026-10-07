@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.20.0] – 2026-10-07
 
 ### Geändert
 - **Brim aufgeräumt:** eigener Abschnitt „Brim“ in „Werte für diesen Auftrag“ – **Brim außen** und **Brim innen** getrennt an/aus (je „aus“ wählbar), **Form außen** (Ohrenkette – Löcher und Schriften frei / Orca ringsum / Orca-Mausohren nur an Ecken) und **Abstand zum Teil**. Darunter die Zeile **„In Orca“**: welche Orca-Einstellungen für dieses Teil geschrieben werden (erkennt, ob das Teil Löcher oder Schriften in der ersten Schicht hat). Die Karte Aufbau zeigt außen und innen zusammen („5 mm · innen 3 mm“, „nur innen 3 mm“).
