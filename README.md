@@ -9,7 +9,8 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Anycubic-Drucker:** Kobra S1 mit eigener Vorlage, weitere Anycubic-Modelle aus den OrcaSlicer-Profilen – Geschwindigkeiten und Beschleunigung werden auf das Profil des Druckers begrenzt
 - **Modell laden:** STL (auch mit mehreren Körpern), mehrere Dateien, 3MF, Makerworld-ZIP
 - **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
-- **Datenblatt:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung
+- **Druckwerte:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung; oben die Kennzahlen, darunter die **Werte-Tafel** (Reiter nach Thema, Suche, Tabelle *Einstellung | Wert | Vorschlag*) – jeder Wert direkt änderbar, auch rund 30 weitere Orca-Einstellungen, eigene Standardwerte je Filament auf dem Server
+- **Brim, der Löcher und Schriften freilässt:** gesetzte Mausohren entlang des Außenrands statt Orcas Rundum-Brim um Inseln in Öffnungen; Brim außen und innen getrennt, innen nur in großen Löchern
 - **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil; Kopien, Modelle kombinieren, einzelne Teile oder Modelle wieder entfernen
 - **Slots wie in OrcaSlicer:** farbige Slot-Chips in der Teileliste, Filamentleiste, bei Makerworld-3MF „Modell → Slot“ mit automatischer Zuordnung nach Farbe und Material; das Filament in den Druckwerten folgt dem Slot
 - **Mehrfarbig:** mehrere Körper in einem Teil, jeder mit eigenem Slot – auch mehrere STLs (eine je Farbe) zu einem Teil vereinen; **Bemalung** und Farb-Modifikatoren von Makerworld-Modellen werden angezeigt und auf die eigenen Slots umgeschrieben (auch mehr Farben als Slots)
@@ -22,9 +23,9 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Kostenkalkulation:** exakt geslict mit OrcaSlicer (im Container) – Filament je Slot, Spülabfall, Strom, Verschleiß, optional Aufschlag und MwSt.
 - **Slice-Vorschau:** der geslicte G-Code als Schichtansicht im Tool (Linienart oder Filament, Schichtregler) und zum Herunterladen
 - **Drucker-Werkbank (Kobra S1, LAN-Modus):** Druckauftrag mit Pause/Abbruch, Kamera, Temperaturen, Lüfter, Licht, Achsen und ACE (Trocknen, Laden, Nachfüllen) – auch mit mehreren ACE-Einheiten
-- **3D-Fortschritt:** der laufende Druck Schicht für Schicht, mit Druckkopf auf der echten Position (folgt den Bahnen mit den Geschwindigkeiten aus dem G-Code), Druckbett und Gestänge
-- **Filamentverwaltung und Druckhistorie:** Spulen mit errechneter Restmenge, Verbrauch und Kosten je Druck, Monatsstatistik
-- **Warteschlange:** Platten nacheinander drucken, mit „Bett abräumen“-Hinweis
+- **3D-Fortschritt:** der laufende Druck Schicht für Schicht als beleuchtete Raupen, mit Druckkopf auf der echten Position (folgt den Bahnen mit den Geschwindigkeiten aus dem G-Code), Druckplatte und Mechanik; Objekte während des Drucks überspringen
+- **Filamentverwaltung und Druckhistorie:** Spulen mit errechneter Restmenge (auch „Neue Spule eingelegt“ bei gleicher Sorte und Farbe), Verbrauch und Kosten je Druck, Monatsstatistik
+- **Warteschlange und geplanter Druck:** Platten nacheinander drucken, mit „Bett abräumen“-Hinweis (der Server hebt die Platten dauerhaft auf); Druck zeitlich planen, vorher trocknen und Bett vorwärmen
 - **Home Assistant:** als Add-on (Seitenleiste, Einstellungen dort) und Sensoren über MQTT (Fortschritt, Restzeit, Warteschlange, Restmenge je Slot)
 - **Direkt drucken:** geslicte Platte an den Kobra S1 senden und starten – mit Prüfung der ACE-Belegung
 - **Bohrlöcher verstärken:** erkannte Löcher per Häkchen mit einem 100-%-Füllung-Ring versehen (Orca-Modifikator)
@@ -32,7 +33,7 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
 - **Drucker-Verbindung (Kobra S1):** mit der **Werksfirmware im LAN-Modus** die ACE-Belegung live lesen und Slot-Filament sowie „Nachfüllen“ am Drucker ändern – oder über Rinkhals/Moonraker lesen. Ohne Verbindung: Belegung einmal eintragen
 - **Als Container** (z. B. auf dem NAS) oder lokal im Browser, ohne Cloud; das geladene Projekt übersteht ein Neuladen, optional mit PIN geschützt
-- **Deutsch und Englisch, hell und dunkel, Desktop, Tablet und Handy**
+- **Deutsch und Englisch, hell und dunkel (Graphit + Petrol), Desktop, Tablet und Handy**
 
 ## Schnellstart
 

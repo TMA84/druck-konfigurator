@@ -15,6 +15,10 @@ const PREP = `
   window.__stl=(name,tris)=>{const b=new ArrayBuffer(84+50*tris.length),d=new DataView(b);d.setUint32(80,tris.length,true);tris.forEach((t,i)=>{const o=84+50*i;t.forEach((p,j)=>p.forEach((c,k)=>d.setFloat32(o+12+j*12+k*4,c,true)))});return new File([b],name)};
   window.__pilz=()=>__stl('pilz.stl',[...__box(15,15,0,25,25,20),...__box(0,0,20,40,40,25)]);
   if ($('disclaimerDlg').open) $('disclaimerDlg').close();
+  // Spulen nie aus dem echten Datenordner des lokalen Servers: Antwort nachstellen (leer, bis eine Aufnahme eigene setzt)
+  window.__spoolFake = {host:'', flush:1.5, low_g:100, track:{}, history:[], spools:[]};
+  window.fetch = (orig => (u, o) => { const q = String(u).split('?')[0]; return q === 'api/spools' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(window.__spoolFake), {headers:{'Content-Type':'application/json'}})) : orig(u, o); })(window.fetch);
+  spoolData = window.__spoolFake; if (typeof renderSpoolBits === 'function') renderSpoolBits();
   store.settings.costAuto = false;
   // nachgestellter Drucker (ACE-Belegung, laufender Druck) – ohne echte Verbindung
   window.__fakeSlots = [{type:'PLA',colour:'#2E7D32',present:true,name:'PLA'},{type:'PLA',colour:'#F2F2F2',present:true,name:'PLA'},{type:'PLA',colour:'#1565C0',present:true,name:'PLA'},{type:'PETG',colour:'#212121',present:true,name:'PETG'}];
@@ -33,7 +37,8 @@ const SHOTS = {
     ptStroke('end',null,{}); await new Promise(r=>setTimeout(r,800));`,
   // Filamente der Hersteller (② Druckwerte): SUNLU PLA+ 2.0 mit Farben
   filamente: `await loadFiles([__pilz()]); setTab('settings'); $('material').value='sl_pla_plus2'; $('material').dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,800));`,
-  uebersicht: `await loadFiles([__pilz()]); setTab('settings'); await new Promise(r=>setTimeout(r,800));`,
+  // ② Druckwerte: Kennzahlen und Werte-Tafel (Reiter Tempo, zwei Werte angepasst)
+  uebersicht: `await loadFiles([__pilz()]); setTab('settings'); project.parts[0].overrides={nozzle:220,sp_fill:160}; update(); await new Promise(r=>setTimeout(r,500)); ovTab('Tempo'); window.scrollTo(0,0); await new Promise(r=>setTimeout(r,500));`,
   modell: `await loadFiles([__pilz(), __stl('deckel.stl',__box(0,0,0,50,30,4)), __stl('halter.stl',__box(0,0,0,60,40,25))]); setTab('3d');
            selectPart(1); setCopies(project.parts[1], 2); await new Promise(r=>setTimeout(r,800));`,
   ansicht3d: `await loadFiles([__pilz()]); setTab('3d'); document.getElementById('btnMeasure').click(); await new Promise(r=>setTimeout(r,800));`,
@@ -41,7 +46,7 @@ const SHOTS = {
   menue: `await loadFiles([__pilz()]); setTab('settings'); document.querySelectorAll('.menu-btn')[1].click(); await new Promise(r=>setTimeout(r,400));`,
   slicen: `await loadFiles([__pilz(), __stl('deckel.stl',__box(0,0,0,50,30,4)), __stl('platte.stl',__box(0,0,0,200,180,3))]);
            setTab('slice'); await runCosts(); await new Promise(r=>setTimeout(r,2500)); refreshSlicePreview(true); await new Promise(r=>setTimeout(r,2500));`,
-  drucker: `await loadFiles([__pilz()]); setTab('slice'); await runCosts(); setTab('printer');
+  drucker: `await loadFiles([__pilz()]); clearTimeout(spoolTimer); setTab('slice'); await runCosts(); setTab('printer');
            $('wbNoLink').classList.add('hidden'); $('wbGrid').classList.remove('hidden');
            const st = {model:'Anycubic Kobra S1', firmware:'2.7.2.7', ip:'', state:'busy', printing:true, connected:true,
              job:{name:'pilz_Platte1', status:'druckt', progress:62, layer:78, layers:126, remaining_min:14, elapsed_min:22, paused:false, filament_mm:2100},
@@ -52,6 +57,7 @@ const SHOTS = {
            // Vorschau des geslicten Auftrags als „laufenden Druck“ zeigen
            window.fetch = (orig => (u, o) => String(u).startsWith('api/printing/preview') ? orig('api/slice/' + costState.slice.job + '/plate_1.preview') : orig(u, o))(window.fetch);
            spoolData = {host:'', flush:1.5, low_g:100, history:[], track:{}, spools:__fakeSlots.map((s,i)=>({id:'s'+i, slot:i, type:s.type, colour:s.colour, sku:'', rfid:true, name:'', brand:'Anycubic', net_g:1000, used_g:[180,620,90,860][i], purge_g:0, adjust_g:0, remaining_g:[820,380,910,140][i]}))};
+           window.__spoolFake = spoolData;
            wb.st = st; wb.err = ''; clearTimeout(wb.timer); wbRender(); liveMode('live'); liveUpdate(st);
            for (let i = 0; i < 100 && !(lv.data && lv.pos); i++) { await new Promise(r=>setTimeout(r,100)); liveUpdate(st); }
            // echte Kopfposition: 60 % der Schicht, die zur gemeldeten Schicht passt
@@ -75,7 +81,7 @@ const SHOTS = {
            spoolData = {host:'', flush:1.5, low_g:100, track:{}, history:[{job:'halter_Platte1.gcode', end:Date.now()/1000-3600, used:{s0:42.5, s3:3.1}, changes:3}],
              spools:__fakeSlots.map((s,i)=>({id:'s'+i, slot:i, type:s.type, colour:s.colour, sku:['AHPLCG-107','AHPLBW-107','AHPLBL-107','HPETBK-103'][i], rfid:true, name:'', brand:'Anycubic', net_g:1000, used_g:[180,620,90,860][i], purge_g:[4,6,2,9][i], adjust_g:0, remaining_g:[816,374,908,131][i], last_seen:Date.now()/1000, added:Date.now()/1000}))
                .concat([{id:'s9', slot:null, type:'ASA', colour:'#B71C1C', sku:'', rfid:false, name:'Rot matt', brand:'Sunlu', net_g:1000, used_g:420, purge_g:0, adjust_g:0, remaining_g:580, last_seen:Date.now()/1000-86400*3, added:Date.now()/1000-86400*30}])};
-           $('spoolDlg').showModal(); renderSpoolDialog(); await new Promise(r=>setTimeout(r,500));`
+           window.__spoolFake = spoolData; $('spoolDlg').showModal(); renderSpoolDialog(); await new Promise(r=>setTimeout(r,500));`
 };
 
 (async () => {
