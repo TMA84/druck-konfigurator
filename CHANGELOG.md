@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.22.0] – 2026-10-07
 
 ### Geändert
 - **Neues Farbschema Graphit + Petrol** (hell und dunkel): kühles Anthrazit bzw. helles Blaugrau mit Petrol als Akzent; der Snapmaker U1 bekommt Bernstein, damit er sich abhebt.
