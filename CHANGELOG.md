@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.23.0] – 2026-10-07
 
 ### Geändert
 - **Druckwerte ruhiger:** oben die wichtigsten Kennzahlen (Düse, Heizbett, Schichthöhe, Wandlinien, Fülldichte, Stützen, Brim), darunter je Thema eine Karte als Liste „Bezeichnung … Wert“ (rechtsbündig, angepasste Werte in Petrol, Notizen klein darunter) in einem festen Raster statt unterschiedlich hoher Kacheln.
