@@ -1,6 +1,6 @@
 'use strict';
 // Brim-Arten (Werte für diesen Auftrag): auto = außen, Löcher/Schriften frei (gesetzte Mausohren, js/brim-ears.js)
-const BRIM_KINDS={auto:'außen – Löcher und Schriften frei',outer:'außen ringsum (Orca, auch um Inseln in Löchern)',ears:'Mausohren an den Ecken'};
+const BRIM_KINDS={auto:'Ohrenkette – Löcher und Schriften frei',outer:'Orca ringsum (auch um Inseln in Löchern)',ears:'Orca-Mausohren nur an Ecken'};
 // Brim innen (eigene Auswahl): nur in großen Löchern, kleine Löcher und Schriften bleiben frei (js/brim-ears.js)
 const BRIM_INNER=[['0','aus'],['2','2 mm'],['3','3 mm'],['5','5 mm']];
 /* Rechenkern – aus v4 übernommen. Einziger Unterschied: Eingaben kommen als
@@ -242,6 +242,8 @@ function compute(I,geom,ctx){
   const brimKind=has('brim_kind')&&ov.brim_kind!=='inner'?ov.brim_kind:oldKind||'auto';
   sugg.brim_inner='0';
   const brimInner=has('brim_inner')?(+ov.brim_inner||0):wasInner?3:0;
+  // Anzeige: außen und innen getrennt
+  const brimTxt=brim==='Nicht nötig'?(brimInner?t('nur innen {w} mm',{w:de(brimInner,0)}):t('Nicht nötig')):t(brim)+(brimInner?' · '+t('innen {w} mm',{w:de(brimInner,0)}):'');
 
   // Naht
   const round=['tire','dumpling','case','decor','overhang'].includes(o);
@@ -263,7 +265,7 @@ function compute(I,geom,ctx){
     mark(['inf','pattern'],['Fülldichte / Muster',(base.ir&&soft&&!has('inf')?base.ir:inf+' %')+' / '+t(pattern)]),
     mark(['fan'],['Lüfter',m.fan+' %',fanNote]),
     ...(fans2?[mark(['fan_aux','fan_box'],['Hilfs- / Gehäuselüfter',fanAux+' % / '+fanBox+' %',S1P.box<=20?t('Gehäuse warm halten ({kind})',{kind:KIND_LABEL[m.kind]||m.kind}):''])]:[]),['Max. Volumenstrom',de(maxVol,1)+' mm³/s',volF!==1?t('umgerechnet für {noz}',{noz:nozLabel}):''],
-    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim','brim_kind','brim_inner'],['Brim',t(brim),[brim!=='Nicht nötig'&&brimKind!=='auto'?t(BRIM_KINDS[brimKind]||''):'',brimInner>0&&brimKind==='auto'?t('innen {w} mm (nur große Löcher)',{w:de(brimInner,1)}):''].filter(Boolean).join(' · ')||brimNote])
+    mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow,mark(['support'],['Support',t(sup)]),mark(['brim','brim_kind','brim_inner'],['Brim',brimTxt,brimKind!=='auto'&&brim!=='Nicht nötig'?t(BRIM_KINDS[brimKind]||''):brimNote])
   ];
 
   const supZ=supportZGap(layer,m.kind,tpu);
@@ -312,7 +314,7 @@ function compute(I,geom,ctx){
     .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
   {const xo=typeof extraOverrides==='function'?extraOverrides(ov):{};const xk=Object.keys(xo);
    if(xk.length)ordered.push(['Weitere Orca-Einstellungen',xk.map(k=>[ORCA_EXTRA_BY_KEY[k][1],esc(extraLabel(k,xo[k])),t(userSet('x:'+k)?'angepasst':'dein Standard'),true])])}
-  ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],mark(['brim','brim_gap'],['Brim',t(brim)+(brim!=='Nicht nötig'?' · '+t('Abstand {g} mm',{g:de(brimGap,2)}):''),brimNote]),mark(['zhop'],['Z-Hop',de(m.zhop,1)+' mm']),['Erste Schicht beobachten',t('Ja')]]]);
+  ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],mark(['brim','brim_gap','brim_kind','brim_inner'],['Brim',brimTxt+(brim!=='Nicht nötig'||brimInner?' · '+t('Abstand {g} mm',{g:de(brimGap,2)}):''),brimKind!=='auto'&&brim!=='Nicht nötig'?t(BRIM_KINDS[brimKind]||''):brimNote]),mark(['zhop'],['Z-Hop',de(m.zhop,1)+' mm']),['Erste Schicht beobachten',t('Ja')]]]);
   // Für diesen Auftrag angepasste Werte auch in der Slicer-Reihenfolge markieren (wie in der Übersicht)
   const ORDER_KEYS={'Schichthöhe':['layer'],'Wandlinien':['w'],'Obere Schichten':['t'],'Untere Schichten':['b'],'Fülldichte':['inf'],'Füllmuster':['pattern'],
     'Außenwand':['sp_outer'],'Innere Wand':['sp_inner'],'Füllung':['sp_fill'],'Düse':['nozzle'],'Heizbett':['bed'],'Lüfter Folgeschichten':['fan'],'Brim':['brim'],'Stützstrukturen':['support']};

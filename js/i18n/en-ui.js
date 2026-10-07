@@ -718,3 +718,23 @@ I18N.add({
  "Brim innen (nur große Löcher)": "Inner brim (large holes only)",
  "innen {w} mm (nur große Löcher)": "inside {w} mm (large holes only)",
 });
+I18N.add({
+ "Brim außen": "Outer brim",
+ "Form außen": "Outer shape",
+ "Abstand zum Teil": "Gap to part",
+ "In Orca:": "In Orca:",
+ "Kein Brim:": "No brim:",
+ "Ohrenkette – Löcher und Schriften frei": "Ear chain – holes and lettering kept clear",
+ "Orca ringsum (auch um Inseln in Löchern)": "Orca all around (also around islands in holes)",
+ "Orca-Mausohren nur an Ecken": "Orca mouse ears at corners only",
+ "Dieses Teil hat Löcher oder Schriften in der ersten Schicht →": "This part has holes or lettering in the first layer →",
+ "gesetzte Ohren in {f}": "placed ears in {f}",
+ "außen: Ohrenkette {w} mm entlang des Außenrands, neben Löchern kleiner": "outer: {w} mm ear chain along the outer edge, smaller next to holes",
+ "innen: Ohrenkette {w} mm nur in Löchern ab {min} mm Weite; kleine Löcher, Schlitze und Schriften bleiben frei": "inner: {w} mm ear chain only in holes at least {min} mm wide; small holes, slots and lettering stay clear",
+ "zieht den Brim auch um Inseln in Löchern": "also draws the brim around islands in holes",
+ "Orca setzt Ohren an spitze Ecken": "Orca places ears at sharp corners",
+ "keine Löcher: normaler Brim": "no holes: normal brim",
+ "innen: dieses Teil hat keine Löcher – kein innerer Brim": "inner: this part has no holes – no inner brim",
+ "innen: wirkt nur mit Form „Ohrenkette“": "inner: only works with shape “ear chain”",
+ "nur innen {w} mm": "inner only {w} mm",
+});

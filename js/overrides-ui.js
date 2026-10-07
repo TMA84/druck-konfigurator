@@ -4,7 +4,7 @@
    nutzen dann dieselben Werte. Gilt für alle Platzierungen desselben Objekts; auf Wunsch für alle Teile. */
 
 const OV_PATTERNS = ['Gyroid', 'Kubisch', 'Gitter', 'Waben', 'Linien', 'Dreiecke', 'Kreuzschraffur', 'Blitz'];
-const OV_BRIMS = ['Nicht nötig', '3 mm', '5 mm', '8 mm', '10 mm'];
+const OV_BRIMS = [['Nicht nötig', 'aus'], ['3 mm', '3 mm'], ['5 mm', '5 mm'], ['8 mm', '8 mm'], ['10 mm', '10 mm']];
 // Muster- und Brim-Werte bleiben deutsch (export3mf.js ordnet sie Orca-Werten zu); angezeigt wird t(Wert).
 // [Schlüssel, Beschriftung, Einheit, min, max, Schritt, Gruppe] – Auswahllisten statt Zahl bei options
 const OV_FIELDS = [
@@ -27,10 +27,12 @@ const OV_FIELDS = [
   ['fan_aux', t('Hilfslüfter (seitlich)'), '%', 0, 100, 5, t('Kühlung & Haftung')], ['fan_box', t('Gehäuselüfter (Abluft)'), '%', 0, 100, 5, t('Kühlung & Haftung')],
   ['support', t('Stützen'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]],
   // Orca „Nur kritische Bereiche“: an = Stützen nur für Spitzen/Auskragungen, aus = auch normale Überhänge
-  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], ['brim', 'Brim', '', 0, 0, 0, t('Kühlung & Haftung'), OV_BRIMS],
-  ['brim_kind', t('Brim-Art'), '', 0, 0, 0, t('Kühlung & Haftung'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
-  ['brim_inner', t('Brim innen (nur große Löcher)'), '', 0, 0, 0, t('Kühlung & Haftung'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
-  ['brim_gap', t('Brim-Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Kühlung & Haftung')]
+  ['critical', t('Nur kritische Bereiche'), '', 0, 0, 0, t('Kühlung & Haftung'), [['on', t('an')], ['off', t('aus')]]], 
+  // Brim (2026-10-07): außen und innen getrennt an/aus, Form außen, Abstand; darunter, was in Orca geschrieben wird (ovBrimInfo)
+  ['brim', t('Brim außen'), '', 0, 0, 0, t('Brim'), OV_BRIMS.map(([v, l]) => [v, t(l)])],
+  ['brim_kind', t('Form außen'), '', 0, 0, 0, t('Brim'), Object.entries(BRIM_KINDS).map(([v, l]) => [v, t(l)])],
+  ['brim_inner', t('Brim innen (nur große Löcher)'), '', 0, 0, 0, t('Brim'), BRIM_INNER.map(([v, l]) => [v, t(l)])],
+  ['brim_gap', t('Abstand zum Teil'), 'mm', 0, 1, 0.05, t('Brim')]
 ];
 /* Geltungsbereich in Orca: je Teil (Objekt-Einstellung), je Filament-Slot (Filamentprofil) oder für die ganze Platte
    (Prozess). Slot- und Plattenwerte wirkten bisher nur am ersten Teil des Slots bzw. des Projekts – bei mehreren Teilen
@@ -93,6 +95,9 @@ function openOverrideDialog(focusGroup) {
         : t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') })) + '</span>' + input +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
   }).join('');
+  ovBrimSugg = sugg; ovBrimHoles = undefined;
+  { const last = $('ovRows').querySelector('[data-ov="brim_gap"]'); if (last) last.closest('.ov-row').insertAdjacentHTML('afterend', '<div id="ovBrimInfo" class="ov-brim-info muted small"></div>'); }
+  ovBrimInfo();
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2); $('ovAll').checked = false;
   $('ovTitle').textContent = t('Werte anpassen') + (project.parts.length > 1 ? ' · ' + p.name : '');
   const nDef = Object.keys(def).length;
@@ -117,8 +122,37 @@ function ovWarn(k, v) {
   if (Number.isFinite(s) && s > 0 && Math.abs(v - s) / s > 0.3) return t('deutlich anders als der Vorschlag ({s})', { s: de(s, s < 1 ? 3 : s < 10 ? 2 : 0) });
   return '';
 }
+/* Was beim Brim in Orca landet – für die Werte im Dialog (leer = Vorschlag) und dieses Teil (Löcher in der ersten Schicht?) */
+let ovBrimSugg = {}, ovBrimHoles;
+function ovBrimHasHoles() {
+  if (ovBrimHoles !== undefined) return ovBrimHoles;
+  const p = ovPart(), g = p && p.geom;
+  try { ovBrimHoles = !!(g && g.pos && typeof brimEarPoints === 'function' && brimEarPoints([{ pos: g.pos }], [], [0, 0, 0], g.mn[2], 5)); } catch (e) { ovBrimHoles = false; }
+  return ovBrimHoles;
+}
+function ovBrimInfo() {
+  const box = $('ovBrimInfo'); if (!box) return;
+  const val = k => { const el = $('ovRows').querySelector('[data-ov="' + k + '"]'); return el && el.value !== '' ? el.value : ovBrimSugg[k]; };
+  const outer = String(val('brim') || 'Nicht nötig'), w = Number((/^(\d+(?:[.,]\d+)?)/.exec(outer) || [0, 0])[1].toString().replace(',', '.')) || 0;
+  const kind = val('brim_kind') || 'auto', inner = Number(val('brim_inner')) || 0, gap = val('brim_gap'), holes = ovBrimHasHoles();
+  const code = s => '<code>' + esc(s) + '</code>', lines = [];
+  if (!w && !inner) lines.push(t('Kein Brim:') + ' ' + code('brim_type = no_brim'));
+  else if (kind === 'auto' && holes) {
+    lines.push(t('Dieses Teil hat Löcher oder Schriften in der ersten Schicht →') + ' ' + code('brim_type = painted') + ' · ' + code('brim_use_efc_outline = 0') + ' · ' + t('gesetzte Ohren in {f}', { f: code('brim_ear_points.txt') }));
+    if (w) lines.push(t('außen: Ohrenkette {w} mm entlang des Außenrands, neben Löchern kleiner', { w: de(w, 0) }));
+    if (inner) lines.push(t('innen: Ohrenkette {w} mm nur in Löchern ab {min} mm Weite; kleine Löcher, Schlitze und Schriften bleiben frei', { w: de(inner, 0), min: de(inner * 3, 0) }));
+  } else {
+    if (w) lines.push(code('brim_type = ' + (kind === 'ears' ? 'brim_ears' : 'outer_only')) + ' · ' + code('brim_width = ' + de(w, 0).replace(',', '.')) +
+      (kind === 'outer' ? ' – ' + t('zieht den Brim auch um Inseln in Löchern') : kind === 'ears' ? ' – ' + t('Orca setzt Ohren an spitze Ecken') : ' – ' + t('keine Löcher: normaler Brim')));
+    if (inner) lines.push(kind === 'auto' ? t('innen: dieses Teil hat keine Löcher – kein innerer Brim') : t('innen: wirkt nur mit Form „Ohrenkette“'));
+  }
+  if (w || inner) lines.push(code('brim_object_gap = ' + String(gap ?? '').replace(',', '.')));
+  box.innerHTML = '<b>' + t('In Orca:') + '</b> ' + lines.join('<br>');
+}
+$('ovRows').addEventListener('change', e => { if (/^brim/.test((e.target.dataset || {}).ov || '')) ovBrimInfo(); });
 $('ovRows').addEventListener('input', e => {
   const el = e.target.closest('[data-ov]'); if (!el) return;
+  if (/^brim/.test(el.dataset.ov)) ovBrimInfo();
   const row = el.closest('.ov-row'), set = el.value !== '';
   row.classList.toggle('set', set); row.querySelector('.ov-x').hidden = !set;
   let w = row.querySelector('.ov-warn');

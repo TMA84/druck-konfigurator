@@ -570,8 +570,14 @@ async function runSmoke(opts={}){
     // Brim: nur noch eine Stelle – Breite und Art nebeneinander, keine „Brim-Art“ mehr unter den weiteren Orca-Einstellungen
     { const b=$('ovRows').querySelector('[data-ov="brim"]'),k=$('ovRows').querySelector('[data-ov="brim_kind"]');
       ok(!!k&&!$('ovRows').querySelector('[data-ov="x:brim_type"]'),'Brim-Art einmal (neben Brim), nicht doppelt');
-      ok(b&&k&&b.closest('.ov-row').nextElementSibling===k.closest('.ov-row'),'Brim-Art direkt unter Brim');
-      ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: außen – Löcher und Schriften frei');
+      ok(b&&k&&b.closest('.ov-row').nextElementSibling===k.closest('.ov-row'),'Form außen direkt unter Brim außen');
+      ok(/Löcher und Schriften frei/.test(k.closest('.ov-row').textContent),'Vorschlag: Ohrenkette – Löcher und Schriften frei');
+      ok([...b.options].some(o=>o.value==='Nicht nötig'&&o.textContent==='aus'),'Brim außen: „aus“ wählbar');
+      ok(b.closest('.ov-row').previousElementSibling.textContent==='Brim','eigener Abschnitt „Brim“');
+      ok(/In Orca:/.test($('ovBrimInfo').textContent)&&/brim_type/.test($('ovBrimInfo').textContent),'Brim: Zeile „In Orca“ mit den geschriebenen Werten');
+      b.value='Nicht nötig';b.dispatchEvent(new Event('change',{bubbles:true}));const bi0=$('ovRows').querySelector('[data-ov="brim_inner"]');bi0.value='';bi0.dispatchEvent(new Event('change',{bubbles:true}));
+      ok(/no_brim/.test($('ovBrimInfo').textContent),'außen und innen aus → no_brim');
+      b.value='';b.dispatchEvent(new Event('input',{bubbles:true}));
       const bi=$('ovRows').querySelector('[data-ov="brim_inner"]');
       ok(bi&&bi.tagName==='SELECT'&&[...bi.options].map(o=>o.value).join()===',0,2,3,5','Brim innen: Auswahl aus / 2 / 3 / 5 mm');
       ok(/große Löcher/.test(bi.closest('.ov-row').textContent)&&/Vorschlag aus/.test(bi.closest('.ov-row').textContent),'Brim innen: nur große Löcher, Vorschlag aus'); }

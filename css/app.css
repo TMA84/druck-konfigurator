@@ -1166,3 +1166,5 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 #settings [data-ovk] { cursor: pointer; }
 #settings [data-ovk]:hover { background: var(--paper-2); }
 .spec-group .spec-cell.ov { padding-left: 9px; }
+.ov-brim-info { margin: 4px 0 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--paper-2); border-radius: 6px; line-height: 1.55; }
+.ov-brim-info code { font-size: 11.5px; }
