@@ -291,7 +291,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if url.path == "/api/spools":
             return self._api(spools.api_get)
         if url.path == "/api/queue":
-            return self._api(lambda: printqueue.api_get(st=printer_now()))
+            # auch beim Abrufen: rettet eine schon bestehende Warteschlange, solange ihr Auftrag noch da ist
+            return self._api(lambda: queue_pin(printqueue.api_get(st=printer_now()), prune=False))
         if url.path == "/api/schedule":
             return self._api(schedule.api_get)
         if url.path == "/api/prefs":
@@ -390,7 +391,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/queue":
             if ctype != "application/json" or length > MAX_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-            return self._api(lambda: printqueue.api_post(json.loads(self.rfile.read(length) or b"{}"), st=printer_now()))
+            return self._api(lambda: queue_post(json.loads(self.rfile.read(length) or b"{}")))
         if path == "/api/prefs":
             # eigene Standardwerte für alle Browser (tools/prefs.py)
             if ctype != "application/json" or length > MAX_BODY:
@@ -535,6 +536,24 @@ def _printed_dir():
 def _stem(name):
     base = str(name or "").replace("\\", "/").rsplit("/", 1)[-1]
     return re.sub(r"(\.(gcode|3mf|gco|g))+$", "", base, flags=re.I)
+
+
+def queue_post(req):
+    """Warteschlange ändern; ihren Slice-Auftrag dauerhaft aufheben (slicer.pin_job), alte Kopien wegräumen."""
+    return queue_pin(printqueue.api_post(req, st=printer_now()), prune=True)
+
+
+def queue_pin(res, prune):
+    q = (res or {}).get("queue") or {}
+    job = (q.get("slice") or {}).get("job")
+    try:
+        if job and not slicer.pin_job(job):
+            print("Warteschlange: Slice-Auftrag %s nicht mehr vorhanden – nicht aufgehoben" % job, flush=True)
+        if prune:
+            slicer.keep_pinned([job] if job else [])
+    except OSError as e:
+        print("Warteschlange: Auftrag nicht aufgehoben: %s" % e, flush=True)
+    return res
 
 
 def scheduled_start(plan):

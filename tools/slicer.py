@@ -23,6 +23,10 @@ CANDIDATES = [
 ]
 MAX_BYTES = 200 * 1024 * 1024
 KEEP_JOBS = 8              # so viele Slice-Aufträge (G-Code) bleiben für Vorschau und Download
+# Aufträge der Druckwarteschlange: dauerhafte Kopie im Datenordner (2026-10-07: nach der ersten Platte war der Auftrag
+# weg – jedes neue Slicen räumt die ältesten der KEEP_JOBS auf, und das temporäre Verzeichnis überlebt keinen Neustart)
+PINNED_DIR = os.environ.get("SLICE_PINNED_DIR") or os.path.join(
+    os.environ.get("DATA_DIR") or os.path.join(os.path.expanduser("~"), ".druck-konfigurator"), "queue-jobs")
 JOBS_DIR = os.environ.get("SLICE_JOBS_DIR", os.path.join(tempfile.gettempdir(), "druck-konfigurator-jobs"))
 JOB_ID = re.compile(r"^[0-9a-f]{16}$")
 TIMEOUT_S = 900
@@ -119,13 +123,50 @@ def _new_job_dir():
     return job, path
 
 
+def pin_job(job):
+    """Auftrag dauerhaft aufheben (Kopie in PINNED_DIR, mit Vorschauen). True, wenn danach vorhanden."""
+    if not JOB_ID.match(str(job)):
+        return False
+    dst = os.path.join(PINNED_DIR, job)
+    if os.path.isdir(dst):
+        return True
+    src = os.path.join(JOBS_DIR, job)
+    if not os.path.isdir(src):
+        return False
+    for f in os.listdir(src):   # Vorschauen jetzt bauen, damit die Kopie vollständig ist
+        m = re.fullmatch(r"plate_(\d+)\.gcode", f)
+        if m:
+            try:
+                job_file(job, m.group(1), "preview")
+            except Exception:
+                pass
+    os.makedirs(PINNED_DIR, exist_ok=True)
+    tmp = dst + ".tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(src, tmp)
+    os.replace(tmp, dst)
+    return True
+
+
+def keep_pinned(jobs):
+    """Nur diese Aufträge dauerhaft behalten, die übrigen Kopien löschen."""
+    if not os.path.isdir(PINNED_DIR):
+        return
+    for d in os.listdir(PINNED_DIR):
+        if d not in jobs:
+            shutil.rmtree(os.path.join(PINNED_DIR, d), ignore_errors=True)
+
+
 def job_file(job, plate, ext):
     """Pfad zu plate_<n>.gcode bzw. .preview eines Auftrags oder None (nur gültige Ids, keine Pfadtricks)."""
     if not JOB_ID.match(str(job)) or not str(plate).isdigit():
         return None
-    base = os.path.join(JOBS_DIR, job, "plate_%d" % int(plate))
-    gcode = base + ".gcode"
-    if not os.path.isfile(gcode):
+    for root in (JOBS_DIR, PINNED_DIR):
+        base = os.path.join(root, job, "plate_%d" % int(plate))
+        gcode = base + ".gcode"
+        if os.path.isfile(gcode):
+            break
+    else:
         return None
     if ext == "gcode":
         return gcode

@@ -169,6 +169,7 @@ with tempfile.TemporaryDirectory() as d:
     # HTTP-API über tools/serve.py (eigener Port, eigene Datei)
     os.environ["QUEUE_FILE"] = os.path.join(d, "http.json")
     os.environ["SPOOL_FILE"] = os.path.join(d, "spools.json")
+    os.environ["SLICE_PINNED_DIR"] = os.path.join(d, "queue-jobs")   # aufgehobene Aufträge nicht im echten Datenordner
     import serve  # noqa: E402
     import http.server
     import functools

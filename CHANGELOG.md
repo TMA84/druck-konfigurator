@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Warteschlange: nächste Platte ließ sich nicht starten („Auftrag nicht mehr vorhanden“):** Der Server behielt nur die letzten 8 Slice-Aufträge im temporären Ordner – jedes weitere Slicen (auch das automatische für die Kosten) räumte den Auftrag der Warteschlange weg, ein Neustart sowieso. Jetzt kopiert der Server den Auftrag der Warteschlange beim Anlegen (und beim Abrufen einer bestehenden) mit allen Platten und Vorschauen in den Datenordner (`queue-jobs`) und räumt die Kopie erst weg, wenn die Warteschlange beendet oder ersetzt wird.
+
 ## [10.22.0] – 2026-10-07
 
 ### Geändert
