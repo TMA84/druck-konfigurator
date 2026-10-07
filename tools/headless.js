@@ -21,7 +21,9 @@ async function launch() {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dk-headless-'));
     const proc = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--no-first-run',
-      '--window-size=' + W + ',' + H, '--lang=de-DE', '--hide-scrollbars', '--force-device-scale-factor=1', 'about:blank'], { stdio: 'ignore' });
+      '--window-size=' + W + ',' + H, '--lang=de-DE', '--hide-scrollbars', '--force-device-scale-factor=1',
+      // zusätzliche Schalter, z. B. HEADLESS_ARGS="--use-angle=swiftshader" (Software-Grafik, wenn die GPU des Systems hängt)
+      ...(process.env.HEADLESS_ARGS || '').split(/\s+/).filter(Boolean), 'about:blank'], { stdio: 'ignore' });
     let spawnErr = null, page = null;
     proc.on('error', e => { spawnErr = e; });
     for (let i = 0; i < 300 && !page && proc.exitCode === null && !spawnErr; i++) {

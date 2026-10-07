@@ -167,7 +167,7 @@ function lvHeadInit() {
     sh.lineTo(x + r, y + d); sh.quadraticCurveTo(x, y + d, x, y + d - r); sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y); return sh; };
   const slab = (w, d, h, r, bevel) => new THREE.ExtrudeGeometry(rounded(w, d, r), { depth: h, bevelEnabled: !!bevel, bevelThickness: bevel || 0, bevelSize: bevel || 0, bevelSegments: 2, curveSegments: 8 });
   /* Aussehen wie das Kobra-S1-Innenleben (2026-10-07, Vorlage: Anycubic-Produktbild): weißer Kopf mit orangem Streifen
-     unten und schwarzem Lüfter, zwei X-Stangen und die Y-Stangen in Kupfer, schwarze Eckwagen, blaue Motoren hinten,
+     unten und schwarzem Lüfter, zwei X-Stangen übereinander und die Y-Stangen in Silber, schwarze Eckwagen, blaue Motoren hinten,
      dunkler Rahmen mit Z-Spindeln. Rahmen und Mechanik hängen zusammen – wie beim Drucker fährt relativ dazu das Bett. */
   const tip = new THREE.Mesh(new THREE.ConeGeometry(3.2, H.tip, 24), mat(0xd4a93f, { m: 0.45, r: 0.35 }));
   tip.rotation.x = -Math.PI / 2; tip.position.z = H.tip / 2;
@@ -187,15 +187,17 @@ function lvHeadInit() {
   // Mechanik (Koordinaten relativ zur Traverse, die mit dem Kopf in Z fährt)
   const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22, R = LV_RAIL;
   const len = bx1 - bx0 + 2 * m, cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2, ylen = by1 - by0 + 2 * m;
-  const copper = mat(0xd98a45, { m: 0.6, r: 0.3 }); copper.emissive = new THREE.Color(0x4a2208);
+  // Stangen silbern (beim Kobra S1 Stahl – auf dem Produktbild nur orange angeleuchtet)
+  const rodM = mat(0xd9dee1, { m: 0.55, r: 0.25 });
   const black = mat(0x1d2124, { r: 0.6 }), steel = mat(0xd5dbde, { m: 0.5, r: 0.3 }), frameM = mat(0x2a3034, { r: 0.7, op: 0.45 });   // rauchig wie im Produktbild, versperrt die Sicht nicht
   // X: zwei Stangen (der Kopf hängt daran), Eckwagen an den Enden; fährt in Y (lvPlaceHead: beam.position.y)
   const beam = new THREE.Group(), rodX = new THREE.CylinderGeometry(2.4, 2.4, len, 20);
-  for (const dy of [-7, 7]) { const r = new THREE.Mesh(rodX, copper); r.rotation.z = Math.PI / 2; r.position.set(0, dy, 0); beam.add(r); }
-  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3.4, R * 2.4, 3, 0.6), black); car.position.set(sx * len / 2, 0, -R * 1.6); beam.add(car); }
+  // zwei X-Stangen übereinander (wie am Kobra S1), der Kopf gleitet darauf
+  for (const dz of [-8, 8]) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
+  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3.4, R * 3.2, 3, 0.6), black); car.position.set(sx * len / 2, 0, -R * 2); beam.add(car); }
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
-  const rodY = new THREE.CylinderGeometry(2.4, 2.4, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, copper); r.position.set(x, cy, -R * 0.6); return r; });
+  const rodY = new THREE.CylinderGeometry(2.4, 2.4, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, -R * 0.6); return r; });
   // Rahmen: oben ein Rechteck aus Profilen mit Eckblöcken, vier Säulen, unten ein Rechteck; Z-Spindeln links/rechts
   const fx0 = bx0 - m - 16, fx1 = bx1 + m + 16, fy0 = by0 - m - 16, fy1 = by1 + m + 16, fw = 13, fh = LV_FRAME_H, top = 12, frame = new THREE.Group();
   const bar = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.Mesh(new THREE.BoxGeometry(Math.max(fw, x1 - x0), Math.max(fw, y1 - y0), Math.max(fw, z1 - z0)), frameM); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); frame.add(g); };
@@ -205,7 +207,9 @@ function lvHeadInit() {
   const motor = mat(0x3d9fe0, { r: 0.35, m: 0.2 }); motor.emissive = new THREE.Color(0x0c3a5c);
   for (const x of [fx0 + 26, fx1 - 26]) { const mo = new THREE.Mesh(slab(30, 30, 34, 3, 1), motor); mo.position.set(x, fy1 - 24, top - 30); frame.add(mo);
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 8, 20), steel); cap.rotation.x = Math.PI / 2; cap.position.set(x, fy1 - 24, top + 9); frame.add(cap); }
-  for (const x of [bx0 - 10, bx1 + 10]) { const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 20, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, cy, top - fh / 2); frame.add(sc); }
+  // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
+  for (const [x, y] of [[cx, by1 + 10], [bx0 - 10, by0 + 25], [bx1 + 10, by0 + 25]]) {
+    const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 20, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, y, top - fh / 2); frame.add(sc); }
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails, frame); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
   // Bett: Umriss auf Höhe 0
   const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));
