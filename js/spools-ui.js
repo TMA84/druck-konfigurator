@@ -302,7 +302,7 @@ $('spoolImportFile').addEventListener('change', async e => {
   try {
     if (file.size > 2 * 1024 * 1024) throw Error(t('Datei zu groß (höchstens 2 MB)'));
     const data = JSON.parse(await file.text());
-    if (!data || typeof data !== 'object' || !Array.isArray(data.spools)) throw Error(t('Keine Spulendatei des Druck-Konfigurators'));
+    if (!data || typeof data !== 'object' || !Array.isArray(data.spools)) throw Error(t('Keine Spulendatei der Druckwerkstatt'));
     delete data.track;
     spoolImport = { name: file.name, data }; renderSpoolDialog(); $('spoolBody').scrollTop = 0;
   } catch (err) { toast(t('Import fehlgeschlagen: {msg}', { msg: err instanceof SyntaxError ? t('keine gültige JSON-Datei') : err.message })); }

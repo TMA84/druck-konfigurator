@@ -1,4 +1,4 @@
-# Druck-Konfigurator als Container (z. B. auf dem NAS im Heimnetz).
+# Druckwerkstatt (früher Druck-Konfigurator) als Container (z. B. auf dem NAS im Heimnetz).
 # Die Seite läuft im Browser; der Server liefert sie aus, spricht mit Anycubic-Druckern im LAN-Modus und
 # slict für die Kostenkalkulation mit der OrcaSlicer-Kommandozeile (ohne Bildschirm).
 # Ubuntu 24.04, weil Orca dafür gebaut ist; Orca-Version passend zu den Vorlagen in templates/.

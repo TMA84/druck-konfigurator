@@ -1,4 +1,4 @@
-/* Druck-Konfigurator – „Werkstatt-Datenblatt“.
+/* Druckwerkstatt – „Werkstatt-Datenblatt“.
    Bahnschrift (Windows, DIN-artig) für Überschriften und Werte, Segoe UI für Fließtext.
    Die Akzentfarbe folgt dem aktiven Drucker (body[data-printer]). */
 :root {

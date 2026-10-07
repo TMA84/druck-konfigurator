@@ -77,7 +77,7 @@ a { color: #b0440b; text-decoration: none; }
 `;
 
 const body = toHtml(fs.readFileSync(MD, 'utf8'));
-fs.writeFileSync(HTML, '<!doctype html><html lang="de"><meta charset="utf-8"><title>Druck-Konfigurator – Handbuch</title><style>' + CSS + '</style><body>' + body + '</body></html>');
+fs.writeFileSync(HTML, '<!doctype html><html lang="de"><meta charset="utf-8"><title>Druckwerkstatt – Handbuch</title><style>' + CSS + '</style><body>' + body + '</body></html>');
 console.log('→ ' + path.relative(ROOT, HTML));
 // PDF über das DevTools-Protokoll (tools/headless.js): zuverlässig auch am Mac, wo Chrome nach --print-to-pdf
 // nicht von selbst endet (2026-09-29)

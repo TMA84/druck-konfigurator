@@ -1,4 +1,6 @@
-# Druck-Konfigurator für OrcaSlicer
+# Druckwerkstatt – Druck-Konfigurator für OrcaSlicer und Anycubic
+
+*Früher „Druck-Konfigurator“ – der Name ist mit dem Tool gewachsen: vom Einstellungsrechner zur Werkstatt mit Slicen, Drucken, Spulen und Warteschlange.*
 
 Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – mit Überhang-Analyse, Lage-Vorschlag, Einstellungen je Teil und Umstellung von Makerworld-Projekten auf den eigenen Drucker. Zurzeit **nur für Anycubic-Drucker**: der **Kobra S1 (Combo)** mit eigener, getesteter Vorlage und die übrigen Anycubic-Modelle aus den OrcaSlicer-Profilen. Die anderen Hersteller (und der Snapmaker U1) sind im Code enthalten, aber ausgeblendet – `index.html?alle-drucker` zeigt sie.
 
@@ -47,7 +49,7 @@ docker compose up -d --build
 
 Danach im Browser `http://<IP-des-NAS>:8765/` öffnen. Das Image enthält OrcaSlicer für die Kostenkalkulation (rund 1,5 GB, x86_64 und ARM). Der Container braucht nur ausgehende Verbindungen zum Drucker (Ports 18910 und 9883 im LAN-Modus); das normale Docker-Netz reicht. Die Seite hat keine Anmeldung – nur im Heimnetz betreiben, nicht ins Internet freigeben. Eigene Filamentwerte speichert weiterhin jeder Browser für sich.
 
-**Als Home-Assistant-Add-on:** In Home Assistant unter **Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories** `https://github.com/TMA84/ha-addons` hinzufügen, dann **Druck-Konfigurator** installieren. Das Tool erscheint in der Seitenleiste (Ingress, mit der HA-Anmeldung); optional zusätzlich direkt auf Port 8765. Spulen und Verbrauch der Filamentverwaltung liegen im Add-on unter `/data`.
+**Als Home-Assistant-Add-on:** In Home Assistant unter **Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories** `https://github.com/TMA84/ha-addons` hinzufügen, dann **Druckwerkstatt** installieren. Das Tool erscheint in der Seitenleiste (Ingress, mit der HA-Anmeldung); optional zusätzlich direkt auf Port 8765. Spulen und Verbrauch der Filamentverwaltung liegen im Add-on unter `/data`.
 
 **Oder herunterladen:**
 
@@ -107,7 +109,7 @@ Der Bedientest `tests/ui-smoke.js` läuft im Browser (Anleitung im Kopf der Date
 
 ## Haftungsausschluss
 
-Die Nutzung erfolgt auf eigene Verantwortung. Der Druck-Konfigurator ist ein privates, nicht kommerzielles Projekt und wird ohne jede Gewährleistung bereitgestellt.
+Die Nutzung erfolgt auf eigene Verantwortung. Die Druckwerkstatt ist ein privates, nicht kommerzielles Projekt und wird ohne jede Gewährleistung bereitgestellt.
 
 1. **Keine Gewähr für die Werte.** Alle berechneten Einstellungen – auch die für einen Auftrag angepassten – sind Startwerte. Filamente unterscheiden sich je nach Hersteller und Charge; die Angaben auf der Rolle, die Vorschau im Slicer und ein Testdruck haben immer Vorrang.
 2. **Keine Haftung für Schäden an Drucker und Zubehör.** Für Schäden an Düse, Druckplatte (z. B. PETG auf glatter PEI-Platte ohne Trennmittel), Hotend, ACE oder anderen Teilen, für Verstopfungen, Fehldrucke, Kollisionen oder verbrauchtes Material wird keine Haftung übernommen.

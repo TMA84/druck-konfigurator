@@ -102,8 +102,8 @@ function update(){
   if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
   const row=x=>rowHTML(x,r.m.kind);
-  $('mainTitle').textContent=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
-  document.title=t('{printer} – Druck-Konfigurator',{printer:r.printer.label});
+  $('mainTitle').textContent=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
+  document.title=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;
   $('matBadge').innerHTML='<span class="badge '+st[0]+'">'+st[1]+'</span>';
   renderMatColours(r.m);

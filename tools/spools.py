@@ -504,7 +504,7 @@ def validate_import(data):
     if not isinstance(data, dict):
         raise ValueError("Keine Spulendatei (JSON-Objekt erwartet)")
     if data.get("format") not in (None, EXPORT_FORMAT) or not isinstance(data.get("spools"), list):
-        raise ValueError("Keine Spulendatei des Druck-Konfigurators")
+        raise ValueError("Keine Spulendatei der Druckwerkstatt")
     if data.get("version", 1) != 1:
         raise ValueError("Unbekannte Version der Spulendatei")
     if len(data["spools"]) > MAX_SPOOLS:

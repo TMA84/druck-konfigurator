@@ -3,6 +3,7 @@
    Schlüssel = deutscher Text (Leerraum zusammengefasst), Wert = englisches innerHTML bei Blöcken, sonst Text.
    Erzeugt aus einem Abgleich mit index.html; Texte, die auf Englisch gleich bleiben, fehlen absichtlich. */
 I18N.add({
+  "Druckwerkstatt": "Print Workshop",
   "Druck-Konfigurator": "Print Configurator",
   "Drucker und Düse": "Printer and nozzle",
   "Drucker": "Printer",

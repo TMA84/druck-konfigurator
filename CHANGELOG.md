@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Geändert
+- **Neuer Name: Druckwerkstatt** (englisch: Print Workshop) – der Name ist mit dem Tool gewachsen. Geändert ist der angezeigte Name (Fenstertitel, Kopfzeile, Anmeldeseite, Handbuch, README, in Home Assistant Add-on-Name und Seitenleiste); Repository, Container-Image, Add-on-Kennung und das MQTT-Gerät in Home Assistant bleiben, damit Daten, Entitäten und Dashboards erhalten bleiben.
+- 3D-Fortschritt: Traverse, Laufwagen und Schienen deckend und richtig verbunden (die Stangen sitzen in den Laufwagen unter der Traverse) – vorher lagen sie je nach Blickwinkel scheinbar davor oder dahinter.
 - Handbuch, README und Handbuch-PDF auf den aktuellen Stand (Werte-Tafel, Brim außen/innen, 3D-Fortschritt, „Neue Spule eingelegt“, Warteschlange); alle Bilder neu aufgenommen. Der Bildgenerator stellt die Spulen jetzt immer nach (nie aus dem echten Datenordner).
 - 3D-Fortschritt: Petrol-Streifen am Druckkopf entfernt – er lag als Platte quer durch den Kopf und verdeckte das Teil.
 - 3D-Fortschritt: Bildausschnitt mindestens ~170 mm, damit der Druckkopf bei kleinen Teilen nicht das Bild füllt.

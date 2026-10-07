@@ -53,7 +53,7 @@ I18N.add({
  "Fremde Modelle: Wer Projekte anderer (z. B. von Makerworld) umstellt, beachtet deren Lizenz.": "<b>Other people’s models:</b> If you convert other people’s projects (e.g. from MakerWorld), respect their license.",
  "Ausführlich in der README auf GitHub. Lizenz: CC BY-NC 4.0, ohne Gewährleistung. Grundlage: Druck-Konfigurator von wolfb63-del – danke!": "Details in the README on GitHub. License: CC BY-NC 4.0, without warranty. Based on the <a href=\"https://github.com/wolfb63-del/druck-konfigurator\" target=\"_blank\" rel=\"noopener\">Druck-Konfigurator by wolfb63-del</a> – thank you!"
 });
-I18N.add({ 'Druck-Konfigurator – Fork des': 'Print Configurator – fork of the', 'Druck-Konfigurators von wolfb63-del': 'Druck-Konfigurator by wolfb63-del', '(danke!) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen. ·': '(thank you!) · Starting values, no guarantee – always check the slicer preview. ·' });
+I18N.add({ 'Druckwerkstatt – Fork des': 'Print Workshop – fork of the', 'Druck-Konfigurators von wolfb63-del': 'Druck-Konfigurator by wolfb63-del', '(danke!) · Startwerte ohne Gewähr – immer die Slicer-Vorschau prüfen. ·': '(thank you!) · Starting values, no guarantee – always check the slicer preview. ·' });
 // Stützen ohne „nur kritische Bereiche“ (2026-09-29, js/engine.js, js/panel.js)
 I18N.add({
   'Ja – wenige Baumstützen': 'Yes – a few tree supports',

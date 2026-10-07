@@ -1,6 +1,6 @@
-# Druck-Konfigurator – Handbuch
+# Druckwerkstatt – Handbuch
 
-Der Druck-Konfigurator berechnet passende Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** und schreibt sie direkt in eine Projektdatei für **OrcaSlicer**. Du lädst ein Modell, das Tool prüft Maße und Überhänge, schlägt die beste Lage auf dem Bett vor und liefert eine 3MF-Datei, die in Orca sofort mit den richtigen Werten öffnet.
+Die Druckwerkstatt (früher „Druck-Konfigurator“) berechnet passende Startwerte für den **Anycubic Kobra S1 (Combo)** und den **Snapmaker U1** und schreibt sie direkt in eine Projektdatei für **OrcaSlicer**. Du lädst ein Modell, das Tool prüft Maße und Überhänge, schlägt die beste Lage auf dem Bett vor und liefert eine 3MF-Datei, die in Orca sofort mit den richtigen Werten öffnet.
 
 Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Internet geschickt.
 
@@ -30,7 +30,7 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 **Als Container (empfohlen für die Drucker-Verbindung):** auf dem NAS oder Heimserver im Projektordner `docker compose up -d --build`, dann im Browser `http://<IP-des-NAS>:8765/` – von jedem Gerät im Heimnetz. Ohne weitere Einstellung hat die Seite keine Anmeldung: nur im Heimnetz betreiben, nicht ins Internet freigeben. Mit `KONFIGURATOR_PIN` (4–32 Zeichen, in `docker-compose.yml`) fragt sie nach einer **PIN**; die Anmeldung gilt 30 Tage, nach 5 Fehlversuchen ist sie für 5 Minuten gesperrt. Eigene Filamentwerte speichert weiterhin jeder Browser für sich (über **Profile exportieren/importieren** übertragen).
 
-**Als Home-Assistant-Add-on:** Repository `https://github.com/TMA84/ha-addons` hinzufügen, **Druck-Konfigurator** installieren, in der Konfiguration die **Drucker-IP** eintragen. Das Tool erscheint in der Seitenleiste (geschützt durch die Anmeldung von Home Assistant). Den optionalen direkten Port 8765 schützt die Option **access_pin**. Mehr unter [Home Assistant](#home-assistant).
+**Als Home-Assistant-Add-on:** Repository `https://github.com/TMA84/ha-addons` hinzufügen, **Druckwerkstatt** installieren, in der Konfiguration die **Drucker-IP** eintragen. Das Tool erscheint in der Seitenleiste (geschützt durch die Anmeldung von Home Assistant). Den optionalen direkten Port 8765 schützt die Option **access_pin**. Mehr unter [Home Assistant](#home-assistant).
 
 **Tablet:** Die Seite passt sich an Tablets an (Hoch- und Querformat); im Tab **Drucker** sind Knöpfe, Achsen und Regler für Finger groß genug.
 
@@ -38,7 +38,7 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 **Voraussetzungen:** Windows, macOS oder Linux mit einem aktuellen Browser (Chrome, Edge, Firefox oder Safari) und OrcaSlicer. Getestet ist Windows mit Chrome; auf Mac und Linux sollte es genauso laufen. **Keine Installation nötig.** Nur wer die Filament-Belegung live vom Drucker lesen will (Rinkhals/Moonraker), braucht zusätzlich [Python](https://www.python.org) (Version 3.8 oder neuer).
 
-1. Das Projekt als ZIP herunterladen (auf GitHub: **Code → Download ZIP**) und in einen Ordner entpacken, z. B. `C:\Druck-Konfigurator`.
+1. Das Projekt als ZIP herunterladen (auf GitHub: **Code → Download ZIP**) und in einen Ordner entpacken, z. B. `C:\Druckwerkstatt`.
 2. Starten – zwei Möglichkeiten:
    - **Normal:** Doppelklick auf **`index.html`**. Alles funktioniert; die Filament-Belegung trägst du einmal im Export-Dialog ein (siehe [Kapitel 9](#9-3mf-für-orcaslicer-speichern)).
    - **Mit Live-Abfrage** (nur Rinkhals/Moonraker, braucht Python): unter Windows Doppelklick auf **`Konfigurator starten.cmd`**; unter Mac/Linux im Projektordner im Terminal `python3 tools/serve.py` eingeben und im Browser `http://127.0.0.1:8765` öffnen. Es öffnet sich ein schwarzes Fenster (lokaler Webserver) und der Browser mit dem Tool. Das Fenster offen lassen, solange du das Tool benutzt. Der Server ist nur auf deinem PC erreichbar. Direkt geöffnet (`index.html`) blockiert der Browser die Antworten der Drucker.
@@ -545,4 +545,4 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 
 ---
 
-*Druck-Konfigurator · Lizenz: CC BY-NC 4.0 (nur nicht-kommerziell) · Änderungen siehe [CHANGELOG.md](CHANGELOG.md)*
+*Druckwerkstatt · Lizenz: CC BY-NC 4.0 (nur nicht-kommerziell) · Änderungen siehe [CHANGELOG.md](CHANGELOG.md)*

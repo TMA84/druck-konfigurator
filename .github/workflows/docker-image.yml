@@ -58,7 +58,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.description=Druck-Konfigurator mit OrcaSlicer (Kostenkalkulation) und LAN-Modus für Anycubic
+            org.opencontainers.image.description=Druckwerkstatt mit OrcaSlicer (Kostenkalkulation) und LAN-Modus für Anycubic
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
@@ -75,7 +75,7 @@ jobs:
           echo "$health"
           grep -q '"slicer": "2' <<<"$health" || { docker logs druck-test; exit 1; }
           page="$(get /)"
-          grep -q 'Druck-Konfigurator' <<<"$page"
+          grep -q 'Druckwerkstatt' <<<"$page"
 
     outputs:
       version: ${{ steps.meta.outputs.version }}

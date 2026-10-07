@@ -60,7 +60,7 @@ I18N.add({
   'Exportieren': 'Export',
   'Importieren …': 'Import …',
   'Alle Spulen und letzten Drucke als Datei sichern, z. B. für den Umzug auf einen anderen Server': 'Save all spools and recent prints as a file, e.g. to move to another server',
-  'Keine Spulendatei des Druck-Konfigurators': 'Not a spool file of the print configurator',
+  'Keine Spulendatei der Druckwerkstatt': 'Not a spool file of the Print Workshop',
   'Keine Spulendatei (JSON-Objekt erwartet)': 'Not a spool file (JSON object expected)',
   'Unbekannte Version der Spulendatei': 'Unknown spool file version',
   'Import: Art „merge“ oder „replace“ angeben': 'Import: specify mode “merge” or “replace”',

@@ -58,7 +58,7 @@ def login(pin, nxt="index.html"):
 
 # 1) ohne PIN: alles offen wie bisher
 st, _, data = req("GET", "/index.html")
-check("ohne PIN: Seite offen", st == 200 and b"Druck-Konfigurator" in data, st)
+check("ohne PIN: Seite offen", st == 200 and b"Druckwerkstatt" in data, st)
 st, _, data = req("GET", "/api/queue")
 check("ohne PIN: API offen", st == 200, st)
 
@@ -105,7 +105,7 @@ check("Cookie: zufälliges Token", token.startswith("dk_session=") and len(token
 st, _, data = req("GET", "/api/queue", headers={"Cookie": token})
 check("mit Cookie: API", st == 200, st)
 st, _, data = req("GET", "/index.html", headers={"Cookie": "andere=1; " + token})
-check("mit Cookie: Seite", st == 200 and b"Druck-Konfigurator" in data, st)
+check("mit Cookie: Seite", st == 200 and b"Druckwerkstatt" in data, st)
 st, _, data = req("GET", "/api/health", headers={"Cookie": token})
 check("mit Cookie: /api/health mit Drucker", json.loads(data).get("printer") == "192.168.1.50", data)
 os.environ.pop("KONFIGURATOR_PRINTER")

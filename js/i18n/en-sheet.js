@@ -123,7 +123,7 @@ I18N.add({
  'Turm, an dem nach dem Farbwechsel vorgedruckt wird. Stabilisiert den Düsendruck; beim Kobra S1 geht der Großteil der Spülung ohnehin in die Abfallrutsche.': 'Tower the printer primes on after a color change. Stabilizes nozzle pressure; on the Kobra S1 most of the flushing goes down the waste chute anyway.',
  'Nutzt einen Teil des Spülmaterials als Füllung im Inneren des Objekts und spart so Abfall.': 'Uses part of the flushing material as infill inside the object, which saves waste.',
  '<b>Hinweis:</b> Dieser Browser erlaubt hier kein dauerhaftes Speichern. Deine Werte gelten nur bis zum Schließen – bitte über <b>Exportieren</b> sichern.': '<b>Note:</b> This browser does not allow permanent storage here. Your values only last until you close it – please back them up via <b>Export</b>.',
- '{printer} – Druck-Konfigurator': '{printer} – Print Configurator',
+ '{printer} – Druckwerkstatt': '{printer} – Print Workshop',
  'Einstellungen in {slicer}-Reihenfolge': 'Settings in {slicer} order',
  'Die Bezeichnungen orientieren sich an {slicer}. Je nach Version und „Erweitert“-Schalter liegen einzelne Felder tiefer in der jeweiligen Registerkarte. Die Nahtposition gehört zu <b>Qualität</b>, nicht zu Struktur.': 'The names follow {slicer}. Depending on the version and the “Advanced” switch, some fields are deeper inside the respective tab. The seam position belongs to <b>Quality</b>, not to Strength.',
  'Startprofil · {printer}': 'Starting profile · {printer}',

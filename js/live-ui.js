@@ -180,14 +180,17 @@ function lvHeadInit() {
   lv.head = new THREE.Group(); lv.head.add(tip, heat, body, bodyE, fan); lv.head.visible = false;
   // Mechanik: X-Traverse (fährt in Y und Z mit) mit Laufwagen, Y-Schienen (fahren in Z mit)
   const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22, R = LV_RAIL;
-  const len = bx1 - bx0 + 2 * m, alu = mat(0xc4ccd1, { m: 0.3, r: 0.4, op: 0.85 }), beam = new THREE.Group();
-  const beamG = new THREE.BoxGeometry(len, R * 1.6, R * 1.6), slot = new THREE.Mesh(new THREE.BoxGeometry(len, R * 0.35, 0.6), mat(0x39444b, { r: 0.7, op: 0.82 }));
+  // deckend: durchscheinende Teile sortiert three.js nicht je Pixel – Traverse, Wagen und Stangen lagen je nach Blickwinkel
+  // scheinbar davor/dahinter (2026-10-07). Stangen sitzen unter der Traverse in den Laufwagen.
+  const len = bx1 - bx0 + 2 * m, alu = mat(0xc4ccd1, { m: 0.3, r: 0.4 }), beam = new THREE.Group(), rodZ = -R * 1.5;
+  const beamG = new THREE.BoxGeometry(len, R * 1.6, R * 1.6), slot = new THREE.Mesh(new THREE.BoxGeometry(len, R * 0.35, 0.6), mat(0x39444b, { r: 0.7 }));
   slot.position.z = R * 0.8 + 0.2;
   beam.add(new THREE.Mesh(beamG, alu), edges(beamG, 0.18), slot);
-  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3, R * 2.2, 3, 0.8), mat(0x27313a, { r: 0.55, op: 0.9 })); car.position.set(sx * len / 2, 0, -R * 1.1); beam.add(car); }
+  // Laufwagen: umschließt die Stange (z = rodZ) und trägt die Traverse (Unterkante −0,8 R)
+  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.4, R * 3.2, R * 1.8, 3, 0.6), mat(0x2b353d, { r: 0.55 })); car.position.set(sx * len / 2, 0, rodZ - R * 0.9); beam.add(car); }
   beam.position.x = (bx0 + bx1) / 2;
-  const steel = mat(0xe3e8eb, { m: 0.35, r: 0.3, op: 0.9 }), rails = [bx0 - m, bx1 + m].map(x => {
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.4, R * 0.4, by1 - by0 + 2 * m, 20), steel); rod.position.set(x, (by0 + by1) / 2, 0); return rod; });
+  const steel = mat(0xe3e8eb, { m: 0.35, r: 0.3 }), rails = [bx0 - m, bx1 + m].map(x => {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.4, R * 0.4, by1 - by0 + 2 * m, 20), steel); rod.position.set(x, (by0 + by1) / 2, rodZ); return rod; });
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
   // Bett: Umriss auf Höhe 0
   const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));

@@ -1,4 +1,4 @@
-"""Webserver für den Druck-Konfigurator: liefert die Seite aus und spricht mit Anycubic-Druckern.
+"""Webserver für die Druckwerkstatt (früher Druck-Konfigurator): liefert die Seite aus und spricht mit Anycubic-Druckern.
 
 Wie `python -m http.server`, schickt aber "Cache-Control: no-store": Sonst mischt der Browser nach
 einem Update alte und neue Skripte (beobachtet 2026-09-26: alte engine.js + neue panel.js → Fehler).
@@ -677,7 +677,7 @@ def main():
     handler = functools.partial(Handler, directory=ROOT)
     with Server((host, port), handler) as server:
         shown = "127.0.0.1" if host in ("127.0.0.1", "0.0.0.0") else host
-        print(f"Druck-Konfigurator unter http://{shown}:{port}/" + (" (im ganzen Netz erreichbar)" if host == "0.0.0.0" else " – Fenster offen lassen."), flush=True)
+        print(f"Druckwerkstatt unter http://{shown}:{port}/" + (" (im ganzen Netz erreichbar)" if host == "0.0.0.0" else " – Fenster offen lassen."), flush=True)
         print("Zugriffsschutz: " + ("PIN nötig (außer Home-Assistant-Ingress und /api/health)" if auth_pin() else "aus (KONFIGURATOR_PIN nicht gesetzt)"), flush=True)
         if not anycubic_lan.AVAILABLE:
             print("Hinweis: LAN-Modus (Werksfirmware) braucht: pip install -r requirements.txt", flush=True)
