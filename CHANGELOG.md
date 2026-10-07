@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Druckwerte neu: Reiter + Tabelle, direkt bearbeitbar.** Oben die Kennzahlen, darunter die Werte-Tafel mit Reitern nach Thema (mit Zähler) und Suche; je Reiter eine Tabelle **Einstellung | Wert | Vorschlag**. Wert direkt ändern – gilt beim Verlassen des Felds, bei Enter oder bei der Auswahl, × setzt auf den Vorschlag zurück. Werte ohne Anpassung (z. B. Herstellerbereich, Profilname) stehen als Anzeigezeilen im passenden Reiter, Erklärungen per „?“. Der separate Dialog „Werte für diesen Auftrag anpassen“ und die Themenkacheln entfallen; „Als Standard merken“, „für alle Teile“ und die Zeile „In Orca“ beim Brim sind in der Tafel.
+
 ## [10.24.0] – 2026-10-07
 
 ### Geändert

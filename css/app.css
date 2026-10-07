@@ -1203,3 +1203,38 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 #settings .vl-n { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
 #settings .vl-row.ov { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 #settings .vl-row.ov .vl-v { color: var(--accent); }
+/* Werte-Tafel in ② Druckwerte (2026-10-07): Reiter + Tabelle Einstellung | Wert | Vorschlag, direkt bearbeitbar */
+.ov-panel { background: var(--sheet, var(--paper)); border: 1px solid var(--rule); border-radius: 12px; margin: 4px 0 18px; overflow: hidden; }
+.ov-panel .ov-nav { padding: 12px 14px 10px; background: var(--paper-2); border-bottom: 1px solid var(--rule); }
+.ov-panel .ov-colhead, .ov-panel .ov-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(150px, 1fr) minmax(0, 0.9fr) 28px; gap: 12px; align-items: center; padding: 7px 16px; }
+.ov-panel .ov-colhead { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--rule); padding-top: 9px; padding-bottom: 7px; }
+.ov-panel #ovRows { max-height: none; }
+.ov-panel .ov-row { border-bottom: 1px solid var(--rule); font-size: 13.5px; background: none; }
+.ov-panel .ov-row:last-child { border-bottom: 0; }
+.ov-panel .ov-row.set { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.ov-panel .ov-row.set .ov-in input, .ov-panel .ov-row.set .ov-in select { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.ov-panel .ov-in { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ov-panel .ov-in input, .ov-panel .ov-in select { width: 100%; min-width: 0; padding: 6px 8px; font-size: 13.5px; }
+.ov-panel .ov-in input::placeholder { color: var(--ink-2); opacity: .85; }
+.ov-panel .ov-unit { flex: 0 0 auto; font-size: 12px; }
+.ov-panel .ov-sugg { color: var(--ink-3); font-size: 12.5px; }
+.ov-panel .ov-ro .ov-ro-v { font-weight: 600; display: flex; flex-direction: column; }
+.ov-panel .ov-ro .ov-ro-v small { font-weight: 400; font-size: 11.5px; }
+.ov-panel .ov-ro { color: var(--ink-2); }
+.ov-panel .ov-group { display: none; }
+.ov-panel .ov-tabs.searching ~ * { }
+.ov-panel .ov-brim-info { margin: 8px 16px 12px; }
+.ov-panel .ov-row.ov-focus { animation: ovFocus 1.6s ease-out; }
+@keyframes ovFocus { 0% { background: var(--accent-soft); } 100% { background: none; } }
+.ov-panel-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-top: 1px solid var(--rule); background: var(--paper-2); }
+.ov-panel-foot .ov-foot-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+.ov-panel-foot .ov-def-info { flex-basis: 100%; margin: 0; }
+.ov-panel-foot .ov-def-info:empty { display: none; }
+@media (max-width: 640px) {
+  .ov-panel .ov-colhead { display: none; }
+  .ov-panel .ov-row { grid-template-columns: minmax(0, 1fr) 28px; gap: 4px 8px; }
+  .ov-panel .ov-row > span:first-child { grid-column: 1 / -1; font-weight: 600; }
+  .ov-panel .ov-row .ov-sugg { grid-column: 1 / -1; }
+}
+/* bei der Suche die Themen als Zwischenüberschrift */
+.ov-panel.searching .ov-group:not([hidden]) { display: block; padding: 10px 16px 2px; }

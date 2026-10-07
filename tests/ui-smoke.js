@@ -211,7 +211,7 @@ async function runSmoke(opts={}){
   $('tabSettings').click();
 
   /* 7) Hilfe und Erklärungen */
-  const help=document.querySelector('.spec .help');help.click();
+  const help=document.querySelector('#ovPanel .ov-row:not([hidden]) .help');help.click();
   ok(!$('tip').hidden&&$('tip').textContent.length>20,'Erklärung per Klick');
   document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));ok($('tip').hidden,'Escape schließt Erklärung');
   document.querySelector('[data-action="help"]').click();ok($('helpDlg').open,'Hilfe-Dialog');$('helpDlg').close();
@@ -220,7 +220,7 @@ async function runSmoke(opts={}){
   menuClick('editMat');ok($('editor').open,'Editor „Werte anpassen“ öffnet');
   $('ed_nozzle_1').value='219';$('edSave').click();
   ok($('matBadge').textContent==='Eigene Werte'&&$('material').selectedOptions[0].textContent.startsWith('★'),'Eigene Werte gespeichert (★, Badge)');
-  ok(document.querySelector('#settings .ks .ks-v').textContent==='219 °C'&&document.querySelector('#settings .vl-row .vl-v').textContent==='219 °C','Kennwert zeigt 219 °C');
+  ok(document.querySelector('#settings .ks .ks-v').textContent==='219 °C','Kennwert zeigt 219 °C');
   menuClick('editMat');$('ed_maxVol').value='abc';$('edSave').click();
   ok(alerts.some(a=>a.includes('Volumengeschwindigkeit'))&&$('editor').open,'Ungültige Eingabe wird abgelehnt');
   $('edCancel').click();
@@ -538,15 +538,15 @@ async function runSmoke(opts={}){
     setTab('slice');await wait(100);
     const li=document.querySelector('#slotPanelList [data-slot-pick="1"]');ok(!!li,'Filament-Slots anklickbar');
     // Werte je Auftrag: nur kritische Bereiche
-    setTab('settings');$('ovOpen').click();await wait(50);
+    setTab('settings');openOverrideDialog();await wait(50);
     ok(!!$('ovRows').querySelector('[data-ov="retr_len"]')&&!!$('ovRows').querySelector('[data-ov="sp_travel"]')&&!!$('ovRows').querySelector('[data-ov="accel"]'),'Werte anpassen: Travel, Beschleunigung, Rückzug');
     { const rl=$('ovRows').querySelector('[data-ov="retr_len"]'),fa=$('ovRows').querySelector('[data-ov="fan_aux"]'),fb=$('ovRows').querySelector('[data-ov="fan_box"]');
       ok(!!fa&&!!fb,'Kobra S1: Hilfs- und Gehäuselüfter im Dialog');
-      rl.value='1.3';fb.value='10';$('ovSave').click();await wait(80);const po=project.parts[project.selected].overrides||{};
+      rl.value='1.3';fb.value='10';ovApply();await wait(80);const po=project.parts[project.selected].overrides||{};
       ok(po.retr_len===1.3&&po.fan_box===10&&lastResult.retr&&lastResult.retr.len===1.3&&lastResult.fans2&&lastResult.fans2.box===10,'Rückzug 1,3 mm bleibt 1,3 (nicht gerundet), Gehäuselüfter 10 %');
       const pcl=plannedChanges(lastResult,0),pv=k=>(pcl.find(c=>c.key===k)||{}).value;
       ok(pv('filament_retraction_length')==='1.3'&&pv('during_print_exhaust_fan_speed')==='10'&&pv('additional_cooling_fan_speed')!=null,'Export Kobra S1: Rückzug, Gehäuselüfter 10, Hilfslüfter mit Vorgabe');
-      delete po.retr_len;delete po.fan_box;update();await wait(50);$('ovOpen').click();await wait(50); }
+      delete po.retr_len;delete po.fan_box;update();await wait(50);openOverrideDialog();await wait(50); }
     { const keys=['nozzle_first','first_layer','seam','sp_top','sp_gap','max_vol','flow','pa','zhop','fan_first','brim_gap'];
       const miss=keys.filter(k=>!$('ovRows').querySelector('[data-ov="'+k+'"]'));ok(!miss.length,'Werte anpassen: alle geschriebenen Werte einstellbar'+(miss.length?' – fehlt '+miss.join(','):''));
       const sg=lastResult.suggested;ok(keys.filter(k=>k!=='pa').every(k=>sg[k]!==undefined&&sg[k]!==null&&sg[k]!==''),'jeder Wert hat einen Vorschlag');
@@ -557,20 +557,22 @@ async function runSmoke(opts={}){
       ok(!!st&&!!ef,'Werte anpassen: Stützen-Typ und Elefantenfuß-Kompensation');
       ok(/0,075|0.075/.test(ef.closest('.ov-row').textContent),'Elefantenfuß: Vorschlag aus dem Profil (0,075 mm)');
       const before=plannedChanges(lastResult,0).map(c=>c.key);ok(!before.includes('elefant_foot_compensation'),'ohne Eingabe nicht geschrieben');
-      st.value='normal(auto)';ef.value='0.15';$('ovSave').click();await wait(80);
+      st.value='normal(auto)';ef.value='0.15';ovApply();await wait(80);
       const pc=plannedChanges(lastResult,0),last=k=>pc.filter(c=>c.key===k).pop();
       ok(last('support_type')&&last('support_type').value==='normal(auto)'&&last('elefant_foot_compensation').value==='0.15','gesetzt: Stützen-Typ normal(auto), Elefantenfuß 0,15 im Export (zuletzt)');
       ok(!$('orderedSettings'),'Abschnitt in Orca-Reihenfolge entfernt');
-      const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);$('ovOpen').click();await wait(50); }
-    { const titles=[...$('settings').querySelectorAll('.th-card .spec-title')].map(h=>h.firstChild.textContent.trim());
-      ok(['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen'].every(x=>titles.includes(x)),'Druckwerte: Karten nach Thema '+titles.join('/'));
-      ok(!$('settings').querySelector('details'),'Druckwerte: nichts eingeklappt');
-      ok([...$('settings').querySelectorAll('.vl-row .vl-k')].filter(k=>k.textContent.replace('?','').trim()==='Rückzug').length===1,'Rückzug nur einmal');
-      ok($('settings').querySelectorAll('.key-strip .ks').length>=6,'Kennzahlen oben'); }
-    // Karte „Weitere Orca-Einstellungen“: Elefantenfuß aus dem Profil, angepasst hervorgehoben, Klick öffnet den Dialog
-    { const c=$('settings').querySelector('[data-ovk="x:elefant_foot_compensation"]');ok(!!c&&/0[,.]075/.test(c.textContent)&&!c.classList.contains('ov'),'Druckwerte: Elefantenfuß 0,075 mm aus dem Profil');
-      $('ovDlg').close();c.click();await wait(50);ok($('ovDlg').open&&document.activeElement===$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]'),'Klick auf die Kachel: Dialog beim Wert');
-      $('ovDlg').close();$('ovOpen').click();await wait(50); }
+      const p=project.parts[project.selected];delete p.overrides['x:support_type'];delete p.overrides['x:elefant_foot_compensation'];if(!Object.keys(p.overrides).length)p.overrides=null;update();await wait(50);openOverrideDialog();await wait(50); }
+    // Tafel statt Kacheln/Dialog: Spalten, Anzeigezeilen, Kennzahlen oben, Klick springt zum Wert
+    { ok(!$('ovDlg')&&!document.querySelector('#settings .th-card'),'kein Dialog, keine Kacheln mehr');
+      ok([...document.querySelectorAll('.ov-colhead span')].map(x=>x.textContent).slice(0,3).join('|')==='Einstellung|Wert|Vorschlag','Tafel: Einstellung | Wert | Vorschlag');
+      ovTab('Temperatur');ok([...$('ovRows').querySelectorAll('.ov-ro')].some(r=>!r.hidden&&/Herstellerbereich/.test(r.textContent)),'Anzeigezeile Herstellerbereich im Reiter Temperatur');
+      ok($('settings').querySelectorAll('.key-strip .ks').length>=6,'Kennzahlen oben');
+      const ks=$('settings').querySelector('.ks[data-ovk="nozzle"]');ks.click();await wait(80);
+      ok(document.activeElement===$('ovRows').querySelector('[data-ov="nozzle"]')&&$('ovTabs').querySelector('.ov-tab.on').dataset.tab==='Temperatur','Klick auf Kennzahl Düse: Feld Düse in der Tafel');
+      const ef=$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]');ef.value='0.1';ef.dispatchEvent(new Event('change',{bubbles:true}));await wait(80);
+      ok((project.parts[project.selected].overrides||{})['x:elefant_foot_compensation']===0.1&&$('ovRows').querySelector('[data-ov="x:elefant_foot_compensation"]').closest('.ov-row').classList.contains('set'),'Wert ändern gilt sofort (ohne Übernehmen)');
+      $('ovRows').querySelector('[data-ov-x="x:elefant_foot_compensation"]').click();await wait(80);
+      ok(!(project.parts[project.selected].overrides||{})['x:elefant_foot_compensation'],'× setzt auf den Vorschlag zurück'); }
     // Brim: nur noch eine Stelle – Breite und Art nebeneinander, keine „Brim-Art“ mehr unter den weiteren Orca-Einstellungen
     { const b=$('ovRows').querySelector('[data-ov="brim"]'),k=$('ovRows').querySelector('[data-ov="brim_kind"]');
       ok(!!k&&!$('ovRows').querySelector('[data-ov="x:brim_type"]'),'Brim-Art einmal (neben Brim), nicht doppelt');
@@ -584,7 +586,7 @@ async function runSmoke(opts={}){
       b.value='';b.dispatchEvent(new Event('input',{bubbles:true}));
       const bi=$('ovRows').querySelector('[data-ov="brim_inner"]');
       ok(bi&&bi.tagName==='SELECT'&&[...bi.options].map(o=>o.value).join()===',0,2,3,5','Brim innen: Auswahl aus / 2 / 3 / 5 mm');
-      ok(/Vorschlag aus/.test(bi.closest('.ov-row').textContent),'Brim innen: Vorschlag aus');
+      ok(/Vorschlag: aus/.test(bi.closest('.ov-row').textContent),'Brim innen: Vorschlag aus');
       const ik=$('ovRows').querySelector('[data-ov="brim_inner_kind"]');
       ok(ik&&[...ik.options].map(o=>o.value).join()===',large,all,corners,orca','Form innen: große Löcher / alle Löcher / Lochecken / Orca');
       bi.value='3';bi.dispatchEvent(new Event('input',{bubbles:true}));ik.value='orca';ik.dispatchEvent(new Event('input',{bubbles:true}));
@@ -595,12 +597,12 @@ async function runSmoke(opts={}){
       bedIn.value=String(fac+5);$('ovDefSave').click();await wait(80);const key=lastResult.defKey;
       ok(store.settings.ovDefaults&&store.settings.ovDefaults[key]&&store.settings.ovDefaults[key].bed===fac+5&&lastResult.m.bed===fac+5,'Als Standard gemerkt: Heizbett '+(fac+5)+' für '+key);
       const p=project.parts[project.selected];ok(!p.overrides,'Teil-Anpassung steckt jetzt im Standard');
-      ok($('settings').textContent.includes('dein Standard'),'Datenblatt: „dein Standard – Werk …“');
-      $('ovOpen').click();await wait(50);ok(/Standard/.test($('ovRows').querySelector('[data-ov="bed"]').closest('.ov-row').textContent)&&!$('ovDefReset').classList.contains('hidden'),'Dialog: Standard und Werk, „Standard zurücksetzen“');
+      ok(/Standard/.test($('ovRows').querySelector('[data-ov="bed"]').closest('.ov-row').textContent),'Tafel: „Standard … Werk …“');
+      openOverrideDialog();await wait(50);ok(/Standard/.test($('ovRows').querySelector('[data-ov="bed"]').closest('.ov-row').textContent)&&!$('ovDefReset').classList.contains('hidden'),'Dialog: Standard und Werk, „Standard zurücksetzen“');
       const oc=window.confirm;window.confirm=()=>true;$('ovDefReset').click();await wait(80);window.confirm=oc;
       ok(!(store.settings.ovDefaults||{})[key]&&lastResult.m.bed===fac,'Standard zurückgesetzt: wieder Werkswert');
-      store.settings.ovDefaults=JSON.parse(d0)||undefined;persist();$('ovOpen').click();await wait(50); }
-    $('ovDlg').close();const se=$('settings').querySelector('[data-ov-group="Tempo"]');ok(!!se,'Datenblatt: „✎ anpassen“ an der Karte Tempo');se.click();await wait(50);
+      store.settings.ovDefaults=JSON.parse(d0)||undefined;persist();openOverrideDialog();await wait(50); }
+    openOverrideDialog('Tempo');await wait(50);
     ok($('ovTabs').querySelector('.ov-tab.on')?.dataset.tab==='Tempo','Dialog: Reiter Tempo aktiv');
     ok([...$('ovRows').querySelectorAll('.ov-row')].filter(r=>!r.hidden).every(r=>r.dataset.theme==='Tempo'),'Reiter zeigt nur Tempo-Werte');
     $('ovSearch').value='brim';$('ovSearch').dispatchEvent(new Event('input'));
@@ -608,9 +610,9 @@ async function runSmoke(opts={}){
     $('ovSearch').value='';$('ovSearch').dispatchEvent(new Event('input'));
     { const th=['Temperatur','Kühlung','Tempo','Qualität','Struktur','Filament','Brim & Haftung','Stützen','Oberflächen','Sonstiges'];ok([...$('ovTabs').querySelectorAll('[data-tab]')].map(b=>b.dataset.tab).join()===th.join(),'Reiter in Themenreihenfolge'); }
     ovTab('Tempo');
-    ok($('ovDlg').open&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Tempo');
-    const crit=$('ovRows').querySelector('[data-ov="critical"]');ok($('ovDlg').open&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
-    crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));$('ovSave').click();await wait(80);
+    ok(!$('ovPanel').classList.contains('hidden')&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Tempo');
+    const crit=$('ovRows').querySelector('[data-ov="critical"]');ok(!$('ovPanel').classList.contains('hidden')&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
+    crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));ovApply();await wait(80);
     ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');
     // Filament ↔ Slot: PETG gewählt, im Slot steckt PLA (eigene Angabe) – Hinweis bei den Druckwerten und in ③, Übernehmen stellt um
     { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),p=project.parts[project.selected],m0=p.input.material,sl=p.slot??costDefaultSlot();
@@ -632,10 +634,10 @@ async function runSmoke(opts={}){
       lv.data=d0;lv.at=at0;if(pr0!=null)store.settings.prepS=pr0;else delete store.settings.prepS;persist(); }
     // Mehrere Teile: Anpassung am ZWEITEN Teil – Slot-/Plattenwerte gelten trotzdem (Probedruck 2026-10-04: gingen verloren)
     { const keep=project.parts.map(q=>q.overrides);project.parts.forEach(q=>{q.overrides=null});
-      if(project.parts.length>1){selectPart(1);await wait(50);setTab('settings');$('ovOpen').click();await wait(50);
+      if(project.parts.length>1){selectPart(1);await wait(50);setTab('settings');openOverrideDialog();await wait(50);
         const set=(k,v)=>{const el=$('ovRows').querySelector('[data-ov="'+k+'"]');el.value=String(v)};set('bed',63);set('sp_first',25);set('w',5);
         ok(/ganze Platte/.test($('ovRows').querySelector('[data-ov="sp_first"]').closest('.ov-row').textContent),'Dialog: „gilt für die ganze Platte“ bei erster Schicht');
-        $('ovSave').click();await wait(80);
+        ovApply();await wait(80);
         const plan=exportPlan(costDefaultSlot()),pc=plannedChanges(plan.r,plan.slot),v=k=>(pc.find(c=>c.key===k)||{}).value;
         ok(v('hot_plate_temp')==='63'&&v('initial_layer_speed')==='25','Am 2. Teil angepasst: Bett 63 und erste Schicht 25 im Export (globale Werte)');
         ok(project.parts[1].overrides.w===5&&!(project.parts[0].overrides||{}).w,'Wände nur am 2. Teil (je Teil)');

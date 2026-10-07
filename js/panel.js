@@ -112,7 +112,8 @@ function update(){
   document.querySelectorAll('.printer-switch [data-printer]').forEach(b=>{const on=b.dataset.printer===r.printer.id;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1});
   $('resultPrinter').textContent=t('Startprofil · {printer}',{printer:r.printer.label});
   // alle Werte als Kacheln nach Thema
-  $('settings').innerHTML=keyStrip(r)+'<div class="th-grid">'+themeCards(r)+'</div>';
+  // oben die Kennzahlen; alle Werte stehen in der Tafel darunter (js/overrides-ui.js ovPanelSync)
+  $('settings').innerHTML=keyStrip(r);
   $('title').textContent=r.m.name+' – '+t(r.ob.label)+' · '+GOAL_LABEL[r.g];
   $('summary').innerHTML=(geom?de(geom.x,1)+' × '+de(geom.y,1)+' × '+de(geom.z,1)+' mm · ':'')+'<span class="badge '+st[0]+'" style="margin-left:0">'+st[1]+'</span> '+
     esc(r.m.overridden?t('Standardprofil mit deinen eigenen Werten.'):t(r.m.src));

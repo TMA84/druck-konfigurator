@@ -65,57 +65,103 @@ function extraSuggestion(r, key) {
   } catch (e) { return undefined; }
 }
 const ovCount = p => p && p.overrides ? Object.keys(p.overrides).length : 0;
-const ovFmt = (f, v) => Array.isArray(f[7]) && Array.isArray(f[7][0]) && !f[0].startsWith('x:') ? ((f[7].find(o => String(o[0]) === String(v)) || [, String(v)])[1]) : f[0].startsWith('x:') && typeof extraLabel === 'function' ? extraLabel(f[0].slice(2), v) : f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
+const ovFmt = (f, v) => f[0] === 'accel' && +v === 0 ? t('Werksprofil') : Array.isArray(f[7]) && Array.isArray(f[7][0]) && !f[0].startsWith('x:') ? ((f[7].find(o => String(o[0]) === String(v)) || [, String(v)])[1]) : f[0].startsWith('x:') && typeof extraLabel === 'function' ? extraLabel(f[0].slice(2), v) : f[0] === 'support' || f[0] === 'critical' ? (v === 'on' ? t('an') : t('aus')) : f[0] === 'layer' ? de(v, 2) + ' mm' : (typeof v === 'number' ? de(v, Number.isInteger(v) ? 0 : 2) : t(String(v).replace(/ oder .*/, ''))) + (f[2] && typeof v === 'number' ? ' ' + f[2] : '');
 
-// Leiste über dem Datenblatt: Knopf, wie viele Werte angepasst sind, alle zurücknehmen
+// Fußzeile der Tafel: wie viele Werte angepasst sind, alle zurücknehmen
 function renderOverrideBar() {
   const p = ovPart(), n = ovCount(p), r = lastResult;
-  $('ovOpen').disabled = !p;
-  $('ovOpen').title = p ? '' : t('Zuerst ein Modell laden');
   const diff = r && r.changed ? r.changed.length : 0;
   $('ovInfo').textContent = !p ? t('Zuerst ein Modell laden.') : n ? t(n > 1 ? '{n} Werte angepasst' : '{n} Wert angepasst', { n }) + (diff < n ? ' ' + t('({n} davon wie der Vorschlag)', { n: n - diff }) : '') + (project.parts.length > 1 ? ' – ' + t('für „{name}“', { name: p.name }) : '') : '';
   $('ovReset').classList.toggle('hidden', !n);
   // eigene Standardwerte für dieses Filament (js/engine.js ovDefaults)
   const nDef = r && r.ovDefaults ? Object.keys(r.ovDefaults).length : 0;
   if (p && nDef) $('ovInfo').textContent += (n ? ' · ' : '') + t('{n} eigene Standardwerte ({mat})', { n: nDef, mat: r.m.name });
+  if (typeof ovPanelSync === 'function') ovPanelSync();
 }
 
-function openOverrideDialog(focusGroup) {
-  const p = ovPart(), r = lastResult; if (!p || !r) return;
-  const sugg = { ...(r.suggested || {}) }, own = p.overrides || {}, def = r.ovDefaults || {};
-  let group = '';
-  for (const f of ovFields()) if (f[0].startsWith('x:')) { const v = extraSuggestion(r, f[0].slice(2)); if (v !== undefined) sugg[f[0]] = /^-?\d+(\.\d+)?$/.test(String(v)) && !f[7] ? +v : String(v); }
-  $('ovRows').innerHTML = ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1')).map(f => {
+/* Werte für diesen Auftrag als feste Tafel in ② Druckwerte (2026-10-07, vorher ein Dialog): Reiter nach Thema, je Reiter
+   eine Tabelle Einstellung | Wert | Vorschlag – Wert direkt änderbar, gilt beim Verlassen des Felds bzw. bei der Auswahl.
+   Dazu reine Anzeigezeilen für Werte ohne Anpassung (z. B. Herstellerbereich). ovPanelSync() zeichnet nur neu, wenn sich
+   Teil, Vorschläge oder Anpassungen geändert haben – sonst gingen Eingaben verloren. */
+let ovPanelKey = null;
+// Vorschläge der weiteren Orca-Einstellungen in einem Durchgang (statt je Feld neu zu rechnen)
+function ovExtraSugg(r) {
+  const out = {}; if (typeof ORCA_EXTRA === 'undefined') return out;
+  let pc = [], tpl = null; try { pc = plannedChanges({ ...r, extraOv: {} }, 0, null); } catch (e) {} try { tpl = exportTemplate(r.printer.id, r.dSel); } catch (e) {}
+  for (const f of ORCA_EXTRA) { const c = pc.filter(c => c.key === f[0] && !c.perSlot).pop(); let v = c ? c.value : tpl && tpl.settings ? tpl.settings[f[0]] : undefined; if (Array.isArray(v)) v = v[0]; if (v !== undefined) out['x:' + f[0]] = v; }
+  return out;
+}
+// Anzeigezeilen: Werte aus der Orca-Liste ohne eigenes Feld, nach Thema (js/panel.js ORDER_THEME/ROW_THEME)
+function ovReadonlyRows(r) {
+  if (typeof ORDER_THEME === 'undefined') return {};
+  const keys = new Set(ovFields().map(f => f[0])), by = {}, seen = new Set();
+  for (const [g, rows] of r.ordered) { if (!ORDER_THEME[g]) continue;
+    for (const x of rows) { const k = ROW_OV_T[t(x[0])] || (ROW_AS_EXTRA[x[0]] ? 'x:' + ROW_AS_EXTRA[x[0]] : null);
+      if (k && keys.has(k)) continue;
+      const th = ROW_THEME[x[0]] || ORDER_THEME[g], id = th + '|' + x[0]; if (seen.has(id)) continue; seen.add(id);
+      (by[t(th)] = by[t(th)] || []).push(x); } }
+  return by;
+}
+function ovRenderPanel() {
+  const p = ovPart(), r = lastResult; if (!p || !r) { $('ovRows').innerHTML = ''; $('ovTabs').innerHTML = ''; return; }
+  const sugg = { ...(r.suggested || {}) }, own = p.overrides || {}, def = r.ovDefaults || {}, xs = ovExtraSugg(r);
+  for (const f of ovFields()) if (f[0].startsWith('x:') && xs[f[0]] !== undefined) { const v = xs[f[0]]; sugg[f[0]] = /^-?\d+(\.\d+)?$/.test(String(v)) && !f[7] ? +v : String(v); }
+  const ro = ovReadonlyRows(r), roHtml = th => (ro[th] || []).map(x => '<div class="ov-row ov-ro" data-theme="' + esc(th) + '"><span>' + esc(t(x[0])) + '</span><span class="ov-ro-v">' + x[1] +
+    (x[2] ? '<small class="muted">' + x[2] + '</small>' : '') + '</span><span class="ov-sugg"></span><span></span></div>').join('');
+  let group = '', html = '';
+  for (const f of ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1'))) {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
-    const head = grp !== group ? '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>' : ''; group = grp;
+    if (grp !== group) { if (group) html += roHtml(group); html += '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>'; group = grp; }
+    const ph = def[k] ?? sugg[k] ?? '';
     const input = opts
-      ? '<select data-ov="' + k + '"><option value="">' + t('– Vorschlag –') + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
-      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(def[k] ?? sugg[k] ?? '') + '" aria-label="' + esc(label) + '">';
+      ? '<select data-ov="' + k + '" aria-label="' + esc(label) + '"><option value="">' + esc(t('Vorschlag') + (sugg[k] !== undefined || def[k] !== undefined ? ': ' + ovFmt(f, def[k] ?? sugg[k]) : '')) + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
+      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(ph) + '" aria-label="' + esc(label) + '">' + (unit ? '<small class="ov-unit muted">' + unit + '</small>' : '');
     const sc = project.parts.length > 1 ? ovScope(k) : null;
     const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
-    return head + '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '" data-theme="' + esc(grp) + '"><span>' + esc(label) + (unit ? ' <small class="muted">' + unit + '</small>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
+    // Erklärung (?) wie im Datenblatt: über die deutsche Zeilenbezeichnung (js/panel.js ROW_OV, helpFor)
+    const rowName = typeof ROW_OV !== 'undefined' ? Object.keys(ROW_OV).find(l => ROW_OV[l] === k) : null, hp = rowName && typeof helpFor === 'function' ? helpFor(rowName, r.m.kind) : '';
+    html += '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '" data-theme="' + esc(grp) + '"><span>' + esc(label) + (hp ? '<span class="help" title="' + esc(hp) + '">?</span>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
+      '<span class="ov-in">' + input + '</span>' +
       '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
-        : t('Vorschlag {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') })) + '</span>' + input +
+        : esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–')) + '</span>' +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
-  }).join('');
+  }
+  if (group) html += roHtml(group);
+  for (const th of Object.keys(ro)) if (!html.includes('data-theme="' + esc(th) + '"')) html += '<div class="ov-group" data-theme="' + esc(th) + '">' + esc(th) + '</div>' + roHtml(th);
+  $('ovRows').innerHTML = html;
   ovBrimSugg = sugg; ovBrimHoles = undefined;
   { const last = $('ovRows').querySelector('[data-ov="brim_gap"]'); if (last) last.closest('.ov-row').insertAdjacentHTML('afterend', '<div id="ovBrimInfo" class="ov-brim-info muted small" data-theme="' + esc(t('Brim & Haftung')) + '"></div>'); }
-  $('ovSearch').value = '';
   ovTab(ovTabNow && $('ovRows').querySelector('[data-theme="' + CSS.escape(ovTabNow) + '"]') ? ovTabNow : t(VALUE_THEMES[0]));
   ovBrimInfo();
-  $('ovAllRow').classList.toggle('hidden', project.parts.length < 2); $('ovAll').checked = false;
-  $('ovTitle').textContent = t('Werte anpassen') + (project.parts.length > 1 ? ' · ' + p.name : '');
+  $('ovAllRow').classList.toggle('hidden', project.parts.length < 2);
   const nDef = Object.keys(def).length;
   $('ovDefSave').textContent = t('Als Standard für {mat} merken', { mat: r.m.name });
   $('ovDefReset').classList.toggle('hidden', !nDef);
   $('ovDefInfo').textContent = nDef ? t('{n} eigene Standardwerte für {mat} auf diesem Drucker aktiv.', { n: nDef, mat: r.m.name }) : '';
-  $('ovDlg').showModal();
-  // aus dem Datenblatt („✎ anpassen“): zum Abschnitt springen
+}
+// nach jedem update(): neu zeichnen, wenn sich etwas Relevantes geändert hat; Fokus und Reiter bleiben
+function ovPanelSync() {
+  const p = ovPart(), r = lastResult;
+  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, r.printer.id, r.dSel, p.overrides, r.ovDefaults, r.suggested, typeof LANG !== 'undefined' ? LANG : '']) : '';
+  $('ovPanel').classList.toggle('hidden', !p);
+  if (key === ovPanelKey) return;
+  ovPanelKey = key;
+  const a = document.activeElement, fk = a && a.dataset && a.dataset.ov, sc = window.scrollY;
+  ovRenderPanel();
+  if (fk) { const el = $('ovRows').querySelector('[data-ov="' + fk + '"]'); if (el) el.focus({ preventScroll: true }); }
+  window.scrollTo(0, sc);
+}
+// zu einem Thema oder Wert springen (früher: Dialog öffnen) – aus Kennzahlen, Datenblatt und Hinweisen
+function openOverrideDialog(focusGroup) {
+  if (!ovPart() || !lastResult) return;
+  if (typeof setTab === 'function') setTab('settings');
+  ovPanelKey = null; ovPanelSync();
+  $('ovSearch').value = '';
   if (typeof focusGroup === 'string') ovTab(focusGroup);
   else if (focusGroup && focusGroup.key) { const el = $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]'); if (el) ovTab(el.closest('.ov-row').dataset.theme); }
-  if (typeof focusGroup === 'string') { const g = [...$('ovRows').querySelectorAll('.ov-group')].find(x => x.textContent === focusGroup); if (g) { g.scrollIntoView({ block: 'start' }); const i = g.nextElementSibling && g.nextElementSibling.querySelector('[data-ov]'); if (i) i.focus(); } }
-  // aus einer Zeile des Datenblatts: genau dieses Feld
-  else if (focusGroup && focusGroup.key) { const i = $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]'); if (i) { i.closest('.ov-row').scrollIntoView({ block: 'center' }); i.focus(); i.closest('.ov-row').classList.add('ov-focus'); } }
+  const el = focusGroup && focusGroup.key ? $('ovRows').querySelector('[data-ov="' + focusGroup.key + '"]') : $('ovRows').querySelector('.ov-row:not([hidden]) [data-ov]');
+  $('ovPanel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (el) { el.focus({ preventScroll: true }); if (focusGroup && focusGroup.key) { el.closest('.ov-row').classList.add('ov-focus'); setTimeout(() => el.closest('.ov-row') && el.closest('.ov-row').classList.remove('ov-focus'), 1600); } }
 }
 /* Warnung am Feld (sperrt nichts): Düse außerhalb des Herstellerbereichs der Spule, sonst > 30 % vom Vorschlag entfernt –
    der Vorschlag ist der erprobte Stand, × setzt darauf zurück */
@@ -147,6 +193,7 @@ function ovTab(th) {
   $('ovNoHit').hidden = !q || !!$('ovRows').querySelector('.ov-row:not([hidden])');
   ovTabsRender();
   $('ovTabs').classList.toggle('searching', !!q);
+  $('ovPanel').classList.toggle('searching', !!q);
 }
 $('ovTabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; $('ovSearch').value = ''; ovTab(b.dataset.tab); $('ovRows').scrollTop = 0; });
 $('ovSearch').addEventListener('input', () => ovTab(ovTabNow));
@@ -200,9 +247,8 @@ $('ovRows').addEventListener('input', e => {
 });
 $('ovRows').addEventListener('click', e => {
   const x = e.target.closest('[data-ov-x]'); if (!x) return;
-  const el = $('ovRows').querySelector('[data-ov="' + x.dataset.ovX + '"]'); el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true }));
+  const el = $('ovRows').querySelector('[data-ov="' + x.dataset.ovX + '"]'); el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); ovApply(true);
 });
-$('ovClear').addEventListener('click', () => $('ovRows').querySelectorAll('[data-ov]').forEach(el => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }));
 
 // Eingaben des Dialogs → {Schlüssel: Wert} oder null (ungültige Eingabe gemeldet)
 function ovCollect() {
@@ -221,7 +267,7 @@ function ovCollect() {
   if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return null; }
   return out;
 }
-$('ovSave').addEventListener('click', () => {
+function ovApply(quiet) {
   const out = ovCollect(); if (!out) return;
   const p = ovPart(), base = $('ovAll').checked ? project.parts : samePlacements(p), touched = new Set();
   for (const q of project.parts) {
@@ -236,12 +282,12 @@ $('ovSave').addEventListener('click', () => {
     q.overrides = Object.keys(next).length ? next : null;
   }
   base.forEach(q => touched.add(q));
-  $('ovDlg').close();
   update();
-  const n = Object.keys(out).length;
-  toast(n ? t('{n} Wert(e) angepasst', { n }) + (touched.size > 1 ? ' ' + t('für {n} Teile', { n: touched.size }) : '') : t('Vorschlag wird verwendet'));
-});
-$('ovOpen').addEventListener('click', openOverrideDialog);
+  if (!quiet && touched.size > 1) toast(t('Für {n} Teile übernommen', { n: touched.size }));
+}
+// Änderung gilt sofort: Auswahl, Feld verlassen, Enter, × (Vorschlag)
+$('ovRows').addEventListener('change', e => { if (e.target.closest('[data-ov]')) ovApply(); });
+$('ovRows').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[data-ov]')) { e.preventDefault(); ovApply(); } });
 /* Als Standard merken: die eingetragenen Werte gelten ab jetzt für dieses Filament auf diesem Drucker (js/engine.js
    ovDefaults) – als neuer Vorschlag; die Anpassungen dieses Teils fallen weg (sie stecken jetzt im Standard) */
 const ovMatName = () => lastResult && lastResult.m ? lastResult.m.name : '';
@@ -251,13 +297,13 @@ $('ovDefSave').addEventListener('click', () => {
   const all = store.settings.ovDefaults || (store.settings.ovDefaults = {});
   all[r.defKey] = { ...(all[r.defKey] || {}), ...out };
   const p = ovPart(); samePlacements(p).forEach(x => { x.overrides = null; });
-  persist(); prefsPush(); $('ovDlg').close(); update();
+  persist(); prefsPush(); update();
   toast(t('{n} Wert(e) als Standard für {mat} gemerkt', { n: Object.keys(out).length, mat: ovMatName() }));
 });
 $('ovDefReset').addEventListener('click', () => {
   const r = lastResult; if (!r || !store.settings.ovDefaults || !store.settings.ovDefaults[r.defKey]) return;
   if (!confirm(t('Eigene Standardwerte für {mat} löschen? Danach gelten wieder die Werkswerte.', { mat: ovMatName() }))) return;
-  delete store.settings.ovDefaults[r.defKey]; persist(); prefsPush(); $('ovDlg').close(); update();
+  delete store.settings.ovDefaults[r.defKey]; persist(); prefsPush(); update();
   toast(t('Werkswerte für {mat} wieder aktiv', { mat: ovMatName() }));
 });
 $('ovReset').addEventListener('click', () => {
@@ -265,7 +311,6 @@ $('ovReset').addEventListener('click', () => {
   samePlacements(p).forEach(x => { x.overrides = null; });
   update(); toast(t('Anpassungen zurückgenommen – Vorschlag gilt'));
 });
-$('ovDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 /* Standardwerte auf dem Server (tools/prefs.py, /api/prefs) – gelten in jedem Browser (Mac, iPhone, Home Assistant).
    Beim Start vom Server holen; liegen dort noch keine, aber im Browser, werden sie einmal hochgeladen. Ohne Server

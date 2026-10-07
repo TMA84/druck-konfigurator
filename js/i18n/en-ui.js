@@ -763,3 +763,11 @@ I18N.add({
  "Qualität": "Quality",
  "Struktur": "Strength",
 });
+I18N.add({
+ "Wert": "Value",
+ "Vorschlag": "Suggestion",
+ "Einstellung": "Setting",
+ "Änderungen für alle Teile des Projekts": "Changes for all parts of the project",
+ "Werte für diesen Auftrag": "Values for this job",
+ "Für {n} Teile übernommen": "Applied to {n} parts",
+});
