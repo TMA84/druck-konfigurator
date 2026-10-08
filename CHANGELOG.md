@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.29.0] – 2026-10-08
 
 ### Verbessert
 - **Anordnen nach echter Grundfläche:** Dünne Rahmen, Winkel und Dreiecke bekamen je eine eigene Platte, weil nur mit dem umschließenden Rechteck gerechnet wurde (Rack-Teile belegen 18–28 % davon). Neu (js/nest.js): Grundfläche als 1-mm-Raster, Drehung 0/90/180/270°, Abstand zwischen den Umrissen, „unten links zuerst“ mit Vorausschau, welche Drehung des ersten Teils einer Platte am meisten Platz lässt. Wird genommen, wenn es Platten spart (z. B. RackV2: 5 statt 9 Platten, 4 XRiser + Backbar: 2 statt 5). Die Draufsicht zeigt die Umrisse. Nicht bei „Objekt für Objekt“.
