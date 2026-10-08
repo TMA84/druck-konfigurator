@@ -157,7 +157,7 @@ const LV_HEAD = { w: 56, d: 48, h: 100, tip: 8 },   // h: bis über die Riemen (
 const LV_BELT_Z = { A: 23, B: 12 }, LV_ROD_Z = [0, 35];
 // Stangen und Riemen sitzen im hinteren Viertel bis Drittel des Kopfes (Foto): Traverse liegt so weit hinter der Düse
 const LV_BEAM_DY = 13;
-const LV_BELT_GAP = 8;   // Abstand der beiden Riemenstränge je Seite (Motor ↔ Umlenkung)
+const LV_BELT_GAP = 8, LV_BELT_SPAN = 12;   // Strangabstand je Seite (Umkehrrolle vorn: Durchmesser 12 mm)   // Abstand der beiden Riemenstränge je Seite (Motor ↔ Umlenkung)
 // Modell des Druckers für die Nachbildung: gemeldetes Modell, sonst gewählter Drucker, sonst Kobra S1 (js/anycubic-models.js)
 function lvModel() {
   const st = typeof wb !== 'undefined' && wb.st;
@@ -260,23 +260,37 @@ function lvHeadInit() {
   const motor = mat(0x3d9fe0, { r: 0.35, m: 0.2 }); motor.emissive = new THREE.Color(0x0c3a5c);
   // Motoren und seitliche Riemenstränge außerhalb des Kopfwegs: innerer Strang ≥ 5 mm neben dem Kopf am Bettrand
   // (Kopf ±LV_HEAD.w/2 um die Düse); die Riemen laufen unter den Y-Stangen, dürfen sie also in x überdecken
-  const mxL = Math.min(fx0 + 42, bx0 - LV_HEAD.w / 2 - 5 - LV_BELT_GAP), mxR = Math.max(fx1 - 42, bx1 + LV_HEAD.w / 2 + 5 + LV_BELT_GAP),
-    my = Math.max(fy1 - 42, by1 + LV_HEAD.d / 2 + 5 + 21);   // Motor (42 mm) hinter dem Kopf, auch wenn er ganz hinten steht
-  for (const [x, bz] of [[mxL, LV_BELT_Z.B], [mxR, LV_BELT_Z.A]]) {
-    const mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, my, bz - LV_BELT_H / 2 - 14 - 40); frame.add(mo);
-    const cap = lvMotorPulley(); cap.rotation.x = Math.PI / 2; cap.position.set(x, my, bz); frame.add(cap);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, my, bz - LV_BELT_H / 2 - 7); frame.add(shaft);
+  /* Riemenlauf nach der Anycubic-Skizze (2026-10-08): je Seite außen und innen ein Strang (innen = Wagenrolle), hinten zwei
+     Rollen nebeneinander mit dem Motor dazwischen davor („Omega“), vorn eine Umkehrrolle. Die Motoren sitzen OBEN auf dem
+     Rahmen, Welle nach unten (Explosionsbild) – über dem Kopfweg, keine Kollision. Innere Stränge außerhalb des Kopfwegs. */
+  const G = LV_BELT_SPAN, xLi = bx0 - LV_HEAD.w / 2 - 16, xLo = xLi - G, xRi = bx1 + LV_HEAD.w / 2 + 16, xRo = xRi + G;   // Wagenrollen (Mitte 5 mm innen) bleiben neben Kopf und Hotend-Lüfter
+  const yb = fy1 - 22, yF = fy0 + 34, mL = [xLo + 34, yb - 16], mR = [xRo - 34, yb - 16], zMot = top + 4;
+  for (const [[x, y], bz] of [[mL, LV_BELT_Z.B], [mR, LV_BELT_Z.A]]) {
+    const mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, y, zMot); frame.add(mo);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(54, fy1 - y + 27, 3), black); plate.position.set(x, (y - 27 + fy1) / 2, zMot - 1.5); frame.add(plate);   // Halteblech zum hinteren Rahmen
+    const cap = lvMotorPulley(); cap.rotation.x = Math.PI / 2; cap.position.set(x, y, bz); frame.add(cap);
+    const sl = zMot - bz, shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, sl, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, y, bz + sl / 2); frame.add(shaft);
     lv.motorCaps.push(cap); }
-  lv.xy = { mxL, mxR, my, yF: fy0 + 34, fx0, fx1, fy0, fy1, top };
+  lv.xy = { xLi, xLo, xRi, xRo, yb, yF, mL, mR, fx0, fx1, fy0, fy1, top };
+  // Y-Stangen mit Endblöcken an den Rahmenecken (vorn/hinten oben)
+  for (const x of [bx0 - m, bx1 + m]) for (const [y0, y1] of [[fy0, cy - ylen / 2 + 10], [cy + ylen / 2 - 10, fy1]]) {
+    const blk = new THREE.Mesh(new THREE.BoxGeometry(20, y1 - y0, top - LV_ROD_Z[1] + 16), black); blk.position.set(x, (y0 + y1) / 2, (LV_ROD_Z[1] - 8 + top + 8) / 2); frame.add(blk); }
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
   // direkt am Druckbett: das Bett hängt mit Haltern und Spindelmuttern daran (lv.zArms, bleiben beim Bett)
   // außerhalb des Kopfwegs (Kopf ±LV_HEAD.w/2 bzw. ±LV_HEAD.d/2 um die Düse, + 6 mm), damit sie bis übers Bett reichen dürfen
-  const zx = LV_HEAD.w / 2 + 8, zy = LV_HEAD.d / 2 + 10;
+  const zx = LV_HEAD.w / 2 + 18, zy = LV_HEAD.d / 2 + 18;   // inkl. Lagerböcke (16 mm) und Hotend-Lüfter außen am Kopf
   const zs = [[cx, by1 + zy], [bx0 - zx, by0 + 30], [bx1 + zx, by0 + 30]];
   for (const [x, y] of zs) {
     // reichen bis 12 mm über die Düsenspitze: auch beim höchsten Bettstand (erste Schicht) geht die Spindel durch die Mutter
     const zTop = -LV_GANTRY_Z + 12, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
-    sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc); }
+    sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc);
+    // Lagerböcke oben und unten mit Strebe zur nächsten Rahmenwand (links/rechts bzw. hinten)
+    const toX = Math.abs(x - cx) > 40, wall = toX ? (x < cx ? fx0 : fx1) : fy1;
+    for (const z of [zTop + 3, zBot - 3]) {
+      const brg = new THREE.Mesh(new THREE.BoxGeometry(16, 16, 10), black); brg.position.set(x, y, z); frame.add(brg);
+      const L = Math.abs(wall - (toX ? x : y)), st = new THREE.Mesh(new THREE.BoxGeometry(toX ? L : 10, toX ? 10 : L, 6), black);
+      st.position.set(toX ? (x + wall) / 2 : x, toX ? y : (y + wall) / 2, z); frame.add(st); }
+  }
   // Z-Antrieb unten im Gehäuse: Motor hinten rechts, geschlossener Zahnriemen über die Ritzel der drei Spindeln und des Motors
   lv.zDrive = lvZDrive(frame, zs.concat([[cx + 95, by1 + zy - 6]]), top - fh + 30, () => new THREE.Mesh(slab(42, 42, 40, 4, 1), motor));   // gleiche Form wie die XY-Motoren
   lv.zArms = new THREE.Group();
@@ -506,11 +520,23 @@ function lvMechInit(md, g) {
   } else {
     /* CoreXY: zwei Riemen übereinander. A (oben): rechter Motor → vorn rechts → Eckwagen rechts → Kopf; vom Kopf → Eckwagen links
        → hinten links → rechter Motor. B (unten) gespiegelt mit dem linken Motor. Linienzüge ab der Klemme am Kopf. */
-    const { mxL, mxR, my, yF } = lv.xy, M = LV_MOTOR_R, G = LV_BELT_GAP;
-    // am Motor läuft der Riemen außen ums Ritzel: hinterer Strang bei my + M, Strang nach vorn bei Motor ± M
-    const yb = my + M, xRo = mxR + M, xLo = mxL - M;
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py - 9], [mxL + G, py - 9], [mxL + G, yb], [xRo, yb]], [[xRo, yb], [xRo, yF], [mxR - G, yF], [mxR - G, py - 9], [px + 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 1 });
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 9], [mxR - G, py - 9], [mxR - G, yb], [xLo, yb]], [[xLo, yb], [xLo, yF], [mxL + G, yF], [mxL + G, py - 9], [px - 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 0 });
+    const { xLi, xLo, xRi, xRo, yb, yF, mL, mR } = lv.xy, M = LV_MOTOR_R;
+    /* Eckpunkt am Motor so, dass die Ritzelmitte genau auf dem Motor liegt (Riemen läuft unten herum, Omega) */
+    const motorCorner = (c, a, b) => {
+      let q = c.slice();
+      for (let it = 0; it < 3; it++) {
+        const d1 = [q[0] - a[0], q[1] - a[1]], d2 = [b[0] - q[0], b[1] - q[1]], l1 = Math.hypot(...d1), l2 = Math.hypot(...d2);
+        const u = [d1[0] / l1, d1[1] / l1], v = [d2[0] / l2, d2[1] / l2], bx = v[0] - u[0], by = v[1] - u[1], bl = Math.hypot(bx, by) || 1;
+        const cosH = Math.sqrt(Math.max(0.04, (1 + u[0] * v[0] + u[1] * v[1]) / 2)), off = M / cosH;
+        q = [c[0] - bx / bl * off, c[1] - by / bl * off];
+      }
+      return q;
+    };
+    // Riemen B (Motor links, unten): linke Klemme → Wagen links innen → vorn Umkehr → außen nach hinten → Omega um den Motor → hinten nach rechts → rechts innen zum Wagen → rechte Klemme
+    const qL = motorCorner(mL, [xLo, yb], [xLo + 50, yb]), qR = motorCorner(mR, [xRo, yb], [xRo - 50, yb]);
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px - 12, py - 9], [xLi, py - 9], [xLi, yF], [xLo, yF], [xLo, yb], qL], [qL, [xLo + 50, yb], [xRi, yb], [xRi, py - 9], [px + 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 0 });
+    // Riemen A (Motor rechts, oben): gespiegelt
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px + 12, py - 9], [xRi, py - 9], [xRi, yF], [xRo, yF], [xRo, yb], qR], [qR, [xRo - 50, yb], [xLi, yb], [xLi, py - 9], [px - 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 1 });
   }
   // Schleppkette: Glieder entlang einer Kurve vom Rahmen hinten oben zum Kopf
   const link = new THREE.BoxGeometry(9, 7, 13),   // lange Seite entlang z: lookAt richtet z auf die Kurve
@@ -523,7 +549,7 @@ function lvMechInit(md, g) {
   lvFansInit(md, g);
   // Kette: CoreXY vom Rahmen hinten links (großer Bogen über die linke Seite), Bettschubser vom oberen Querholm
   lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true, xmin: bx0 - m }
-    : { x: lv.xy.fx0 + 60, y: lv.xy.fy1 - 70, z: LV_ROD_Z[1] + 30, fixed: false, xmin: lv.xy.fx0 + 25 };
+    : { x: (lv.xy.mL[0] + lv.xy.mR[0]) / 2 - 40, y: lv.xy.fy1 - 30, z: LV_ROD_Z[1] + 30, fixed: false, xmin: lv.xy.fx0 + 25 };   // hinten zwischen den Motoren
 }
 /* Lüfter mit Luftstrom (2026-10-08): Bauteillüfter am Kopf (bläst von beiden Seiten zur Düse), Seitenlüfter rechts an der
    Gehäusewand (flacher Fächer übers Bett) und Gehäuselüfter hinten (nach außen) – Stärke und Tempo des Luftstroms nach den gemeldeten

@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.38.0] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, XY-Riemenlauf nach der Anycubic-Skizze:** Je Riemen auf der Motorseite zwei Stränge (außen nach vorn, Umkehrrolle, innen zurück zum Wagen), hinten zwei Rollen mit dem Motor dazwischen („Omega“-Umschlingung), auf der Gegenseite ein einzelner Strang von der hinteren Eckrolle zum Wagen; an jedem Wagen je eine Rolle beider Riemen übereinander. Geprüft: Riemen lückenlos, auf allen Rollen und Ritzeln, Länge in jeder Kopfstellung gleich (wie bei echtem CoreXY).
+- **3D-Fortschritt, Motoren oben auf dem Rahmen:** Welle nach unten mit Halteblech (Explosionsbild) – über dem Kopfweg.
+- **3D-Fortschritt, Halterungen:** Y-Stangen mit Endblöcken an den Rahmenecken; Z-Spindeln mit Lagerböcken oben und unten und Strebe zur Rahmenwand. Spindeln, Wagenrollen und Motorritzel außerhalb des Kopfwegs (an 8 Randstellungen geprüft).
+
 ## [10.37.2] – 2026-10-08
 
 ### Behoben
