@@ -783,3 +783,6 @@ I18N.add({
  "Kleine Überhänge weglassen": "Skip small overhangs",
  "nein – auch kleine stützen": "no – support small ones too",
 });
+I18N.add({
+ "Warteschlange wird angelegt …": "Creating queue …",
+});

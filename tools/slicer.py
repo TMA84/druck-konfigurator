@@ -123,8 +123,22 @@ def _new_job_dir():
     return job, path
 
 
+def _link_or_copy(src, dst):
+    """Datei verknüpfen (schnell, kein Platz) – über Dateisystemgrenzen hinweg kopieren."""
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+_pin_lock = threading.Lock()
+_pinning = set()
+
+
 def pin_job(job):
-    """Auftrag dauerhaft aufheben (Kopie in PINNED_DIR, mit Vorschauen). True, wenn danach vorhanden."""
+    """Auftrag dauerhaft aufheben (in PINNED_DIR). True, wenn danach vorhanden.
+    2026-10-08: ohne Vorschauen vorab (die baut job_file bei Bedarf) und mit Verknüpfungen statt Kopien – bei 7 Platten
+    mit je ~18 MB G-Code dauerte das Anlegen der Warteschlange sonst lange ohne Rückmeldung."""
     if not JOB_ID.match(str(job)):
         return False
     dst = os.path.join(PINNED_DIR, job)
@@ -133,19 +147,33 @@ def pin_job(job):
     src = os.path.join(JOBS_DIR, job)
     if not os.path.isdir(src):
         return False
-    for f in os.listdir(src):   # Vorschauen jetzt bauen, damit die Kopie vollständig ist
-        m = re.fullmatch(r"plate_(\d+)\.gcode", f)
-        if m:
-            try:
-                job_file(job, m.group(1), "preview")
-            except Exception:
-                pass
     os.makedirs(PINNED_DIR, exist_ok=True)
     tmp = dst + ".tmp"
     shutil.rmtree(tmp, ignore_errors=True)
-    shutil.copytree(src, tmp)
+    shutil.copytree(src, tmp, copy_function=_link_or_copy)
     os.replace(tmp, dst)
     return True
+
+
+def pin_job_async(job, done=None):
+    """pin_job im Hintergrund (der Server antwortet sofort); doppelte Aufrufe für denselben Auftrag laufen nur einmal."""
+    with _pin_lock:
+        if job in _pinning:
+            return
+        _pinning.add(job)
+
+    def run():
+        ok = False
+        try:
+            ok = pin_job(job)
+        except OSError as e:
+            print("Warteschlange: Auftrag %s nicht aufgehoben: %s" % (job, e), flush=True)
+        finally:
+            with _pin_lock:
+                _pinning.discard(job)
+        if done:
+            done(ok)
+    threading.Thread(target=run, daemon=True, name="pin-" + str(job)).start()
 
 
 def keep_pinned(jobs):
@@ -153,7 +181,7 @@ def keep_pinned(jobs):
     if not os.path.isdir(PINNED_DIR):
         return
     for d in os.listdir(PINNED_DIR):
-        if d not in jobs:
+        if d.split(".")[0] not in jobs:   # auch die Zwischenkopie „<job>.tmp“ eines laufenden Aufhebens behalten
             shutil.rmtree(os.path.join(PINNED_DIR, d), ignore_errors=True)
 
 

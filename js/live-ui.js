@@ -173,10 +173,11 @@ function lvHeadInit() {
   tip.rotation.x = -Math.PI / 2; tip.position.z = H.tip / 2;
   const heat = new THREE.Mesh(new THREE.BoxGeometry(16, 14, 6), mat(0xb4bdc2, { m: 0.35, r: 0.4 })); heat.position.z = H.tip + 3;
   const bodyH = H.h - 12, bodyZ = H.tip + 8;
-  const body = new THREE.Mesh(slab(H.w - 4, H.d - 4, bodyH, 9, 2), mat(0xeceff1, { r: 0.45 })); body.position.z = bodyZ;
+  // leicht durchsichtig, damit die Druckstelle zu sehen bleibt (2026-10-08)
+  const body = new THREE.Mesh(slab(H.w - 4, H.d - 4, bodyH, 9, 2), mat(0xeceff1, { r: 0.45, op: 0.72 })); body.position.z = bodyZ; body.renderOrder = 2;
   // oranger Streifen unten: nur die Außenhaut (Ring), kein Querschnitt
   const ringSh = rounded(H.w + 1, H.d + 1, 11); ringSh.holes.push(rounded(H.w - 5, H.d - 5, 8.5));
-  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ringSh, { depth: 10, bevelEnabled: false, curveSegments: 8 }), mat(0xf26a21, { r: 0.45 })); ring.position.z = bodyZ - 2;
+  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ringSh, { depth: 10, bevelEnabled: false, curveSegments: 8 }), mat(0xf26a21, { r: 0.45, op: 0.85 })); ring.position.z = bodyZ - 2; ring.renderOrder = 2;
   // Lüfter vorn (−Y): dunkler Ring, schwarze Scheibe, Nabe
   const fanR = Math.min(H.w, H.h) * 0.24, fan = new THREE.Group(), fanZ = bodyZ + bodyH * 0.55;
   fan.add(new THREE.Mesh(new THREE.TorusGeometry(fanR, 1.8, 10, 40), mat(0x2a2f33, { r: 0.6 })), new THREE.Mesh(new THREE.CircleGeometry(fanR - 0.5, 40), mat(0x0f1215, { r: 0.8 })),

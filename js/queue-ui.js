@@ -78,8 +78,12 @@ async function startQueue() {
   const name = project ? project.name : 'Druck';
   const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s + prepS(), changes: p.changes }));
   if (qSrv.mode === 'server') {
+    // Rückmeldung, solange der Server anlegt (2026-10-08: bei vielen großen Platten dauerte das ohne jedes Zeichen)
+    const btn = $('queueStart'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = t('Warteschlange wird angelegt …');
     try { await queueApi({ action: 'create', name, job: s.job, plates, materials, order: o.list.map(n => n.plate) }); }
     catch (e) { toast(t('Warteschlange nicht angelegt: {msg}', { msg: e.message })); return; }
+    finally { btn.disabled = false; btn.textContent = label; }
     queueSync();
   } else {
     saveQueue({ name, created: Date.now(), materials, slice: { job: s.job, plates },

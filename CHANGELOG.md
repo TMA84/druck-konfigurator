@@ -5,9 +5,11 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 ## [Unveröffentlicht]
 
 ### Behoben
+- **Warteschlange anlegen dauerte lange ohne Rückmeldung:** Der Server baute beim Anlegen für jede Platte die Vorschau und kopierte alle G-Codes (7 Platten × ~18 MB). Jetzt antwortet er sofort und sichert die Platten im Hintergrund – verknüpft statt kopiert, Vorschauen erst bei Bedarf. Der Knopf zeigt „Warteschlange wird angelegt …“.
 - **Weitere Orca-Einstellungen wirkten nicht im Objekt:** Setzte man einen Wert, den das Tool auch selbst berechnet (z. B. Stützen-Typ, kleine Überhänge), blieb in den Objekt-Einstellungen der berechnete stehen – und der hat in Orca Vorrang. Jetzt gilt der zuletzt gesetzte Wert.
 
 ### Geändert
+- 3D-Fortschritt: Druckkopf leicht durchsichtig, damit die Druckstelle zu sehen bleibt.
 - **„Änderungen für alle Teile des Projekts“ standardmäßig an** (Wahl bleibt gespeichert) – vorher galten Werte nur für das gewählte Teil, andere Teile bekamen z. B. keine Stützen.
 - Werte-Tafel, Reiter Stützen: „Stützen ab Überhang“ heißt jetzt **„Stützen bis Neigung (zur Waagerechten, höher = mehr)“** – Orca stützt Flächen, die flacher sind als der Winkel; 1° stützte fast nichts. Neu: **„Kleine Überhänge weglassen“** (Orca `support_remove_small_overhang`, Vorschlag ja) zum Abschalten, wenn kleine Ecken gestützt werden sollen.
 

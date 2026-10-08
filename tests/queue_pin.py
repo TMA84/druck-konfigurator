@@ -50,6 +50,22 @@ slicer.keep_pinned([other])
 check("alte Kopie weggeräumt, aktuelle bleibt", not os.path.isdir(os.path.join(os.environ["SLICE_PINNED_DIR"], job)) and slicer.job_file(other, 1, "gcode") is not None)
 slicer.keep_pinned([])
 check("Warteschlange beendet: keine Kopie mehr", not os.listdir(os.environ["SLICE_PINNED_DIR"]))
+# im Hintergrund, ohne Vorschauen vorab, mit Verknüpfung statt Kopie
+import time as _t
+j2 = fake_job()
+done = []
+slicer.pin_job_async(j2, done.append)
+for _ in range(50):
+    if done:
+        break
+    _t.sleep(0.05)
+pinned = os.path.join(os.environ["SLICE_PINNED_DIR"], j2, "plate_1.gcode")
+check("im Hintergrund aufgehoben", done == [True] and os.path.isfile(pinned), done)
+check("ohne Vorschau vorab", not os.path.exists(pinned.replace(".gcode", ".preview")))
+check("verknüpft statt kopiert (gleiches Dateisystem)", os.stat(pinned).st_ino == os.stat(os.path.join(os.environ["SLICE_JOBS_DIR"], j2, "plate_1.gcode")).st_ino)
+os.makedirs(os.path.join(os.environ["SLICE_PINNED_DIR"], j2 + ".tmp"), exist_ok=True)
+slicer.keep_pinned([j2])
+check("Zwischenkopie des aktuellen Auftrags bleibt", os.path.isdir(os.path.join(os.environ["SLICE_PINNED_DIR"], j2 + ".tmp")))
 shutil.rmtree(d, ignore_errors=True)
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

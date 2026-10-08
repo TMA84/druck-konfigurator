@@ -547,8 +547,8 @@ def queue_pin(res, prune):
     q = (res or {}).get("queue") or {}
     job = (q.get("slice") or {}).get("job")
     try:
-        if job and not slicer.pin_job(job):
-            print("Warteschlange: Slice-Auftrag %s nicht mehr vorhanden – nicht aufgehoben" % job, flush=True)
+        if job:   # im Hintergrund – die Seite bekommt sofort Antwort
+            slicer.pin_job_async(job, lambda ok: ok or print("Warteschlange: Slice-Auftrag %s nicht mehr vorhanden – nicht aufgehoben" % job, flush=True))
         if prune:
             slicer.keep_pinned([job] if job else [])
     except OSError as e:
