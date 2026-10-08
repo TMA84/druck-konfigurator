@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.11] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, ACE-Front wie beim ACE Pro:** Statt der schwarzen Quader liegt oben auf der Front eine helle Leiste mit einem orangen Einlass direkt vor jeder Spule; das Filament läuft vorn vom Wickel schräg nach unten hinein.
+
 ## [10.39.10] – 2026-10-08
 
 ### Verbessert
