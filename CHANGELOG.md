@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.34.0] – 2026-10-08
+
+### Neu
+- **3D-Fortschritt, Lüfter mit Luftstrom:** großer Seitenlüfter rechts an der Wand mit flacher, waagerechter Düse oben auf Höhe des Druckkopfs – immer über dem Bett, flacher Luftfächer über die aktuelle Schicht, Gitter des Gehäuselüfters in der Rückwand, Bauteillüfter vorn am Kopf mit Luftstrom zur Düse, kleiner Hotend-Lüfter links am Kopf. Luftstrom (Dichte, Tempo) und Drehzahl der Lüfterräder richten sich nach den gemeldeten Werten (Bauteil-, Hilfs- und Gehäuselüfter in %); bei 0 % steht der Lüfter, kein Luftstrom. Der Hotend-Lüfter dreht beim Drucken immer.
+
+### Verbessert
+- **3D-Fortschritt nach Fotos des Kobra S1:** zwei X-Stangen (oben knapp unter der Kopfoberkante, unten auf halber Höhe), beide Riemen übereinander dazwischen in derselben Ebene, Y-Stangen auf Höhe der oberen X-Stange, Bauteillüfter im oberen Drittel der Front; Stangen und Riemen im hinteren Viertel des Kopfes (der Kopf ragt nach vorn), kleiner Hotend-Lüfter vorn unten an der linken Kopfseite.
+
 ## [10.33.3] – 2026-10-08
 
 ### Behoben

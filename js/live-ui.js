@@ -149,7 +149,12 @@ function lvBuild() {
 const LV_HEAD = { w: 56, d: 48, h: 100, tip: 8 },   // h: bis über die Riemen (sie enden im Kopf)
       LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330, LV_ROD_R = 4;
 // Riemenebenen (über den X-Stangen): wie im Kobra S1 rechter Motor (A) oben, linker (B) unten
-const LV_BELT_Z = { A: 30, B: 21 };
+/* nach dem Foto des Kobra S1 (2026-10-08): an der Traverse zwei X-Stangen – oben knapp unter der Kopfoberkante, unten etwa
+   auf halber Kopfhöhe – und dazwischen die zwei Riemen übereinander in derselben Ebene; Y-Stangen auf Höhe der oberen X-Stange.
+   z relativ zur Traverse (= Düse + LV_GANTRY_Z) */
+const LV_BELT_Z = { A: 23, B: 12 }, LV_ROD_Z = [0, 35];
+// Stangen und Riemen sitzen im hinteren Viertel bis Drittel des Kopfes (Foto): Traverse liegt so weit hinter der Düse
+const LV_BEAM_DY = 13;
 // Modell des Druckers für die Nachbildung: gemeldetes Modell, sonst gewählter Drucker, sonst Kobra S1 (js/anycubic-models.js)
 function lvModel() {
   const st = typeof wb !== 'undefined' && wb.st;
@@ -191,11 +196,11 @@ function lvHeadInit() {
   const ringSh = rounded(H.w + 4, H.d + 4, 12); ringSh.holes.push(rounded(H.w - 2, H.d - 2, 9.5));
   const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ringSh, { depth: 12, bevelEnabled: false, curveSegments: 8 }), mat(0xf26a21, { r: 0.45 })); ring.position.z = bodyZ - 2; ring.renderOrder = 1;
   // Lüfter vorn (−Y): dunkler Ring, schwarze Scheibe, Nabe
-  const fanR = Math.min(H.w, H.h) * 0.24, fan = new THREE.Group(), fanZ = bodyZ + bodyH * 0.55;
+  const fanR = Math.min(H.w, H.h) * 0.24, fan = new THREE.Group(), fanZ = bodyZ + bodyH * 0.64;   // Bauteillüfter, oberes Drittel der Front (Foto)
   fan.add(new THREE.Mesh(new THREE.TorusGeometry(fanR, 1.8, 10, 40), mat(0x2a2f33, { r: 0.6 })), new THREE.Mesh(new THREE.CircleGeometry(fanR - 0.5, 40), mat(0x0f1215, { r: 0.8 })),
     new THREE.Mesh(new THREE.CircleGeometry(fanR * 0.32, 24), mat(0x2a2f33, { r: 0.6 })));
   fan.children[2].position.z = 0.2;
-  fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 2.2, fanZ);
+  fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 2.2, fanZ); lv.headFan = fan; lv.rotors = [];
   lv.head = new THREE.Group(); lv.head.add(tip, heat, body, ring, fan); lv.head.visible = false;
   // Mechanik (Koordinaten relativ zur Traverse, die mit dem Kopf in Z fährt)
   const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, R = LV_RAIL;
@@ -211,11 +216,11 @@ function lvHeadInit() {
   // X: zwei Stangen (der Kopf hängt daran), Eckwagen an den Enden; fährt in Y (lvPlaceHead: beam.position.y)
   const beam = new THREE.Group(), rodX = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, len, 20);
   // zwei X-Stangen übereinander (wie am Kobra S1), der Kopf gleitet darauf
-  for (const dz of [-12, 4]) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
-  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3.4, R * 3.2, 3, 0.6), black); car.position.set(sx * len / 2, 0, -R * 2); beam.add(car); }
+  for (const dz of LV_ROD_Z) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
+  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.8, R * 3.6, LV_ROD_Z[1] + 16, 3, 0.6), black); car.position.set(sx * len / 2, 0, -8); beam.add(car); }
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
-  const rodY = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, -R * 0.6); return r; });
+  const rodY = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, md.kin === 'bed' ? -R * 0.6 : LV_ROD_Z[1]); return r; });
   let frame = new THREE.Group();
   if (md.kin === 'bed') {
     /* Bettschubser (Kobra 3, 3 Max, X): zwei Z-Türme links/rechts der X-Achse, oben eine Querstrebe, unten Y-Schienen unter dem
@@ -233,7 +238,7 @@ function lvHeadInit() {
   } else {
     lv.frameFixed = null;
   // Rahmen: oben und unten ein Rechteck aus 20er-Profilen, vier Säulen; oben auf Höhe der Riemen
-  const fx0 = cx - halfW, fx1 = cx + halfW, fy0 = cy - halfD, fy1 = cy + halfD, fw = 20, fh = md.size[2] + 180, top = LV_BELT_Z.A + 16;
+  const fx0 = cx - halfW, fx1 = cx + halfW, fy0 = cy - halfD, fy1 = cy + halfD, fw = 20, fh = md.size[2] + 180, top = LV_ROD_Z[1] + 18;
   const bar = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.Mesh(new THREE.BoxGeometry(Math.max(fw, x1 - x0), Math.max(fw, y1 - y0), Math.max(fw, z1 - z0)), frameM); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); frame.add(g); };
   for (const z of [top, top - fh]) { bar(fx0, fy0, z, fx1, fy0, z); bar(fx0, fy1, z, fx1, fy1, z); bar(fx0, fy0, z, fx0, fy1, z); bar(fx1, fy0, z, fx1, fy1, z); }
   for (const x of [fx0, fx1]) for (const y of [fy0, fy1]) bar(x, y, top - fh, x, y, top);
@@ -245,7 +250,7 @@ function lvHeadInit() {
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(LV_MOTOR_R, LV_MOTOR_R, LV_BELT_H + 2, 20), mat(0xd5dbde, { m: 0.5, r: 0.3, flat: true })); cap.rotation.x = Math.PI / 2; cap.position.set(x, my, bz); frame.add(cap);
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, my, bz - LV_BELT_H / 2 - 7); frame.add(shaft);
     lv.motorCaps.push(cap); }
-  lv.xy = { mxL, mxR, my, yF: fy0 + 34 };
+  lv.xy = { mxL, mxR, my, yF: fy0 + 34, fx0, fx1, fy0, fy1, top };
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
   // direkt am Druckbett: das Bett hängt mit Haltern und Spindelmuttern daran (lv.zArms, bleiben beim Bett)
   const zs = [[cx, by1 + 18], [bx0 - 18, by0 + 30], [bx1 + 18, by0 + 30]];
@@ -269,7 +274,7 @@ function lvHeadInit() {
   if (lv.plate) { lv.scene.remove(lv.plate); lv.plate.geometry.dispose(); lv.plate.material.dispose(); }
   lv.plate = new THREE.Mesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), new THREE.MeshLambertMaterial({ color: 0x1d272d }));
   lv.plate.position.set((bx0 + bx1) / 2, (by0 + by1) / 2, -0.03);
-  lvMechInit(md, { bx0, bx1, by0, by1, m, cx, beam });
+  lvMechInit(md, { bx0, bx1, by0, by1, m, cx, cy, beam });
   lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate, lv.mechG);
   if (lv.zArms) lv.scene.add(lv.zArms);
   lvTheme();
@@ -335,8 +340,8 @@ function lvMechInit(md, g) {
     /* CoreXY: zwei Riemen übereinander. A (oben): rechter Motor → vorn rechts → Eckwagen rechts → Kopf; vom Kopf → Eckwagen links
        → hinten links → rechter Motor. B (unten) gespiegelt mit dem linken Motor. Linienzüge ab der Klemme am Kopf. */
     const { mxL, mxR, my, yF } = lv.xy;
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py + 6], [mxL + 9, py + 6], [mxL + 9, my], [mxR, my]], [[mxR, my], [mxR, yF], [mxR - 9, yF], [mxR - 9, py + 6], [px + 12, py + 6]]]), go: p => [p.x, p.y], motor: 1 });
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 6], [mxR - 9, py - 6], [mxR - 9, my], [mxL, my]], [[mxL, my], [mxL, yF], [mxL + 9, yF], [mxL + 9, py - 6], [px - 12, py - 6]]]), go: p => [p.x, p.y], motor: 0 });
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py - 9], [mxL + 9, py - 9], [mxL + 9, my], [mxR, my]], [[mxR, my], [mxR, yF], [mxR - 9, yF], [mxR - 9, py - 9], [px + 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 1 });
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 9], [mxR - 9, py - 9], [mxR - 9, my], [mxL, my]], [[mxL, my], [mxL, yF], [mxL + 9, yF], [mxL + 9, py - 9], [px - 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 0 });
   }
   // Schleppkette: Glieder entlang einer Kurve vom Rahmen hinten oben zum Kopf
   const link = new THREE.BoxGeometry(9, 7, 13),   // lange Seite entlang z: lookAt richtet z auf die Kurve
@@ -346,7 +351,97 @@ function lvMechInit(md, g) {
   lv.tubeM = new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
   lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
   lv.tube = null; lv.fil = null;
+  lvFansInit(md, g);
   lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true } : { x: cx, y: by1 + m + 4, z: LV_BELT_Z.A + 40, fixed: false };
+}
+/* Lüfter mit Luftstrom (2026-10-08): Bauteillüfter am Kopf (bläst von beiden Seiten zur Düse), Seitenlüfter rechts an der
+   Gehäusewand (flacher Fächer übers Bett) und Gehäuselüfter hinten (nach außen) – Stärke und Tempo des Luftstroms nach den gemeldeten
+   Werten (st.fans: fan_speed_pct, aux_fan_speed_pct, box_fan_level, je 0–100). Teilchen wandern vom Lüfter weg und verblassen. */
+const LV_AIR_N = 110;
+let lvAirTex = null;
+// weiche runde Flocke für die Luftteilchen
+function lvAirSprite() {
+  if (lvAirTex) return lvAirTex;
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+  return (lvAirTex = new THREE.CanvasTexture(c));
+}
+function lvAirStream(parent, from, dir, len, spread, key, size) {
+  const pos = new Float32Array(LV_AIR_N * 3), col = new Float32Array(LV_AIR_N * 3), g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: size || 11, map: lvAirSprite(), vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  pts.renderOrder = 4; parent.add(pts);
+  const d = new THREE.Vector3(...dir).normalize(), a = Math.abs(d.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(d, a).normalize(), v = new THREE.Vector3().crossVectors(d, u).normalize();
+  const t = new Float32Array(LV_AIR_N), r = new Float32Array(LV_AIR_N * 2);
+  for (let k = 0; k < LV_AIR_N; k++) { t[k] = Math.random(); const ang = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()); r[2 * k] = Math.cos(ang) * rr; r[2 * k + 1] = Math.sin(ang) * rr; }
+  // spread: Radius oder [quer, hoch] (flacher Fächer)
+  const [su, sv] = Array.isArray(spread) ? spread : [spread, spread];
+  return { pts, from: new THREE.Vector3(...from), d, u, v, len, su, sv, t, r, key };
+}
+// Lüfterrad: n schräge Flügel um die Nabe (Ebene xy, dreht um z)
+function lvRotor(r, n, color) {
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: color || 0x3b4247, roughness: 0.5, side: THREE.DoubleSide });
+  for (let k = 0; k < n; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(r * 0.32, r * 0.78, 0.8), m); const a = k / n * Math.PI * 2;
+    b.position.set(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, 0); b.rotation.z = a - Math.PI / 2 + 0.5; g.add(b); }
+  const hub = new THREE.Mesh(new THREE.CircleGeometry(r * 0.28, 20), new THREE.MeshStandardMaterial({ color: 0x2a2f33, roughness: 0.6 })); hub.position.z = 0.6; g.add(hub);
+  return g;
+}
+function lvFansInit(md, g) {
+  lv.air = [];
+  /* Lüfterräder drehen mit (lvAirTick): Kopf vorn = Bauteillüfter (fan_speed_pct), klein links am Kopf = Hotend-Lüfter (läuft
+     beim Drucken immer, key null), Seitenlüfter rechts nach aux_fan_speed_pct */
+  if (lv.headFan) { const ro = lvRotor(LV_HEAD.w * 0.2, 9, 0x2c3236); ro.position.z = 0.4; lv.headFan.add(ro); lv.rotors.push({ obj: ro, key: 'fan_speed_pct' }); }
+  { const H = LV_HEAD, hf = new THREE.Group(), r = 9;
+    hf.add(new THREE.Mesh(new THREE.TorusGeometry(r, 1.2, 8, 28), new THREE.MeshStandardMaterial({ color: 0x2a2f33, roughness: 0.6 })),
+      new THREE.Mesh(new THREE.CircleGeometry(r - 0.4, 28), new THREE.MeshStandardMaterial({ color: 0x0f1215, roughness: 0.8 })));
+    const ro = lvRotor(r, 7, 0x3b4247); ro.position.z = 0.3; hf.add(ro); lv.rotors.push({ obj: ro, key: null });
+    hf.rotation.y = -Math.PI / 2; hf.position.set(-(H.w / 2) - 1.4, -H.d / 2 + r + 8, H.tip + 8 + 12 + r + 2); lv.head.add(hf); }   // vorn unten, knapp über dem orangen Ring
+  // Bauteillüfter: Auslässe links und rechts unten am Kopf, Luft zur Düsenspitze
+  const H = LV_HEAD;
+  for (const sx of [-1, 1]) lv.air.push(lvAirStream(lv.head, [sx * (H.w / 2 - 4), 0, H.tip + 6], [-sx, 0, -0.55], H.w / 2 + 6, 5, 'fan_speed_pct', 4));
+  if (md.kin === 'bed' || !lv.xy || !lv.xy.fx0) return;
+  if (md.fans && md.fans.aux === false) return;
+  /* nach dem Foto des Kobra S1 (2026-10-08): großer Seitenlüfter rechts an der Wand, oben die flache, waagerechte Düse – bläst einen
+     flachen Fächer quer übers Bett; Gehäuselüfter hinten links der Mitte (Gitter), etwa auf halber Bauraumhöhe */
+  const { fx1, fy1, top } = lv.xy, cx = g.cx, cy = g.cy || 0, zAux = 22 - LV_GANTRY_Z, zBox = top - 200;   // Düse ≈ 22 mm über der Düsenspitze: liegt immer über dem Bett
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1c2023, roughness: 0.6 }), side = new THREE.Group();
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(30, 110, 110), dark); housing.position.set(fx1 - 25, cy, zAux - 47); side.add(housing);
+  const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 52); side.add(wheel);
+  { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 52); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 52, cy, zAux); side.add(slot);   // flache Düse
+  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(84, 6), new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
+  lv.gantry.add(side);
+  lv.air.push(lvAirStream(lv.gantry, [fx1 - 72, cy, zAux], [-1, 0, -0.04], 230, [40, 3], 'aux_fan_speed_pct'));
+  // Gehäuselüfter: Gitter in der Rückwand, Luft strömt von innen hinein und nach außen
+  const grill = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.7 });
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(90, 6, 70), dark); grill.add(plate);
+  for (let k = -3; k <= 3; k++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(70, 7, 4), gm); bar.position.set(0, -1, k * 9); bar.rotation.y = 0.5; grill.add(bar); }
+  grill.position.set(cx - 70, fy1 - 14, zBox); lv.gantry.add(grill);
+  lv.air.push(lvAirStream(lv.gantry, [cx - 70, fy1 - 110, zBox], [0, 1, 0], 100, [26, 20], 'box_fan_level'));
+}
+function lvAirTick(dt) {
+  const st = typeof wb !== 'undefined' && wb.st, fans = (st && st.fans) || {};
+  for (const ro of lv.rotors || []) { const pct = ro.key ? Math.max(0, Math.min(100, +fans[ro.key] || 0)) : 100; ro.obj.rotation.z -= dt * 30 * pct / 100; }
+  if (!lv.air || !lv.air.length) return;
+  for (const a of lv.air) {
+    const pct = Math.max(0, Math.min(100, +fans[a.key] || 0));
+    a.pts.visible = pct > 0 && lv.head.visible;
+    if (!a.pts.visible) continue;
+    const pos = a.pts.geometry.attributes.position.array, col = a.pts.geometry.attributes.color.array, speed = 0.15 + 0.85 * pct / 100;
+    const live = Math.round(LV_AIR_N * (0.25 + 0.75 * pct / 100));   // mehr Leistung = dichterer Strom
+    a.pts.geometry.setDrawRange(0, live);
+    for (let k = 0; k < live; k++) {
+      let t = a.t[k] + dt * speed * 0.9; if (t >= 1) t -= 1; a.t[k] = t;
+      const g = 0.4 + t, l = t * a.len, x = a.r[2 * k] * a.su * g, y = a.r[2 * k + 1] * a.sv * g;
+      pos[3 * k] = a.from.x + a.d.x * l + a.u.x * x + a.v.x * y; pos[3 * k + 1] = a.from.y + a.d.y * l + a.u.y * x + a.v.y * y; pos[3 * k + 2] = a.from.z + a.d.z * l + a.u.z * x + a.v.z * y;
+      const f = (1 - t) * (0.35 + 0.65 * pct / 100);   // verblasst mit dem Weg, stärker bei mehr Leistung
+      col[3 * k] = 0.45 * f; col[3 * k + 1] = 0.75 * f; col[3 * k + 2] = 1.0 * f;
+    }
+    a.pts.geometry.attributes.position.needsUpdate = true; a.pts.geometry.attributes.color.needsUpdate = true;
+  }
 }
 // Kurve der Kette: hinten oben → Bogen → senkrecht von oben auf den Kopf
 function lvChainCurve(a, h) {
@@ -357,6 +452,7 @@ function lvChainCurve(a, h) {
 function lvMechUpdate(p) {
   if (!lv.mechG) return;
   lv.mechG.visible = lv.head.visible;
+  { const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt); }
   if (!lv.head.visible) return;
   for (const { b, go, motor } of lv.belts) {
     const [px, py] = go(p), ends = lvBeltSet(b, px, py);
@@ -397,7 +493,7 @@ function lvPlaceHead(p) {
   lv.gantry.position.z = p.z + LV_GANTRY_Z;
   // CoreXY: Traverse fährt in Y; Bettschubser: der ganze Aufbau steht relativ zum Kopf, das Bett (mit dem Teil) fährt
   if (lv.kin === 'bed') { lv.gantry.position.y = p.y; lv.gantry.userData.beam.position.y = 0; if (lv.frameFixed) { lv.frameFixed.position.y = p.y; lv.frameFixed.visible = lv.head.visible; } }
-  else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y; }
+  else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y + LV_BEAM_DY; }
   lvMechUpdate(p);
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
