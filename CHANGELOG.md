@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.8] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Schlauch zum Kopf ohne Knick:** Aus der Zusammenführung steigt der Schlauch senkrecht, biegt im 90°-Bogen nach vorn, geht waagerecht durch die Rückwand und läuft dort glatt in die Kette (vorher über den Deckel mit Knick).
+- **3D-Fortschritt, Flimmern an der ACE-Haube:** Die Bodenfläche der Haube lag genau auf dem Unterteil und flimmerte (Streifen zwischen Haube und Unterteil). Sie entfällt, die Haube sitzt minimal darüber.
+
 ## [10.39.7] – 2026-10-08
 
 ### Verbessert

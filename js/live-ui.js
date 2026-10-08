@@ -590,15 +590,22 @@ function lvEnclosureInit(g) {
     // Profil-x → Welt-y, Profil-y → Welt-z, Extrusion → Welt-x; dann mittig auf die Einheit, Unterkante z = 0
     g2.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
     g2.computeBoundingBox(); const bb = g2.boundingBox; g2.translate(-(bb.min.x + bb.max.x) / 2, -(bb.min.y + bb.max.y) / 2, -bb.min.z);
-    return g2; })();
+    // Bodenfläche der Haube weglassen: sie läge genau auf dem Unterteil und flimmerte (Z-Fighting)
+    const ps = g2.getAttribute('position'), nm = g2.getAttribute('normal'), keep = [], keepN = [];
+    for (let t = 0; t < ps.count; t += 3) {
+      if (ps.getZ(t) < 0.01 && ps.getZ(t + 1) < 0.01 && ps.getZ(t + 2) < 0.01) continue;
+      for (let v = t; v < t + 3; v++) { keep.push(ps.getX(v), ps.getY(v), ps.getZ(v)); keepN.push(nm.getX(v), nm.getY(v), nm.getZ(v)); }
+    }
+    const g3 = new THREE.BufferGeometry(); g3.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3)); g3.setAttribute('normal', new THREE.Float32BufferAttribute(keepN, 3));
+    g2.dispose(); return g3; })();
   lv.aceSpools = [];
   for (let u = 0; u < 2; u++) {
     const uz = z0 + u * (A.h + 6), unit = new THREE.Group(); unit.position.set(ax, cy, uz); ace.add(unit);
     // Unterteil als Wanne: Boden, Front, Rückteil mit den Einzügen, Seiten – die Spulen liegen darin, der Einzug unten bleibt sichtbar
     for (const [w, d, h, x, y, z] of [[A.w, A.d, 18, 0, 0, 9], [A.w, A.d / 2 - 100, 90, 0, -(A.d / 2 + 100) / 2, 45], [A.w, A.d / 2 - 100, 90, 0, (A.d / 2 + 100) / 2, 45],
       [12, 200, 90, -A.w / 2 + 6, 0, 45], [12, 200, 90, A.w / 2 - 6, 0, 45]]) { const b1 = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), body); b1.position.set(x, y, z); unit.add(b1); }
-    const b2 = new THREE.Mesh(hood, lid); b2.position.z = 90; b2.renderOrder = 7; unit.add(b2);   // klare Haube
-    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.9 })); he.position.z = 90; unit.add(he);   // Kanten der Haube
+    const b2 = new THREE.Mesh(hood, lid); b2.position.z = 90.5; b2.renderOrder = 7; unit.add(b2);   // klare Haube
+    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.9 })); he.position.z = 90.5; unit.add(he);   // Kanten der Haube
     const front = new THREE.Mesh(new THREE.BoxGeometry(A.w * 0.5, 4, 22), new THREE.MeshStandardMaterial({ color: 0x15181a })); front.position.set(0, -A.d / 2 - 1, 28); unit.add(front);
     // zwei Tragrollen quer unter allen Spulen (die Spulen liegen mit den Flanschen darauf)
     for (const ry of [-55, 55]) { const ro = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, A.w - 26, 20), new THREE.MeshStandardMaterial({ color: 0x8d969c, metalness: 0.6, roughness: 0.35 }));
@@ -633,8 +640,8 @@ function lvEnclosureInit(g) {
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, links, Mitte der oberen Hälfte
-  // Zusammenführung oben raus, über die Rückwand: lvMechUpdate setzt diese Punkte (Rahmen-Koordinaten) vor den Kopfschlauch – ein Schlauch am Stück
-  lv.hubPath = [hub.clone().add(new THREE.Vector3(0, 0, 22)), new THREE.Vector3(hub.x, hub.y + 4, z1 - 10), new THREE.Vector3(hub.x + 10, hub.y - 6, z1 + 18), new THREE.Vector3(hub.x + 20, y1 - 30, z1 + 6)];
+  // Zusammenführung oben raus: lvMechUpdate führt den Kopfschlauch von hier (Rahmen-Koordinaten) hoch, im 90°-Bogen nach vorn durch die Rückwand zur Kette
+  lv.hubTop = hub.clone().add(new THREE.Vector3(0, 0, 22));
   ace.visible = store.settings.liveAce !== false; lv.gantry.add(ace); lv.aceG = ace;
   lvAceColours(typeof wb !== 'undefined' && wb.st);
 }
@@ -853,8 +860,14 @@ function lvMechUpdate(p) {
     if (sd.lengthSq() > 1e-4) { sd.normalize(); if (sd.dot(side) < 0) sd.negate(); side.copy(sd); }
     pts.push(P.add(side.clone().multiplyScalar(9)));
   }
-  if (lv.hubPath && lv.aceG && lv.aceG.visible && !A.fixed) {   // mit ACE: Schlauch beginnt oben an der Zusammenführung
-    const gz = lv.gantry.position.z; pts.unshift(...lv.hubPath.map(v => new THREE.Vector3(v.x, v.y, v.z + gz)));
+  if (lv.hubTop && lv.aceG && lv.aceG.visible && !A.fixed) {
+    /* mit ACE: Schlauch beginnt oben an der Zusammenführung, steigt senkrecht, biegt im 90°-Bogen nach vorn, geht waagerecht durch die
+       Rückwand und trifft die Kette dort, wo sie hinten an der Zusammenführung vorbeiläuft (der Teil der Kette davor bleibt ohne Schlauch) */
+    const H = lv.hubTop, gz = lv.gantry.position.z, zc = pts[0].z, R = 30;
+    while (pts.length > 2 && pts[0].x > H.x - 12) pts.shift();
+    const yc = H.y - R, z0c = zc - R, arc = [];
+    for (let k = 0; k <= 6; k++) { const t = k / 6 * Math.PI / 2; arc.push(new THREE.Vector3(H.x, yc + Math.cos(t) * R, z0c + Math.sin(t) * R)); }
+    pts.unshift(new THREE.Vector3(H.x, H.y, H.z + gz), ...arc, new THREE.Vector3(H.x - 4, (yc + pts[0].y) / 2, zc));
   }
   const inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
   pts.push(new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h + 8), inHead);
