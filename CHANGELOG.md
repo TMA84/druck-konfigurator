@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.32.0] – 2026-10-08
 
 ### Neu
 - **3D-Fortschritt: Riemen, Schleppkette und Filament:** Kobra S1/S1 Max mit den zwei CoreXY-Riemen übereinander (Motoren hinten, Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf) – die Zähne laufen mit, Riemen A mit x + y, B mit x − y, die Rollen drehen sich. Bettschubser mit X-Riemen an der Traverse und Y-Riemen unter dem Bett. Dazu eine Schleppkette vom Rahmen zum Kopf und daneben der PTFE-Schlauch mit dem Filament in der Farbe der gerade gedruckten Bahn.
