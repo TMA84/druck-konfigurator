@@ -64,17 +64,17 @@ if slicer.find_orca():
             tail = f.read().decode("utf-8", "replace")
         check("time_cost 0,35 €/h in der 3MF", "; time_cost = 0.35" in tail)
         check("filament_cost je Slot", "; filament_cost = 25,30,27.5,40" in tail)
-        # Stützen und „Nur kritische Bereiche“ (Vorschlag an, je Auftrag umschaltbar): an → Orca stützt normale
-        # Überhänge nicht (2026-09-29: 0 Stützbahnen), aus → Stützen im G-Code
+        # Stützen und „Nur kritische Bereiche“ (Vorschlag seit 2026-10-08 aus, je Auftrag umschaltbar): an → Orca stützt
+        # normale Überhänge nicht (2026-09-29: 0 Stützbahnen), aus → Stützen im G-Code
         def supports(*args):
             job = slicer.slice_3mf(subprocess.run(["node", os.path.join(ROOT, "tests", "make-test-3mf.js"), "stuetzen", *args], capture_output=True, check=True).stdout)
             with open(slicer.job_file(job["job"], 1, "gcode"), encoding="utf-8", errors="replace") as f:
                 text = f.read()
             return text.count("\n;TYPE:Support"), "; support_critical_regions_only = 1" in text
-        n_on, crit_on = supports()
-        n_off, crit_off = supports("aus")
-        check("Vorschlag: nur kritische Bereiche an", crit_on and not crit_off, (crit_on, crit_off))
-        check("je Auftrag aus: Stützen im G-Code (Trichterform)", n_off > 20, n_off)
+        n_off, crit_off = supports()
+        n_on, crit_on = supports("an")
+        check("Vorschlag: nur kritische Bereiche aus, je Auftrag an", crit_on and not crit_off, (crit_on, crit_off))
+        check("Vorschlag (aus): Stützen im G-Code (Trichterform)", n_off > 20, n_off)
         check("an: weniger Stützen als aus", n_on < n_off, (n_on, n_off))
         gone = slicer.slice_3mf(two, plates=[2], count=2, reuse="0" * 16)
         check("fehlender Auftrag: alles geslict", gone["sliced"] == 2, gone["plates"])

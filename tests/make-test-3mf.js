@@ -3,7 +3,7 @@
    Mit Argument „platten“: Pilz auf Platte 1, Würfel auf Platte 2 (Slicen einzelner Platten).
    Mit „kosten“: Kostenwerte wie aus den Preis-Einstellungen (time_cost 0,35 €/h, filament_cost je Slot).
    Mit „stuetzen“: umgedrehter Pyramidenstumpf (Überhang ≈ 53°, keine Auskragung) – das Tool empfiehlt Stützen;
-   „stuetzen aus“: dazu „Nur kritische Bereiche“ je Auftrag ausgeschaltet (Werte anpassen). */
+   „stuetzen an“ / „stuetzen aus“: dazu „Nur kritische Bereiche“ je Auftrag ein- bzw. ausgeschaltet (Vorschlag: aus). */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..'), fflate = require('../vendor/fflate.min.js');
 const ctx = vm.createContext({ console, TextDecoder });
@@ -18,7 +18,7 @@ if (process.argv[2] === 'stuetzen') {
   const b = [[15, 15, 0], [25, 15, 0], [25, 25, 0], [15, 25, 0]], tp = [[0, 0, 20], [40, 0, 20], [40, 40, 20], [0, 40, 20]], v = [...b, ...tp];
   const faces = [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 5, 1], [0, 4, 5], [1, 6, 2], [1, 5, 6], [2, 7, 3], [2, 6, 7], [3, 4, 0], [3, 7, 4]];
   const g = K.makeGeom('trichter.stl', Float32Array.from(faces.flatMap(f => f.flatMap(i => v[i]))));
-  const rs = K.compute({ printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45', overrides: process.argv[3] === 'aus' ? { critical: 'off' } : null }, g, { getMat: K.getMat, settings: K.store.settings });
+  const rs = K.compute({ printer: 'kobra_s1', material: 'pla_hs', nozD: '0.4', nozM: 'steel_hardened', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45', overrides: process.argv[3] === 'an' ? { critical: 'on' } : process.argv[3] === 'aus' ? { critical: 'off' } : null }, g, { getMat: K.getMat, settings: K.store.settings });
   if (!rs.supOn) throw Error('Trichter: Tool empfiehlt keine Stützen (' + rs.sup + ')');
   process.stdout.write(Buffer.from(K.build3mf(K.exportTemplate('kobra_s1', '0.4'), rs, [{ geom: g, r: rs }], 0, fflate).bytes));
   process.exit(0);
