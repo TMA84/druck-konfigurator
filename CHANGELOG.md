@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.27.1] – 2026-10-08
 
 ### Behoben
 - 3D-Fortschritt: Stangen silbern statt Kupfer, die beiden X-Stangen am Kopf übereinander statt hintereinander (wie am Kobra S1); drei Z-Spindeln – hinten in der Mitte, vorne links und vorne rechts.
