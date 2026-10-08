@@ -18,10 +18,12 @@ const livePosWanted = () => store.settings.livePos !== false && lv.mode === 'liv
 const LV_FAT_MAX = 600000, LV_LINE_W = 0.44;
 const lvCss = (v, f) => { const s = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return s || f; };
 // Hintergrund, Raster und Druckplatte passend zum Hell-/Dunkelmodus
+// Hintergrund dunkles Design: Schiefergrau statt fast Schwarz (2026-10-08) – Mechanik und Rahmen heben sich besser ab
+const LV_BG_DARK = 0x2a343a;
 function lvTheme() {
   if (!lv.scene) return;
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-  lv.scene.background = new THREE.Color(dark ? 0x0c1114 : 0xe9eff1);
+  lv.scene.background = new THREE.Color(dark ? LV_BG_DARK : 0xe9eff1);
   if (lv.plate) lv.plate.material.color.setHex(dark ? 0x171b1e : 0x23282c);   // PEI-Platte: dunkel wie beim Drucker
   if (lv.grid) lv.grid.material.color.setHex(dark ? 0x2c393f : 0x3a454b);
   // Kanten von Kopf und Mechanik: hell auf dunklem, dunkel auf hellem Grund
@@ -37,7 +39,7 @@ function lvInit() {
   lv.renderer = new THREE.WebGLRenderer({ antialias: true });
   lv.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   $('wbLiveStage').appendChild(lv.renderer.domElement);
-  lv.scene = new THREE.Scene(); lv.scene.background = new THREE.Color(0x0c1114);
+  lv.scene = new THREE.Scene(); lv.scene.background = new THREE.Color(LV_BG_DARK);
   lv.scene.add(new THREE.HemisphereLight(0xffffff, 0x2a363d, 0.55));
   const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(0.6, -1, 1.4); lv.scene.add(sun);
   const fill = new THREE.DirectionalLight(0xffffff, 0.18); fill.position.set(-1, 0.8, 0.6); lv.scene.add(fill);
@@ -583,7 +585,8 @@ function lvFansInit(md, g) {
   const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 155); side.add(wheel);
   { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 155); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
   const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 52, cy, zAux); side.add(slot);   // flache Düse
-  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(84, 6), new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
+  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(6, 84),   // nach der Drehung um y: 6 mm hoch, 84 mm breit (waagerechter Schlitz)
+    new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
   lv.air.push(lvAirStream(lv.gantry, [fx1 - 72, cy, zAux], [-1, 0, -0.04], 230, [40, 3], 'aux_fan_speed_pct'));
   // Ansaugung: Luft aus dem Bauraum strömt als Kegel auf das Lüfterrad zu

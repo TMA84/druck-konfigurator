@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.37.2] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, schwarzer Balken am Seitenlüfter:** Die Austrittsöffnung der flachen Düse war um 90° verdreht und stand als 84 mm hoher senkrechter Balken im Bauraum – jetzt ein waagerechter Schlitz (84 × 6 mm).
+
+### Verbessert
+- **3D-Fortschritt, hellerer Hintergrund:** im dunklen Design Schiefergrau statt fast Schwarz – Rahmen und Mechanik heben sich besser ab.
+
 ## [10.37.1] – 2026-10-08
 
 ### Behoben
