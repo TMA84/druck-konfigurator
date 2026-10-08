@@ -146,7 +146,8 @@ function lvBuild() {
 /* Drucker-Mechanik ungefähr wie beim Kobra S1 (CoreXY, das Bett fährt nach unten): Kopf ≈ 56 × 48 × 70 mm (geschätzt, keine
    offiziellen Maße), darüber die X-Traverse über die ganze Breite und links/rechts die Y-Schienen – beide auf Höhe des
    Kopfes, sie fahren mit der Düse mit. Dazu der Umriss des Druckbetts. Maße in mm, Koordinaten wie die Bahnen. */
-const LV_HEAD = { w: 56, d: 48, h: 70, tip: 8 }, LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330, LV_ROD_R = 4;
+const LV_HEAD = { w: 56, d: 48, h: 100, tip: 8 },   // h: bis über die Riemen (sie enden im Kopf)
+      LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330, LV_ROD_R = 4;
 // Riemenebenen (über den X-Stangen): wie im Kobra S1 rechter Motor (A) oben, linker (B) unten
 const LV_BELT_Z = { A: 30, B: 21 };
 // Modell des Druckers für die Nachbildung: gemeldetes Modell, sonst gewählter Drucker, sonst Kobra S1 (js/anycubic-models.js)
@@ -186,8 +187,9 @@ function lvHeadInit() {
   // leicht durchsichtig, damit die Druckstelle zu sehen bleibt (2026-10-08)
   const body = new THREE.Mesh(slab(H.w - 4, H.d - 4, bodyH, 9, 2), mat(0xeceff1, { r: 0.45, op: 0.72 })); body.position.z = bodyZ; body.renderOrder = 2;
   // oranger Streifen unten: nur die Außenhaut (Ring), kein Querschnitt
-  const ringSh = rounded(H.w + 1, H.d + 1, 11); ringSh.holes.push(rounded(H.w - 5, H.d - 5, 8.5));
-  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ringSh, { depth: 10, bevelEnabled: false, curveSegments: 8 }), mat(0xf26a21, { r: 0.45, op: 0.85 })); ring.position.z = bodyZ - 2; ring.renderOrder = 2;
+  // undurchsichtig und 2 mm über dem Gehäuse – durchscheinend verschwand er von der Seite hinter dem Gehäuse (2026-10-08)
+  const ringSh = rounded(H.w + 4, H.d + 4, 12); ringSh.holes.push(rounded(H.w - 2, H.d - 2, 9.5));
+  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ringSh, { depth: 12, bevelEnabled: false, curveSegments: 8 }), mat(0xf26a21, { r: 0.45 })); ring.position.z = bodyZ - 2; ring.renderOrder = 1;
   // Lüfter vorn (−Y): dunkler Ring, schwarze Scheibe, Nabe
   const fanR = Math.min(H.w, H.h) * 0.24, fan = new THREE.Group(), fanZ = bodyZ + bodyH * 0.55;
   fan.add(new THREE.Mesh(new THREE.TorusGeometry(fanR, 1.8, 10, 40), mat(0x2a2f33, { r: 0.6 })), new THREE.Mesh(new THREE.CircleGeometry(fanR - 0.5, 40), mat(0x0f1215, { r: 0.8 })),

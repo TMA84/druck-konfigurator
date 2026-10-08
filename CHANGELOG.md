@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.33.1] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Druckkopf:** 100 statt 70 mm hoch – die Riemen enden jetzt im Kopf statt darüber frei in der Luft. Der orange Ring ist undurchsichtig und steht 2 mm über das Gehäuse; durchscheinend verschwand er von der Seite hinter dem Gehäuse und war nur von unten richtig zu sehen.
+
 ## [10.33.0] – 2026-10-08
 
 ### Verbessert
