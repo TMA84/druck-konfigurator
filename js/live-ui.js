@@ -13,7 +13,6 @@ const lv = { prep: { job: null, s: null }, name: null, data: null, missing: fals
   hs: null, anim: 0, dirty: null, disp: null, lastTick: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
 const LV_POS_FRESH_S = 10;
 const livePosWanted = () => store.settings.livePos !== false && lv.mode === 'live';
-const LV_NOW = [0.18, 0.77, 0.71];   // aktuelle Schicht: Petrol (Farbschema)
 /* Darstellung (2026-10-07): Bahnen als beleuchtete Raupen (je Bahn ein Quader mit Linienbreite × Schichthöhe, ein
    InstancedMesh) statt 1-Pixel-Linien; über LV_FAT_MAX Bahnen die schnellen Linien wie bisher. */
 const LV_FAT_MAX = 600000, LV_LINE_W = 0.44;
@@ -147,7 +146,9 @@ function lvBuild() {
 /* Drucker-Mechanik ungefähr wie beim Kobra S1 (CoreXY, das Bett fährt nach unten): Kopf ≈ 56 × 48 × 70 mm (geschätzt, keine
    offiziellen Maße), darüber die X-Traverse über die ganze Breite und links/rechts die Y-Schienen – beide auf Höhe des
    Kopfes, sie fahren mit der Düse mit. Dazu der Umriss des Druckbetts. Maße in mm, Koordinaten wie die Bahnen. */
-const LV_HEAD = { w: 56, d: 48, h: 70, tip: 8 }, LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330;
+const LV_HEAD = { w: 56, d: 48, h: 70, tip: 8 }, LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330, LV_ROD_R = 4;
+// Riemenebenen (über den X-Stangen): wie im Kobra S1 rechter Motor (A) oben, linker (B) unten
+const LV_BELT_Z = { A: 30, B: 21 };
 // Modell des Druckers für die Nachbildung: gemeldetes Modell, sonst gewählter Drucker, sonst Kobra S1 (js/anycubic-models.js)
 function lvModel() {
   const st = typeof wb !== 'undefined' && wb.st;
@@ -169,7 +170,7 @@ function lvHeadInit() {
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
-  const H = LV_HEAD, mat = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.55, metalness: o.m ?? 0.1, transparent: (o.op ?? 1) < 1, opacity: o.op ?? 1, depthWrite: (o.op ?? 1) >= 1 });
+  const H = LV_HEAD, mat = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.55, metalness: o.m ?? 0.1, transparent: (o.op ?? 1) < 1, opacity: o.op ?? 1, depthWrite: (o.op ?? 1) >= 1, flatShading: !!o.flat });
   const edges = (geo, op) => new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: op }));
   const rounded = (w, d, r) => { const sh = new THREE.Shape(), x = -w / 2, y = -d / 2;
     sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.quadraticCurveTo(x + w, y, x + w, y + r); sh.lineTo(x + w, y + d - r); sh.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
@@ -195,20 +196,24 @@ function lvHeadInit() {
   fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 2.2, fanZ);
   lv.head = new THREE.Group(); lv.head.add(tip, heat, body, ring, fan); lv.head.visible = false;
   // Mechanik (Koordinaten relativ zur Traverse, die mit dem Kopf in Z fährt)
-  const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, m = 22, R = LV_RAIL;
-  const len = bx1 - bx0 + 2 * m, cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2, ylen = by1 - by0 + 2 * m;
+  const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, R = LV_RAIL;
+  const md = lvModel(); lv.kin = md.kin;
+  /* CoreXY in den Maßen des Kobra S1 (2026-10-08): Gehäuse ≈ Bauraum + 150 × 160 mm (S1: 400 × 410), Höhe Bauraum + 180,
+     Y-Stangen 32 mm innen am Rahmen, Stangen Ø 8 mm, NEMA-17-Motoren 42 × 42 × 40 mm */
+  const halfW = md.size[0] / 2 + 75, halfD = md.size[1] / 2 + 80, cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
+  const m = md.kin === 'bed' ? 22 : halfW - 32 - (bx1 - bx0) / 2;
+  const len = bx1 - bx0 + 2 * m, ylen = md.kin === 'bed' ? by1 - by0 + 2 * m : 2 * halfD - 40;
   // Stangen silbern (beim Kobra S1 Stahl – auf dem Produktbild nur orange angeleuchtet)
   const rodM = mat(0xd9dee1, { m: 0.55, r: 0.25 });
   const black = mat(0x1d2124, { r: 0.6 }), steel = mat(0xd5dbde, { m: 0.5, r: 0.3 }), frameM = mat(0x2a3034, { r: 0.7, op: 0.45 });   // rauchig wie im Produktbild, versperrt die Sicht nicht
   // X: zwei Stangen (der Kopf hängt daran), Eckwagen an den Enden; fährt in Y (lvPlaceHead: beam.position.y)
-  const beam = new THREE.Group(), rodX = new THREE.CylinderGeometry(2.4, 2.4, len, 20);
+  const beam = new THREE.Group(), rodX = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, len, 20);
   // zwei X-Stangen übereinander (wie am Kobra S1), der Kopf gleitet darauf
-  for (const dz of [-8, 8]) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
+  for (const dz of [-12, 4]) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
   for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.6, R * 3.4, R * 3.2, 3, 0.6), black); car.position.set(sx * len / 2, 0, -R * 2); beam.add(car); }
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
-  const rodY = new THREE.CylinderGeometry(2.4, 2.4, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, -R * 0.6); return r; });
-  const md = lvModel(); lv.kin = md.kin;
+  const rodY = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, -R * 0.6); return r; });
   let frame = new THREE.Group();
   if (md.kin === 'bed') {
     /* Bettschubser (Kobra 3, 3 Max, X): zwei Z-Türme links/rechts der X-Achse, oben eine Querstrebe, unten Y-Schienen unter dem
@@ -225,21 +230,23 @@ function lvHeadInit() {
     lv.frameFixed = frame; frame = new THREE.Group();
   } else {
     lv.frameFixed = null;
-  // Rahmen: oben ein Rechteck aus Profilen mit Eckblöcken, vier Säulen, unten ein Rechteck; Z-Spindeln links/rechts
-  const fx0 = bx0 - m - 16, fx1 = bx1 + m + 16, fy0 = by0 - m - 16, fy1 = by1 + m + 16, fw = 13, fh = Math.max(LV_FRAME_H, md.size[2] + 80), top = 12;
+  // Rahmen: oben und unten ein Rechteck aus 20er-Profilen, vier Säulen; oben auf Höhe der Riemen
+  const fx0 = cx - halfW, fx1 = cx + halfW, fy0 = cy - halfD, fy1 = cy + halfD, fw = 20, fh = md.size[2] + 180, top = LV_BELT_Z.A + 16;
   const bar = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.Mesh(new THREE.BoxGeometry(Math.max(fw, x1 - x0), Math.max(fw, y1 - y0), Math.max(fw, z1 - z0)), frameM); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); frame.add(g); };
   for (const z of [top, top - fh]) { bar(fx0, fy0, z, fx1, fy0, z); bar(fx0, fy1, z, fx1, fy1, z); bar(fx0, fy0, z, fx0, fy1, z); bar(fx1, fy0, z, fx1, fy1, z); }
   for (const x of [fx0, fx1]) for (const y of [fy0, fy1]) bar(x, y, top - fh, x, y, top);
-  // blaue Motoren an den hinteren Ecken (oben)
+  // blaue NEMA-17-Motoren in den hinteren Ecken, Riemenscheibe je auf der Höhe ihres Riemens (links B unten, rechts A oben)
   const motor = mat(0x3d9fe0, { r: 0.35, m: 0.2 }); motor.emissive = new THREE.Color(0x0c3a5c);
-  // je Motor die Riemenscheibe auf der Höhe seines Riemens (links Riemen B unten, rechts Riemen A oben – lvMechInit)
-  for (const [x, bz] of [[fx0 + 26, LV_BELT_Z.B], [fx1 - 26, LV_BELT_Z.A]]) { const mo = new THREE.Mesh(slab(30, 30, 34, 3, 1), motor); mo.position.set(x, fy1 - 24, bz - LV_BELT_H / 2 - 3 - 34); frame.add(mo);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, LV_BELT_H + 2, 20), steel); cap.rotation.x = Math.PI / 2; cap.position.set(x, fy1 - 24, bz); frame.add(cap);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 6, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, fy1 - 24, bz - LV_BELT_H / 2 - 2); frame.add(shaft);
-    (lv.motorCaps || (lv.motorCaps = [])).push(cap); }
+  const mxL = fx0 + 42, mxR = fx1 - 42, my = fy1 - 42;
+  for (const [x, bz] of [[mxL, LV_BELT_Z.B], [mxR, LV_BELT_Z.A]]) {
+    const mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, my, bz - LV_BELT_H / 2 - 14 - 40); frame.add(mo);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(LV_MOTOR_R, LV_MOTOR_R, LV_BELT_H + 2, 20), mat(0xd5dbde, { m: 0.5, r: 0.3, flat: true })); cap.rotation.x = Math.PI / 2; cap.position.set(x, my, bz); frame.add(cap);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, my, bz - LV_BELT_H / 2 - 7); frame.add(shaft);
+    lv.motorCaps.push(cap); }
+  lv.xy = { mxL, mxR, my, yF: fy0 + 34 };
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
-  for (const [x, y] of [[cx, by1 + 10], [bx0 - 10, by0 + 25], [bx1 + 10, by0 + 25]]) {
-    const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 20, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, y, top - fh / 2); frame.add(sc); }
+  for (const [x, y] of [[cx, fy1 - 22], [fx0 + 30, fy0 + 60], [fx1 - 30, fy0 + 60]]) {
+    const sc = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, fh - 30, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, y, top - fh / 2); frame.add(sc); }
   }
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...(md.kin === 'bed' ? [] : rails), frame);
   if (lv.frameFixed) { lv.frameFixed.visible = false; lv.scene.add(lv.frameFixed); } lv.gantry.userData.beam = beam; lv.gantry.visible = false;
@@ -258,7 +265,7 @@ function lvHeadInit() {
    Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf; Riemen A läuft mit x + y, B mit x − y (CoreXY), die Zähne
    wandern mit. Bettschubser: X-Riemen an der Traverse (läuft mit x), Y-Riemen unter dem Bett (läuft mit y). Schleppkette
    vom Rahmen hinten oben zum Kopf, daneben der PTFE-Schlauch mit dem Filament in der Farbe der gerade gedruckten Bahn. */
-const LV_BELT_PITCH = 4, LV_BELT_H = 6, LV_BELT_T = 1.4, LV_CHAIN_LINKS = 26, LV_BELT_Z = { A: 21, B: 12 };   // wie im Kobra S1: rechter Motor (A) oben, linker (B) unten
+const LV_BELT_PITCH = 4, LV_BELT_H = 6, LV_BELT_T = 1.4, LV_CHAIN_LINKS = 26, LV_ROLL_R = 5, LV_MOTOR_R = 6.5;
 let lvBeltTex = null;
 function lvBeltTexture() {
   if (lvBeltTex) return lvBeltTex;
@@ -267,48 +274,56 @@ function lvBeltTexture() {
   lvBeltTex = new THREE.CanvasTexture(c); lvBeltTex.wrapS = THREE.RepeatWrapping;
   return lvBeltTex;
 }
-// Riemen: offene Linienzüge (2D, Höhe z) aus Quadern mit wandernden Zähnen, Rollen an den Ecken
+/* Riemen: Linienzüge (2D, Höhe z), in Laufrichtung des Riemens hintereinander, beginnend an einer Klemme (Kopf bzw. Bett).
+   Ein Zahn sitzt immer gleich weit (entlang des Riemens) von der Klemme – die Zahnlage ergibt sich so aus der Geometrie:
+   fährt der Kopf, ändern sich die Längen der Abschnitte und die Zähne wandern richtig, ohne zu rutschen; die Rollen drehen
+   sich um den Weg, der über sie gelaufen ist. */
 function lvBelt(parent, z, paths) {
-  const box = new THREE.BoxGeometry(1, 1, 1), belt = { z, segs: [], rolls: [] };
-  const roll = new THREE.CylinderGeometry(4.2, 4.2, LV_BELT_H + 2, 14), rollM = new THREE.MeshStandardMaterial({ color: 0xb9c1c6, metalness: 0.5, roughness: 0.35, flatShading: true });
+  const box = new THREE.BoxGeometry(1, 1, 1), belt = { z, segs: [], rolls: [], paths };
+  const roll = new THREE.CylinderGeometry(LV_ROLL_R, LV_ROLL_R, LV_BELT_H + 2, 14), rollM = new THREE.MeshStandardMaterial({ color: 0xb9c1c6, metalness: 0.5, roughness: 0.35, flatShading: true });
   for (const n of paths(0, 0)) for (let k = 0; k < n.length - 1; k++) {
     const tex = lvBeltTexture().clone(); tex.needsUpdate = true;
     const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
     parent.add(mesh); belt.segs.push(mesh);
   }
   for (const n of paths(0, 0)) for (let k = 1; k < n.length - 1; k++) { const r = new THREE.Mesh(roll, rollM); r.rotation.x = Math.PI / 2; parent.add(r); belt.rolls.push(r); }
-  belt.paths = paths;
   return belt;
 }
-function lvBeltSet(b, px, py, travel) {
-  let si = 0, ri = 0;
+// legt den Riemen für Kopf (px, py); Ergebnis: Riemenweg bis zum Ende jedes Linienzugs (für die Motorscheibe)
+function lvBeltSet(b, px, py) {
+  let si = 0, ri = 0, mat = 0;
+  const ends = [];
   for (const n of b.paths(px, py)) {
-    let acc = 0;
     for (let k = 0; k < n.length - 1; k++) {
       const [x0, y0] = n[k], [x1, y1] = n[k + 1], len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0)), mesh = b.segs[si++];
+      if (k > 0) { const r = b.rolls[ri++]; r.position.set(x0, y0, b.z); r.rotation.y = -mat / LV_ROLL_R; }
       mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, b.z); mesh.rotation.z = Math.atan2(y1 - y0, x1 - x0); mesh.scale.set(len, LV_BELT_T, LV_BELT_H);
-      const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = (acc - travel) / LV_BELT_PITCH;
-      acc += len;
+      const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = mat / LV_BELT_PITCH;
+      mat += len;
     }
-    for (let k = 1; k < n.length - 1; k++) { const r = b.rolls[ri++]; r.position.set(n[k][0], n[k][1], b.z); r.rotation.y = -travel / 4.2; }
+    ends.push(mat);
   }
+  return ends;
 }
 function lvMechInit(md, g) {
   const { bx0, bx1, by0, by1, m, cx, beam } = g;
   lv.mechG = new THREE.Group(); lv.mechG.visible = false;
   lv.belts = [];
   if (md.kin === 'bed') {
-    // X-Riemen hinter den Stangen der Traverse (Motor links), Y-Riemen unter dem Bett (im festen Rahmen)
+    // X-Riemen hinter den Stangen der Traverse (Motor links), beide Enden am Kopf
     const xl = bx0 - m - 4 - cx, xr = bx1 + m - 6 - cx;   // Koordinaten der Traverse (beam.position.x = cx)
-    lv.belts.push({ b: lvBelt(beam, 0, (px) => [[[px - 14, 12], [xl, 12], [xl, 18], [xr, 18], [xr, 12], [px + 14, 12]]]), go: p => [p.x - cx, 0, p.x] });
+    lv.belts.push({ b: lvBelt(beam, 0, (px) => [[[px - 14, 12], [xl, 12], [xl, 18], [xr, 18], [xr, 12], [px + 14, 12]]]), go: p => [p.x - cx, 0] });
+    // Y-Riemen unter dem Bett (im festen Rahmen, der relativ zum Bett in Y fährt): beide Enden am Bett (lokal y = −py)
     if (lv.frameFixed) {
       const yl = (by1 - by0) * 0.55, zb = -45 + 22;
-      lv.belts.push({ b: lvBelt(lv.frameFixed, zb, () => [[[0, -6], [0, -yl], [6, -yl], [6, yl], [0, yl], [0, 6]]].map(n => n.map(([x, y]) => [x + cx, y]))), go: p => [0, 0, p.y] });
+      lv.belts.push({ b: lvBelt(lv.frameFixed, zb, (px, py) => [[[cx, -py - 6], [cx, -yl], [cx + 6, -yl], [cx + 6, yl], [cx, yl], [cx, -py + 6]]]), go: p => [0, p.y] });
     }
   } else {
-    const xL = bx0 - m, xR = bx1 + m, yB = by1 + m - 8, yF = by0 - m + 4;
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[xR - 10, yB], [xR - 10, yF], [xR - 18, yF], [xR - 18, py + 5], [px + 12, py + 5]], [[px - 12, py + 5], [xL + 18, py + 5], [xL + 18, yB], [xR - 10, yB]]]), go: p => [p.x, p.y, p.x + p.y] });
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[xL + 10, yB], [xL + 10, yF], [xL + 18, yF], [xL + 18, py - 5], [px - 12, py - 5]], [[px + 12, py - 5], [xR - 18, py - 5], [xR - 18, yB], [xL + 10, yB]]]), go: p => [p.x, p.y, p.x - p.y] });
+    /* CoreXY: zwei Riemen übereinander. A (oben): rechter Motor → vorn rechts → Eckwagen rechts → Kopf; vom Kopf → Eckwagen links
+       → hinten links → rechter Motor. B (unten) gespiegelt mit dem linken Motor. Linienzüge ab der Klemme am Kopf. */
+    const { mxL, mxR, my, yF } = lv.xy;
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py + 6], [mxL + 9, py + 6], [mxL + 9, my], [mxR, my]], [[mxR, my], [mxR, yF], [mxR - 9, yF], [mxR - 9, py + 6], [px + 12, py + 6]]]), go: p => [p.x, p.y], motor: 1 });
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 6], [mxR - 9, py - 6], [mxR - 9, my], [mxL, my]], [[mxL, my], [mxL, yF], [mxL + 9, yF], [mxL + 9, py - 6], [px - 12, py - 6]]]), go: p => [p.x, p.y], motor: 0 });
   }
   // Schleppkette: Glieder entlang einer Kurve vom Rahmen hinten oben zum Kopf
   const link = new THREE.BoxGeometry(9, 7, 13),   // lange Seite entlang z: lookAt richtet z auf die Kurve
@@ -318,7 +333,7 @@ function lvMechInit(md, g) {
   lv.tubeM = new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
   lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
   lv.tube = null; lv.fil = null;
-  lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true } : { x: cx, y: by1 + m + 4, z: 46, fixed: false };
+  lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true } : { x: cx, y: by1 + m + 4, z: LV_BELT_Z.A + 40, fixed: false };
 }
 // Kurve der Kette: hinten oben → Bogen → senkrecht von oben auf den Kopf
 function lvChainCurve(a, h) {
@@ -330,9 +345,11 @@ function lvMechUpdate(p) {
   if (!lv.mechG) return;
   lv.mechG.visible = lv.head.visible;
   if (!lv.head.visible) return;
-  for (const { b, go } of lv.belts) { const [px, py, tr] = go(p); lvBeltSet(b, px, py, tr); }
-  // Motorscheiben drehen mit (rechts Riemen A: x + y, links Riemen B: x − y)
-  if (lv.kin !== 'bed' && lv.motorCaps && lv.motorCaps.length === 2) { lv.motorCaps[0].rotation.y = -(p.x - p.y) / 6; lv.motorCaps[1].rotation.y = -(p.x + p.y) / 6; }
+  for (const { b, go, motor } of lv.belts) {
+    const [px, py] = go(p), ends = lvBeltSet(b, px, py);
+    // Motorscheibe dreht um den Riemenweg, der bis zu ihr gelaufen ist (CoreXY: ergibt x + y bzw. x − y)
+    if (motor != null && lv.motorCaps[motor]) lv.motorCaps[motor].rotation.y = -ends[0] / LV_MOTOR_R;
+  }
   // Anker in Weltkoordinaten: CoreXY am Rahmen (fährt in Z mit der Traverse), Bettschubser am oberen Querholm (fährt in Y)
   const A = lv.mechAnchor, a = A.fixed ? { x: A.x, y: A.y + p.y, z: A.z } : { x: A.x, y: A.y, z: p.z + LV_GANTRY_Z + A.z };
   const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 2 }, c = lvChainCurve(a, top), q = new THREE.Vector3();
@@ -623,7 +640,12 @@ function lvSkipSet(objs) {
   lv.skip = mask; lv.track = null;
   if (lv.shown >= 0) lvColour(lv.shown, lv.shownDone);
 }
-function lvCurColour(i, split, withHead) { return lv.skip && lv.skip[i] ? LV_SKIP : !withHead || i < split ? LV_NOW : LV_PENDING; }
+// gerade gedruckt: in der Filamentfarbe der Bahn (2026-10-08, vorher Petrol) – noch nicht gedruckt: blass
+function lvFilRgb(i) {
+  const k = lv.data.a[2 * i + 1], c = lv.filRgb || (lv.filRgb = {});
+  return c[k] || (c[k] = lvVisible(hexToRgb01(toolColour(k))));
+}
+function lvCurColour(i, split, withHead) { return lv.skip && lv.skip[i] ? LV_SKIP : !withHead || i < split ? lvFilRgb(i) : LV_PENDING; }
 function lvColour(cur, done) {
   const d = lv.data, cache = {};
   const start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, withHead = done != null;
@@ -668,7 +690,7 @@ async function lvLoad(name) {
     const r = await fetch('api/printing/preview?name=' + encodeURIComponent(name));
     if (lv.name !== name) return;
     if (!r.ok) { lv.missing = true; lv.missingAt = Date.now(); return; }
-    lv.data = parsePreview(await r.arrayBuffer());
+    lv.data = parsePreview(await r.arrayBuffer()); lv.filRgb = null;
     if (!lvInit()) { lv.missing = true; return; }
     lvResize(); lvBuild();
     if (typeof skDrawLines === 'function' && wb.st && wb.st.job) skDrawLines(new Set(wb.st.job.skipped || []));

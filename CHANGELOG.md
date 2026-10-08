@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.33.0] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, gedruckte Bahnen in Filamentfarbe:** Was der Kopf in der aktuellen Schicht schon gedruckt hat, erscheint sofort in der Farbe des Filaments (vorher Petrol); noch nicht gedruckt bleibt blass.
+- **3D-Fortschritt, Riemen physikalisch richtig:** Die Zähne sitzen jetzt fest auf dem Riemen, gerechnet ab der Klemme am Kopf – fährt der Kopf, wandern sie auf jedem Abschnitt richtig (vorher rutschten sie auf stehenden Abschnitten, wenn sich ein Eckwagen bewegte); Rollen und Motorscheiben drehen um den Weg, der über sie gelaufen ist.
+- **3D-Fortschritt, Proportionen wie beim Kobra S1:** Gehäuse ≈ Bauraum + 150 × 160 mm (S1: 400 × 410), Höhe Bauraum + 180, 20er-Profile, Stangen Ø 8 mm, NEMA-17-Motoren 42 × 42 × 40 mm in den hinteren Ecken, Riemen über den X-Stangen, Z-Spindeln am Rahmen.
+
 ## [10.32.1] – 2026-10-08
 
 ### Behoben
