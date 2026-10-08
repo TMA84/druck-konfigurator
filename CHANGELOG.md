@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.28.0] – 2026-10-08
 
 ### Behoben
 - **„Nicht gestartet: Slice-Auftrag nicht (mehr) vorhanden“:** Slice-Aufträge lagen im temporären Ordner – nach einem Neustart oder Update des Add-ons war der Stand der offenen Seite weg. Jetzt liegen sie mit DATA_DIR (Container, Home-Assistant-Add-on) im Datenordner (`slice-jobs`) und überstehen Neustarts; fehlt ein Auftrag trotzdem, slict die Seite einmal neu und startet dann gleich.
