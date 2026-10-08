@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.9] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Sammler von hinten gesehen links:** Der Sammler sitzt jetzt auf der richtigen Seite. Der Schlauch zum Kopf steigt auf, geht im 90°-Bogen durch die Rückwand und biegt waagerecht in den Anfang der Kette ein.
+- **Gleichmäßige Bögen vom ACE zum Sammler:** Jeder Schlauch kommt waagerecht hinten aus dem ACE und läuft in einem einzigen Bogen senkrecht von unten in den Sammler.
+
 ## [10.39.8] – 2026-10-08
 
 ### Behoben

@@ -580,7 +580,7 @@ function lvEnclosureInit(g) {
   enc.visible = store.settings.liveEnclosure !== false; lv.gantry.add(enc); lv.enclosureG = enc;
   // ACE-Einheiten oben auf dem Deckel, Spulen in Slotfarbe, Schläuche zum Verteiler hinten oben
   /* neben dem Drucker (rechts, LV_ACE.gap Abstand), auf derselben Standfläche, übereinander; klare, gerundete Haube */
-  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx - 90, y1 + 14, z0 + (z1 - z0) * 0.75), ax = x1 + A.gap + A.w / 2;
+  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx + 100, y1 + 14, z0 + (z1 - z0) * 0.75), ax = x1 + A.gap + A.w / 2;
   const body = new THREE.MeshStandardMaterial({ color: 0x2d3236, roughness: 0.5 });
   const lid = new THREE.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
   const hood = (() => {   // Profil (y, z): Rechteck mit großen Radien oben, entlang x extrudiert
@@ -625,8 +625,9 @@ function lvEnclosureInit(g) {
       // Schlauch vom Slot (hinten am ACE) zum Verteiler, Filament darin in Slotfarbe
       // hinten aus dem ACE, hinter dem Drucker entlang und von unten in die Zusammenführung (8 Eingänge unten nebeneinander)
       const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 30), port = hub.clone().add(new THREE.Vector3((u * 4 + k - 3.5) * 5, 0, -22));
-      const curve = new THREE.CatmullRomCurve3([out, new THREE.Vector3(out.x, out.y + 40, out.z + 10),
-        new THREE.Vector3(port.x + (out.x - port.x) * 0.35, port.y + 12 + u * 6, port.z - 120 + k * 4), new THREE.Vector3(port.x, port.y, port.z - 30), port], false, 'centripetal');
+      // ein gleichmäßiger Bogen: waagerecht hinten aus dem ACE, senkrecht von unten in den Sammler (Bézier mit Tangenten in beiden Richtungen)
+      const lift = port.z - out.z, curve = new THREE.CubicBezierCurve3(out, new THREE.Vector3(out.x, out.y + 70 + k * 6, out.z),
+        new THREE.Vector3(port.x, port.y + 6 + k * 3, port.z - Math.max(60, lift * 0.7)), port);
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
       const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
       tube.renderOrder = 8; ace.add(fline, tube);
@@ -639,7 +640,7 @@ function lvEnclosureInit(g) {
         strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -84, 38), k: null });
     }
   }
-  const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, links, Mitte der oberen Hälfte
+  const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, von hinten gesehen links, Mitte der oberen Hälfte
   // Zusammenführung oben raus: lvMechUpdate führt den Kopfschlauch von hier (Rahmen-Koordinaten) hoch, im 90°-Bogen nach vorn durch die Rückwand zur Kette
   lv.hubTop = hub.clone().add(new THREE.Vector3(0, 0, 22));
   ace.visible = store.settings.liveAce !== false; lv.gantry.add(ace); lv.aceG = ace;
@@ -863,11 +864,18 @@ function lvMechUpdate(p) {
   if (lv.hubTop && lv.aceG && lv.aceG.visible && !A.fixed) {
     /* mit ACE: Schlauch beginnt oben an der Zusammenführung, steigt senkrecht, biegt im 90°-Bogen nach vorn, geht waagerecht durch die
        Rückwand und trifft die Kette dort, wo sie hinten an der Zusammenführung vorbeiläuft (der Teil der Kette davor bleibt ohne Schlauch) */
-    const H = lv.hubTop, gz = lv.gantry.position.z, zc = pts[0].z, R = 30;
-    while (pts.length > 2 && pts[0].x > H.x - 12) pts.shift();
-    const yc = H.y - R, z0c = zc - R, arc = [];
+    const H = lv.hubTop, gz = lv.gantry.position.z, zc = pts[0].z, R = 25;
+    const yc = H.y - R, z0c = zc - R, arc = [new THREE.Vector3(H.x, H.y, H.z + gz)];
     for (let k = 0; k <= 6; k++) { const t = k / 6 * Math.PI / 2; arc.push(new THREE.Vector3(H.x, yc + Math.cos(t) * R, z0c + Math.sin(t) * R)); }
-    pts.unshift(new THREE.Vector3(H.x, H.y, H.z + gz), ...arc, new THREE.Vector3(H.x - 4, (yc + pts[0].y) / 2, zc));
+    if (H.x - 12 > pts[0].x) {   // Zusammenführung rechts vom Kettenanfang (von vorn): waagerecht im Bogen nach links in den Anfang der Kette
+      const R2 = Math.max(8, yc - pts[0].y);
+      for (let k = 1; k <= 5; k++) { const t = k / 5 * Math.PI / 2; arc.push(new THREE.Vector3(H.x - R2 + Math.cos(t) * R2, yc - Math.sin(t) * R2, zc)); }
+      if (H.x - R2 - 20 > pts[0].x) arc.push(new THREE.Vector3((H.x - R2 + pts[0].x) / 2, pts[0].y, zc));
+    } else {                     // links davon: trifft die Kette dort, wo sie hinten vorbeiläuft
+      while (pts.length > 2 && pts[0].x > H.x - 12) pts.shift();
+      arc.push(new THREE.Vector3(H.x - 4, (yc + pts[0].y) / 2, zc));
+    }
+    pts.unshift(...arc);
   }
   const inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
   pts.push(new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h + 8), inHead);
