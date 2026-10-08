@@ -219,6 +219,8 @@ I18N.add({
  "voll": "solid",
  "Kopf: echte Position": "head: real position",
  "Kopf: geschätzt": "head: estimated",
+ "Kein Druck aktiv": "No print running",
+ "Kopf geparkt": "head parked",
  "Kopfposition wird auch während des Drucks abgefragt (alle 5 s)": "The head position is also queried while printing (every 5 s)",
  "Echte Kopfposition": "Real head position",
  "Fragt die Kopfposition auch während des Drucks ab (alle 5 s)": "Also queries the head position while printing (every 5 s)",

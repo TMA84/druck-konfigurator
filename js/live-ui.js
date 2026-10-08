@@ -553,8 +553,8 @@ function lvFitAll() {
     if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); if (isFinite(tmp.min.x)) bb.union(tmp); } });
   if (bb.isEmpty()) return;
   const c = bb.getCenter(new THREE.Vector3()), cam = lv.camera, dir = new THREE.Vector3(0, -1, 0.35).normalize();   // frontal von vorn, leicht von oben
-  // Abstand so, dass jede Ecke der Hülle in den Bildausschnitt fällt (5 % Rand)
-  const tv = Math.tan(cam.fov * Math.PI / 360) * 0.95, th = tv * (cam.aspect || 1), right = new THREE.Vector3().crossVectors(dir, cam.up).normalize(), up = new THREE.Vector3().crossVectors(right, dir);
+  // Abstand so, dass jede Ecke der Hülle in den Bildausschnitt fällt (10 % Rand)
+  const tv = Math.tan(cam.fov * Math.PI / 360) * 0.9, th = tv * (cam.aspect || 1), right = new THREE.Vector3().crossVectors(dir, cam.up).normalize(), up = new THREE.Vector3().crossVectors(right, dir);
   let dist = 0;
   for (let k = 0; k < 8; k++) {
     const q = new THREE.Vector3(k & 1 ? bb.max.x : bb.min.x, k & 2 ? bb.max.y : bb.min.y, k & 4 ? bb.max.z : bb.min.z).sub(c);
@@ -663,11 +663,12 @@ function lvAceColours(st) {
     const full = LV_ACE.spoolR - 14, k = (LV_SPOOL_CORE + 2 + (full - LV_SPOOL_CORE - 2) * pct) / full;
     sp.filMesh.scale.set(k, 1, k);
     sp.strand.visible = on;
-    if (on && k !== sp.k) {   // Strang läuft vorn vom Wickel ab und senkrecht von oben in den Einlass (unten sanft auf dessen Position)
+    if (on && k !== sp.k) {   // Strang läuft oben vom Wickel ab, im Viertelbogen vorn um die Spule und senkrecht von oben in den Einlass
       sp.k = k;
-      const rw = full * k, C = sp.spoolC, I = sp.inlet, P0 = new THREE.Vector3(C.x, C.y - rw, C.z), h = P0.z - I.z;
-      const cv = new THREE.CubicBezierCurve3(P0, new THREE.Vector3(C.x, P0.y, P0.z - h * 0.55), new THREE.Vector3(C.x, I.y, I.z + h * 0.35), I);
-      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(cv, 16, 0.9, 6);
+      const rw = full * k, C = sp.spoolC, I = sp.inlet, ry = C.y - I.y, pts = [];
+      for (let q = 0; q <= 12; q++) { const t = q / 12 * Math.PI / 2; pts.push(new THREE.Vector3(C.x, C.y - ry * Math.sin(t), C.z + rw * Math.cos(t))); }
+      for (let q = 1; q <= 3; q++) pts.push(new THREE.Vector3(C.x, I.y, C.z + (I.z - C.z) * q / 3));
+      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 40, 0.9, 6);
     }
     const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';
     sp.lbl.visible = !!txt;
@@ -1209,8 +1210,24 @@ function lvGhostApply() {
 }
 
 const LV_RETRY_MS = 20000;
+/* Leerlauf (kein Druckauftrag): Szene einmal mit leerer Vorschau aufbauen (Bettmitte), Kopf an die gemeldete Position (falls frisch)
+   oder geparkt über der Bettmitte. Rückgabe: true = echte Position, false = geparkt, null = kein WebGL */
+function lvIdle(st) {
+  if (!lv.idle || !lv.data) {
+    if (!lvInit()) return null;
+    const b = lvBed(), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    lv.data = { count: 0, bbox: [cx - 1, cy - 1, 0, cx + 1, cy + 1, 1], layers: [], q: new Uint16Array(0), a: new Uint8Array(0), v: null, types: [] };
+    lv.idle = true; lv.missing = false; lv.hs = null; lv.disp = null;
+    lvResize(); lvBuild();
+  }
+  const p = st && st.position, real = !!(p && st.position_age_s != null && st.position_age_s < LV_POS_FRESH_S && Number.isFinite(+p.x));
+  lv.hs = null; lv.head.visible = true;
+  lvPlaceHead(real ? { x: +p.x - lv.cx, y: +p.y - lv.cy, z: +p.z } : { x: 0, y: 0, z: 40 });
+  lvRender();
+  return real;
+}
 async function lvLoad(name) {
-  lv.name = name; lv.data = null; lv.missing = false; lv.loading = true;
+  lv.name = name; lv.data = null; lv.missing = false; lv.loading = true; lv.idle = false;
   $('wbLiveNote').textContent = t('Lade 3D-Ansicht …'); $('wbLiveNote').classList.remove('hidden');
   try {
     const r = await fetch('api/printing/preview?name=' + encodeURIComponent(name));
@@ -1230,10 +1247,12 @@ function liveUpdate(st) {
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {
-    lv.at = null;
-    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; if (lv.mechG) lv.mechG.visible = false; }
-    $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden');
-    $('wbLiveInfo').textContent = '';
+    // ohne Druckauftrag: Drucker, Gehäuse und ACE trotzdem zeigen (leeres Bett, Kopf an der gemeldeten Stelle oder geparkt)
+    lv.at = null; lv.name = null;
+    const real = lvIdle(st);
+    if (real == null) { $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden'); $('wbLiveInfo').textContent = ''; return; }
+    $('wbLiveNote').classList.add('hidden');
+    $('wbLiveInfo').textContent = t('Kein Druck aktiv') + ' · ' + (real ? t('Kopf: echte Position') : t('Kopf geparkt'));
     return;
   }
   // fehlte die Vorschau, alle 20 s erneut fragen (der Server legt sie beim Start ab – ein früher Abruf kam zu früh)

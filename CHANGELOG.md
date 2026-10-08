@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.13] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, ACE-Einzug richtig herum:** Das Filament läuft oben vom Wickel ab, im Bogen vorn um die Spule und senkrecht von oben in den orangen Einlass im Gehäuse.
+- **3D-Ansicht auch ohne Druckauftrag:** Ohne laufenden Druck bleibt die 3D-Ansicht stehen: Drucker, Gehäuse und ACE mit den Spulen und Restmengen, leeres Bett, Kopf an der gemeldeten Position oder geparkt über der Bettmitte.
+
 ## [10.39.12] – 2026-10-08
 
 ### Verbessert
