@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.31.0] – 2026-10-08
 
 ### Verbessert
 - **Brim beim Anordnen:** Der Abstand zwischen Teilen zählt ab dem Brim (Brim außen je Teil), der Brim bleibt auf dem Bett – vorher konnten die Brims ineinander gedruckter Teile zusammenwachsen. Gilt für das Rechteck-Verfahren und das Anordnen nach Grundfläche, in der Vorschau wie im Export.
