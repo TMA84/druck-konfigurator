@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.6] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt startet frontal von vorn:** Beim Laden blickt die Ansicht von vorn (leicht von oben) und zoomt genau so, dass Drucker, Gehäuse und ACE ins Bild passen (Ecken der Hülle statt Kugel – weniger Leerraum).
+- **Zusammenführung von unten:** Die Schläuche der ACE laufen hinter dem Drucker entlang und von unten in die Zusammenführung an der Rückwand; oben kommt ein Schlauch heraus.
+- **Ein Schlauch bis zum Kopf:** Von der Zusammenführung bis zum Druckkopf läuft der Schlauch jetzt am Stück (vorher sah der Übergang im Drucker wie abgebrochen aus).
+- **ACE-Einzug vor den Rollen:** Die Spulen liegen auf zwei Tragrollen; der Einzug mit Trichter sitzt vorn unten vor den Rollen, das Filament läuft unten vom Wickel ab hinein.
+
 ## [10.39.5] – 2026-10-08
 
 ### Behoben
