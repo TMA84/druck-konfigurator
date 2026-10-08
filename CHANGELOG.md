@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.32.1] – 2026-10-08
 
 ### Behoben
 - **3D-Fortschritt, Motoren:** Beide Motorscheiben saßen auf derselben Höhe, die Riemen laufen aber auf zwei Ebenen – es sah aus, als triebe ein Motor beide. Jetzt sitzt jeder Motor mit Scheibe auf der Höhe seines Riemens (wie im Kobra S1: rechts oben, links unten), die Scheiben drehen mit ihrem Riemen.
