@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.2] – 2026-10-08
+
+### Neu
+- **3D-Fortschritt, Restmenge an den Spulen:** Der Wickel jeder Spule ist so dick wie das verbleibende Filament (aus der Filamentverwaltung; fast leer = dünner Ring um den Kern), darüber ein Schild mit der Restmenge in Gramm – rot unter 200 g.
+
 ## [10.39.1] – 2026-10-08
 
 ### Verbessert

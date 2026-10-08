@@ -532,7 +532,7 @@ function lvCornerHousings() {
    Glastür vorn und Glasdeckel oben (durchscheinend, die Mechanik bleibt sichtbar). Daneben die ACE-Pro-Einheiten
    (370 × 290 × 240 mm, klare Haube, je 4 Spulen in den Farben der Slots aus dem Druckerstand), von jedem Slot ein PTFE-Schlauch mit
    Filament zum Verteiler hinten oben am Drucker. Beides hängt am Rahmen (fährt relativ zum Teil in Z mit). */
-const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64, gap: 150 };
+const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64, gap: 150 }, LV_SPOOL_CORE = 30;
 function lvEnclosureInit(g) {
   const { fx0, fx1, fy0, fy1, top } = lv.xy, fh = lv.frameH, bot = top - fh, cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
   const x0 = fx0 - 12, x1 = fx1 + 12, y0 = fy0 - 12, y1 = fy1 + 12, z0 = bot - 40, z1 = top + 40;
@@ -572,6 +572,12 @@ function lvEnclosureInit(g) {
       const sx = (k - 1.5) * (A.w - 40) / 4, sp = new THREE.Group(); sp.position.set(sx, 0, 20 + A.spoolR); unit.add(sp);
       const fil = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR - 14, A.spoolR - 14, A.spoolW - 8, 32), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6 }));
       fil.rotation.z = Math.PI / 2; sp.add(fil);
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(LV_SPOOL_CORE, LV_SPOOL_CORE, A.spoolW - 6, 24), new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.5 }));
+      core.rotation.z = Math.PI / 2; sp.add(core);
+      // Restmenge als Schild über der Spule (Text wird bei Änderung neu gezeichnet)
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 48;
+      const lbl = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false }));
+      lbl.scale.set(64, 24, 1); lbl.position.set(sx, 0, A.h + 22); lbl.renderOrder = 9; unit.add(lbl);
       for (const s2 of [-1, 1]) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR, A.spoolR, 2, 32), new THREE.MeshStandardMaterial({ color: 0x1b1e20, roughness: 0.5, transparent: true, opacity: 0.85 })); fl.rotation.z = Math.PI / 2; fl.position.x = s2 * A.spoolW / 2; sp.add(fl); }
       // Schlauch vom Slot (hinten am ACE) zum Verteiler, Filament darin in Slotfarbe
       const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 60), mid = new THREE.Vector3((ax + sx + hub.x) / 2, y1 + 60, Math.max(uz + 60, z1 + 30));
@@ -579,7 +585,7 @@ function lvEnclosureInit(g) {
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
       const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
       tube.renderOrder = 8; ace.add(fline, tube);
-      lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, line: fm, group: sp, tubes: [tube, fline] });
+      lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null });
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(40, 20, 30), body); hubM.position.copy(hub); ace.add(hubM);
@@ -594,6 +600,20 @@ function lvAceColours(st) {
     const box = boxes[sp.unit], s = box && (box.slots || [])[sp.slot], on = !!(s && s.present && s.colour);
     sp.group.visible = on; sp.tubes[1].visible = on; sp.tubes[0].visible = !!box;   // Schlauch nur, wenn die Einheit da ist
     if (on) { sp.fil.color.set(s.colour); sp.line.color.set(s.colour); }
+    // Restmenge (Filamentverwaltung, js/spools-ui.js): Wickel so dick wie der Rest, Schild mit Gramm (rot unter 200 g)
+    const rec = on && typeof spoolInSlot === 'function' ? spoolInSlot(sp.unit * 4 + sp.slot) : null;
+    const pct = rec && rec.net_g > 0 ? Math.max(0, Math.min(1, rec.remaining_g / rec.net_g)) : (on ? 1 : 0);
+    const full = LV_ACE.spoolR - 14, k = (LV_SPOOL_CORE + 2 + (full - LV_SPOOL_CORE - 2) * pct) / full;
+    sp.filMesh.scale.set(k, 1, k);
+    const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';
+    sp.lbl.visible = !!txt;
+    if (txt !== sp.txt) {
+      sp.txt = txt;
+      const g = sp.cv.getContext('2d'); g.clearRect(0, 0, 128, 48);
+      if (txt) { g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(4, 6, 120, 36, 10); g.fill();
+        g.font = 'bold 24px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = rec && rec.remaining_g < 200 ? '#ff6b5e' : '#ffffff'; g.fillText(txt, 64, 25); }
+      sp.lbl.material.map.needsUpdate = true;
+    }
   }
   if (lv.aceG) lv.aceG.children.forEach(c => { if (c.isGroup && c.position.z > (lv.aceG.children[0].position.z + 10)) c.visible = boxes.length > 1; });
 }
