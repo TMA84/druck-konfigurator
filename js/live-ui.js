@@ -450,11 +450,11 @@ function lvAirTick(dt) {
   }
 }
 // Kurve der Kette: hinten oben → Bogen → senkrecht von oben auf den Kopf
-// großer Bogen über die linke Seite: vom Anker nach oben links, dann links über dem Kopf von oben hinein
+// liegender Bogen (waagerecht, knapp über dem Kopf): vom Anker nach links, links herum nach vorn zum Kopf
 function lvChainCurve(a, h, xmin) {
-  const up = Math.max(70, (a.z - h.z) * 0.4 + 90), lx = Math.max(xmin ?? -Infinity, Math.min(a.x, h.x) - 110);
-  return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(lx, a.y - 30, a.z + 80),
-    new THREE.Vector3(lx, h.y + 10, h.z + up), new THREE.Vector3(h.x, h.y + 4, h.z));
+  const z = h.z, lx = Math.max(xmin ?? -Infinity, Math.min(a.x, h.x) - 80);
+  return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, z), new THREE.Vector3(lx, a.y, z),
+    new THREE.Vector3(lx, h.y, z), new THREE.Vector3(h.x, h.y, z));
 }
 function lvMechUpdate(p) {
   if (!lv.mechG) return;
@@ -468,22 +468,22 @@ function lvMechUpdate(p) {
   }
   // Anker in Weltkoordinaten: CoreXY am Rahmen (fährt in Z mit der Traverse), Bettschubser am oberen Querholm (fährt in Y)
   const A = lv.mechAnchor, a = A.fixed ? { x: A.x, y: A.y + p.y, z: A.z } : { x: A.x, y: A.y, z: p.z + LV_GANTRY_Z + A.z };
-  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 2 }, c = lvChainCurve(a, top, A.xmin), q = new THREE.Vector3();
+  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 14 }, c = lvChainCurve(a, top, A.xmin), q = new THREE.Vector3();
   lv.chain.forEach((l, k) => {
     const t = (k + 0.5) / LV_CHAIN_LINKS; c.getPoint(t, l.position); c.getTangent(t, q);
     l.lookAt(l.position.x + q.x, l.position.y + q.y, l.position.z + q.z);
   });
-  /* Schlauch liegt oben auf der Kette (fester Abstand entlang der Kettennormalen – kann sie nicht kreuzen), löst sich erst am
-     Kopf und endet oben mittig darin; das Filament läuft weiter senkrecht bis zur Düsenspitze */
-  const pts = [], T = new THREE.Vector3(), up = new THREE.Vector3(0, 0, 1), side = new THREE.Vector3(1, 0, 0), nrm = new THREE.Vector3();
+  /* Schlauch hängt außen (im Bogen links) an der Kette – fester seitlicher Abstand, Seite bleibt über den ganzen Bogen gleich,
+     kann sie nicht kreuzen; am Kopf taucht er von oben hinein, das Filament läuft weiter senkrecht bis zur Düsenspitze */
+  const pts = [], T = new THREE.Vector3(), up = new THREE.Vector3(0, 0, 1), side = new THREE.Vector3(0, 1, 0);
   for (let k = 0; k <= 36; k++) {
     const t = k / 36 * 0.92, P = c.getPoint(t); c.getTangent(t, T);
-    const sd = new THREE.Vector3().crossVectors(T, up); if (sd.lengthSq() > 1e-4) side.copy(sd.normalize());
-    nrm.crossVectors(side, T).normalize(); if (nrm.z < 0) nrm.negate();
-    pts.push(P.add(nrm.multiplyScalar(7)));
+    const sd = new THREE.Vector3().crossVectors(T, up);
+    if (sd.lengthSq() > 1e-4) { sd.normalize(); if (sd.dot(side) < 0) sd.negate(); side.copy(sd); }
+    pts.push(P.add(side.clone().multiplyScalar(9)));
   }
   const inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
-  pts.push(new THREE.Vector3(p.x, p.y + 2, p.z + LV_HEAD.h + 6), inHead);
+  pts.push(new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h + 8), inHead);
   const ct = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
   const cf = new THREE.CurvePath(); cf.add(ct); cf.add(new THREE.LineCurve3(inHead.clone(), new THREE.Vector3(p.x, p.y, p.z + 1)));
   for (const k of ['tube', 'fil']) if (lv[k]) { lv.mechG.remove(lv[k]); lv[k].geometry.dispose(); }
