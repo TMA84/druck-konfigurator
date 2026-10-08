@@ -123,7 +123,9 @@ function orcaPrinterEntry(vendor, name) {
     id: 'orca', label: name.replace(/ \d+(\.\d+)? nozzle$/, ''), slicer: 'OrcaSlicer',
     nozzleOptions: ['brass', 'steel_stainless', 'steel_hardened'], nozzleDefault: 'brass',
     multicolorSystem: null, enclosureBuiltin: false, testedOK: false, brassNozzleNote: false,
-    orca: { vendor, name, nozzle: String(p.nozzle), process: data.processes[p.process] || {}, maxVol, fixedStartTemp: fixedStartTemp(p.machine) }
+    orca: { vendor, name, nozzle: String(p.nozzle), process: data.processes[p.process] || {}, maxVol, fixedStartTemp: fixedStartTemp(p.machine),
+      // Höchstwerte (js/data.js printerLimits)
+      machine: Object.fromEntries(['machine_max_speed_x', 'machine_max_speed_y', 'machine_max_acceleration_extruding', 'machine_max_acceleration_x'].filter(k => p.machine && p.machine[k] != null).map(k => [k, p.machine[k]])) }
   };
 }
 

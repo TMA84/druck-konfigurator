@@ -546,6 +546,19 @@ async function runSmoke(opts={}){
     // Werte je Auftrag: nur kritische Bereiche
     setTab('settings');openOverrideDialog();await wait(50);
     ok(!!$('ovRows').querySelector('[data-ov="retr_len"]')&&!!$('ovRows').querySelector('[data-ov="sp_travel"]')&&!!$('ovRows').querySelector('[data-ov="accel"]'),'Werte anpassen: Travel, Beschleunigung, Rückzug');
+    // Höchstwerte des Druckers: Kobra S1 laut Orca-Profil 600 mm/s, 20 000 mm/s² – nichts darüber, eigener Wert möglich
+    { const P=project.parts[project.selected],ov0=P.overrides,L0=JSON.stringify(store.settings.printerLimits||null);
+      ok(lastResult.limits.speed===600&&lastResult.limits.accel===20000&&!!$('ovRows').querySelector('.ov-limit [data-lim="speed"]'),'Höchstwerte S1: 600 mm/s, 20 000 mm/s², Zeile im Reiter Tempo');
+      P.overrides={...(ov0||{}),sp_outer:900,accel:50000};update();await wait(100);
+      ok(lastResult.sp_outer===600&&lastResult.accel===20000&&lastResult.capped.length===2&&lastResult.warn.some(w=>/Höchstwerte/.test(w)),'Anpassung über dem Maximum: auf 600 mm/s / 20 000 mm/s² begrenzt, Hinweis');
+      P.overrides=ov0;update();await wait(100);
+      const fi=$('ovRows').querySelector('[data-ov="sp_fill"]');ok(+fi.max===600,'Eingabefeld Füllung: max 600');
+      fi.value='800';fi.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+      ok((P.overrides||{}).sp_fill===600&&lastResult.sp_fill===600,'Eingabe 800 mm/s → 600 gespeichert');
+      const li=$('ovRows').querySelector('[data-lim="speed"]');li.value='150';li.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+      ok(lastResult.limits.speed===150&&lastResult.sp_outer<=150&&lastResult.sp_fill===150&&store.settings.printerLimits.kobra_s1.speed===150,'eigenes Maximum 150 mm/s gilt für alle Tempo-Werte');
+      store.settings.printerLimits=JSON.parse(L0);P.overrides=ov0;update();await wait(100);
+      ok(lastResult.limits.speed===600,'eigenes Maximum zurückgesetzt'); }
     { const rl=$('ovRows').querySelector('[data-ov="retr_len"]'),fa=$('ovRows').querySelector('[data-ov="fan_aux"]'),fb=$('ovRows').querySelector('[data-ov="fan_box"]');
       ok(!!fa&&!!fb,'Kobra S1: Hilfs- und Gehäuselüfter im Dialog');
       rl.value='1.3';fb.value='10';ovApply();await wait(80);const po=project.parts[project.selected].overrides||{};

@@ -800,3 +800,12 @@ I18N.add({
  "Der Slice-Stand war nicht mehr auf dem Server (z. B. nach einem Neustart) – wird neu berechnet …": "The slice was no longer on the server (e.g. after a restart) – slicing again …",
  "Bitte die Warteschlange neu anlegen.": "Please create the queue again.",
 });
+I18N.add({
+ "<b>Höchstwerte {printer}:</b> {n} Wert(e) auf das Maximum des Druckers begrenzt ({speed}{accel}) – mehr kann der Drucker nicht.": "<b>Limits {printer}:</b> {n} value(s) capped at the printer's maximum ({speed}{accel}) – the printer can't go faster.",
+ "Maximum dieses Druckers": "Maximum of this printer",
+ "eigener Wert – leer = Herstellerprofil": "own value – empty = manufacturer profile",
+ "aus dem Herstellerprofil – nichts wird schneller gesetzt": "from the manufacturer profile – nothing is set faster",
+ "Höchstgeschwindigkeit": "Maximum speed",
+ "Höchstbeschleunigung": "Maximum acceleration",
+ "Maximum des Druckers: {list}": "Printer maximum: {list}",
+});

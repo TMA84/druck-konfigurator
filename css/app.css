@@ -1243,3 +1243,4 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .wb-rest-btn { display: block; width: 100%; background: none; border: 0; padding: 0; margin: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .wb-rest-btn:hover .wb-rest-g { color: var(--accent); text-decoration: underline; }
 .badge.lan-exp { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-rule); font-size: 10.5px; margin-left: 6px; vertical-align: middle; }
+.ov-row.ov-limit { background: var(--paper-2); border-radius: 6px; }

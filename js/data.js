@@ -94,6 +94,25 @@ const PRINTERS={
   }
 };
 
+/* Höchstwerte je Drucker (2026-10-08): Tempo und Druckbeschleunigung aus dem Orca-Maschinenprofil (machine_max_speed_x/y,
+   machine_max_acceleration_extruding; bei zwei Werten gilt der erste = normaler Modus). Eigene Werte je Drucker unter
+   „Werte für diesen Auftrag“ → Tempo (settings.printerLimits[printerLimitKey]). js/engine.js setzt nichts darüber –
+   weder Vorschlag noch Anpassung noch eigenen Standard. */
+const printerLimitKey = p => (p ? (p.id === 'orca' && p.orca ? p.orca.name : p.id) : '');
+function machineLimits(S) {
+  const n = k => { const v = Number([].concat(S && S[k] != null ? S[k] : [])[0]); return v > 0 ? v : null; };
+  const sx = n('machine_max_speed_x'), sy = n('machine_max_speed_y');
+  return { speed: sx && sy ? Math.min(sx, sy) : sx || sy, accel: n('machine_max_acceleration_extruding') || n('machine_max_acceleration_x') };
+}
+function printerLimits(p, settings) {
+  if (!p) return { speed: null, accel: null, profile: {}, own: {} };
+  let S = null;
+  if (p.orca) S = p.orca.machine;
+  else if (typeof ORCA_TEMPLATES !== 'undefined' && ORCA_TEMPLATES[p.id]) { const tp = ORCA_TEMPLATES[p.id]; S = (tp['0.4'] || Object.values(tp)[0]).settings; }
+  const profile = machineLimits(S), own = ((settings || {}).printerLimits || {})[printerLimitKey(p)] || {};
+  return { speed: +own.speed || profile.speed || null, accel: +own.accel || profile.accel || null, profile, own };
+}
+
 /* ================= ORCASLICER-EXPORT =================
    Vendor-Presets verifiziert gegen resources/profiles/<Vendor>/ im
    OrcaSlicer-Repo (github.com/OrcaSlicer/OrcaSlicer). Beide Vendor-Bäume sind

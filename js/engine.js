@@ -139,6 +139,10 @@ function compute(I,geom,ctx){
   const base=Object.assign({},tpu?ob.tpu:ob.pla);
   const pi=g==='quality'?0:g==='fast'?2:1;
   const warn=[],danger=[];
+  // Höchstwerte des Druckers (js/data.js printerLimits): Tempo und Beschleunigung nie darüber – auch keine Anpassung
+  const lim=typeof printerLimits==='function'?printerLimits(printer,ctx.settings):{},capped=[];
+  const capTo=(k,v,max)=>{if(!max||!(+v>max))return v;if(has(k))capped.push(k);if(sugg[k]>max)sugg[k]=max;return max};
+  const capS=(k,v)=>capTo(k,v,lim.speed),capA=(k,v)=>capTo(k,v,lim.accel);
 
   // Düse: Umrechnung vom Referenzprofil auf die gewählte Düse
   const dSel=nkey(I.nozD),mSel=I.nozM;
@@ -150,7 +154,7 @@ function compute(I,geom,ctx){
   if(selFamily!==refFamily){if(selFamily==='steel'){tOff=+S.steelOffset;volF*=+S.steelVol}else{tOff=-S.steelOffset;volF/=+S.steelVol}}
   const maxVol=take('max_vol',Math.round(m.maxVol*volF*10)/10);
   // Filament-Werte: Vorschlag = Profil (alles unter „Werte für diesen Auftrag“ einstellbar, 2026-10-04)
-  m.flow=take('flow',m.flow);m.zhop=take('zhop',m.zhop);m.gap=take('sp_gap',m.gap);m.fanFirst=take('fan_first',+m.fanFirst||0);
+  m.flow=take('flow',m.flow);m.zhop=take('zhop',m.zhop);m.gap=capS('sp_gap',take('sp_gap',m.gap));m.fanFirst=take('fan_first',+m.fanFirst||0);
   if(m.pa!=null&&m.pa!==''||has('pa'))m.pa=take('pa',m.pa);
   // Wasserdicht: etwas heißer für besser verschmelzende Schichten, langsamere Außenwand
   const wtBoost=o==='watertight'?WATERTIGHT_TEMP_BOOST:0;
@@ -178,11 +182,11 @@ function compute(I,geom,ctx){
 
   // Geschwindigkeiten (Slicer-Wert + effektive Grenze durch Volumenstrom)
   let top=m.top;if(o==='multicolor'||o==='precision'||g==='quality')top=Math.min(top,tpu?20:40);
-  top=take('sp_top',top);
+  top=capS('sp_top',take('sp_top',top));
   const capNote=(v,lw)=>{const c=Math.floor(maxVol/(layer*lw));return v>c?t('effektiv ca. {v} mm/s (Grenze {max} mm³/s)',{v:c,max:de(maxVol,1)}):''};
-  const sp_outer=take('sp_outer',o==='watertight'?Math.round(m.outer[pi]*WATERTIGHT_OUTER_FACTOR):m.outer[pi]),sp_inner=take('sp_inner',m.inner[pi]),sp_fill=take('sp_fill',m.fill[pi]);
+  const sp_outer=capS('sp_outer',take('sp_outer',o==='watertight'?Math.round(m.outer[pi]*WATERTIGHT_OUTER_FACTOR):m.outer[pi])),sp_inner=capS('sp_inner',take('sp_inner',m.inner[pi])),sp_fill=capS('sp_fill',take('sp_fill',m.fill[pi]));
   const nOuter=capNote(sp_outer,N.lwo),nInner=capNote(sp_inner,N.lw),nFill=capNote(sp_fill,N.lw);
-  const sp_travel=take('sp_travel',m.travel),sp_first=take('sp_first',m.first),accel=take('accel',+m.accel||0);
+  const sp_travel=capS('sp_travel',take('sp_travel',m.travel)),sp_first=capS('sp_first',take('sp_first',m.first)),accel=capA('accel',take('accel',+m.accel||0));
   const accelTxt=accel>0?de(accel,0)+' mm/s²':t('Werksprofil beibehalten');
   const accelNote=accel>0?'':t('bei Ringing reduzieren');
   /* Rückzug bleibt beim Orca-Standard (Filament- bzw. Druckerprofil des Slots) – außer du setzt ihn unter „Werte für
@@ -355,6 +359,11 @@ function compute(I,geom,ctx){
   if(o==='watertight')warn.push(t('<b>Wasserdicht:</b> Dicht wird ein Teil über die Wand: {w} Wandlinien, {t} / {b} Deck-/Bodenschichten, +{boost} °C und eine langsamere Außenwand sind gesetzt; im Slicer „Lückenfüllung überall“. Lüfter eher niedrig halten. PETG und ASA werden dichter als PLA. Einfache Gefäße ohne Deckel: Vasenmodus mit breiter Linie (0,6–0,8 mm) ist oft dichter. Für dauerhaften Wasserkontakt oder Druck innen mit Epoxidharz beschichten. Nicht für Trinkwasser oder Lebensmittel geeignet – nach dem Druck mit Wasser testen.',{w,t:tt,b,boost:WATERTIGHT_TEMP_BOOST}));
   if(o==='thin')warn.push(t('<b>Dünnwandig:</b> In der Vorschau prüfen, ob schmale Wände wirklich Bahnen bekommen. Bei zu dünnen Stellen im Slicer „Dünne Wände erkennen“ aktivieren.'));
 
+  // weitere Orca-Einstellungen: Tempo-Werte (mm/s) ebenfalls höchstens bis zum Maximum des Druckers
+  const extraOv=typeof extraOverrides==='function'?extraOverrides(ov):{};
+  for(const k of Object.keys(extraOv))if(typeof ORCA_EXTRA_BY_KEY!=='undefined'&&ORCA_EXTRA_BY_KEY[k][3]==='mm/s')extraOv[k]=capS('x:'+k,+extraOv[k]);
+  if(capped.length)warn.push(t('<b>Höchstwerte {printer}:</b> {n} Wert(e) auf das Maximum des Druckers begrenzt ({speed}{accel}) – mehr kann der Drucker nicht.',
+    {printer:esc(printer.label),n:capped.length,speed:lim.speed?de(lim.speed,0)+' mm/s':'',accel:lim.accel?(lim.speed?', ':'')+de(lim.accel,0)+' mm/s²':''}));
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.
@@ -362,5 +371,5 @@ function compute(I,geom,ctx){
     // Anpassungen: Vorschlag je Wert und welche tatsächlich abweichen (Dialog „Werte für diesen Auftrag“)
     suggested:sugg,changed,ovDefaults:myDef,defKey,
     // weitere Orca-Einstellungen (js/orca-extra.js), angepasst oder aus deinem Standard: {orca_key: Wert}
-    extraOv:typeof extraOverrides==='function'?extraOverrides(ov):{}};
+    extraOv,limits:lim,capped};
 }
