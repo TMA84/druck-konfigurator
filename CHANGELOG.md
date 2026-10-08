@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.33.2] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Filament bis zur Düse:** Der Schlauch endet oben mittig im Kopf, das Filament läuft von dort senkrecht weiter bis zur Düsenspitze (vorher endete es am Schlauch).
+
 ## [10.33.1] – 2026-10-08
 
 ### Behoben

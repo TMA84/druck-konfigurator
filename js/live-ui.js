@@ -360,10 +360,13 @@ function lvMechUpdate(p) {
     l.lookAt(l.position.x + q.x, l.position.y + q.y, l.position.z + q.z);
   });
   // Schlauch mit Filament neben der Kette (seitlich versetzt), endet oben im Kopf
-  const off = new THREE.Vector3(9, 0, 0), ct = new THREE.CubicBezierCurve3(c.v0.clone().add(off), c.v1.clone().add(off), c.v2.clone().add(off), c.v3.clone().add(new THREE.Vector3(4, 0, -6)));
+  // Schlauch endet oben mittig im Kopf; das Filament läuft von dort senkrecht weiter bis zur Düsenspitze (2026-10-08)
+  const off = new THREE.Vector3(9, 0, 0), inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
+  const ct = new THREE.CubicBezierCurve3(c.v0.clone().add(off), c.v1.clone().add(off), new THREE.Vector3(p.x, p.y, c.v2.z), inHead);
+  const cf = new THREE.CurvePath(); cf.add(ct); cf.add(new THREE.LineCurve3(inHead.clone(), new THREE.Vector3(p.x, p.y, p.z + 1)));
   for (const k of ['tube', 'fil']) if (lv[k]) { lv.mechG.remove(lv[k]); lv[k].geometry.dispose(); }
   lv.tube = new THREE.Mesh(new THREE.TubeGeometry(ct, 40, 2.4, 10), lv.tubeM);
-  lv.fil = new THREE.Mesh(new THREE.TubeGeometry(ct, 40, 0.9, 6), lv.filM);
+  lv.fil = new THREE.Mesh(new THREE.TubeGeometry(cf, 60, 0.9, 6), lv.filM);
   lv.tube.renderOrder = 3;
   lv.mechG.add(lv.fil, lv.tube);
 }
