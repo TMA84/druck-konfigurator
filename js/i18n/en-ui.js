@@ -838,3 +838,8 @@ I18N.add({
  "von der Druckwerkstatt pausiert (Werkbank oder Home Assistant)": "paused from Print Workshop (workbench or Home Assistant)",
  "kein Filament im Drucker (ACE meldet keinen geladenen Slot) – Spule leer oder Zuführung hängt": "no filament in the printer (ACE reports no loaded slot) – spool empty or feed stuck",
 });
+I18N.add({
+ "Gehäuse": "Enclosure",
+ "Gehäuse mit Glastür und Glasdeckel einblenden": "Show enclosure with glass door and lid",
+ "ACE-Einheiten mit Spulen und Schläuchen einblenden": "Show ACE units with spools and tubes",
+});

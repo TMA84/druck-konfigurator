@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.0] – 2026-10-08
+
+### Neu
+- **3D-Fortschritt, Gehäuse und ACE zuschaltbar:** Zwei Schalter unten links (Standard aus, gemerkt): **Gehäuse** – Seiten- und Rückwand, Sockel, Glastür mit Rahmen und Glasdeckel, durchscheinend; **ACE** – zwei ACE-Pro-Einheiten oben auf dem Drucker mit je 4 Spulen in den gemeldeten Slotfarben (leere Slots ohne Spule, die zweite Einheit nur, wenn gemeldet) und je Slot ein PTFE-Schlauch mit Filament in Spulenfarbe zum Verteiler hinten oben.
+
 ## [10.38.2] – 2026-10-08
 
 ### Behoben
