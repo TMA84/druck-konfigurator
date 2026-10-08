@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.5] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Zoom beim Laden (auch in Home Assistant):** Die Ansicht passt sich so lange neu an, bis man selbst dreht oder zoomt: wenn sie sichtbar wird oder ihre Größe ändert, wenn die ACE-Daten ankommen und beim Umschalten von Gehäuse/ACE. Etwas mehr Rand, damit nichts angeschnitten wird.
+
 ## [10.39.4] – 2026-10-08
 
 ### Verbessert

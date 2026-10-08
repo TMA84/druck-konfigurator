@@ -47,6 +47,7 @@ function lvInit() {
   lv.camera = new THREE.PerspectiveCamera(40, 1, 0.5, 5000); lv.camera.up.set(0, 0, 1);
   lv.controls = new THREE.OrbitControls(lv.camera, lv.renderer.domElement);
   lv.controls.addEventListener('change', lvRender);
+  lv.controls.addEventListener('start', () => { lv.autoFit = false; });   // selbst gedreht/gezoomt: nicht mehr automatisch einpassen
   new ResizeObserver(lvResize).observe($('wbLiveStage'));
   return true;
 }
@@ -54,7 +55,8 @@ function lvResize() {
   if (!lv.renderer) return;
   const el = $('wbLiveStage'), w = el.clientWidth, h = el.clientHeight;
   if (!w || !h) return;
-  lv.renderer.setSize(w, h, false); lv.camera.aspect = w / h; lv.camera.updateProjectionMatrix(); lvRender();
+  lv.renderer.setSize(w, h, false); lv.camera.aspect = w / h; lv.camera.updateProjectionMatrix();
+  lvRefit(); lvRender();
 }
 /* Geänderte Farben (Bahn-Bereich lo…hi) bis zum nächsten Zeichnen sammeln: three.js überträgt nur einen Bereich je Bild –
    setzt man ihn zweimal, bevor gezeichnet wird, geht der erste verloren (die Bahnen blieben schwarz). */
@@ -142,7 +144,7 @@ function lvBuild() {
   lv.controls.target.set(0, 0, top / 3); lv.controls.update();
   lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null; lv.skip = null; lv.skipKey = null;
   lvHeadInit();
-  lv.fitPending = true;   // Zoom auf alles, sobald Kopf und Mechanik zum ersten Mal stehen (lvPlaceHead)
+  lv.autoFit = true; lv.fitPending = true;   // Zoom auf alles, sobald Kopf und Mechanik stehen (lvPlaceHead) – bis selbst gedreht/gezoomt wird
   lvTheme();
 }
 
@@ -535,6 +537,14 @@ function lvCornerHousings() {
    Filament zum Verteiler hinten oben am Drucker. Beides hängt am Rahmen (fährt relativ zum Teil in Z mit). */
 const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64, gap: 150 }, LV_SPOOL_CORE = 30;
 // Kamera so weit zurück, dass alles Sichtbare (Bett, Mechanik, Gehäuse, ACE) ins Bild passt – gleiche Blickrichtung
+// Neu einpassen, solange nicht selbst gedreht/gezoomt wurde (Größe der Ansicht, ACE-Einheiten oder Schalter geändert)
+function lvRefit() { if (lv.autoFit) { lv.fitPending = true; lvTryFit(); } }
+// erst einpassen, wenn Kopf und Mechanik stehen und die Ansicht eine Größe hat (in HA ist sie beim Laden oft noch verdeckt)
+function lvTryFit() {
+  const el = $('wbLiveStage');
+  if (!lv.fitPending || !lv.head || !lv.head.visible || !el || !el.clientWidth || !el.clientHeight) return;
+  lv.fitPending = false; lvFitAll(); lvRender();
+}
 function lvFitAll() {
   if (!lv.gantry) return;
   lv.scene.updateMatrixWorld(true);
@@ -543,7 +553,7 @@ function lvFitAll() {
     if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); if (isFinite(tmp.min.x)) bb.union(tmp); } });
   if (bb.isEmpty()) return;
   const c = bb.getCenter(new THREE.Vector3()), r = bb.getSize(new THREE.Vector3()).length() / 2, cam = lv.camera;
-  const fv = cam.fov * Math.PI / 360, fh = Math.atan(Math.tan(fv) * (cam.aspect || 1)), dist = r / Math.sin(Math.min(fv, fh)) * 0.75;
+  const fv = cam.fov * Math.PI / 360, fh = Math.atan(Math.tan(fv) * (cam.aspect || 1)), dist = r / Math.sin(Math.min(fv, fh)) * 0.88;
   const dir = cam.position.clone().sub(lv.controls.target).normalize();
   lv.controls.target.copy(c); cam.position.copy(c).add(dir.multiplyScalar(dist)); cam.far = Math.max(cam.far, dist * 4); cam.updateProjectionMatrix(); lv.controls.update();
 }
@@ -652,6 +662,7 @@ function lvAceColours(st) {
     }
   }
   if (lv.aceG) lv.aceG.children.forEach(c => { if (c.isGroup && c.position.z > (lv.aceG.children[0].position.z + 10)) c.visible = boxes.length > 1; });
+  if (lv.aceUnits !== boxes.length) { lv.aceUnits = boxes.length; lvRefit(); }   // zweite Einheit kam dazu/fiel weg
 }
 function lvMechInit(md, g) {
   const { bx0, bx1, by0, by1, m, cx, beam } = g;
@@ -863,7 +874,7 @@ function lvPlaceHead(p) {
   if (lv.kin === 'bed') { lv.gantry.position.y = p.y; lv.gantry.userData.beam.position.y = 0; if (lv.frameFixed) { lv.frameFixed.position.y = p.y; lv.frameFixed.visible = lv.head.visible; } }
   else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y + LV_BEAM_DY; }
   lvMechUpdate(p);
-  if (lv.fitPending && lv.head.visible) { lv.fitPending = false; lvFitAll(); }
+  lvTryFit();
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
 function lvVisible(rgb) {
@@ -1270,7 +1281,7 @@ $('wbLiveGhost').addEventListener('change', e => { store.settings.liveGhost = e.
 $('wbLivePos').checked = livePosOn();
 for (const [id, key, grp] of [['wbLiveEnc', 'liveEnclosure', 'enclosureG'], ['wbLiveAce', 'liveAce', 'aceG']]) {
   $(id).checked = store.settings[key] !== false;
-  $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; lvRender(); } });
+  $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; lvRefit(); lvRender(); } });
 }
 $('wbLivePos').addEventListener('change', e => {
   store.settings.livePos = e.currentTarget.checked; persist();
