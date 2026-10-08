@@ -77,6 +77,8 @@ function orcaInfillPattern(pattern) { return INFILL_PATTERNS[pattern] || (String
 const numStr = v => String(Math.round(Number(v) * 1000) / 1000);
 
 // Brim-Empfehlung ("5–8 mm", "Nicht nötig", "0–5 mm") → [brim_type, brim_width]; untere Grenze als Startwert.
+// Brim-Breite außen in mm (0 ohne Brim) – Rand beim Anordnen (packPlates pads)
+const brimPad = r => (r && r.brim ? Number(orcaBrim(r.brim)[1]) || 0 : 0);
 function orcaBrim(brim) {
   const m = /^(\d+(?:[.,]\d+)?)/.exec(brim);
   const w = m ? Number(m[1].replace(',', '.')) : 0;
@@ -539,15 +541,22 @@ function packSets(geoms, idx, sets, W, H, gap) {
   }
   return best.bins.map(b => compactBin(geoms, b, W, H, gap));
 }
-function packPlates(geoms, groups, tpl, sets) {
+function packPlates(geoms, groups, tpl, sets, pads) {
   const [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, gap = packGap(tpl);
+  // Rechteck-Verfahren mit Brim: Hüllrechteck um 2 × Brim größer (Mitte bleibt die Mitte des Teils)
+  const real = geoms;
+  if (pads && pads.some(p => p > 0)) geoms = geoms.map((g, i) => pads[i] > 0 ? { x: g.x + 2 * pads[i], y: g.y + 2 * pads[i], z: g.z } : g);
   const plates = [];   // je Platte die belegten Rechtecke {i, x, y, w, h, rot} (inkl. Abstand)
   const sources = [];  // je Platte: aus welcher Gruppe (Plattennummer) sie stammt
   let setsKept = null;  // null = keine Sätze; true = zusammengehalten; false = hätte mehr als eine Platte zusätzlich gekostet
   for (const [gi, idx] of groups.entries()) {
     let bins = packGroup(geoms, idx, bw, bd, gap);
     // Grundfläche statt Hüllrechteck (js/nest.js), wenn das Platten spart – nicht bei „Objekt für Objekt“ (Kopf-Freiraum rechteckig)
-    if (bins.length > 1 && !printSeq.byObject && typeof nestGroup === 'function') { const nb = nestGroup(geoms, idx, bw, bd, gap); if (nb && nb.length < bins.length) bins = nb; }
+    if (!printSeq.byObject && typeof nestGroup === 'function') {
+      // auch, wenn ein Teil nur schräg aufs Bett passt (Rechteck-Verfahren: „zu groß“)
+      const tooBig = idx.some(i => volumeExcess(real[i], [bw, bd, Infinity]).length && volumeExcess({ x: real[i].y, y: real[i].x, z: 0 }, [bw, bd, Infinity]).length);
+      if (bins.length > 1 || tooBig) { const nb = nestGroup(real, idx, bw, bd, gap, pads); if (nb && (nb.length < bins.length || (tooBig && nb.length <= bins.length))) bins = nb; }
+    }
     const mine = sets && sets.map(s => s.filter(i => idx.includes(i))).filter(s => s.length > 1);
     if (mine && mine.length) {
       const kept = packSets(geoms, idx, mine, bw, bd, gap);
@@ -571,24 +580,34 @@ function packPlates(geoms, groups, tpl, sets) {
     }
   });
   // Teile, die größer als das Bett sind, lassen sich nicht sinnvoll platzieren → Hinweis im Dialog
-  const vol = buildVolume(tpl), oversize = geoms.map((g, i) => i).filter(i => volumeExcess(geoms[i], vol).length && volumeExcess({ x: geoms[i].y, y: geoms[i].x, z: geoms[i].z }, vol).length);
+  // zu groß – außer schräg gelegt (Anordnen nach Grundfläche hat dann geprüft, dass es aufs Bett passt; Höhe zählt weiter)
+  const vol = buildVolume(tpl), oversize = real.map((g, i) => i).filter(i => places[i] && placeAng(places[i]) % 90 ? real[i].z > vol[2] + 0.01
+    : volumeExcess(real[i], vol).length && volumeExcess({ x: real[i].y, y: real[i].x, z: real[i].z }, vol).length);
   const overflow = used.length > new Set(used.map(([, s]) => s)).size;
   return { places, plateCount: used.length, oversize, overflow, setsKept };
 }
-// Grundfläche eines platzierten Teils (gedreht: Breite und Tiefe getauscht)
-const footprint = (g, pl) => pl && pl.rot ? [g.y, g.x] : [g.x, g.y];
+// Grundfläche eines platzierten Teils (gedreht: Breite und Tiefe getauscht; schräg: Rechteck um den Drehpunkt, js/nest.js)
+const footprint = (g, pl) => {
+  const k = placeAng(pl);
+  if (k % 90 && typeof footprintMask === 'function') { const m = footprintMask(g, k); if (m) return [m.fw, m.fd]; }
+  return k === 90 || k === 270 ? [g.y, g.x] : [g.x, g.y];
+};
 // 3MF-Transformation (Zeilenvektor · Matrix): gedreht = +90° um Z, sonst nur verschoben
 // Drehung um Z in 90°-Schritten (pl.ang; ältere Lagen nur pl.rot = 90°) – Zeilenvektor: 90° → (−y, x), 180° → (−x, −y), 270° → (y, −x)
+// beliebige Winkel (Anordnen nach Grundfläche auch in 45°-Schritten): Zeilen (cos, sin) und (−sin, cos)
 const placeAng = pl => pl ? (pl.ang != null ? ((pl.ang % 360) + 360) % 360 : pl.rot ? 90 : 0) : 0;
 const ROT_Z = { 0: [1, 0, 0, 0, 1, 0, 0, 0, 1], 90: [0, 1, 0, -1, 0, 0, 0, 0, 1], 180: [-1, 0, 0, 0, -1, 0, 0, 0, 1], 270: [0, -1, 0, 1, 0, 0, 0, 0, 1] };
-const placeXY = (pl, a, b) => { const k = placeAng(pl); return k === 90 ? [-b, a] : k === 180 ? [-a, -b] : k === 270 ? [b, -a] : [a, b]; };
-const placeTransform = (pl, hz) => ROT_Z[placeAng(pl)].map(String).join(' ') + ' ' + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
+const rotZ = k => ROT_Z[k] || (() => { const c = Math.cos(k * Math.PI / 180), s = Math.sin(k * Math.PI / 180); return [c, s, 0, -s, c, 0, 0, 0, 1]; })();
+const placeXY = (pl, a, b) => { const k = placeAng(pl); if (k === 90) return [-b, a]; if (k === 180) return [-a, -b]; if (k === 270) return [b, -a]; if (!k) return [a, b];
+  const c = Math.cos(k * Math.PI / 180), s = Math.sin(k * Math.PI / 180); return [a * c - b * s, a * s + b * c]; };
+const placeTransform = (pl, hz) => rotZ(placeAng(pl)).map(v => String(Math.abs(v) < 1e-12 ? 0 : +v.toFixed(9))).join(' ') + ' ' + coord(pl.x) + ' ' + coord(pl.y) + ' ' + hz;
 // Alle Teile automatisch auf möglichst wenige Platten (ohne feste Zuordnung)
-function arrangeParts(geoms, tpl, sets) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl, sets); }
+// pads[i] = Brim-Breite außen (mm): der Abstand zählt ab dem Brim, sonst wachsen die Brims zusammen
+function arrangeParts(geoms, tpl, sets, pads) { return packPlates(geoms, [geoms.map((g, i) => i)], tpl, sets, pads); }
 // Nach Plattenzuordnung je Teil (1-basiert); Platten in aufsteigender Reihenfolge, Lücken fallen weg
 function arrangeByPlate(items, tpl) {
   const nums = [...new Set(items.map(p => p.plate || 1))].sort((a, b) => a - b);
-  return packPlates(items.map(p => p.geom), nums.map(n => items.map((p, i) => i).filter(i => (items[i].plate || 1) === n)), tpl);
+  return packPlates(items.map(p => p.geom), nums.map(n => items.map((p, i) => i).filter(i => (items[i].plate || 1) === n)), tpl, null, items.map(p => p.pad || 0));
 }
 
 /* ---------- Makerworld-/Orca-3MF neu anordnen (2026-09-29) ----------
@@ -605,16 +624,16 @@ const needsRelayout = (threemf, parts) => !!(threemf && (threemf.layout || three
    der Plattennummern mit Designer-Lage) und oversizePlates. places[i].x/y = Mitte des Hüllrechtecks in Orca-Welt-
    koordinaten, auch für Teile in Designer-Lage (dort rot = false). */
 function layout3mf(items, tpl, mode) {
-  const geoms = items.map(p => p.geom), [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, vol = buildVolume(tpl);
+  const geoms = items.map(p => p.geom), pads = items.map(p => p.pad || 0), [bw, bd] = bedSize(tpl), [bx, by] = tpl.bedCenter, vol = buildVolume(tpl);
   const designer = new Set(), oversizePlates = [];
   if (mode === 'auto') {
-    const r = arrangeParts(geoms, tpl);
+    const r = arrangeParts(geoms, tpl, null, pads);
     return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, overflow: false, oversize: r.oversize, oversizePlates, designer };
   }
   const plateNo = p => p.plate || 1, all = items.map((p, i) => i);
   const nums = [...new Set(items.map(plateNo))].sort((a, b) => a - b);
   const packNums = nums.filter(k => mode === 'plates' || items.some(p => plateNo(p) === k && p.own));
-  const pk = packNums.length ? packPlates(geoms, packNums.map(k => all.filter(i => plateNo(items[i]) === k)), tpl) : null;
+  const pk = packNums.length ? packPlates(geoms, packNums.map(k => all.filter(i => plateNo(items[i]) === k)), tpl, null, pads) : null;
   const local = [];
   let f = 0, overflow = false;
   for (const k of nums) {
@@ -751,12 +770,12 @@ function applyTowers(settings, changes, plan) {
 }
 
 function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
-  const items = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom ? p : { geom: p });
+  const items = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom ? p : { geom: p }).map(p => p.pad != null ? p : { ...p, pad: brimPad(p.r || r) });
   const list = items.map(p => p.geom);
   const { extra, notes, partSlot } = slotPlan(items, r, slot);
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra, machine);
   // Plattenzuordnung je Teil beachten (plate 1-basiert); ohne Angabe alles automatisch
-  const { places, plateCount, overflow } = items.some(p => p.plate) ? arrangeByPlate(items, tpl) : arrangeParts(list, tpl);
+  const { places, plateCount, overflow } = items.some(p => p.plate) ? arrangeByPlate(items, tpl) : arrangeParts(list, tpl, null, items.map(p => p.pad));
   if (overflow) notes.push(t('Nicht alle Teile einer Platte passen aufs Bett – sie stehen auf einer zusätzlichen Platte.'));
   {
     // Reinigungsturm je Platte: Teile in Bettkoordinaten der Platte (arrangeParts versetzt Platten wie Orca)
@@ -885,7 +904,7 @@ function patchModifierExtruders(ms, objectId, map, nFil) {
    Hüllrechtecks (Weltkoordinaten) optional +90° um Z drehen und diese Mitte auf (pl.x, pl.y) setzen. Höhe bleibt. */
 const ROT_Z90 = [0, 1, 0, -1, 0, 0, 0, 0, 1], ROT_ID = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 function relocateTransform(m, c, pl) {
-  const R = ROT_Z[placeAng(pl)] || ROT_ID, out = [];
+  const R = rotZ(placeAng(pl)), out = [];
   for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) out.push(m[r * 3] * R[k] + m[r * 3 + 1] * R[3 + k] + m[r * 3 + 2] * R[6 + k]);
   const tx = m[9] - c[0], ty = m[10] - c[1], tz = m[11];
   out.push(tx * R[0] + ty * R[3] + tz * R[6] + pl.x, tx * R[1] + ty * R[4] + tz * R[7] + pl.y, tx * R[2] + ty * R[5] + tz * R[8]);
@@ -1082,7 +1101,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   const relayout = needsRelayout(threemf, items.map(j => j.part));
   let shifts = new Map(), lay = null;
   if (relayout) {
-    lay = layout3mf(items.map(j => ({ geom: j.geom, plate: j.plate, own: ownPlaced(j.part) })), tpl, threemf.layout || null);
+    lay = layout3mf(items.map(j => ({ geom: j.geom, plate: j.plate, own: ownPlaced(j.part), pad: brimPad(j.r) })), tpl, threemf.layout || null);
     lay.oversizePlates.forEach(id => notes.push(t('Platte {n} ist größer als dein Druckbett – in Orca prüfen.', { n: id })));
     if (lay.oversize.length) notes.push(t('Passt nicht aufs Bett: {parts} – in Orca prüfen.', { parts: lay.oversize.map(i => items[i].geom.name).join(', ') }));
     if (lay.overflow) notes.push(t('Nicht alle Teile einer Platte passen aufs Bett – sie stehen auf einer zusätzlichen Platte.'));

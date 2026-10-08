@@ -293,7 +293,7 @@ function openEditor(mode){
   if($('edDelete'))$('edDelete').onclick=()=>{if(!confirm(t('Filament „{name}“ endgültig löschen?',{name:src.name})))return;delete store.profiles[src.id];persist();closeDialog();fillMaterialSelect('pla_hs');update()};
   const save=asNew=>{
     const {out,errs}=readForm();
-    if(errs.length){alert(t('Bitte prüfen: {list}',{list:errs.join(', ')}));return}
+    if(errs.length){formError(t('Bitte prüfen: {list}',{list:errs.join(', ')}),$('edFoot'));return}
     let id;
     if(asNew||mode==='new'){id='u'+Date.now().toString(36);if(asNew&&out.name===src.name)out.name+=' '+t('(Kopie)')}
     else id=src.id;
@@ -322,7 +322,7 @@ $('settingsBtn').addEventListener('click',()=>{
   $('stReset').onclick=()=>{$('st_off').value='5';$('st_vol').value='0,9'};
   $('edSave').onclick=()=>{
     const o=num($('st_off').value),v=num($('st_vol').value);
-    if(isNaN(o)||o<0||o>30||isNaN(v)||v<=0.3||v>1.5){alert(t('Bitte gültige Werte eingeben (Aufschlag 0–30 °C, Faktor 0,3–1,5).'));return}
+    if(isNaN(o)||o<0||o>30||isNaN(v)||v<=0.3||v>1.5){formError(t('Bitte gültige Werte eingeben (Aufschlag 0–30 °C, Faktor 0,3–1,5).'),$('edFoot'),[$('st_off'),$('st_vol')]);return}
     store.settings.steelOffset=o;store.settings.steelVol=v;persist();closeDialog();update();
   };
   openDialog();
@@ -362,7 +362,7 @@ $('importFile').addEventListener('change',()=>{
         ['object','goal','load','support','supportLevel'].forEach(id=>{if(store.last[id]!==undefined)$(id).value=store.last[id]});
       }
       fillMaterialSelect(store.last.material);update();
-    }catch(e){alert(t('Import fehlgeschlagen: {msg}',{msg:e.message}))}
+    }catch(e){toast(t('Import fehlgeschlagen: {msg}',{msg:e.message}))}
     $('importFile').value='';
   };
   r.readAsText(f);

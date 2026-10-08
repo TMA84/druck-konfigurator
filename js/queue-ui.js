@@ -154,6 +154,7 @@ function renderQueue() {
   $('queueT').textContent = t('Warteschlange · {name}', { name: q.name.replace(/\.(stl|3mf|zip)$/i, '') });
   $('queueSum').textContent = t('{done} von {total} fertig', { done, total: q.items.length }) + (rest > 0 ? ' · ' + t('noch ≈ {time} Druckzeit (ohne Pausen zum Abräumen)', { time: duration(rest) }) : '');
   const ace = st && st.ace && st.ace.length ? aceSlots(st) : null;
+  queueRelayoutHint(q, cur);
   const banner = $('queueBanner');
   const last = q.lastDone && q.items.find(i => i.plate === q.lastDone);
   banner.classList.toggle('hidden', !(last || (!cur && !next)));
@@ -170,7 +171,31 @@ function renderQueue() {
   }).join('');
 }
 
+/* Gleiches Projekt, aber jetzt weniger Platten (z. B. nach „Platzsparend anordnen“ oder dem Anordnen nach Grundfläche):
+   sagen und – solange noch nichts gedruckt ist – neu anlegen anbieten. Mit schon gedruckten Platten erst die fertigen
+   Teile aus dem Projekt nehmen, sonst würden sie noch einmal gedruckt. */
+function queueRelayoutHint(q, cur) {
+  let el = $('queueRelayout');
+  if (!el) { el = document.createElement('p'); el.id = 'queueRelayout'; el.className = 'note hidden'; $('queueBanner').before(el); }
+  let lay = null;
+  try { lay = project && typeof plTpl === 'function' && plTpl() ? projectLayout(plTpl()) : null; } catch (e) { lay = null; }
+  const same = lay && project.name === q.name, n = q.items.length, fresh = q.items.every(i => i.state === 'wait');
+  const show = same && lay.count < n && !cur;
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+  el.innerHTML = t('Mit der aktuellen Anordnung wären es <b>{n} statt {m} Platten</b>.', { n: lay.count, m: n }) + ' ' + (fresh
+    ? '<button class="btn sec" type="button" id="queueRelayoutGo">' + t('Warteschlange neu anlegen') + '</button>'
+    : t('Gedruckte Teile zuerst aus dem Projekt entfernen, dann neu slicen und die Warteschlange neu anlegen.'));
+}
+async function queueRelayout() {
+  const btn = $('queueRelayoutGo'); if (btn) { btn.disabled = true; btn.textContent = t('Slicen …'); }
+  setTab('slice');
+  if (!(costState.slice && costState.sig === costSignature())) { costState.sig = null; await runCosts(); }
+  if (costState.slice && costState.slice.job && !costState.error) await startQueue();
+  else { toast(t('Nicht neu angelegt: Slicen fehlgeschlagen')); setTab('printer'); }
+}
 $('queueCard').addEventListener('click', e => {
+  if (e.target.closest('#queueRelayoutGo')) { queueRelayout(); return; }
   const q = queue(); if (!q) return;
   const p = e.target.closest('[data-q-print]'), s = e.target.closest('[data-q-skip]'), a = e.target.closest('[data-q-again]');
   if (p) { queuePrint(+p.dataset.qPrint); return; }

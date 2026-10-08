@@ -467,6 +467,18 @@ document.addEventListener('scroll',hideTip,true);
 
 let toastTimer=0;
 // action: {label, fn} – Knopf in der Meldung (z. B. „Rückgängig“), dann bleibt sie länger stehen
+/* Eingabefehler ohne blockierendes Browser-Fenster (2026-10-08): Hinweis direkt vor anchor (Tabelle, Knopfleiste),
+   ungültige Felder rot markiert; verschwindet beim nächsten Tippen */
+function formError(msg,anchor,bad){
+  (bad||[]).forEach(el=>{if(!el)return;el.classList.add('bad-input');el.setAttribute('aria-invalid','true');
+    el.addEventListener('input',()=>{el.classList.remove('bad-input');el.removeAttribute('aria-invalid')},{once:true})});
+  if(!anchor){toast(msg);return}
+  let p=anchor.previousElementSibling;
+  if(!p||!p.classList.contains('form-err')){p=document.createElement('p');p.className='note bad form-err';p.setAttribute('role','alert');anchor.before(p)}
+  p.textContent=msg;p.classList.remove('hidden');
+  (anchor.parentElement||document).addEventListener('input',()=>p.classList.add('hidden'),{once:true});
+  const f=(bad||[]).find(Boolean);if(f)f.focus({preventScroll:false});
+}
 function toast(text,action){
   const el=$('toast');el.textContent=text;el.classList.add('show');el.classList.toggle('has-action',!!action);
   if(action){const b=document.createElement('button');b.type='button';b.textContent=action.label;

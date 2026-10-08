@@ -20,9 +20,26 @@ function projectLayout(tpl) {
   plCache.lay = { key, val };
   return val;
 }
+/* Brim außen je Teil (mm) – Rand beim Anordnen wie im Export (build3mfFiles: brimPad des Teil-Ergebnisses); das
+   Ergebnis je Teil (compute) ist teuer, daher nur neu, wenn sich Eingaben, Anpassungen oder Teile ändern */
+const padCache = { sig: null, val: null };
+// Hintergrund-Anordnung fertig (js/nest.js): neu zeichnen – der Schlüssel (nestRev) erzwingt die neue Lage, Kosten slicen neu
+function onNestDone() { if (project && typeof update === 'function') update(); }
+function partPads() {
+  if (!project || typeof brimPad !== 'function' || typeof exportPlan !== 'function' || !lastResult) return null;
+  let sig;
+  try { sig = JSON.stringify([currentInput(), store.settings.ovDefaults || null, project.parts.map(p => [geomId(p.geom), p.input || null, p.overrides || null])]); } catch (e) { return null; }
+  if (padCache.sig !== sig) {
+    let val = null;
+    try { val = exportPlan(costDefaultSlot()).jobs.map(j => brimPad(j.r)); } catch (e) { console.error(e); }
+    padCache.sig = sig; padCache.val = val;
+  }
+  return padCache.val;
+}
 function computeLayout(tpl) {
   if (project.threemf && needsRelayout(project.threemf, project.parts)) {
-    const r = layout3mf(project.parts.map(p => ({ geom: p.geom, plate: p.plate, own: ownPlaced(p) })), tpl, project.threemf.layout || null);
+    const pads = partPads();
+    const r = layout3mf(project.parts.map((p, i) => ({ geom: p.geom, plate: p.plate, own: ownPlaced(p), pad: pads ? pads[i] : 0 })), tpl, project.threemf.layout || null);
     return { count: r.count, plateOf: r.plateOf, places: r.places, oversize: r.oversize, oversizePlates: r.oversizePlates, overflow: r.overflow, designer: r.designer };
   }
   if (project.threemf) {
@@ -31,7 +48,7 @@ function computeLayout(tpl) {
       oversize: project.parts.map((p, i) => i).filter(i => volumeExcess(project.parts[i].geom, vol).length),
       oversizePlates: plateShifts(project.parts.map(p => ({ geom: p.geom, plate: p.plate })), tpl).oversize };
   }
-  const r = project.platesFixed ? arrangeByPlate(project.parts, tpl) : packAll(tpl);
+  const pads = partPads(), r = project.platesFixed ? arrangeByPlate(project.parts.map((p, i) => ({ geom: p.geom, plate: p.plate, pad: pads ? pads[i] : 0 })), tpl) : packAll(tpl);
   // automatisch angeordnet: weitere Platten sind gewollt, kein „passte nicht“
   return { count: r.plateCount, plateOf: r.places.map(p => p.plate + 1), places: r.places, oversize: r.oversize, overflow: !!project.platesFixed && r.overflow, setsKept: r.setsKept };
 }
@@ -57,7 +74,7 @@ function projectSets() {
 function packAll(tpl) {
   const key = layoutKey(tpl, true);
   if (plCache.all && plCache.all.key === key) return plCache.all.val;
-  const val = arrangeParts(project.parts.map(p => p.geom), tpl, project.keepSets === false ? null : projectSets());
+  const val = arrangeParts(project.parts.map(p => p.geom), tpl, project.keepSets === false ? null : projectSets(), partPads());
   plCache.all = { key, val };
   return val;
 }
@@ -75,7 +92,9 @@ function layoutKey(tpl, packOnly) {
   const tm = project.threemf;
   const head = [geomId(project), bedSize(tpl).join('x'), (tpl.bedCenter || []).join(','), [].concat(tpl.settings && tpl.settings.printable_height || [])[0],
     packOnly ? 'all' : tm ? '3mf:' + (tm.layout || '') : project.platesFixed ? 'fixed' : 'auto', project.parts.length, project.printSeq === 'object' ? 'obj' : 'layer', 'gap' + packGapMm,
-    project.keepSets === false ? 'nosets' : 'sets:' + project.parts.map(p => (p.src || '') + '/' + (p.copyGroup || '')).join(',')].join('|');
+    project.keepSets === false ? 'nosets' : 'sets:' + project.parts.map(p => (p.src || '') + '/' + (p.copyGroup || '')).join(','),
+    // Brim je Teil (Rand beim Anordnen) und fertige Hintergrund-Anordnungen (js/nest.js)
+    'pads:' + (partPads() || []).join(','), 'nest' + (typeof nestRev !== 'undefined' ? nestRev : '')].join('|');
   return head + '|' + project.parts.map(p => { const g = p.geom || {};
     return geomId(g) + ':' + g.x + ':' + g.y + ':' + g.z + (packOnly ? '' : ':' + (p.plate || '') + (ownPlaced(p) ? '*' : '')); }).join(';');
 }
@@ -178,6 +197,9 @@ function renderPlates() {
   const sel = project.parts[project.selected], fixed = lay.fixed3mf, tm = project.threemf;
   const plN = t(lay.count > 1 ? '{n} Platten' : '{n} Platte', { n: lay.count });
   if (typeof secSum === 'function') secSum('plates', plN);
+  // Anordnung nach Grundfläche rechnet im Hintergrund (js/nest.js)
+  { let n = $('plateNestBusy'); if (!n) { n = document.createElement('small'); n.id = 'plateNestBusy'; n.className = 'muted nest-busy'; $('plateTitle').after(n); }
+    n.textContent = typeof nestBusy === 'function' && nestBusy() ? t('ordne platzsparend an …') : ''; }
   // 3MF: Platten des Designers, bis angeordnet wird (layout); ohne layout packt das Tool nur Platten mit eigenen Teilen
   const auto = tm ? tm.layout === 'auto' : !project.platesFixed, designerLayout = tm && !tm.layout;
   $('plateByObject').checked = project.printSeq === 'object';

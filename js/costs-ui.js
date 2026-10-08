@@ -55,7 +55,9 @@ function sliceSigs() {
   const plates = Array.from({ length: lay.count }, (_, k) => JSON.stringify(plan.jobs.filter((j, i) => lay.plateOf[i] === k + 1)
     .map(j => [j.part.name, j.part.input, j.part.overrides || null, j.slot, (j.bodies || []).map(b => b.slot), j.part.R, (j.holes || []).length, j.geom.x, j.geom.y, j.geom.z, j.part.texts || null,
       // eigene Bemalung (Farbe, Stützen, Naht – js/paint-ui.js): jeder Strich ändert rev
-      ['paintUser', 'paintSup', 'paintSeam'].map(k => j.part[k] ? j.part[k].rev : 0)])));
+      ['paintUser', 'paintSup', 'paintSeam'].map(k => j.part[k] ? j.part[k].rev : 0),
+      // Lage auf der Platte (Anordnen nach Grundfläche, Brim-Rand): andere Lage = neu slicen
+      lay.places && lay.places[plan.jobs.indexOf(j)] ? [Math.round(lay.places[plan.jobs.indexOf(j)].lx), Math.round(lay.places[plan.jobs.indexOf(j)].ly), lay.places[plan.jobs.indexOf(j)].ang || 0] : null])));
   return { global, plates };
 }
 function costSignature() { const s = sliceSigs(); return s && JSON.stringify(s); }
@@ -184,6 +186,7 @@ $('plateCosts').addEventListener('click', e => {
 const prepS = () => +store.settings.prepS > 0 ? +store.settings.prepS : 420;
 async function runCosts() {
   if (!project || costState.busy) return;
+  if (typeof nestBusy === 'function' && nestBusy()) await nestIdle();   // Anordnung im Hintergrund abwarten (js/nest.js)
   const health = await serverHealth();
   if (!health.slicer) { costState = { ...costState, error: t('Der Server hat keinen OrcaSlicer – die Kostenkalkulation braucht den Container (oder lokal ORCA_PATH).'), failedSig: costSignature() }; renderCostPanel(); return; }
   // PLA und ASA/ABS auf einer Platte slict Orca nicht – gleich verständlich melden statt nach dem Slicen
@@ -248,7 +251,7 @@ $('cdSave').addEventListener('click', () => {
   document.querySelectorAll('[data-price]').forEach(inp => { const s = inp.value.trim(); if (!s) return; const v = num(s); if (isNaN(v) || v <= 0) bad.push(inp.closest('.ed-row').querySelector('label').textContent); else prices[inp.dataset.price] = v; });
   const types = {};
   document.querySelectorAll('[data-type-price]').forEach(inp => { const s = inp.value.trim(); if (!s) return; const v = num(s); if (isNaN(v) || v <= 0) bad.push(inp.closest('.ed-row').querySelector('label').textContent); else types[inp.dataset.typePrice] = v; });
-  if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return; }
+  if (bad.length) { formError(t('Bitte prüfen: {list}', { list: bad.join(', ') }), $('cdSave').parentElement); return; }
   // Preise von Filamenten, die gerade nicht aufgeführt sind, bleiben erhalten
   const shown = new Set([...document.querySelectorAll('[data-price]')].map(i => i.dataset.price));
   const kept = Object.fromEntries(Object.entries(store.settings.filamentPrices || {}).filter(([id]) => !shown.has(id)));

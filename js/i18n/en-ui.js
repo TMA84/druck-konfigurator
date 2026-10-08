@@ -809,3 +809,18 @@ I18N.add({
  "Höchstbeschleunigung": "Maximum acceleration",
  "Maximum des Druckers: {list}": "Printer maximum: {list}",
 });
+I18N.add({
+ "ordne platzsparend an …": "arranging to save space …",
+});
+I18N.add({
+ "Mit der aktuellen Anordnung wären es <b>{n} statt {m} Platten</b>.": "With the current arrangement it would be <b>{n} instead of {m} plates</b>.",
+ "Warteschlange neu anlegen": "Create queue again",
+ "Gedruckte Teile zuerst aus dem Projekt entfernen, dann neu slicen und die Warteschlange neu anlegen.": "Remove printed parts from the project first, then slice again and create the queue again.",
+ "Nicht neu angelegt: Slicen fehlgeschlagen": "Not created: slicing failed",
+ "Slicen …": "Slicing …",
+});
+I18N.add({
+ "Höchster Volumenstrom (Hotend)": "Maximum volumetric flow (hotend)",
+ "Hotend": "Hotend",
+ "Volumenstrom, den das Hotend schafft – kein Herstellerwert hinterlegt; die Filamentprofile begrenzen weiter je Material": "Flow the hotend can handle – no manufacturer value available; filament profiles still limit per material",
+});

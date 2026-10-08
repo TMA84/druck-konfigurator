@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Verbessert
+- **Brim beim Anordnen:** Der Abstand zwischen Teilen zählt ab dem Brim (Brim außen je Teil), der Brim bleibt auf dem Bett – vorher konnten die Brims ineinander gedruckter Teile zusammenwachsen. Gilt für das Rechteck-Verfahren und das Anordnen nach Grundfläche, in der Vorschau wie im Export.
+- **Anordnen im Hintergrund:** Das Anordnen nach Grundfläche rechnet in einem Web Worker (js/nest-worker.js) – die Seite bleibt bedienbar, über den Platten steht „ordne platzsparend an …“; bis dahin gilt die Rechteck-Anordnung, Slicen und 3MF-Export warten auf das Ergebnis. Die Plattensignatur für das Teil-Slicen enthält jetzt die Lage der Teile.
+- **Schräg anordnen (45°-Schritte):** Spart es eine Platte, werden Teile auch um 45/135/225/315° gedreht; Teile, die nur diagonal aufs Bett passen (z. B. 300-mm-Leiste auf 250 × 250), sind nicht mehr „zu groß“. 3MF-Matrix für beliebige Winkel, per Orca geprüft.
+- **Warteschlange und neue Anordnung:** Braucht dasselbe Projekt jetzt weniger Platten, sagt es die Werkbank („2 statt 4 Platten“) und bietet – solange nichts gedruckt ist – „Warteschlange neu anlegen“ an.
+- **Keine Browser-Popups bei Eingabefehlern:** Werte-Tafel, Kosten, Spülabfall, Filament-Editor und Düsen-Umrechnung zeigen den Fehler am Formular und markieren die Felder; Import-Fehler als Meldung.
+
+### Neu
+- **Hotend-Maximum (Volumenstrom) je Drucker:** dritter Wert in „Maximum dieses Druckers“ (eigener Wert – die Orca-Profile kennen kein Hotend-Maximum); der Volumenstrom geht nie darüber.
+
 ## [10.30.0] – 2026-10-08
 
 ### Neu

@@ -152,7 +152,7 @@ function compute(I,geom,ctx){
   const selFamily=(NOZZLE_MATERIALS[mSel]||NOZZLE_MATERIALS.steel_hardened).thermalFamily;
   let volF=N.v/R.v,tOff=0;
   if(selFamily!==refFamily){if(selFamily==='steel'){tOff=+S.steelOffset;volF*=+S.steelVol}else{tOff=-S.steelOffset;volF/=+S.steelVol}}
-  const maxVol=take('max_vol',Math.round(m.maxVol*volF*10)/10);
+  const maxVol=capTo('max_vol',take('max_vol',Math.round(m.maxVol*volF*10)/10),lim.vol);
   // Filament-Werte: Vorschlag = Profil (alles unter „Werte für diesen Auftrag“ einstellbar, 2026-10-04)
   m.flow=take('flow',m.flow);m.zhop=take('zhop',m.zhop);m.gap=capS('sp_gap',take('sp_gap',m.gap));m.fanFirst=take('fan_first',+m.fanFirst||0);
   if(m.pa!=null&&m.pa!==''||has('pa'))m.pa=take('pa',m.pa);
@@ -363,7 +363,7 @@ function compute(I,geom,ctx){
   const extraOv=typeof extraOverrides==='function'?extraOverrides(ov):{};
   for(const k of Object.keys(extraOv))if(typeof ORCA_EXTRA_BY_KEY!=='undefined'&&ORCA_EXTRA_BY_KEY[k][3]==='mm/s')extraOv[k]=capS('x:'+k,+extraOv[k]);
   if(capped.length)warn.push(t('<b>Höchstwerte {printer}:</b> {n} Wert(e) auf das Maximum des Druckers begrenzt ({speed}{accel}) – mehr kann der Drucker nicht.',
-    {printer:esc(printer.label),n:capped.length,speed:lim.speed?de(lim.speed,0)+' mm/s':'',accel:lim.accel?(lim.speed?', ':'')+de(lim.accel,0)+' mm/s²':''}));
+    {printer:esc(printer.label),n:capped.length,speed:lim.speed?de(lim.speed,0)+' mm/s':'',accel:[lim.accel?(lim.speed?', ':'')+de(lim.accel,0)+' mm/s²':'',lim.vol?', '+de(lim.vol,1)+' mm³/s':''].join('')}));
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.

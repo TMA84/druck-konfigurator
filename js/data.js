@@ -110,7 +110,9 @@ function printerLimits(p, settings) {
   if (p.orca) S = p.orca.machine;
   else if (typeof ORCA_TEMPLATES !== 'undefined' && ORCA_TEMPLATES[p.id]) { const tp = ORCA_TEMPLATES[p.id]; S = (tp['0.4'] || Object.values(tp)[0]).settings; }
   const profile = machineLimits(S), own = ((settings || {}).printerLimits || {})[printerLimitKey(p)] || {};
-  return { speed: +own.speed || profile.speed || null, accel: +own.accel || profile.accel || null, profile, own };
+  // Volumenstrom (Hotend): die Orca-Profile kennen kein Hotend-Maximum (nur vorsichtige Filamentwerte, S1: 12 mm³/s bei
+  // getesteten 18–22) – daher nur ein eigener Wert
+  return { speed: +own.speed || profile.speed || null, accel: +own.accel || profile.accel || null, vol: +own.vol || null, profile, own };
 }
 
 /* ================= ORCASLICER-EXPORT =================

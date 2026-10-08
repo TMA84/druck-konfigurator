@@ -106,7 +106,7 @@ function ovReadonlyRows(r) {
    Beschleunigung lassen sich nicht darüber eintragen; die Zeile oben im Reiter Tempo zeigt sie und nimmt eigene Werte */
 function ovLimitOf(f) {
   const L = (lastResult && lastResult.limits) || {}, k = f[0];
-  return k === 'accel' ? L.accel || null : /^sp_/.test(k) || (k.startsWith('x:') && f[2] === 'mm/s') ? L.speed || null : null;
+  return k === 'accel' ? L.accel || null : k === 'max_vol' ? L.vol || null : /^sp_/.test(k) || (k.startsWith('x:') && f[2] === 'mm/s') ? L.speed || null : null;
 }
 function ovLimitRow(r) {
   const L = r.limits || {}, P = L.profile || {}, own = L.own || {}, th = esc(t('Tempo'));
@@ -114,12 +114,14 @@ function ovLimitRow(r) {
     '" aria-label="' + esc(label) + '"><small class="ov-unit muted">' + unit + '</small>';
   return '<div class="ov-row ov-limit" data-theme="' + th + '"><span>' + esc(t('Maximum dieses Druckers')) + '<small class="ov-scope muted">' +
     esc(own.speed || own.accel ? t('eigener Wert – leer = Herstellerprofil') : t('aus dem Herstellerprofil – nichts wird schneller gesetzt')) + '</small></span>' +
-    '<span class="ov-in">' + inp('speed', 'mm/s', P.speed, 10, t('Höchstgeschwindigkeit')) + '</span><span class="ov-in">' + inp('accel', 'mm/s²', P.accel, 500, t('Höchstbeschleunigung')) + '</span><span></span></div>';
+    '<span class="ov-in ov-lim3">' + inp('speed', 'mm/s', P.speed, 10, t('Höchstgeschwindigkeit')) + inp('accel', 'mm/s²', P.accel, 500, t('Höchstbeschleunigung')) +
+    inp('vol', 'mm³/s', null, 0.5, t('Höchster Volumenstrom (Hotend)')).replace('placeholder="' + esc(t('unbekannt')) + '"', 'placeholder="' + esc(t('Hotend')) + '" title="' + esc(t('Volumenstrom, den das Hotend schafft – kein Herstellerwert hinterlegt; die Filamentprofile begrenzen weiter je Material')) + '"') + '</span></div>';
 }
 $('ovRows').addEventListener('change', e => {
   const el = e.target.closest('[data-lim]'), r = lastResult; if (!el || !r) return;
   const key = printerLimitKey(r.printer), all = store.settings.printerLimits || (store.settings.printerLimits = {}), cur = { ...(all[key] || {}) }, v = Math.round(num(el.value));
-  if (v > 0) cur[el.dataset.lim] = v; else delete cur[el.dataset.lim];
+  const vv = el.dataset.lim === 'vol' ? Math.round(num(el.value) * 2) / 2 : v;
+  if (vv > 0) cur[el.dataset.lim] = vv; else delete cur[el.dataset.lim];
   if (Object.keys(cur).length) all[key] = cur; else delete all[key];
   persist(); update();
 });
@@ -165,7 +167,7 @@ function ovRenderPanel() {
 // nach jedem update(): neu zeichnen, wenn sich etwas Relevantes geändert hat; Fokus und Reiter bleiben
 function ovPanelSync() {
   const p = ovPart(), r = lastResult;
-  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, printerLimitKey(r.printer), r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel], typeof LANG !== 'undefined' ? LANG : '']) : '';
+  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, printerLimitKey(r.printer), r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel, r.limits.vol], typeof LANG !== 'undefined' ? LANG : '']) : '';
   $('ovPanel').classList.toggle('hidden', !p);
   if (key === ovPanelKey) return;
   ovPanelKey = key;
@@ -275,7 +277,7 @@ $('ovRows').addEventListener('click', e => {
 
 // Eingaben des Dialogs → {Schlüssel: Wert} oder null (ungültige Eingabe gemeldet)
 function ovCollect() {
-  const out = {}, bad = [], capped = [];
+  const out = {}, bad = [], capped = [], badEls = [];
   for (const f of ovFields()) {
     const [k, label, , min, max0, step, , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el ? el.value.trim() : '';
     if (!s) continue;
@@ -284,13 +286,13 @@ function ovCollect() {
     // über dem Maximum des Druckers: auf das Maximum setzen und sagen
     const lm = ovLimitOf(f), max = lm ? Math.min(max0, lm) : max0;
     if (lm && v > max) { v = max; el.value = String(max); capped.push(label + ' ' + de(max, 0) + ' ' + f[2]); }
-    if (isNaN(v) || v < min || v > max) { bad.push(label + ' (' + de(min, min < 1 ? 2 : 0) + '–' + de(max, 0) + ')'); continue; }
+    if (isNaN(v) || v < min || v > max) { bad.push(label + ' (' + de(min, min < 1 ? 2 : 0) + '–' + de(max, 0) + ')'); badEls.push(el); continue; }
     // auf die Schrittweite des Felds runden (Schichthöhe 0,02 mm, Rückzug 0,1 mm – bisher wurde alles außer der
     // Schichthöhe ganzzahlig, aus 1,3 mm Rückzug wurde 1 mm)
     const dec = step > 0 && step < 1 ? Math.min(3, String(step).split('.')[1].length) : 0;
     out[k] = Math.round(v * 10 ** dec) / 10 ** dec;
   }
-  if (bad.length) { alert(t('Bitte prüfen: {list}', { list: bad.join(', ') })); return null; }
+  if (bad.length) { formError(t('Bitte prüfen: {list}', { list: bad.join(', ') }), $('ovRows'), badEls); return null; }
   if (capped.length) toast(t('Maximum des Druckers: {list}', { list: capped.join(', ') }));
   return out;
 }

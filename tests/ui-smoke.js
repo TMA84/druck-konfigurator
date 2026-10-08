@@ -222,7 +222,7 @@ async function runSmoke(opts={}){
   ok($('matBadge').textContent==='Eigene Werte'&&$('material').selectedOptions[0].textContent.startsWith('★'),'Eigene Werte gespeichert (★, Badge)');
   ok(document.querySelector('#settings .ks .ks-v').textContent==='219 °C','Kennwert zeigt 219 °C');
   menuClick('editMat');$('ed_maxVol').value='abc';$('edSave').click();
-  ok(alerts.some(a=>a.includes('Volumengeschwindigkeit'))&&$('editor').open,'Ungültige Eingabe wird abgelehnt');
+  ok(/Volumengeschwindigkeit/.test(($('edFoot').previousElementSibling||{}).textContent||'')&&$('editor').open&&!alerts.length,'Ungültige Eingabe wird abgelehnt – Hinweis im Dialog, kein Browser-Fenster');
   $('edCancel').click();
   document.querySelector('[data-action="profiles"]').click();
   ok($('profilesDlg').open&&$('myList').textContent.includes('Anycubic PLA High Speed'),'Meine Profile listet Überschreibung');$('profilesDlg').close();
@@ -252,7 +252,7 @@ async function runSmoke(opts={}){
 
   /* 11) Düsen-Umrechnung */
   menuClick('settingsBtn');$('st_off').value='99';$('edSave').click();
-  ok(alerts.some(a=>a.includes('gültige Werte')),'Düsen-Umrechnung: ungültiger Wert abgelehnt');
+  ok(/gültige Werte/.test(($('edFoot').previousElementSibling||{}).textContent||'')&&$('st_off').classList.contains('bad-input')&&!alerts.length,'Düsen-Umrechnung: ungültiger Wert abgelehnt, Feld markiert');
   $('st_off').value='6';$('edSave').click();sel('nozM','brass');
   ok($('warning').innerHTML.includes('6 °C'),'Düsen-Umrechnung wirkt (−6 °C bei Messing)');
   menuClick('settingsBtn');$('stReset').click();$('edSave').click();sel('nozM','steel_hardened');
@@ -395,6 +395,24 @@ async function runSmoke(opts={}){
     $('exportDlg').close();store.settings.printerHosts=opts.hosts;persist();
   }
 
+  /* 13a) Anordnen nach Grundfläche (js/nest.js, Web Worker): zwei Dreiecke 220 mm passen ineinander auf eine Platte */
+  { const L=220,tri=[[0,0],[L,0],[0,L]],h=5,T=[];
+    T.push([[0,0,0],[0,L,0],[L,0,0]],[[0,0,h],[L,0,h],[0,L,h]]);
+    tri.forEach((a,k)=>{const b=tri[(k+1)%3];T.push([[...a,0],[...b,0],[...b,h]],[[...a,0],[...b,h],[...a,h]])});
+    const triFile=n=>{const buf=new ArrayBuffer(84+T.length*50),dv=new DataView(buf);dv.setUint32(80,T.length,true);T.forEach((t,i)=>t.flat().forEach((c,j)=>dv.setFloat32(84+i*50+12+j*4,c,true)));return new File([buf],n)};
+    await dropFile(triFile('dreieck-a.stl'),triFile('dreieck-b.stl'));await wait(200);
+    const busy=nestBusy();
+    for(let i=0;i<150&&nestBusy();i++)await wait(100);
+    ok(!nestBusy()&&projectLayout(plTpl()).count===1,'Zwei Dreiecke 220 mm: im Hintergrund ineinander gelegt, eine Platte'+(busy?' (Worker)':' (sofort)'));
+    const lay=projectLayout(plTpl());ok(Math.abs(lay.places[0].ang-lay.places[1].ang)===180,'gegeneinander gedreht');
+    renderPlates();ok(document.querySelectorAll('#plateList .plate-svg path[data-pick]').length===2&&!$('plateNestBusy').textContent,'Draufsicht mit Umrissen, kein „ordne an“ mehr');
+    // Warteschlange desselben Projekts mit mehr Platten: Hinweis, neu anlegen nur solange nichts gedruckt ist
+    queueRelayoutHint({name:project.name,items:[{plate:1,state:'wait'},{plate:2,state:'wait'}]},null);
+    ok(!$('queueRelayout').classList.contains('hidden')&&/1 statt 2 Platten/.test($('queueRelayout').textContent)&&!!$('queueRelayoutGo'),'Warteschlange: „1 statt 2 Platten“ mit „neu anlegen“');
+    queueRelayoutHint({name:project.name,items:[{plate:1,state:'done'},{plate:2,state:'wait'}]},null);
+    ok(!$('queueRelayoutGo')&&/Gedruckte Teile/.test($('queueRelayout').textContent),'nach gedruckter Platte: nur Hinweis, gedruckte Teile entfernen');
+    queueRelayoutHint({name:'anderes.stl',items:[{plate:1,state:'wait'},{plate:2,state:'wait'}]},null);
+    ok($('queueRelayout').classList.contains('hidden'),'andere Warteschlange: kein Hinweis'); }
   /* 13b) Seit 8.3/9.x: Platten, Kopien, Modell hinzufügen, Slot-Wahl, Werte je Auftrag, Spulen, Sprache/Darstellung */
   {
     const mk=(n,x,y,z)=>stlFile(n,[[0,0,0,x,y,z]]);
@@ -557,6 +575,9 @@ async function runSmoke(opts={}){
       ok((P.overrides||{}).sp_fill===600&&lastResult.sp_fill===600,'Eingabe 800 mm/s → 600 gespeichert');
       const li=$('ovRows').querySelector('[data-lim="speed"]');li.value='150';li.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
       ok(lastResult.limits.speed===150&&lastResult.sp_outer<=150&&lastResult.sp_fill===150&&store.settings.printerLimits.kobra_s1.speed===150,'eigenes Maximum 150 mm/s gilt für alle Tempo-Werte');
+      li.value='';li.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+      const lv=$('ovRows').querySelector('[data-lim="vol"]');lv.value='9';lv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+      ok(lastResult.limits.vol===9&&lastResult.maxVol<=9,'eigenes Hotend-Maximum 9 mm³/s begrenzt den Volumenstrom');
       store.settings.printerLimits=JSON.parse(L0);P.overrides=ov0;update();await wait(100);
       ok(lastResult.limits.speed===600,'eigenes Maximum zurückgesetzt'); }
     { const rl=$('ovRows').querySelector('[data-ov="retr_len"]'),fa=$('ovRows').querySelector('[data-ov="fan_aux"]'),fb=$('ovRows').querySelector('[data-ov="fan_box"]');

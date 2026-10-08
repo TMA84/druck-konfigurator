@@ -72,5 +72,25 @@ vm.runInContext('setPackGap(15)', ctx);
 r = K.arrangeParts([T, T], tpl);
 { const A = placed(T, tri, r.places[0]), C = placed(T, tri, r.places[1]); check('Abstand 15 mm eingehalten', r.plateCount === 1 && polyDist(A, C) >= 15 - 0.01, [r.plateCount, polyDist(A, C)]); }
 vm.runInContext('setPackGap(PART_GAP_MM)', ctx);
+// 7) Brim zählt mit: je 5 mm Brim → Abstand der Teile ≥ 8 + 5 + 5 mm; Brim bleibt auf dem Bett
+r = K.arrangeParts([T, T], tpl, null, [5, 5]);
+{ const A = placed(T, tri, r.places[0]), C = placed(T, tri, r.places[1]), grow = P => P;
+  check('Brim 5 mm: Abstand ≥ 18 mm', r.plateCount === 1 && polyDist(A, C) >= 18 - 0.01, [r.plateCount, polyDist(A, C)]);
+  const inBed5 = P => P.every(([x, y]) => x >= 5 - 0.01 && y >= 5 - 0.01 && x <= 245.01 && y <= 245.01);
+  check('Brim 5 mm bleibt auf dem Bett', inBed5(A) && inBed5(C), [A, C]); }
+// Rechteck-Verfahren mit Brim: zwei Quader 115 mm passen ohne Brim nebeneinander, mit 5 mm Brim nicht mehr
+const Q = prism('Q', [[0, 0], [115, 0], [115, 115], [0, 115]], 5);
+check('Quader 115 mm ohne Brim: 4 auf einer Platte', K.arrangeParts([Q, Q, Q, Q], tpl).plateCount === 1);
+check('Quader 115 mm mit 5 mm Brim: mehr Platten', K.arrangeParts([Q, Q, Q, Q], tpl, null, [5, 5, 5, 5]).plateCount > 1);
+
+// 8) Leiste 300 × 20 mm passt nur schräg (45°) aufs 250er-Bett
+const Bar = prism('Leiste', [[0, 0], [300, 0], [300, 20], [0, 20]], 5);
+r = K.arrangeParts([Bar], tpl);
+{ const P = placed(Bar, [[0, 0], [300, 0], [300, 20], [0, 20]], r.places[0]);
+  check('Leiste 300 mm: schräg gelegt, nicht „zu groß“', r.places[0].ang % 90 !== 0 && r.oversize.length === 0, [r.places[0].ang, r.oversize]);
+  check('Leiste liegt ganz auf dem Bett', inBed(P), P); }
+const tr45 = vm.runInContext("placeTransform({ang:45,x:10,y:20}, 1)", ctx).split(' ').map(Number);
+check('3MF-Matrix 45°: cos/sin', Math.abs(tr45[0] - Math.SQRT1_2) < 1e-6 && Math.abs(tr45[1] - Math.SQRT1_2) < 1e-6 && Math.abs(tr45[3] + Math.SQRT1_2) < 1e-6 && tr45[9] === 10, tr45);
+
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

@@ -208,7 +208,7 @@ function openPurgeSettings(){
 $('pgFlush').addEventListener('change',renderPurgeModel);
 $('pgSave').addEventListener('click',()=>{
   const g=$('pgGrams').value.trim(),s=$('pgSeconds').value.trim(),gn=g?num(g):0,sn=s?num(s):0;
-  if(isNaN(gn)||gn<0||gn>20||isNaN(sn)||sn<0||sn>900){alert(t('Bitte gültige Werte eingeben (Abfall 0–20 g, Zeit 0–900 s je Wechsel) oder leer lassen.'));return}
+  if(isNaN(gn)||gn<0||gn>20||isNaN(sn)||sn<0||sn>900){formError(t('Bitte gültige Werte eingeben (Abfall 0–20 g, Zeit 0–900 s je Wechsel) oder leer lassen.'),$('pgSave').parentElement,[$('pgGrams'),$('pgSeconds')]);return}
   store.settings.aceFlush=+$('pgFlush').value;
   store.settings.acePurgeOwn=gn>0||sn>0?{grams:gn,seconds:sn}:null;
   persist();$('purgeDlg').close();
@@ -271,7 +271,9 @@ function exportBytes(defaultSlot){
     :build3mf(tpl,plan.r,plan.jobs,plan.slot,fflate,live,exportMachine(tpl));
   return {bytes,plan,tpl,notes:(notes||[]).filter(n=>/Reinigungsturm|prime tower/i.test(n))};
 }
-function save3mf(){
+async function save3mf(){
+  // Anordnung nach Grundfläche läuft noch im Hintergrund (js/nest.js): erst fertig rechnen, dann exportieren
+  if(typeof nestBusy==='function'&&nestBusy()){$('export3mfSave').disabled=true;await nestIdle();$('export3mfSave').disabled=false}
   const plan=exportPlan(chosenSlot()),r=plan.r,slot=plan.slot;
   try{
     const {bytes,notes:towerNotes}=exportBytes(chosenSlot());
