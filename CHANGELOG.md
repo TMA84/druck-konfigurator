@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.5] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Riemenlauf:** Der Riemen liegt außen an den Rollen an statt durch ihre Mitte zu laufen – jede Rolle sitzt so, dass beide Riemenstücke sie tangential berühren (geprüft: Abstand Mitte–Riemen = Radius); die Umkehr vorn ist eine Rolle mit Durchmesser = Strangabstand, am Motor läuft der Riemen außen ums Ritzel.
+- **3D-Fortschritt, Eckwagen:** Das schwarze Gehäuse umfasst die Enden beider X-Stangen.
+
 ## [10.36.4] – 2026-10-08
 
 ### Verbessert

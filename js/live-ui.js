@@ -228,7 +228,7 @@ function lvHeadInit() {
     box(34, cd, 3, xr + inner * 9, cmid, LV_BELT_Z.B - LV_BELT_H / 2 - 4);                    // Bodenplatte unter den Rollen
     box(34, cd, 3, xr + inner * 9, cmid, LV_BELT_Z.A + LV_BELT_H / 2 + 6);                    // Deckplatte über den Rollen
     box(3, cd, LV_BELT_Z.A - LV_BELT_Z.B + LV_BELT_H + 10, xr - inner * 7, cmid, (LV_BELT_Z.A + LV_BELT_Z.B) / 2 + 1);   // Außenwand
-    box(10, 12, LV_ROD_Z[1] + 8, xr + inner * 4, 0, LV_ROD_Z[1] / 2);                          // Halter der X-Stangen
+    box(24, 22, LV_ROD_Z[1] + 2 * LV_ROD_R + 10, xr + inner * 6, 0, LV_ROD_Z[1] / 2);        // umfasst die Enden beider X-Stangen
     beam.add(car); }
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
@@ -388,9 +388,27 @@ function lvBeltSet(b, px, py) {
   let si = 0, ri = 0, mat = 0;
   const ends = [];
   for (const n of b.paths(px, py)) {
+    /* Rollen so, dass der Riemen außen anliegt (beide Stücke tangential): an einer Ecke um R / cos(Knick/2) nach innen;
+       zwei Ecken mit kurzem Stück dazwischen in dieselbe Richtung (Umkehr 180°) = eine Rolle, Durchmesser = Strangabstand */
+    const R = LV_ROLL_R, dir = (p, q) => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, l]; };
+    const at = [0]; for (let k = 0; k < n.length - 1; k++) at.push(at[k] + Math.hypot(n[k + 1][0] - n[k][0], n[k + 1][1] - n[k][1]));
+    for (let k = 1; k < n.length - 1; k++) {
+      const r = b.rolls[ri++], a = dir(n[k - 1], n[k]), c = dir(n[k], n[k + 1]), turn = a[0] * c[1] - a[1] * c[0];
+      if (k + 1 < n.length - 1) {
+        const e = dir(n[k + 1], n[k + 2]);
+        if (c[2] < 2 * R * 1.6 + 6 && Math.sign(turn) === Math.sign(c[0] * e[1] - c[1] * e[0])) {
+          const half = c[2] / 2, nx = -c[1] * Math.sign(turn), ny = c[0] * Math.sign(turn);   // nach innen (Seite der Kurve)
+          r.position.set((n[k][0] + n[k + 1][0]) / 2 + nx * half, (n[k][1] + n[k + 1][1]) / 2 + ny * half, b.z);
+          r.scale.set(half / R, 1, half / R); r.visible = true; r.rotation.y = -at[k] / half;
+          const r2 = b.rolls[ri++]; r2.visible = false; k++; continue;
+        }
+      }
+      const bx = c[0] - a[0], by = c[1] - a[1], bl = Math.hypot(bx, by) || 1, cosHalf = Math.max(0.2, Math.sqrt((1 + a[0] * c[0] + a[1] * c[1]) / 2));
+      r.position.set(n[k][0] + bx / bl * R / cosHalf, n[k][1] + by / bl * R / cosHalf, b.z);
+      r.scale.set(1, 1, 1); r.visible = true; r.rotation.y = -at[k] / R;
+    }
     for (let k = 0; k < n.length - 1; k++) {
       const [x0, y0] = n[k], [x1, y1] = n[k + 1], len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0)), mesh = b.segs[si++];
-      if (k > 0) { const r = b.rolls[ri++]; r.position.set(x0, y0, b.z); r.rotation.y = -mat / LV_ROLL_R; }
       mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, b.z); mesh.rotation.z = Math.atan2(y1 - y0, x1 - x0); mesh.scale.set(len, LV_BELT_T, LV_BELT_H);
       const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = mat / LV_BELT_PITCH;
       mat += len;
@@ -415,9 +433,11 @@ function lvMechInit(md, g) {
   } else {
     /* CoreXY: zwei Riemen übereinander. A (oben): rechter Motor → vorn rechts → Eckwagen rechts → Kopf; vom Kopf → Eckwagen links
        → hinten links → rechter Motor. B (unten) gespiegelt mit dem linken Motor. Linienzüge ab der Klemme am Kopf. */
-    const { mxL, mxR, my, yF } = lv.xy;
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py - 9], [mxL + LV_BELT_GAP, py - 9], [mxL + LV_BELT_GAP, my], [mxR, my]], [[mxR, my], [mxR, yF], [mxR - LV_BELT_GAP, yF], [mxR - LV_BELT_GAP, py - 9], [px + 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 1 });
-    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 9], [mxR - LV_BELT_GAP, py - 9], [mxR - LV_BELT_GAP, my], [mxL, my]], [[mxL, my], [mxL, yF], [mxL + LV_BELT_GAP, yF], [mxL + LV_BELT_GAP, py - 9], [px - 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 0 });
+    const { mxL, mxR, my, yF } = lv.xy, M = LV_MOTOR_R, G = LV_BELT_GAP;
+    // am Motor läuft der Riemen außen ums Ritzel: hinterer Strang bei my + M, Strang nach vorn bei Motor ± M
+    const yb = my + M, xRo = mxR + M, xLo = mxL - M;
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.A, (px, py) => [[[px - 12, py - 9], [mxL + G, py - 9], [mxL + G, yb], [xRo, yb]], [[xRo, yb], [xRo, yF], [mxR - G, yF], [mxR - G, py - 9], [px + 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 1 });
+    lv.belts.push({ b: lvBelt(lv.gantry, LV_BELT_Z.B, (px, py) => [[[px + 12, py - 9], [mxR - G, py - 9], [mxR - G, yb], [xLo, yb]], [[xLo, yb], [xLo, yF], [mxL + G, yF], [mxL + G, py - 9], [px - 12, py - 9]]]), go: p => [p.x, p.y + LV_BEAM_DY], motor: 0 });
   }
   // Schleppkette: Glieder entlang einer Kurve vom Rahmen hinten oben zum Kopf
   const link = new THREE.BoxGeometry(9, 7, 13),   // lange Seite entlang z: lookAt richtet z auf die Kurve
