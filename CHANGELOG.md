@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.4] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Filamenteinzug im ACE:** Die Spulen liegen in einer Wanne; das Filament läuft unten vom Wickel ab und hinten unten in den Einzug mit Trichter (Strang in Spulenfarbe, folgt der Restmenge).
+- **Zusammenführung → Druckkopf:** Von der Zusammenführung hinten führt ein Schlauch durch die Rückwand zur Kette und weiter zum Kopf, mit Filament in der aktuellen Druckfarbe.
+- **Zoom beim Laden:** Die 3D-Ansicht zoomt beim Laden so, dass alles Sichtbare (Drucker, Gehäuse, ACE) im Bild ist.
+- **Gehäuse und ACE standardmäßig eingeblendet:** Beide sind in der 3D-Ansicht von Anfang an sichtbar und lassen sich weiter abschalten.
+- **ACE-Hauben besser sichtbar:** Die klaren Hauben haben eine kräftigere Tönung und hellere Kanten.
+
 ## [10.39.3] – 2026-10-08
 
 ### Verbessert

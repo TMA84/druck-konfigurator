@@ -142,6 +142,7 @@ function lvBuild() {
   lv.controls.target.set(0, 0, top / 3); lv.controls.update();
   lv.shown = -2; lv.shownDone = null; lv.track = null; lv.hs = null; lv.dirty = null; lv.disp = null; lv.skip = null; lv.skipKey = null;
   lvHeadInit();
+  lv.fitPending = true;   // Zoom auf alles, sobald Kopf und Mechanik zum ersten Mal stehen (lvPlaceHead)
   lvTheme();
 }
 
@@ -528,11 +529,24 @@ function lvCornerHousings() {
     const post = new THREE.Mesh(new THREE.BoxGeometry(8, 8, z1 - z0), black); post.position.set(px, py, (z0 + z1) / 2); lv.gantry.add(post);
   }
 }
-/* Gehäuse und ACE (2026-10-08, zuschaltbar, Standard aus – Schalter unten links): Gehäuse aus Seiten- und Rückwand,
+/* Gehäuse und ACE (2026-10-08, zuschaltbar, Standard an – Schalter unten links): Gehäuse aus Seiten- und Rückwand,
    Glastür vorn und Glasdeckel oben (durchscheinend, die Mechanik bleibt sichtbar). Daneben die ACE-Pro-Einheiten
    (370 × 290 × 240 mm, klare Haube, je 4 Spulen in den Farben der Slots aus dem Druckerstand), von jedem Slot ein PTFE-Schlauch mit
    Filament zum Verteiler hinten oben am Drucker. Beides hängt am Rahmen (fährt relativ zum Teil in Z mit). */
 const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64, gap: 150 }, LV_SPOOL_CORE = 30;
+// Kamera so weit zurück, dass alles Sichtbare (Bett, Mechanik, Gehäuse, ACE) ins Bild passt – gleiche Blickrichtung
+function lvFitAll() {
+  if (!lv.gantry) return;
+  lv.scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3(), tmp = new THREE.Box3();
+  lv.scene.traverseVisible(o => { if ((o.isMesh || o.isLineSegments) && !o.isPoints && o.geometry) {
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); if (isFinite(tmp.min.x)) bb.union(tmp); } });
+  if (bb.isEmpty()) return;
+  const c = bb.getCenter(new THREE.Vector3()), r = bb.getSize(new THREE.Vector3()).length() / 2, cam = lv.camera;
+  const fv = cam.fov * Math.PI / 360, fh = Math.atan(Math.tan(fv) * (cam.aspect || 1)), dist = r / Math.sin(Math.min(fv, fh)) * 0.75;
+  const dir = cam.position.clone().sub(lv.controls.target).normalize();
+  lv.controls.target.copy(c); cam.position.copy(c).add(dir.multiplyScalar(dist)); cam.far = Math.max(cam.far, dist * 4); cam.updateProjectionMatrix(); lv.controls.update();
+}
 function lvEnclosureInit(g) {
   const { fx0, fx1, fy0, fy1, top } = lv.xy, fh = lv.frameH, bot = top - fh, cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
   const x0 = fx0 - 12, x1 = fx1 + 12, y0 = fy0 - 12, y1 = fy1 + 12, z0 = bot - 40, z1 = top + 40;
@@ -547,12 +561,12 @@ function lvEnclosureInit(g) {
   for (const [w, h, x, z] of [[x1 - x0, 15, cx, z1 - 7], [15, z1 - z0 - 30, x0 + 7, (z0 + z1) / 2 + 15], [15, z1 - z0 - 30, x1 - 7, (z0 + z1) / 2 + 15]]) box(w, 6, h, x, y0, z, rim);   // Türrahmen
   box(x1 - x0, y1 - y0, 3, cx, cy, z1, glass);                                                                         // Glasdeckel
   box(x1 - x0, 12, 6, cx, y0 + 6, z1, rim); box(x1 - x0, 12, 6, cx, y1 - 6, z1, rim);
-  enc.visible = !!store.settings.liveEnclosure; lv.gantry.add(enc); lv.enclosureG = enc;
+  enc.visible = store.settings.liveEnclosure !== false; lv.gantry.add(enc); lv.enclosureG = enc;
   // ACE-Einheiten oben auf dem Deckel, Spulen in Slotfarbe, Schläuche zum Verteiler hinten oben
   /* neben dem Drucker (rechts, LV_ACE.gap Abstand), auf derselben Standfläche, übereinander; klare, gerundete Haube */
   const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx, y1 + 18, z1 - 20), ax = x1 + A.gap + A.w / 2;
   const body = new THREE.MeshStandardMaterial({ color: 0x2d3236, roughness: 0.5 });
-  const lid = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
+  const lid = new THREE.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
   const hood = (() => {   // Profil (y, z): Rechteck mit großen Radien oben, entlang x extrudiert
     const sh = new THREE.Shape(), d = A.d / 2, h = A.h - 90, r = 55;
     sh.moveTo(-d, 0); sh.lineTo(d, 0); sh.lineTo(d, h - r); sh.quadraticCurveTo(d, h, d - r, h); sh.lineTo(-d + r, h); sh.quadraticCurveTo(-d, h, -d, h - r); sh.lineTo(-d, 0);
@@ -564,9 +578,11 @@ function lvEnclosureInit(g) {
   lv.aceSpools = [];
   for (let u = 0; u < 2; u++) {
     const uz = z0 + u * (A.h + 6), unit = new THREE.Group(); unit.position.set(ax, cy, uz); ace.add(unit);
-    const b1 = new THREE.Mesh(new THREE.BoxGeometry(A.w, A.d, 90), body); b1.position.z = 45; unit.add(b1);
+    // Unterteil als Wanne: Boden, Front, Rückteil mit den Einzügen, Seiten – die Spulen liegen darin, der Einzug unten bleibt sichtbar
+    for (const [w, d, h, x, y, z] of [[A.w, A.d, 18, 0, 0, 9], [A.w, A.d / 2 - 100, 90, 0, -(A.d / 2 + 100) / 2, 45], [A.w, A.d / 2 - 100, 90, 0, (A.d / 2 + 100) / 2, 45],
+      [12, 200, 90, -A.w / 2 + 6, 0, 45], [12, 200, 90, A.w / 2 - 6, 0, 45]]) { const b1 = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), body); b1.position.set(x, y, z); unit.add(b1); }
     const b2 = new THREE.Mesh(hood, lid); b2.position.z = 90; b2.renderOrder = 7; unit.add(b2);   // klare Haube
-    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xe8f4fa, transparent: true, opacity: 0.55 })); he.position.z = 90; unit.add(he);   // Kanten der Haube
+    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.9 })); he.position.z = 90; unit.add(he);   // Kanten der Haube
     const front = new THREE.Mesh(new THREE.BoxGeometry(A.w * 0.5, 4, 22), new THREE.MeshStandardMaterial({ color: 0x15181a })); front.position.set(0, -A.d / 2 - 1, 28); unit.add(front);
     for (let k = 0; k < 4; k++) {
       const sx = (k - 1.5) * (A.w - 40) / 4, sp = new THREE.Group(); sp.position.set(sx, 0, 20 + A.spoolR); unit.add(sp);
@@ -581,16 +597,28 @@ function lvEnclosureInit(g) {
       lbl.rotation.x = Math.PI / 2; lbl.position.set(sx, -A.d / 2 - 2.5, 70); unit.add(lbl);
       for (const s2 of [-1, 1]) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR, A.spoolR, 2, 32), new THREE.MeshStandardMaterial({ color: 0x1b1e20, roughness: 0.5, transparent: true, opacity: 0.85 })); fl.rotation.z = Math.PI / 2; fl.position.x = s2 * A.spoolW / 2; sp.add(fl); }
       // Schlauch vom Slot (hinten am ACE) zum Verteiler, Filament darin in Slotfarbe
-      const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 60), mid = new THREE.Vector3((ax + sx + hub.x) / 2, y1 + 60, Math.max(uz + 60, z1 + 30));
+      const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 30), mid = new THREE.Vector3((ax + sx + hub.x) / 2, y1 + 60, Math.max(uz + 60, z1 + 30));
       const curve = new THREE.CatmullRomCurve3([out, mid, hub.clone().add(new THREE.Vector3((k - 1.5) * 3, 0, u * 6))]);
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
       const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
       tube.renderOrder = 8; ace.add(fline, tube);
-      lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null });
+      // Einzug hinten unten in der Wanne (Trichter zeigt nach vorn); das Filament läuft unten vom Wickel ab hinein (lvAceColours)
+      const inlet = new THREE.Vector3(sx, 100 - 4, 30);
+      const feed = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 22), new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.5 })); feed.position.set(sx, 100 - 4, 30); unit.add(feed);
+      const funnel = new THREE.Mesh(new THREE.CylinderGeometry(6, 2.5, 8, 16), new THREE.MeshStandardMaterial({ color: 0xc9a14a, metalness: 0.4, roughness: 0.4 }));
+      funnel.position.set(sx, 100 - 12, 30); funnel.rotation.x = Math.PI; unit.add(funnel);
+      const strand = new THREE.Mesh(new THREE.BufferGeometry(), fm); unit.add(strand);
+      lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null,
+        strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, 100 - 16, 30), k: null });
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(40, 20, 30), body); hubM.position.copy(hub); ace.add(hubM);
-  ace.visible = !!store.settings.liveAce; lv.gantry.add(ace); lv.aceG = ace;
+  // Zusammenführung → ein Schlauch durch die Rückwand zum Kettenanfang, dort geht er im Kopfschlauch weiter (Filament in Druckfarbe)
+  const an = lv.mechAnchor, aS = new THREE.Vector3(an.x, an.y + 9, an.z);
+  const hc = new THREE.CatmullRomCurve3([hub.clone().add(new THREE.Vector3(0, -10, 0)), new THREE.Vector3((hub.x + aS.x) / 2, y1 - 8, (hub.z + aS.z) / 2 + 20), aS], false, 'centripetal');
+  const ht = new THREE.Mesh(new THREE.TubeGeometry(hc, 30, 2.4, 10), lv.tubeM); ht.renderOrder = 8;
+  ace.add(ht, new THREE.Mesh(new THREE.TubeGeometry(hc, 30, 0.9, 6), lv.filM));
+  ace.visible = store.settings.liveAce !== false; lv.gantry.add(ace); lv.aceG = ace;
   lvAceColours(typeof wb !== 'undefined' && wb.st);
 }
 // Spulenfarben aus dem Druckerstand (st.ace: Einheiten mit Slots), fehlende Spulen ausgeblendet, zweite Einheit nur, wenn gemeldet
@@ -606,6 +634,13 @@ function lvAceColours(st) {
     const pct = rec && rec.net_g > 0 ? Math.max(0, Math.min(1, rec.remaining_g / rec.net_g)) : (on ? 1 : 0);
     const full = LV_ACE.spoolR - 14, k = (LV_SPOOL_CORE + 2 + (full - LV_SPOOL_CORE - 2) * pct) / full;
     sp.filMesh.scale.set(k, 1, k);
+    sp.strand.visible = on;
+    if (on && k !== sp.k) {   // Strang läuft unten vom Wickel ab (untere Tangente zum Einzug) und hinten unten in den Einzug
+      sp.k = k;
+      const rw = full * k, dy = sp.inlet.y - sp.spoolC.y, dz = sp.inlet.z - sp.spoolC.z;
+      const a = Math.atan2(dz, dy) - Math.acos(Math.min(1, rw / Math.hypot(dy, dz))), from = new THREE.Vector3(sp.spoolC.x, sp.spoolC.y + Math.cos(a) * rw, sp.spoolC.z + Math.sin(a) * rw);
+      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(new THREE.LineCurve3(from, sp.inlet), 4, 0.9, 6);
+    }
     const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';
     sp.lbl.visible = !!txt;
     if (txt !== sp.txt) {
@@ -660,11 +695,11 @@ function lvMechInit(md, g) {
   lv.tubeM = new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
   lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
   lv.tube = null; lv.fil = null;
-  if (md.kin !== 'bed') { lvCornerHousings(); lvEnclosureInit(g); }
-  lvFansInit(md, g);
   // Kette: CoreXY vom Rahmen hinten links (großer Bogen über die linke Seite), Bettschubser vom oberen Querholm
   lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true, xmin: bx0 - m }
     : { x: (lv.xy.mL[0] + lv.xy.mR[0]) / 2 - 40, y: lv.xy.fy1 - 30, z: LV_ROD_Z[1] + 30, fixed: false, xmin: lv.xy.fx0 + 25 };   // hinten zwischen den Motoren
+  if (md.kin !== 'bed') { lvCornerHousings(); lvEnclosureInit(g); }
+  lvFansInit(md, g);
 }
 /* Lüfter mit Luftstrom (2026-10-08): Bauteillüfter am Kopf (bläst von beiden Seiten zur Düse), Seitenlüfter rechts an der
    Gehäusewand (flacher Fächer übers Bett) und Gehäuselüfter hinten (nach außen) – Stärke und Tempo des Luftstroms nach den gemeldeten
@@ -828,6 +863,7 @@ function lvPlaceHead(p) {
   if (lv.kin === 'bed') { lv.gantry.position.y = p.y; lv.gantry.userData.beam.position.y = 0; if (lv.frameFixed) { lv.frameFixed.position.y = p.y; lv.frameFixed.visible = lv.head.visible; } }
   else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y + LV_BEAM_DY; }
   lvMechUpdate(p);
+  if (lv.fitPending && lv.head.visible) { lv.fitPending = false; lvFitAll(); }
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
 function lvVisible(rgb) {
@@ -1233,7 +1269,7 @@ $('wbLiveGhost').value = lvGhostMode();
 $('wbLiveGhost').addEventListener('change', e => { store.settings.liveGhost = e.currentTarget.value; persist(); lvGhostApply(); });
 $('wbLivePos').checked = livePosOn();
 for (const [id, key, grp] of [['wbLiveEnc', 'liveEnclosure', 'enclosureG'], ['wbLiveAce', 'liveAce', 'aceG']]) {
-  $(id).checked = !!store.settings[key];
+  $(id).checked = store.settings[key] !== false;
   $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; lvRender(); } });
 }
 $('wbLivePos').addEventListener('change', e => {
