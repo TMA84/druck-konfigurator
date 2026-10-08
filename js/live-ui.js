@@ -410,9 +410,11 @@ function lvFansInit(md, g) {
      flachen Fächer quer übers Bett; Gehäuselüfter hinten links der Mitte (Gitter), etwa auf halber Bauraumhöhe */
   const { fx1, fy1, top } = lv.xy, cx = g.cx, cy = g.cy || 0, zAux = 22 - LV_GANTRY_Z, zBox = top - 200;   // Düse ≈ 22 mm über der Düsenspitze: liegt immer über dem Bett
   const dark = new THREE.MeshStandardMaterial({ color: 0x1c2023, roughness: 0.6 }), side = new THREE.Group();
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(30, 110, 110), dark); housing.position.set(fx1 - 25, cy, zAux - 47); side.add(housing);
-  const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 52); side.add(wheel);
-  { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 52); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(30, 110, 110), dark); housing.position.set(fx1 - 25, cy, zAux - 150); side.add(housing);
+  // Kanal vom tiefer sitzenden Lüfter hoch zur Düse (Düse bleibt auf Kopfhöhe)
+  const duct = new THREE.Mesh(new THREE.BoxGeometry(26, 70, 102), dark); duct.position.set(fx1 - 30, cy, zAux - 45); side.add(duct);
+  const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 155); side.add(wheel);
+  { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 155); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
   const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 52, cy, zAux); side.add(slot);   // flache Düse
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(84, 6), new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
