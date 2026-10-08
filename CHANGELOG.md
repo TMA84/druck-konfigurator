@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.30.0] – 2026-10-08
 
 ### Neu
 - **Höchstwerte je Drucker:** Höchstgeschwindigkeit und Druckbeschleunigung aus dem Orca-Maschinenprofil (machine_max_speed_x/y, machine_max_acceleration_extruding; normaler Modus) – Kobra S1 600 mm/s / 20 000 mm/s², Snapmaker U1 500 mm/s / 20 000 mm/s², alle Orca-Drucker aus ihrem Profil. Kein Tempo-Wert (Wände, Füllung, obere Fläche, Lückenfüllung, erste Schicht, Travel, Brücken) und keine Beschleunigung geht darüber – weder Vorschlag noch Anpassung noch eigener Standard; Eingaben darüber werden auf das Maximum gesetzt, das Datenblatt sagt es. Eigene Höchstwerte je Drucker oben im Reiter Tempo („Maximum dieses Druckers“).
