@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.27.3] – 2026-10-08
 
 ### Behoben
 - **Warteschlange anlegen dauerte lange ohne Rückmeldung:** Der Server baute beim Anlegen für jede Platte die Vorschau und kopierte alle G-Codes (7 Platten × ~18 MB). Jetzt antwortet er sofort und sichert die Platten im Hintergrund – verknüpft statt kopiert, Vorschauen erst bei Bedarf. Der Knopf zeigt „Warteschlange wird angelegt …“.
