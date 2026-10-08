@@ -173,7 +173,7 @@ function lvBed() {
 }
 function lvHeadInit() {
   for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG', 'zArms']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
-  lv.motorCaps = []; lv.zScrews = [];
+  lv.motorCaps = []; lv.zScrews = []; lv.zDrive = null;
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
@@ -275,6 +275,8 @@ function lvHeadInit() {
     // reichen bis 12 mm über die Düsenspitze: auch beim höchsten Bettstand (erste Schicht) geht die Spindel durch die Mutter
     const zTop = -LV_GANTRY_Z + 12, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
     sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc); }
+  // Z-Antrieb unten im Gehäuse: Motor hinten rechts, geschlossener Zahnriemen über die Ritzel der drei Spindeln und des Motors
+  lv.zDrive = lvZDrive(frame, zs.concat([[cx + 95, by1 + zy - 6]]), top - fh + 30, motor);
   lv.zArms = new THREE.Group();
   const armM = mat(0x3a4146, { r: 0.55 }), nutM = mat(0xc9a14a, { m: 0.5, r: 0.35 });
   for (const [x, y] of zs) {
@@ -317,6 +319,50 @@ function lvLeadScrew(r, len) {
     g.add(new THREE.Mesh(new THREE.TubeGeometry(new LvHelix(r - 0.75, len, turns, k / LV_SCREW_STARTS * Math.PI * 2), Math.ceil(turns * 14), 0.62, 5), steelM));
   lv.zScrews.push(g);
   return g;
+}
+/* Z-Antrieb (2026-10-08): geschlossener Riemen unten im Gehäuse um die Ritzel (Achse z) an pts (Spindeln + Motor, letzter
+   Punkt = Motor). Der Riemen läuft außen um die konvexe Hülle: gerade Stücke tangential, Bögen um die Ritzel. Dreht mit der
+   Höhe (lvZDriveSet): eine Spindel-Umdrehung je LV_SCREW_LEAD mm, Riemenweg = Winkel × Ritzelradius. */
+function lvZDrive(parent, pts, z, motorM) {
+  const r = LV_MOTOR_R, cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  const ring = pts.map((p, i) => ({ p, i, a: Math.atan2(p[1] - cy, p[0] - cx) })).sort((u, v) => u.a - v.a);   // gegen den Uhrzeigersinn
+  const pulleys = [], segs = [], box = new THREE.BoxGeometry(1, 1, 1);
+  for (const { p, i } of ring) {
+    const pu = lvMotorPulley(); pu.rotation.x = Math.PI / 2; pu.position.set(p[0], p[1], z); parent.add(pu); pulleys.push(pu);
+    if (i === pts.length - 1) {   // Motor unter seinem Ritzel
+      const mo = new THREE.Mesh(new THREE.BoxGeometry(42, 42, 40), motorM); mo.position.set(p[0], p[1], z - LV_BELT_H / 2 - 8 - 20); parent.add(mo);
+    }
+  }
+  // Weg: je Kante gerade (außen tangential, Normale nach außen), je Ecke Bogen um das Ritzel
+  const n = ring.length, pieces = [];
+  const norm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; };   // rechts der Laufrichtung = außen (CCW)
+  for (let k = 0; k < n; k++) {
+    const A = ring[k].p, B = ring[(k + 1) % n].p, nn = norm(A, B);
+    pieces.push({ line: [[A[0] + nn[0] * r, A[1] + nn[1] * r], [B[0] + nn[0] * r, B[1] + nn[1] * r]] });
+    const C = ring[(k + 2) % n].p, n2 = norm(B, C), a0 = Math.atan2(nn[1], nn[0]);
+    let sw = Math.atan2(n2[1], n2[0]) - a0; while (sw > 0) sw -= 2 * Math.PI; while (sw <= -2 * Math.PI) sw += 2 * Math.PI;
+    if (sw < -Math.PI) sw += 2 * Math.PI;
+    const steps = Math.max(2, Math.ceil(Math.abs(sw) / (Math.PI / 16)));
+    for (let s2 = 0; s2 < steps; s2++) {
+      const t0 = a0 + sw * s2 / steps, t1 = a0 + sw * (s2 + 1) / steps;
+      pieces.push({ line: [[B[0] + Math.cos(t0) * r, B[1] + Math.sin(t0) * r], [B[0] + Math.cos(t1) * r, B[1] + Math.sin(t1) * r]] });
+    }
+  }
+  let mat = 0;
+  for (const pc of pieces) {
+    const [p, q] = pc.line, len = Math.max(0.01, Math.hypot(q[0] - p[0], q[1] - p[1]));
+    const tex = lvBeltTexture().clone(); tex.needsUpdate = true; tex.repeat.set(len / LV_BELT_PITCH, 1);
+    const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    mesh.position.set((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, z); mesh.rotation.z = Math.atan2(q[1] - p[1], q[0] - p[0]); mesh.scale.set(len + 0.4, LV_BELT_T, LV_BELT_H);
+    parent.add(mesh); segs.push({ mesh, at: mat }); mat += len;
+  }
+  return { pulleys, segs, r };
+}
+function lvZDriveSet(d, z) {
+  if (!d) return;
+  const ang = -(z / LV_SCREW_LEAD) * Math.PI * 2, travel = ang * d.r;
+  for (const pu of d.pulleys) pu.rotation.y = ang;
+  for (const s2 of d.segs) s2.mesh.material.map.offset.x = (s2.at + travel) / LV_BELT_PITCH;
 }
 /* Riemen, Schleppkette und Filamentschlauch (2026-10-08, Spielerei): CoreXY mit zwei Riemen übereinander – Motoren hinten,
    Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf; Riemen A läuft mit x + y, B mit x − y (CoreXY), die Zähne
@@ -586,6 +632,7 @@ function lvMechUpdate(p) {
   lv.mechG.visible = lv.head.visible;
   // Z-Spindeln drehen mit der Höhe (rotation.y = um die eigene Achse, wie die Rollen)
   for (const sc of lv.zScrews || []) sc.rotation.y = -(p.z / LV_SCREW_LEAD) * Math.PI * 2;
+  lvZDriveSet(lv.zDrive, p.z);   // Z-Riemen unten läuft mit
   { const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt); }
   if (!lv.head.visible) return;
   for (const { b, go, motor } of lv.belts) {

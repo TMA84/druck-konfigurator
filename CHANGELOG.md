@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.37.0] – 2026-10-08
+
+### Neu
+- **3D-Fortschritt, Z-Antrieb:** Unten im Gehäuse ein Z-Motor (hinten rechts) und ein geschlossener Zahnriemen über Ritzel an allen drei Spindeln und am Motor – der Riemen läuft außen im Bogen um die Ritzel (geprüft: lückenlos, genau auf dem Umfang); ändert sich die Höhe, drehen Motor, Ritzel und Spindeln gemeinsam und der Riemen läuft mit.
+
 ## [10.36.7] – 2026-10-08
 
 ### Verbessert
