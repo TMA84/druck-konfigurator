@@ -199,6 +199,11 @@ class PrinterLink:
         self.pos_until = 0         # bis dahin Kopfposition auch während des Drucks abfragen (status(…, pos=True))
         self.skipped = {}          # Auftrag (task_id) → übersprungene Objekte, die das Tool gesendet hat (skip/start)
         self.skipped_at = {}       # Auftrag → {Objekt: Schicht des Druckers beim Überspringen} (für den 3D-Fortschritt)
+        # Druck-Meldungen bei jedem Zustandswechsel vollständig (ohne Geheimnisse) – zeigt, was die Firmware bei einer Pause
+        # mitschickt (Grund, Code, Text); eigene Befehle mit Zeitpunkt (Pause aus Werkbank oder Home Assistant erkennen)
+        self.print_log = collections.deque(maxlen=20)
+        self.sent = {}             # (Art, Aktion) → Zeitpunkt des letzten eigenen Befehls
+        self.paused_since = None   # seit wann der laufende Druck pausiert (aus info.project.pause)
         self.connected = threading.Event()
         self.first = threading.Event()
         self.error = None
@@ -328,6 +333,12 @@ class PrinterLink:
         doc = redact(doc)
         with self.lock:
             self.recent.append((time.time(), kind, doc.get("action"), bool(doc.get("msgid")), doc.get("state"), doc.get("code")))
+            if kind == "print":
+                last = self.print_log[-1] if self.print_log else None
+                sig = (doc.get("action"), doc.get("state"), doc.get("code"), doc.get("msg"))
+                if not last or (last["action"], last["state"], last["code"], last["msg"]) != sig:
+                    self.print_log.append({"t": round(time.time()), "action": doc.get("action"), "state": doc.get("state"), "code": doc.get("code"),
+                                           "msg": doc.get("msg"), "data": doc.get("data")})
             self.seen[kind] = time.time()
             # Die Box-Liste nur aus Berichten, die sie vollständig enthalten (getInfo …); Bestätigungen und
             # Teilmeldungen (setInfo ohne Daten, autoUpdateInfo …) unter eigenem Schlüssel
@@ -356,6 +367,7 @@ class PrinterLink:
             raise LanError("Keine Verbindung zum Drucker", "unreachable")
         msg = {"type": kind, "action": action, "timestamp": int(time.time() * 1000), "msgid": msgid or str(uuid.uuid4()),
                "data": data if data is not None else {}}
+        self.sent[(kind, action)] = time.time()
         self.client.publish((self.slicer_topic if channel == "slicer" else self.web_topic) + kind, json.dumps(msg), qos=1)
 
     def request(self, kind, action, data, timeout=10, channel="web"):
@@ -516,6 +528,33 @@ def _job_with_skips(link, project):
     return job
 
 
+# Grund einer Pause (2026-10-08): Die Werksfirmware meldet in info.project nur pause 0/1. Was sie bei einer Pause sonst
+# schickt, steht in PrinterLink.print_log (Rohdaten der Werkbank) – bis das an echten Pausen geprüft ist, gilt: eigener
+# Befehl (Werkbank/Home Assistant) → Code/Text der Druck-Meldung → ACE ohne Filament im Drucker → „Grund nicht gemeldet“.
+PAUSE_OWN_S = 90            # so lange nach unserem Pause-Befehl gilt eine Pause als „von hier“
+
+
+def pause_reason(link, project, print_rep, boxes, now=None):
+    if not project or not project.get("pause"):
+        return None
+    now = now or time.time()
+    since = link.paused_since or now
+    t = link.sent.get(("print", "pause"))
+    if t and -5 <= since - t <= PAUSE_OWN_S:
+        return "von der Druckwerkstatt pausiert (Werkbank oder Home Assistant)"
+    pr = print_rep or {}
+    data = pr.get("data") if isinstance(pr.get("data"), dict) else {}
+    text = next((str(v) for v in (pr.get("msg"), data.get("reason"), data.get("msg"), data.get("err_msg"), data.get("error")) if v), "")
+    code = pr.get("code")
+    if isinstance(code, int) and code not in (0, 200):
+        return "Drucker meldet Code %s%s" % (code, ": " + text if text else "")
+    if text:
+        return "Drucker meldet: " + text
+    if boxes and all(isinstance(b.get("loaded_slot"), int) and b.get("loaded_slot") < 0 for b in boxes):
+        return "kein Filament im Drucker (ACE meldet keinen geladenen Slot) – Spule leer oder Zuführung hängt"
+    return "am Drucker pausiert – Grund nicht gemeldet"
+
+
 POS_WHILE_PRINTING_S = 20   # so lange nach der letzten Anfrage mit pos=True weiter abfragen
 
 
@@ -535,16 +574,27 @@ def status(host, pos=False):
     info, peri, temp, fan, light, axis = data("info"), data("peripherie"), data("tempature"), data("fan"), data("light"), data("axis")
     t = info.get("temp") or {}
     temps = {k: temp.get(k, t.get(k)) for k in ("curr_nozzle_temp", "target_nozzle_temp", "curr_hotbed_temp", "target_hotbed_temp")}
+    project = info.get("project") or {}
+    boxes = ace_boxes({"multiColorBox": [reps["multiColorBox"]]} if "multiColorBox" in reps else {})
+    with link.lock:
+        if project.get("pause"):
+            link.paused_since = link.paused_since or time.time()
+        else:
+            link.paused_since = None
+        reason = pause_reason(link, project, reps.get("print"), boxes)
+        print_log = list(link.print_log)[-10:]
     lights = light.get("lights") if isinstance(light.get("lights"), list) else ([light] if light.get("type") is not None else [])
     return {"model": info.get("model") or link.discovery.get("modelName"), "model_id": link.model_id,
             "name": info.get("printerName"), "firmware": info.get("version"), "ip": info.get("ip"),
             "state": info.get("state"), "printing": bool(info.get("project")), "job": _job_with_skips(link, info.get("project")),
+            # zuletzt beendeter Druck (Firmware: info.last_project) – „fertig“ / „abgebrochen“ nach dem Ende erkennen
+            "last_job": _job(info.get("last_project")),
             "temps": temps, "fans": {k: fan.get(k, info.get(k)) for k in ("fan_speed_pct", "aux_fan_speed_pct", "box_fan_level")},
             "speed_mode": info.get("print_speed_mode"), "lights": lights,
             "position": (axis.get("coordinates") if isinstance(axis, dict) else None),
             "position_age_s": round(pos_age, 1) if pos_age is not None else None,
             "camera": bool(peri.get("camera")), "has_ace": peri.get("multiColorBox"), "features": info.get("features") or {},
-            "ace": ace_boxes({"multiColorBox": [reps["multiColorBox"]]} if "multiColorBox" in reps else {}),
+            "ace": boxes, "pause_reason": reason, "paused_since": link.paused_since, "print_log": print_log,
             "connected": link.connected.is_set(), "error": link.error, "missing": [k for k, _ in POLL_QUERIES if k not in reps],
             # Rohdaten zum Nachsehen (z. B. ob die Firmware die Spülmenge meldet); Geheimnisse entfernt
             "raw": {k: [v.get("data")] for k, v in reps.items()}, "recent": recent}

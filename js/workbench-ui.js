@@ -36,8 +36,10 @@ async function wbPoll() {
   if (!host || !(await lanServerAvailable())) { wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : ''); return; }
   // pos=1: Kopfposition auch während des Drucks (Schalter in der 3D-Ansicht, js/live-ui.js)
   const pos = typeof livePosWanted === 'function' && livePosWanted() ? '&pos=1' : '';
+  const prev = wb.st;
   try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); wb.err = ''; }
   catch (e) { wb.err = t(e.message); }
+  if (!wb.err) wbEvents(prev, wb.st);
   wbRender();
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
   if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)
@@ -46,6 +48,25 @@ async function wbPoll() {
   wb.timer = setTimeout(wbPoll, WB_POLL_MS);
 }
 
+/* Druck pausiert (mit Grund), fertig oder abgebrochen: Meldung in der Seite und – wenn erlaubt – als Benachrichtigung
+   (gleiches tag wie die Warteschlange: eine Meldung, nicht zwei). Zuverlässig auch ohne offene Seite: Home Assistant,
+   Ereignis „Druck-Ereignis“ (tools/ha_mqtt.py). */
+function wbNotify(title, body) {
+  toast(title + (body ? ' – ' + body : ''));
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body: body || '', tag: 'druck-queue' }); } catch (e) { /* nur Hinweis */ }
+}
+function wbEvents(prev, st) {
+  const pj = prev && prev.job, sj = st && st.job;
+  if (!pj || (prev.connected === false) || (st && st.connected === false)) return;
+  const name = wbJobTitle(pj.name).title;
+  if (sj && sj.name === pj.name) {
+    if (!pj.paused && sj.paused) wbNotify(t('Druck pausiert: {name}', { name }), st.pause_reason ? t(st.pause_reason) : '');
+    return;
+  }
+  const end = !sj ? st && st.last_job : null, s = end ? String(end.status || end.state) : '';
+  if (/fertig|finished|complete/.test(s)) wbNotify(t('Platte fertig: {name}', { name }), t('Bett abräumen'));
+  else if (/abgebrochen|stop|cancel/.test(s)) wbNotify(t('Druck abgebrochen: {name}', { name }), '');
+}
 function wbRenderNoLink(why) {
   $('wbNoLink').classList.remove('hidden'); $('wbGrid').classList.add('hidden');
   $('wbNoLinkWhy').textContent = why || t('Am Drucker Einstellungen → Netzwerk → LAN-Modus einschalten, dann hier die IP-Adresse eintragen.');
@@ -113,6 +134,7 @@ function wbRender() {
     $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') +
       '<div class="wb-jobtitle" title="' + esc(job.name) + '">' + esc(jt.title) + '</div>' + (jt.sub ? '<div class="wb-jobsub">' + esc(jt.sub) + '</div>' : '') +
       '<div class="wb-bigpct"><b>' + pct + ' %</b><span>' + (job.paused ? t('pausiert') : esc(t(job.status || ''))) + '</span></div>' +
+      (job.paused ? '<p class="note warn wb-pause"><b>' + t('Pausiert') + ':</b> ' + esc(t(st.pause_reason || 'am Drucker pausiert – Grund nicht gemeldet')) + '</p>' : '') +
       '<div class="wb-progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%"></i></div>' +
       '<dl class="wb-jobinfo"><div><dt>' + t('Schicht') + '</dt><dd>' + (job.layer ?? '–') + ' / ' + (job.layers ?? '–') + '</dd></div>' +
       '<div title="' + esc(remTip) + '"><dt>' + t('Fertig um') + '</dt><dd>' + (remMin != null && !job.paused ? wbClock(remMin) : '–') + '</dd></div>' +

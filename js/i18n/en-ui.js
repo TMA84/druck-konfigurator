@@ -828,3 +828,13 @@ I18N.add({
  "Höchstwert laut Hersteller: {v} {unit} – darauf zurückgesetzt": "Manufacturer maximum: {v} {unit} – reset to it",
  "höchstens {v} {unit} (Herstellerangabe)": "at most {v} {unit} (manufacturer spec)",
 });
+I18N.add({
+ "Druck pausiert: {name}": "Print paused: {name}",
+ "Platte fertig: {name}": "Plate finished: {name}",
+ "Bett abräumen": "Clear the bed",
+ "Druck abgebrochen: {name}": "Print cancelled: {name}",
+ "Pausiert": "Paused",
+ "am Drucker pausiert – Grund nicht gemeldet": "paused on the printer – no reason reported",
+ "von der Druckwerkstatt pausiert (Werkbank oder Home Assistant)": "paused from Print Workshop (workbench or Home Assistant)",
+ "kein Filament im Drucker (ACE meldet keinen geladenen Slot) – Spule leer oder Zuführung hängt": "no filament in the printer (ACE reports no loaded slot) – spool empty or feed stuck",
+});

@@ -98,6 +98,8 @@ $('sendDlg').addEventListener('click', e => {
   if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted });
 });
 $('sendGo').addEventListener('click', async () => {
+  // Benachrichtigung bei Pause/Fertig (js/workbench-ui.js wbEvents) – fragen, solange ein Klick die Erlaubnis trägt
+  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); } catch (e) { /* egal */ }
   let later = null;
   try { later = typeof sendLaterState === 'function' ? sendLaterState(sendCtx.slice.plates.find(x => x.plate === +$('sendPlate').value)) : null; } catch (e) { console.error(e); }
   if (later) { if (later.ok) sendSchedule(later); return; }

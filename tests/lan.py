@@ -540,5 +540,19 @@ flat = lan.all_slots(two)
 check("zwei ACE: Slots 1–3 und 5–7, Box und Slot darin", [(s["index"], s["box"], s["local"]) for s in flat] == [(0, 0, 0), (1, 0, 1), (2, 0, 2), (4, 1, 0), (5, 1, 1), (6, 1, 2)], flat)
 check("zwei ACE: geladener Slot = ACE 2, Slot 2 → 5 (0-basiert)", lan.loaded_slot(two) == 5, lan.loaded_slot(two))
 
+# ---------- Pausengrund ----------
+class _L:
+    def __init__(self, sent=None, since=None):
+        self.sent, self.paused_since = sent or {}, since
+now = 1000.0
+pr = lambda **kw: dict({"pause": 1}, **kw)
+check("nicht pausiert → kein Grund", lan.pause_reason(_L(), {"pause": 0}, None, [], now) is None)
+check("eigener Pause-Befehl → von der Druckwerkstatt", "Druckwerkstatt" in lan.pause_reason(_L({("print", "pause"): 990.0}, 995.0), pr(), None, [], now))
+check("alter Befehl zählt nicht", "Druckwerkstatt" not in lan.pause_reason(_L({("print", "pause"): 100.0}, 995.0), pr(), None, [], now))
+check("Code der Druck-Meldung", lan.pause_reason(_L(), pr(), {"code": 10403, "msg": "filament runout"}, [], now) == "Drucker meldet Code 10403: filament runout")
+check("Text ohne Code", lan.pause_reason(_L(), pr(), {"code": 200, "data": {"reason": "x"}}, [], now) == "Drucker meldet: x")
+check("ACE ohne geladenen Slot", "kein Filament" in lan.pause_reason(_L(), pr(), {"code": 200}, [{"loaded_slot": -1}], now))
+check("sonst: nicht gemeldet", lan.pause_reason(_L(), pr(), {"code": 200}, [{"loaded_slot": 2}], now) == "am Drucker pausiert – Grund nicht gemeldet")
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

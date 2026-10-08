@@ -459,8 +459,27 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Düse, Heizbett | Temperaturen |
 | Warteschlange, Restzeit Warteschlange, Platten fertig/gesamt | Warteschlange |
 | **Bett abräumen** (an/aus) | an, sobald eine Platte der Warteschlange fertig ist – bis die nächste startet |
+| **Pausengrund** | warum der Druck pausiert (leer, solange er nicht pausiert) – siehe unten |
 | Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
+
+**Druck-Ereignis** (`event.druck_konfigurator_print_event`): feuert bei **pausiert** (mit Grund), **fortgesetzt**, **fertig** und **abgebrochen** – Attribute `druck`, `grund`, `fortschritt`. Gemeldet wird vom Server, auch wenn keine Seite offen ist. Handy-Benachrichtigung für jede Pause und jede fertige Platte:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.druck_konfigurator_print_event
+actions:
+  - action: notify.mobile_app_mein_handy
+    data:
+      title: >-
+        {{ {'pausiert': 'Druck pausiert', 'fertig': 'Platte fertig – Bett abräumen',
+            'abgebrochen': 'Druck abgebrochen', 'fortgesetzt': 'Druck läuft weiter'}[trigger.to_state.attributes.event_type] }}
+      message: >-
+        {{ trigger.to_state.attributes.druck }}{% if trigger.to_state.attributes.grund %}: {{ trigger.to_state.attributes.grund }}{% endif %}
+```
+
+**Pausengrund:** Die Werksfirmware meldet bei einer Pause nur „pausiert“, keinen Grund. Das Tool ermittelt ihn so gut es geht: Pause aus der Druckwerkstatt (Werkbank oder Home Assistant) → „von der Druckwerkstatt pausiert“; schickt der Drucker einen Fehlercode oder Text mit → dieser; meldet die ACE keinen geladenen Slot → „kein Filament im Drucker – Spule leer oder Zuführung hängt“; sonst „am Drucker pausiert – Grund nicht gemeldet“ (z. B. Pause am Display). Was der Drucker bei Pausen genau schickt, steht in der Werkbank unter **Rohdaten** (`print_log`) – damit lässt sich die Erkennung verbessern. In der Werkbank steht der Grund direkt unter „pausiert“; mit erlaubten Browser-Benachrichtigungen (Frage beim ersten Drucken) meldet die offene Seite Pause, fertige Platte und Abbruch auch als Benachrichtigung.
 
 **Geplanter Druck** (`sensor.druck_konfigurator_schedule_start` = Startzeit, `…_schedule_state` = geplant / trocknet / gestartet / nicht gestartet / abgesagt, Grund im Attribut `schedule_note`).
 

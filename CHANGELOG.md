@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.35.0] – 2026-10-08
+
+### Neu
+- **Warum pausiert der Druck?** Die Werkbank zeigt den Grund unter „pausiert“, Home Assistant als Sensor **Pausengrund**. Die Werksfirmware meldet nur pause 0/1; ermittelt wird: Pause aus der Druckwerkstatt (Werkbank/Home Assistant, eigener Befehl ≤ 90 s vorher) → Fehlercode/Text der Druck-Meldung → ACE ohne geladenen Slot („kein Filament im Drucker“) → „am Drucker pausiert – Grund nicht gemeldet“. Druck-Meldungen werden bei jedem Zustandswechsel vollständig mitgeschrieben (Rohdaten `print_log`), um die Erkennung an echten Pausen zu verbessern.
+- **Benachrichtigung bei Pause und fertiger Platte:** Home-Assistant-Ereignis **Druck-Ereignis** (pausiert mit Grund, fortgesetzt, fertig, abgebrochen; vom Server, auch ohne offene Seite) – Beispiel-Automation fürs Handy im Handbuch. Die offene Seite meldet dasselbe als Browser-Benachrichtigung (Erlaubnis wird beim ersten Drucken erfragt).
+
 ## [10.34.4] – 2026-10-08
 
 ### Behoben

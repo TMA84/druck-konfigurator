@@ -12,6 +12,8 @@ Themen (base = MQTT_BASE_TOPIC):
   <base>/progress_image   PNG des Druckfortschritts (MQTT-Kamera „3D-Fortschritt“, retained; tools/progress_image.py) –
                           bei jeder neuen Schicht, nur für Drucke aus dem Tool
   <prefix>/<component>/<base>/<key>/config   Discovery (retained)
+  <base>/event            Druck-Ereignis (MQTT-Event „Druck-Ereignis“): {"event_type": pausiert|fortgesetzt|fertig|abgebrochen,
+                          "druck", "grund", "fortschritt"} – nicht retained; für Benachrichtigungen per Automation
   <base>/cmd              nur mit MQTT_CONTROL=1: „pause“ / „resume“ (Knöpfe „Druck pausieren“ / „Druck fortsetzen“)
 Ein Gerät „Druck-Konfigurator <Druckermodell>“. Ohne MQTT_CONTROL liest der Server nur – über MQTT wird nichts gesteuert.
 Mit MQTT_CONTROL (Add-on-Option „Steuern aus Home Assistant“, Standard aus) nur Pausieren und Fortsetzen, nie Abbrechen;
@@ -38,6 +40,8 @@ ORIGIN = {"name": "Druck-Konfigurator", "url": "https://github.com/TMA84/druck-k
 # key → (Komponente, Name, Wert im JSON, Einheit, device_class, state_class, Symbol)
 ENTITIES = [
     ("printer_state", "sensor", "Druckerstatus", None, None, None, "mdi:printer-3d"),
+    # warum der Druck pausiert (tools/anycubic_lan.py pause_reason); leer, solange nicht pausiert
+    ("pause_reason", "sensor", "Pausengrund", None, None, None, "mdi:pause-octagon"),
     ("progress", "sensor", "Fortschritt", "%", None, "measurement", "mdi:progress-clock"),
     ("remaining_min", "sensor", "Restzeit", "min", "duration", None, "mdi:timer-sand"),
     ("finish", "sensor", "Fertig um", None, "timestamp", None, "mdi:clock-end"),
@@ -60,6 +64,33 @@ ENTITIES = [
     ("month_prints", "sensor", "Drucke diesen Monat", None, None, "total", "mdi:counter"),
 ]
 PRINTER_STATE = {"free": "frei", "busy": "beschäftigt", "offline": "offline"}
+EVENT_TYPES = ["pausiert", "fortgesetzt", "fertig", "abgebrochen"]
+FINISHED = {"fertig", "finished", "complete", "completed", 2}
+ABORTED = {"abgebrochen", "stoped", "stopped", "canceled", "cancelled", 3}
+
+
+def print_events(prev, st):
+    """Ereignisse zwischen zwei Ständen: [(event_type, Nutzdaten)]. prev/st = anycubic_lan.status (oder None).
+    pausiert/fortgesetzt aus job.paused; fertig/abgebrochen, wenn der Druck endet (job weg oder Status fertig/abgebrochen)."""
+    if not prev or not st or st.get("connected") is False or prev.get("connected") is False:
+        return []
+    pj, sj = prev.get("job") or None, st.get("job") or None
+    out, name = [], (sj or pj or {}).get("name")
+    info = lambda **kw: dict({"druck": name, "fortschritt": (sj or pj or {}).get("progress")}, **kw)
+    if pj and sj and pj.get("name") == sj.get("name"):
+        if not pj.get("paused") and sj.get("paused"):
+            out.append(("pausiert", info(grund=st.get("pause_reason") or "Grund nicht gemeldet")))
+        elif pj.get("paused") and not sj.get("paused"):
+            out.append(("fortgesetzt", info()))
+    done = lambda j: j and (j.get("status") in FINISHED or j.get("state") in FINISHED)
+    stop = lambda j: j and (j.get("status") in ABORTED or j.get("state") in ABORTED)
+    if pj and not (done(pj) or stop(pj)):
+        end = sj if sj and sj.get("name") == pj.get("name") else (st.get("last_job") if not sj else None)
+        if end and done(end):
+            out.append(("fertig", dict(info(), druck=pj.get("name"), fortschritt=100)))
+        elif end and stop(end):
+            out.append(("abgebrochen", dict(info(), druck=pj.get("name"))))
+    return out
 
 
 def config_from_env(env=None):
@@ -144,7 +175,7 @@ def payload(st, queue, now=None, spool_view=None, plan=None):
     sm = (queue or {}).get("summary") or {}
     rnd = lambda v: round(v, 1) if isinstance(v, (int, float)) else None
     rem = job.get("remaining_min") if isinstance(job.get("remaining_min"), (int, float)) else None
-    return dict({"printer_state": printer_state(st), "progress": job.get("progress") if isinstance(job.get("progress"), (int, float)) else None,
+    return dict({"printer_state": printer_state(st), "pause_reason": (st or {}).get("pause_reason") if job.get("paused") else None, "progress": job.get("progress") if isinstance(job.get("progress"), (int, float)) else None,
             "remaining_min": rem, "finish": _finish(rem, now) if job else None, "job": job.get("name") or None,
             "layer": "%s/%s" % (job.get("layer"), job.get("layers")) if job.get("layers") else None,
             "nozzle_temp": rnd(temps.get("curr_nozzle_temp")), "bed_temp": rnd(temps.get("curr_hotbed_temp")),
@@ -186,6 +217,7 @@ class Publisher:
         b = cfg["base"]
         self.t_avail, self.t_state, self.t_slot, self.t_image, self.t_cmd = b + "/availability", b + "/state", b + "/slot/%d", b + "/progress_image", b + "/cmd"
         self.client, self.connected, self.need_discovery = None, False, True
+        self.t_event, self.prev_st = b + "/event", None
         self.last, self.last_time, self.slots_last, self.disc_key = None, 0, {}, None
         self.last_error = None
         self.stopped = False
@@ -237,6 +269,9 @@ class Publisher:
             if key in ("printer_state", "queue_state", "month_prints", "filament_low", "schedule_state"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
+        out["%s/event/%s/print_event/config" % (prefix, base)] = dict(
+            common, name="Druck-Ereignis", unique_id=base + "_print_event", default_entity_id="event." + base + "_print_event",
+            state_topic=self.t_event, event_types=EVENT_TYPES, icon="mdi:printer-3d-nozzle-alert")
         if self.image_fn:
             out["%s/camera/%s/progress/config" % (prefix, base)] = dict(
                 common, name="3D-Fortschritt", unique_id=base + "_progress", default_entity_id="camera." + base + "_progress",
@@ -324,6 +359,11 @@ class Publisher:
                 self._pub(topic, cfg, retain=True)
             self._pub(self.t_avail, "online", retain=True)
             self.need_discovery, self.disc_key, self.last, self.slots_last = False, key, None, {}
+        # Ereignisse (pausiert mit Grund, fortgesetzt, fertig, abgebrochen) – einmal je Wechsel, nicht retained
+        for etype, data in print_events(self.prev_st, st):
+            self._pub(self.t_event, dict(data, event_type=etype))
+        if st:
+            self.prev_st = st
         sent = False
         if state != self.last or now - self.last_time >= self.every_s:
             self._pub(self.t_state, state)

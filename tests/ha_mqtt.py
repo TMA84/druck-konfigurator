@@ -230,7 +230,7 @@ check("ohne Drucker keine Slot-Sensoren außer bekannten", wait(lambda: disc("se
 status["st"] = ST
 check("Discovery neu mit Modell", wait(lambda: disc("sensor", "slot4_remaining") is not None))
 keys = ["printer_state", "progress", "remaining_min", "finish", "job", "layer", "nozzle_temp", "bed_temp", "queue_state",
-        "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints"]
+        "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints", "pause_reason"]
 check("alle Sensoren angemeldet", all(disc("sensor", k) for k in keys), [k for k in keys if not disc("sensor", k)])
 check("Discovery retained", all(disc("sensor", k)[2] for k in keys) and disc("binary_sensor", "bed_clear")[2])
 c = json.loads(disc("sensor", "progress")[1])
@@ -247,7 +247,9 @@ s1 = json.loads(disc("sensor", "slot1_remaining")[1])
 check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attributes_topic"] == "dk_test/slot/1" and s1["unit_of_measurement"] == "g"
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
-check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4, sorted(set(uids)))
+check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1, sorted(set(uids)))   # + Druck-Ereignis
+evc = json.loads(disc("event", "print_event")[1])
+check("Druck-Ereignis (MQTT-Event)", evc["state_topic"] == "dk_test/event" and evc["event_types"] == ["pausiert", "fortgesetzt", "fertig", "abgebrochen"], evc)
 mc = json.loads(disc("sensor", "month_cost_eur")[1])
 check("Kosten diesen Monat: monetary EUR", mc["device_class"] == "monetary" and mc["unit_of_measurement"] == "EUR" and mc["state_class"] == "total"
       and mc["value_template"] == "{{ value_json.month_cost_eur }}", mc)
@@ -336,6 +338,19 @@ time.sleep(0.5)
 check("abgelehnte Anmeldung: kein Absturz, nicht verbunden", bad.thread.is_alive() and not bad.connected)
 bad.stop()
 check("start() ohne Host", ha_mqtt.start(None, None, None, env={}) == (None, None))
+
+# ---------- Druck-Ereignisse (pausiert mit Grund, fortgesetzt, fertig, abgebrochen) ----------
+J = lambda **kw: dict({"name": "Platte2", "status": "druckt", "state": "printing", "paused": False, "progress": 40}, **kw)
+S = lambda job=None, **kw: dict({"connected": True, "job": job}, **kw)
+ev = ha_mqtt.print_events
+check("Pause → pausiert mit Grund", ev(S(J()), S(J(paused=True), pause_reason="kein Filament")) == [("pausiert", {"druck": "Platte2", "fortschritt": 40, "grund": "kein Filament"})], ev(S(J()), S(J(paused=True), pause_reason="kein Filament")))
+check("weiter → fortgesetzt", [e for e, _ in ev(S(J(paused=True)), S(J()))] == ["fortgesetzt"])
+check("Druck weg, letzter fertig → fertig", ev(S(J(progress=99)), S(None, last_job={"name": "Platte2", "state": "finished", "status": "fertig"})) == [("fertig", {"druck": "Platte2", "fortschritt": 100})])
+check("Druck weg, letzter abgebrochen → abgebrochen", [e for e, _ in ev(S(J()), S(None, last_job={"name": "Platte2", "state": "stoped", "status": "abgebrochen"}))] == ["abgebrochen"])
+check("Status fertig, Druck noch da → fertig", [e for e, _ in ev(S(J()), S(J(status="fertig", state="finished")))] == ["fertig"])
+check("kein Wechsel → nichts", ev(S(J()), S(J(progress=41))) == [])
+check("offline dazwischen → nichts", ev(S(J()), {"connected": False}) == [] and ev(None, S(J())) == [])
+check("Pausengrund im Stand nur bei Pause", ha_mqtt.payload(S(J(paused=True), pause_reason="x"), None)["pause_reason"] == "x" and ha_mqtt.payload(S(J(), pause_reason="x"), None)["pause_reason"] is None)
 
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)
