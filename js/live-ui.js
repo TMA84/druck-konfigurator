@@ -352,7 +352,9 @@ function lvMechInit(md, g) {
   lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
   lv.tube = null; lv.fil = null;
   lvFansInit(md, g);
-  lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true } : { x: cx, y: by1 + m + 4, z: LV_BELT_Z.A + 40, fixed: false };
+  // Kette: CoreXY vom Rahmen hinten links (großer Bogen über die linke Seite), Bettschubser vom oberen Querholm
+  lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true, xmin: bx0 - m }
+    : { x: lv.xy.fx0 + 60, y: lv.xy.fy1 - 70, z: LV_ROD_Z[1] + 30, fixed: false, xmin: lv.xy.fx0 + 25 };
 }
 /* Lüfter mit Luftstrom (2026-10-08): Bauteillüfter am Kopf (bläst von beiden Seiten zur Düse), Seitenlüfter rechts an der
    Gehäusewand (flacher Fächer übers Bett) und Gehäuselüfter hinten (nach außen) – Stärke und Tempo des Luftstroms nach den gemeldeten
@@ -448,10 +450,11 @@ function lvAirTick(dt) {
   }
 }
 // Kurve der Kette: hinten oben → Bogen → senkrecht von oben auf den Kopf
-function lvChainCurve(a, h) {
-  const up = Math.max(40, (a.z - h.z) * 0.5 + 40);
-  return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(a.x, a.y - 70, a.z + 30),
-    new THREE.Vector3(h.x, h.y + 10, h.z + up), new THREE.Vector3(h.x, h.y + 6, h.z));
+// großer Bogen über die linke Seite: vom Anker nach oben links, dann links über dem Kopf von oben hinein
+function lvChainCurve(a, h, xmin) {
+  const up = Math.max(70, (a.z - h.z) * 0.4 + 90), lx = Math.max(xmin ?? -Infinity, Math.min(a.x, h.x) - 110);
+  return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(lx, a.y - 30, a.z + 80),
+    new THREE.Vector3(lx, h.y + 10, h.z + up), new THREE.Vector3(h.x, h.y + 4, h.z));
 }
 function lvMechUpdate(p) {
   if (!lv.mechG) return;
@@ -465,19 +468,27 @@ function lvMechUpdate(p) {
   }
   // Anker in Weltkoordinaten: CoreXY am Rahmen (fährt in Z mit der Traverse), Bettschubser am oberen Querholm (fährt in Y)
   const A = lv.mechAnchor, a = A.fixed ? { x: A.x, y: A.y + p.y, z: A.z } : { x: A.x, y: A.y, z: p.z + LV_GANTRY_Z + A.z };
-  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 2 }, c = lvChainCurve(a, top), q = new THREE.Vector3();
+  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 2 }, c = lvChainCurve(a, top, A.xmin), q = new THREE.Vector3();
   lv.chain.forEach((l, k) => {
     const t = (k + 0.5) / LV_CHAIN_LINKS; c.getPoint(t, l.position); c.getTangent(t, q);
     l.lookAt(l.position.x + q.x, l.position.y + q.y, l.position.z + q.z);
   });
-  // Schlauch mit Filament neben der Kette (seitlich versetzt), endet oben im Kopf
-  // Schlauch endet oben mittig im Kopf; das Filament läuft von dort senkrecht weiter bis zur Düsenspitze (2026-10-08)
-  const off = new THREE.Vector3(9, 0, 0), inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
-  const ct = new THREE.CubicBezierCurve3(c.v0.clone().add(off), c.v1.clone().add(off), new THREE.Vector3(p.x, p.y, c.v2.z), inHead);
+  /* Schlauch liegt oben auf der Kette (fester Abstand entlang der Kettennormalen – kann sie nicht kreuzen), löst sich erst am
+     Kopf und endet oben mittig darin; das Filament läuft weiter senkrecht bis zur Düsenspitze */
+  const pts = [], T = new THREE.Vector3(), up = new THREE.Vector3(0, 0, 1), side = new THREE.Vector3(1, 0, 0), nrm = new THREE.Vector3();
+  for (let k = 0; k <= 36; k++) {
+    const t = k / 36 * 0.92, P = c.getPoint(t); c.getTangent(t, T);
+    const sd = new THREE.Vector3().crossVectors(T, up); if (sd.lengthSq() > 1e-4) side.copy(sd.normalize());
+    nrm.crossVectors(side, T).normalize(); if (nrm.z < 0) nrm.negate();
+    pts.push(P.add(nrm.multiplyScalar(7)));
+  }
+  const inHead = new THREE.Vector3(p.x, p.y, p.z + LV_HEAD.h - 8);
+  pts.push(new THREE.Vector3(p.x, p.y + 2, p.z + LV_HEAD.h + 6), inHead);
+  const ct = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
   const cf = new THREE.CurvePath(); cf.add(ct); cf.add(new THREE.LineCurve3(inHead.clone(), new THREE.Vector3(p.x, p.y, p.z + 1)));
   for (const k of ['tube', 'fil']) if (lv[k]) { lv.mechG.remove(lv[k]); lv[k].geometry.dispose(); }
-  lv.tube = new THREE.Mesh(new THREE.TubeGeometry(ct, 40, 2.4, 10), lv.tubeM);
-  lv.fil = new THREE.Mesh(new THREE.TubeGeometry(cf, 60, 0.9, 6), lv.filM);
+  lv.tube = new THREE.Mesh(new THREE.TubeGeometry(ct, 60, 2.4, 10), lv.tubeM);
+  lv.fil = new THREE.Mesh(new THREE.TubeGeometry(cf, 80, 0.9, 6), lv.filM);
   lv.tube.renderOrder = 3;
   lv.mechG.add(lv.fil, lv.tube);
 }

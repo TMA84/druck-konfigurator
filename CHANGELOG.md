@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.34.3] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Schleppkette und Filamentschlauch:** Die Kette läuft vom Rahmen hinten links in einem großen Bogen über die linke Seite zum Kopf; der Schlauch liegt in festem Abstand oben auf der Kette (vorher kreuzten sich Kette und Schlauch teilweise), löst sich erst am Kopf und das Filament läuft weiter bis zur Düse.
+
 ## [10.34.2] – 2026-10-08
 
 ### Verbessert
