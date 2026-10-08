@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.6] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Z-Spindeln durch die Muttern:** Zu Druckbeginn (Bett ganz oben) endete die Spindel unter der Messingmutter. Jetzt stehen die Spindeln außerhalb des Kopfwegs und reichen bis über die Düsenspitze – in jeder Höhe laufen sie durch die Mutter (geprüft bei 0,2 / 100 / 240 mm), ohne den Kopf zu berühren.
+
 ## [10.36.5] – 2026-10-08
 
 ### Behoben

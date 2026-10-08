@@ -268,10 +268,12 @@ function lvHeadInit() {
   lv.xy = { mxL, mxR, my, yF: fy0 + 34, fx0, fx1, fy0, fy1, top };
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
   // direkt am Druckbett: das Bett hängt mit Haltern und Spindelmuttern daran (lv.zArms, bleiben beim Bett)
-  const zs = [[cx, by1 + 18], [bx0 - 18, by0 + 30], [bx1 + 18, by0 + 30]];
+  // außerhalb des Kopfwegs (Kopf ±LV_HEAD.w/2 bzw. ±LV_HEAD.d/2 um die Düse, + 6 mm), damit sie bis übers Bett reichen dürfen
+  const zx = LV_HEAD.w / 2 + 8, zy = LV_HEAD.d / 2 + 10;
+  const zs = [[cx, by1 + zy], [bx0 - zx, by0 + 30], [bx1 + zx, by0 + 30]];
   for (const [x, y] of zs) {
-    // enden knapp unter der Düse (höher fährt das Bett nicht) – sonst ragen sie in den Weg des Kopfes
-    const zTop = -LV_GANTRY_Z - 10, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
+    // reichen bis 12 mm über die Düsenspitze: auch beim höchsten Bettstand (erste Schicht) geht die Spindel durch die Mutter
+    const zTop = -LV_GANTRY_Z + 12, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
     sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc); }
   lv.zArms = new THREE.Group();
   const armM = mat(0x3a4146, { r: 0.55 }), nutM = mat(0xc9a14a, { m: 0.5, r: 0.35 });
