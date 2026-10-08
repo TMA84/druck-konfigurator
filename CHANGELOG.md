@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.38.1] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Eckrollen im Gehäuse:** Die festen Rollen in den Ecken (vorn die Umkehrrollen, hinten die Rollen am Motor, an der Gegenseite die Eckrolle) sitzen in schwarzen Gehäusen mit Boden- und Deckplatte über beide Riemenebenen und Eckpfosten; nahe beieinander liegende Rollen teilen sich eines. Erkannt automatisch als die Rollen, die sich beim Fahren nicht bewegen.
+
 ## [10.38.0] – 2026-10-08
 
 ### Verbessert

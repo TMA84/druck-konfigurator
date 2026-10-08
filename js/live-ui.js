@@ -504,6 +504,29 @@ function lvBeltSet(b, px, py, joinR) {
   for (let k = si; k < b.segs.length; k++) b.segs[k].visible = false;
   return [motorAt];
 }
+/* Gehäuse für die festen Eckrollen (2026-10-08): Rollen, die bei zwei Kopfstellungen am selben Ort bleiben, liegen in den
+   Ecken; nahe beieinander liegende (hinten die beiden am Motor) teilen sich eines. Je Gehäuse Boden- und Deckplatte über beide
+   Riemenebenen und ein Pfosten an der äußeren Ecke – wie die Eckwagen schwarz und zur Mitte hin offen. */
+function lvCornerHousings() {
+  const pos = q => { const out = []; for (const { b, go } of lv.belts) { const [px, py] = go(q); lvBeltSet(b, px, py, LV_MOTOR_R); b.rolls.forEach(r => out.push(r.visible ? [r.position.x, r.position.y, r.scale.x * LV_ROLL_R] : null)); } return out; };
+  const a = pos({ x: -60, y: -50, z: 0 }), b2 = pos({ x: 70, y: 60, z: 0 });
+  const fixed = a.filter((p, i) => p && b2[i] && Math.hypot(p[0] - b2[i][0], p[1] - b2[i][1]) < 0.01);
+  const clusters = [];
+  for (const p of fixed) {
+    const c = clusters.find(c => c.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 60));
+    c ? c.push(p) : clusters.push([p]);
+  }
+  const black = new THREE.MeshStandardMaterial({ color: 0x1d2124, roughness: 0.6 }), m = 4;
+  const z0 = LV_BELT_Z.B - LV_BELT_H / 2 - 4, z1 = LV_BELT_Z.A + LV_BELT_H / 2 + 3;
+  for (const c of clusters) {
+    const x0 = Math.min(...c.map(p => p[0] - p[2])) - m, x1 = Math.max(...c.map(p => p[0] + p[2])) + m;
+    const y0 = Math.min(...c.map(p => p[1] - p[2])) - m, y1 = Math.max(...c.map(p => p[1] + p[2])) + m, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (const z of [z0, z1]) { const pl = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, 3), black); pl.position.set(cx, cy, z); lv.gantry.add(pl); }
+    // Pfosten an der äußeren Ecke (weg von der Mitte)
+    const px = cx < 0 ? x0 + 4 : x1 - 4, py = cy < 0 ? y0 + 4 : y1 - 4;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(8, 8, z1 - z0), black); post.position.set(px, py, (z0 + z1) / 2); lv.gantry.add(post);
+  }
+}
 function lvMechInit(md, g) {
   const { bx0, bx1, by0, by1, m, cx, beam } = g;
   lv.mechG = new THREE.Group(); lv.mechG.visible = false;
@@ -546,6 +569,7 @@ function lvMechInit(md, g) {
   lv.tubeM = new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
   lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
   lv.tube = null; lv.fil = null;
+  if (md.kin !== 'bed') lvCornerHousings();
   lvFansInit(md, g);
   // Kette: CoreXY vom Rahmen hinten links (großer Bogen über die linke Seite), Bettschubser vom oberen Querholm
   lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true, xmin: bx0 - m }
