@@ -58,7 +58,7 @@ ENTITIES = [
     ("speed_mode", "sensor", "Druckgeschwindigkeit", None, None, None, "mdi:speedometer"),
     ("elapsed_min", "sensor", "Druckdauer bisher", "min", "duration", None, "mdi:timer-outline"),
     ("filament_m", "sensor", "Filament dieser Druck", "m", "distance", None, "mdi:printer-3d-nozzle"),
-    ("light", "binary_sensor", "Licht", None, "light", None, "mdi:lightbulb"),
+    ("light", "binary_sensor", "Licht", None, None, None, "mdi:lightbulb"),   # ohne device_class „light“ – die zeigt „Licht erkannt“ statt „An“
     ("queue_state", "sensor", "Warteschlange", None, None, None, "mdi:format-list-numbered"),
     ("queue_remaining_min", "sensor", "Warteschlange Restzeit", "min", "duration", None, "mdi:timer-sand"),
     ("plates", "sensor", "Platten fertig", None, None, None, "mdi:layers-outline"),

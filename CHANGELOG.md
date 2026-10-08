@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.1] – 2026-10-08
+
+### Behoben
+- **Home Assistant, Licht:** zeigt „An“/„Aus“ statt „Licht erkannt“ (ohne Geräteklasse Lichtsensor).
+
 ## [10.36.0] – 2026-10-08
 
 ### Neu
