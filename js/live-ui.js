@@ -415,12 +415,15 @@ function lvFansInit(md, g) {
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(84, 6), new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
   lv.air.push(lvAirStream(lv.gantry, [fx1 - 72, cy, zAux], [-1, 0, -0.04], 230, [40, 3], 'aux_fan_speed_pct'));
-  // Gehäuselüfter: Gitter in der Rückwand, Luft strömt von innen hinein und nach außen
-  const grill = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.7 });
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(90, 6, 70), dark); grill.add(plate);
-  for (let k = -3; k <= 3; k++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(70, 7, 4), gm); bar.position.set(0, -1, k * 9); bar.rotation.y = 0.5; grill.add(bar); }
-  grill.position.set(cx - 70, fy1 - 14, zBox); lv.gantry.add(grill);
-  lv.air.push(lvAirStream(lv.gantry, [cx - 70, fy1 - 110, zBox], [0, 1, 0], 170, [26, 20], 'box_fan_level'));   // durchs Gitter hinaus, hinter der Rückwand sichtbar
+  /* Gehäuselüfter in der Rückwand: Rahmen mit Lüfterrad (dreht nach box_fan_level), davor ein dünnes Gitter. Abluft: innen
+     ein Kegel, der auf den Lüfter zuläuft (angesaugt), hinter der Wand ein schmaler Strahl nach draußen */
+  const bxx = cx - 70, byy = fy1 - 12, fan = new THREE.Group(), fr = new THREE.MeshStandardMaterial({ color: 0x23282c, roughness: 0.6 });
+  for (const [w, h, x, z] of [[78, 8, 0, 35], [78, 8, 0, -35], [8, 78, -35, 0], [8, 78, 35, 0]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, 12, h), fr); b.position.set(x, 0, z); fan.add(b); }
+  const back = new THREE.Mesh(new THREE.CircleGeometry(33, 32), new THREE.MeshStandardMaterial({ color: 0x0b0d0f, roughness: 0.9, side: THREE.DoubleSide })); back.rotation.x = Math.PI / 2; back.position.y = 4; fan.add(back);
+  { const ro = lvRotor(31, 7, 0x4a5258), hold = new THREE.Group(); hold.rotation.x = Math.PI / 2; hold.position.y = -1; hold.add(ro); fan.add(hold); lv.rotors.push({ obj: ro, key: 'box_fan_level' }); }
+  for (let k = -3; k <= 3; k++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(70, 1.6, 1.6), fr); bar.position.set(0, -8, k * 10); fan.add(bar); }   // dünnes Gitter davor
+  fan.position.set(bxx, byy, zBox); lv.gantry.add(fan);
+  lv.air.push(Object.assign(lvAirStream(lv.gantry, [bxx, byy - 140, zBox], [0, 1, 0], 210, [44, 36], 'box_fan_level'), { funnel: 140 / 210 }));
 }
 function lvAirTick(dt) {
   const st = typeof wb !== 'undefined' && wb.st, fans = (st && st.fans) || {};
@@ -435,7 +438,8 @@ function lvAirTick(dt) {
     a.pts.geometry.setDrawRange(0, live);
     for (let k = 0; k < live; k++) {
       let t = a.t[k] + dt * speed * 0.9; if (t >= 1) t -= 1; a.t[k] = t;
-      const g = 0.4 + t, l = t * a.len, x = a.r[2 * k] * a.su * g, y = a.r[2 * k + 1] * a.sv * g;
+      // Abluft (funnel): innen Kegel zum Lüfter hin enger, danach schmaler Strahl; sonst Fächer, der sich aufweitet
+      const g = a.funnel ? (t < a.funnel ? 1.25 - 1.0 * t / a.funnel : 0.25 + 0.35 * (t - a.funnel) / (1 - a.funnel)) : 0.4 + t, l = t * a.len, x = a.r[2 * k] * a.su * g, y = a.r[2 * k + 1] * a.sv * g;
       pos[3 * k] = a.from.x + a.d.x * l + a.u.x * x + a.v.x * y; pos[3 * k + 1] = a.from.y + a.d.y * l + a.u.y * x + a.v.y * y; pos[3 * k + 2] = a.from.z + a.d.z * l + a.u.z * x + a.v.z * y;
       const f = (1 - t) * (0.35 + 0.65 * pct / 100);   // verblasst mit dem Weg, stärker bei mehr Leistung
       col[3 * k] = 0.45 * f; col[3 * k + 1] = 0.75 * f; col[3 * k + 2] = 1.0 * f;

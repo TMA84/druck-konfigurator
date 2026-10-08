@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.34.2] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Gehäuselüfter erkennbar:** Rahmen mit Lüfterrad hinter einem dünnen Gitter in der Rückwand, das Rad dreht nach der gemeldeten Leistung. Die Abluft läuft innen als Kegel auf den Lüfter zu (angesaugt) und tritt hinter der Wand als schmaler Strahl aus.
+
 ## [10.34.1] – 2026-10-08
 
 ### Verbessert
