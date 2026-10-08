@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.1] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, ACE neben dem Drucker:** die beiden Einheiten stehen übereinander rechts neben dem Drucker (15 cm Abstand, gleiche Standfläche) statt obendrauf; Schläuche zum Verteiler hinten oben.
+- **3D-Fortschritt, klare Haube:** gerundete, klare Haube mit feinen Kanten statt getöntem Kasten.
+
 ## [10.39.0] – 2026-10-08
 
 ### Neu

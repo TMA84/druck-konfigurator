@@ -529,10 +529,10 @@ function lvCornerHousings() {
   }
 }
 /* Gehäuse und ACE (2026-10-08, zuschaltbar, Standard aus – Schalter unten links): Gehäuse aus Seiten- und Rückwand,
-   Glastür vorn und Glasdeckel oben (durchscheinend, die Mechanik bleibt sichtbar). Darauf die ACE-Pro-Einheiten
-   (370 × 290 × 240 mm, je 4 Spulen in den Farben der Slots aus dem Druckerstand), von jedem Slot ein PTFE-Schlauch mit
+   Glastür vorn und Glasdeckel oben (durchscheinend, die Mechanik bleibt sichtbar). Daneben die ACE-Pro-Einheiten
+   (370 × 290 × 240 mm, klare Haube, je 4 Spulen in den Farben der Slots aus dem Druckerstand), von jedem Slot ein PTFE-Schlauch mit
    Filament zum Verteiler hinten oben am Drucker. Beides hängt am Rahmen (fährt relativ zum Teil in Z mit). */
-const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64 };
+const LV_ACE = { w: 370, d: 290, h: 240, spoolR: 98, spoolW: 64, gap: 150 };
 function lvEnclosureInit(g) {
   const { fx0, fx1, fy0, fy1, top } = lv.xy, fh = lv.frameH, bot = top - fh, cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
   const x0 = fx0 - 12, x1 = fx1 + 12, y0 = fy0 - 12, y1 = fy1 + 12, z0 = bot - 40, z1 = top + 40;
@@ -549,13 +549,24 @@ function lvEnclosureInit(g) {
   box(x1 - x0, 12, 6, cx, y0 + 6, z1, rim); box(x1 - x0, 12, 6, cx, y1 - 6, z1, rim);
   enc.visible = !!store.settings.liveEnclosure; lv.gantry.add(enc); lv.enclosureG = enc;
   // ACE-Einheiten oben auf dem Deckel, Spulen in Slotfarbe, Schläuche zum Verteiler hinten oben
-  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx, y1 + 18, z1 - 20);
-  const body = new THREE.MeshStandardMaterial({ color: 0x2d3236, roughness: 0.5 }), lid = new THREE.MeshStandardMaterial({ color: 0x5b6670, roughness: 0.2, transparent: true, opacity: 0.28, depthWrite: false });
+  /* neben dem Drucker (rechts, LV_ACE.gap Abstand), auf derselben Standfläche, übereinander; klare, gerundete Haube */
+  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx, y1 + 18, z1 - 20), ax = x1 + A.gap + A.w / 2;
+  const body = new THREE.MeshStandardMaterial({ color: 0x2d3236, roughness: 0.5 });
+  const lid = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
+  const hood = (() => {   // Profil (y, z): Rechteck mit großen Radien oben, entlang x extrudiert
+    const sh = new THREE.Shape(), d = A.d / 2, h = A.h - 90, r = 55;
+    sh.moveTo(-d, 0); sh.lineTo(d, 0); sh.lineTo(d, h - r); sh.quadraticCurveTo(d, h, d - r, h); sh.lineTo(-d + r, h); sh.quadraticCurveTo(-d, h, -d, h - r); sh.lineTo(-d, 0);
+    const g2 = new THREE.ExtrudeGeometry(sh, { depth: A.w, bevelEnabled: false, curveSegments: 12 });
+    // Profil-x → Welt-y, Profil-y → Welt-z, Extrusion → Welt-x; dann mittig auf die Einheit, Unterkante z = 0
+    g2.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
+    g2.computeBoundingBox(); const bb = g2.boundingBox; g2.translate(-(bb.min.x + bb.max.x) / 2, -(bb.min.y + bb.max.y) / 2, -bb.min.z);
+    return g2; })();
   lv.aceSpools = [];
   for (let u = 0; u < 2; u++) {
-    const uz = z1 + 4 + u * (A.h + 6), unit = new THREE.Group(); unit.position.set(cx, cy, uz); ace.add(unit);
+    const uz = z0 + u * (A.h + 6), unit = new THREE.Group(); unit.position.set(ax, cy, uz); ace.add(unit);
     const b1 = new THREE.Mesh(new THREE.BoxGeometry(A.w, A.d, 90), body); b1.position.z = 45; unit.add(b1);
-    const b2 = new THREE.Mesh(new THREE.BoxGeometry(A.w, A.d, A.h - 90), lid); b2.position.z = 90 + (A.h - 90) / 2; b2.renderOrder = 7; unit.add(b2);
+    const b2 = new THREE.Mesh(hood, lid); b2.position.z = 90; b2.renderOrder = 7; unit.add(b2);   // klare Haube
+    const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xe8f4fa, transparent: true, opacity: 0.55 })); he.position.z = 90; unit.add(he);   // Kanten der Haube
     const front = new THREE.Mesh(new THREE.BoxGeometry(A.w * 0.5, 4, 26), new THREE.MeshStandardMaterial({ color: 0x15181a })); front.position.set(0, -A.d / 2 - 1, 45); unit.add(front);
     for (let k = 0; k < 4; k++) {
       const sx = (k - 1.5) * (A.w - 40) / 4, sp = new THREE.Group(); sp.position.set(sx, 0, 20 + A.spoolR); unit.add(sp);
@@ -563,7 +574,7 @@ function lvEnclosureInit(g) {
       fil.rotation.z = Math.PI / 2; sp.add(fil);
       for (const s2 of [-1, 1]) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR, A.spoolR, 2, 32), new THREE.MeshStandardMaterial({ color: 0x1b1e20, roughness: 0.5, transparent: true, opacity: 0.85 })); fl.rotation.z = Math.PI / 2; fl.position.x = s2 * A.spoolW / 2; sp.add(fl); }
       // Schlauch vom Slot (hinten am ACE) zum Verteiler, Filament darin in Slotfarbe
-      const out = new THREE.Vector3(cx + sx, cy + A.d / 2 + 2, uz + 60), mid = new THREE.Vector3(cx + sx * 0.6, y1 + 40, Math.max(uz + 30, z1 + 10));
+      const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 60), mid = new THREE.Vector3((ax + sx + hub.x) / 2, y1 + 60, Math.max(uz + 60, z1 + 30));
       const curve = new THREE.CatmullRomCurve3([out, mid, hub.clone().add(new THREE.Vector3((k - 1.5) * 3, 0, u * 6))]);
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
       const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
