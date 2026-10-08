@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.35.2] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Ansaugung des Seitenlüfters:** Luft aus dem Bauraum strömt als Kegel auf das Lüfterrad zu (Stärke nach der Leistung des Seitenlüfters), oben tritt sie als flacher Fächer aus der Düse.
+
 ## [10.35.1] – 2026-10-08
 
 ### Verbessert

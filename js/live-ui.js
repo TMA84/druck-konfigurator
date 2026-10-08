@@ -419,6 +419,8 @@ function lvFansInit(md, g) {
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(84, 6), new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
   lv.air.push(lvAirStream(lv.gantry, [fx1 - 72, cy, zAux], [-1, 0, -0.04], 230, [40, 3], 'aux_fan_speed_pct'));
+  // Ansaugung: Luft aus dem Bauraum strömt als Kegel auf das Lüfterrad zu
+  lv.air.push(Object.assign(lvAirStream(lv.gantry, [fx1 - 190, cy, zAux - 155], [1, 0, 0], 145, [48, 48], 'aux_fan_speed_pct'), { funnel: 1 }));
   /* Gehäuselüfter in der Rückwand: Rahmen mit Lüfterrad (dreht nach box_fan_level), davor ein dünnes Gitter. Abluft: innen
      ein Kegel, der auf den Lüfter zuläuft (angesaugt), hinter der Wand ein schmaler Strahl nach draußen */
   const bxx = cx - 70, byy = fy1 - 12, fan = new THREE.Group(), fr = new THREE.MeshStandardMaterial({ color: 0x23282c, roughness: 0.6 });
