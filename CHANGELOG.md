@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.34.1] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Gehäuselüfter:** Der Luftstrom geht sichtbar durchs Gitter nach draußen (reicht etwa 6 cm hinter die Rückwand) statt am Gitter zu enden.
+
 ## [10.34.0] – 2026-10-08
 
 ### Neu

@@ -420,7 +420,7 @@ function lvFansInit(md, g) {
   const plate = new THREE.Mesh(new THREE.BoxGeometry(90, 6, 70), dark); grill.add(plate);
   for (let k = -3; k <= 3; k++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(70, 7, 4), gm); bar.position.set(0, -1, k * 9); bar.rotation.y = 0.5; grill.add(bar); }
   grill.position.set(cx - 70, fy1 - 14, zBox); lv.gantry.add(grill);
-  lv.air.push(lvAirStream(lv.gantry, [cx - 70, fy1 - 110, zBox], [0, 1, 0], 100, [26, 20], 'box_fan_level'));
+  lv.air.push(lvAirStream(lv.gantry, [cx - 70, fy1 - 110, zBox], [0, 1, 0], 170, [26, 20], 'box_fan_level'));   // durchs Gitter hinaus, hinter der Rückwand sichtbar
 }
 function lvAirTick(dt) {
   const st = typeof wb !== 'undefined' && wb.st, fans = (st && st.fans) || {};
