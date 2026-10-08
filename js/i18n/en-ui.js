@@ -801,7 +801,7 @@ I18N.add({
  "Bitte die Warteschlange neu anlegen.": "Please create the queue again.",
 });
 I18N.add({
- "<b>Höchstwerte {printer}:</b> {n} Wert(e) auf das Maximum des Druckers begrenzt ({speed}{accel}) – mehr kann der Drucker nicht.": "<b>Limits {printer}:</b> {n} value(s) capped at the printer's maximum ({speed}{accel}) – the printer can't go faster.",
+ "<b>Höchstwerte {printer}:</b> {n} Wert(e) auf den Höchstwert laut Hersteller gesetzt ({speed}{accel}) – mehr kann der Drucker nicht.": "<b>Limits {printer}:</b> {n} value(s) capped at the printer's maximum ({speed}{accel}) – the printer can't go faster.",
  "Maximum dieses Druckers": "Maximum of this printer",
  "eigener Wert – leer = Herstellerprofil": "own value – empty = manufacturer profile",
  "aus dem Herstellerprofil – nichts wird schneller gesetzt": "from the manufacturer profile – nothing is set faster",
@@ -823,4 +823,8 @@ I18N.add({
  "Höchster Volumenstrom (Hotend)": "Maximum volumetric flow (hotend)",
  "Hotend": "Hotend",
  "Volumenstrom, den das Hotend schafft – kein Herstellerwert hinterlegt; die Filamentprofile begrenzen weiter je Material": "Flow the hotend can handle – no manufacturer value available; filament profiles still limit per material",
+});
+I18N.add({
+ "Höchstwert laut Hersteller: {v} {unit} – darauf zurückgesetzt": "Manufacturer maximum: {v} {unit} – reset to it",
+ "höchstens {v} {unit} (Herstellerangabe)": "at most {v} {unit} (manufacturer spec)",
 });

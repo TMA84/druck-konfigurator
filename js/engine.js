@@ -140,7 +140,7 @@ function compute(I,geom,ctx){
   const pi=g==='quality'?0:g==='fast'?2:1;
   const warn=[],danger=[];
   // Höchstwerte des Druckers (js/data.js printerLimits): Tempo und Beschleunigung nie darüber – auch keine Anpassung
-  const lim=typeof printerLimits==='function'?printerLimits(printer,ctx.settings):{},capped=[];
+  const lim=typeof printerLimits==='function'?printerLimits(printer):{},capped=[];
   const capTo=(k,v,max)=>{if(!max||!(+v>max))return v;if(has(k))capped.push(k);if(sugg[k]>max)sugg[k]=max;return max};
   const capS=(k,v)=>capTo(k,v,lim.speed),capA=(k,v)=>capTo(k,v,lim.accel);
 
@@ -152,7 +152,7 @@ function compute(I,geom,ctx){
   const selFamily=(NOZZLE_MATERIALS[mSel]||NOZZLE_MATERIALS.steel_hardened).thermalFamily;
   let volF=N.v/R.v,tOff=0;
   if(selFamily!==refFamily){if(selFamily==='steel'){tOff=+S.steelOffset;volF*=+S.steelVol}else{tOff=-S.steelOffset;volF/=+S.steelVol}}
-  const maxVol=capTo('max_vol',take('max_vol',Math.round(m.maxVol*volF*10)/10),lim.vol);
+  const maxVol=take('max_vol',Math.round(m.maxVol*volF*10)/10);
   // Filament-Werte: Vorschlag = Profil (alles unter „Werte für diesen Auftrag“ einstellbar, 2026-10-04)
   m.flow=take('flow',m.flow);m.zhop=take('zhop',m.zhop);m.gap=capS('sp_gap',take('sp_gap',m.gap));m.fanFirst=take('fan_first',+m.fanFirst||0);
   if(m.pa!=null&&m.pa!==''||has('pa'))m.pa=take('pa',m.pa);
@@ -362,8 +362,8 @@ function compute(I,geom,ctx){
   // weitere Orca-Einstellungen: Tempo-Werte (mm/s) ebenfalls höchstens bis zum Maximum des Druckers
   const extraOv=typeof extraOverrides==='function'?extraOverrides(ov):{};
   for(const k of Object.keys(extraOv))if(typeof ORCA_EXTRA_BY_KEY!=='undefined'&&ORCA_EXTRA_BY_KEY[k][3]==='mm/s')extraOv[k]=capS('x:'+k,+extraOv[k]);
-  if(capped.length)warn.push(t('<b>Höchstwerte {printer}:</b> {n} Wert(e) auf das Maximum des Druckers begrenzt ({speed}{accel}) – mehr kann der Drucker nicht.',
-    {printer:esc(printer.label),n:capped.length,speed:lim.speed?de(lim.speed,0)+' mm/s':'',accel:[lim.accel?(lim.speed?', ':'')+de(lim.accel,0)+' mm/s²':'',lim.vol?', '+de(lim.vol,1)+' mm³/s':''].join('')}));
+  if(capped.length)warn.push(t('<b>Höchstwerte {printer}:</b> {n} Wert(e) auf den Höchstwert laut Hersteller gesetzt ({speed}{accel}) – mehr kann der Drucker nicht.',
+    {printer:esc(printer.label),n:capped.length,speed:lim.speed?de(lim.speed,0)+' mm/s':'',accel:lim.accel?(lim.speed?', ':'')+de(lim.accel,0)+' mm/s²':''}));
   return {m,ob,o,g,tpu,layer,sp,rows,ordered,sup,supOn,supCritical,supNeed,warn,danger,a,nozLabel,dryNeed,printer,effectiveStatus,
     nozzle,w,t:tt,b,inf,sp_outer,sp_inner,sp_fill,sp_travel,sp_first,accel,retr,fans2:fans2Set,preheatMin,dSel,top,pattern,
     // Neu seit v5 (für den 3MF-Export); tests/compare-v4.js blendet diese Felder aus.

@@ -102,29 +102,14 @@ function ovReadonlyRows(r) {
       (by[t(th)] = by[t(th)] || []).push(x); } }
   return by;
 }
-/* Höchstwerte des Druckers (js/data.js printerLimits): Tempo-Felder (sp_*, weitere Orca-Werte in mm/s) und
-   Beschleunigung lassen sich nicht darüber eintragen; die Zeile oben im Reiter Tempo zeigt sie und nimmt eigene Werte */
+/* Höchstwerte des Druckers (js/data.js printerLimits, Herstellerprofil): Tempo-Felder (sp_*, weitere Orca-Werte in mm/s)
+   und Beschleunigung lassen sich nicht darüber eintragen – eine höhere Eingabe wird auf den Höchstwert gesetzt, die
+   Zeile sagt es (ovCapped: Feld → Höchstwert, bis das Feld wieder ohne Kappen übernommen wird) */
 function ovLimitOf(f) {
   const L = (lastResult && lastResult.limits) || {}, k = f[0];
-  return k === 'accel' ? L.accel || null : k === 'max_vol' ? L.vol || null : /^sp_/.test(k) || (k.startsWith('x:') && f[2] === 'mm/s') ? L.speed || null : null;
+  return k === 'accel' ? L.accel || null : /^sp_/.test(k) || (k.startsWith('x:') && f[2] === 'mm/s') ? L.speed || null : null;
 }
-function ovLimitRow(r) {
-  const L = r.limits || {}, P = L.profile || {}, own = L.own || {}, th = esc(t('Tempo'));
-  const inp = (k, unit, ph, step, label) => '<input data-lim="' + k + '" type="number" inputmode="numeric" min="1" step="' + step + '" value="' + (own[k] || '') + '" placeholder="' + esc(ph ? String(ph) : t('unbekannt')) +
-    '" aria-label="' + esc(label) + '"><small class="ov-unit muted">' + unit + '</small>';
-  return '<div class="ov-row ov-limit" data-theme="' + th + '"><span>' + esc(t('Maximum dieses Druckers')) + '<small class="ov-scope muted">' +
-    esc(own.speed || own.accel ? t('eigener Wert – leer = Herstellerprofil') : t('aus dem Herstellerprofil – nichts wird schneller gesetzt')) + '</small></span>' +
-    '<span class="ov-in ov-lim3">' + inp('speed', 'mm/s', P.speed, 10, t('Höchstgeschwindigkeit')) + inp('accel', 'mm/s²', P.accel, 500, t('Höchstbeschleunigung')) +
-    inp('vol', 'mm³/s', null, 0.5, t('Höchster Volumenstrom (Hotend)')).replace('placeholder="' + esc(t('unbekannt')) + '"', 'placeholder="' + esc(t('Hotend')) + '" title="' + esc(t('Volumenstrom, den das Hotend schafft – kein Herstellerwert hinterlegt; die Filamentprofile begrenzen weiter je Material')) + '"') + '</span></div>';
-}
-$('ovRows').addEventListener('change', e => {
-  const el = e.target.closest('[data-lim]'), r = lastResult; if (!el || !r) return;
-  const key = printerLimitKey(r.printer), all = store.settings.printerLimits || (store.settings.printerLimits = {}), cur = { ...(all[key] || {}) }, v = Math.round(num(el.value));
-  const vv = el.dataset.lim === 'vol' ? Math.round(num(el.value) * 2) / 2 : v;
-  if (vv > 0) cur[el.dataset.lim] = vv; else delete cur[el.dataset.lim];
-  if (Object.keys(cur).length) all[key] = cur; else delete all[key];
-  persist(); update();
-});
+const ovCapped = {};
 function ovRenderPanel() {
   const p = ovPart(), r = lastResult; if (!p || !r) { $('ovRows').innerHTML = ''; $('ovTabs').innerHTML = ''; return; }
   const sugg = { ...(r.suggested || {}) }, own = p.overrides || {}, def = r.ovDefaults || {}, xs = ovExtraSugg(r);
@@ -134,11 +119,12 @@ function ovRenderPanel() {
   let group = '', html = '';
   for (const f of ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && (r.printer.id === 'kobra_s1' || ((typeof lanModelOf === 'function' && lanModelOf(r.printer)) || { fans: {} }).fans[f[0].slice(4)])))) {
     const [k, label, unit, min, max0, step, grp, opts] = f, cur = own[k], lm = ovLimitOf(f), max = lm ? Math.min(max0, lm) : max0;
-    if (grp !== group) { if (group) html += roHtml(group); html += '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>' + (grp === t('Tempo') ? ovLimitRow(r) : ''); group = grp; }
+    if (grp !== group) { if (group) html += roHtml(group); html += '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>'; group = grp; }
     const ph = def[k] ?? sugg[k] ?? '';
     const input = opts
       ? '<select data-ov="' + k + '" aria-label="' + esc(label) + '"><option value="">' + esc(t('Vorschlag') + (sugg[k] !== undefined || def[k] !== undefined ? ': ' + ovFmt(f, def[k] ?? sugg[k]) : '')) + '</option>' + opts.map(o => { const [v, txt] = Array.isArray(o) ? o : [o, t(o)]; return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }).join('') + '</select>'
-      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(ph) + '" aria-label="' + esc(label) + '">' + (unit ? '<small class="ov-unit muted">' + unit + '</small>' : '');
+      : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(ph) + '" aria-label="' + esc(label) + '"' +
+        (lm ? ' title="' + esc(t('höchstens {v} {unit} (Herstellerangabe)', { v: de(lm, 0), unit })) + '"' : '') + '>' + (unit ? '<small class="ov-unit muted">' + unit + '</small>' : '');
     const sc = project.parts.length > 1 ? ovScope(k) : null;
     const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
     // Erklärung (?) wie im Datenblatt: über die deutsche Zeilenbezeichnung (js/panel.js ROW_OV, helpFor)
@@ -146,7 +132,8 @@ function ovRenderPanel() {
     html += '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '" data-theme="' + esc(grp) + '"><span>' + esc(label) + (hp ? '<span class="help" title="' + esc(hp) + '">?</span>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
       '<span class="ov-in">' + input + '</span>' +
       '<span class="ov-sugg">' + (def[k] !== undefined ? t('Standard {v}', { v: esc(ovFmt(f, def[k])) }) + ' <small class="muted">' + t('Werk {v}', { v: esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–') }) + '</small>'
-        : esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–')) + '</span>' +
+        : esc(sugg[k] !== undefined ? ovFmt(f, sugg[k]) : '–')) +
+        (lm && cur !== undefined && ovCapped[k] === cur ? '<small class="ov-cap">' + t('Höchstwert laut Hersteller: {v} {unit} – darauf zurückgesetzt', { v: de(lm, 0), unit }) + '</small>' : '') + '</span>' +
       '<button type="button" class="ov-x" data-ov-x="' + k + '" title="' + t('Vorschlag verwenden') + '"' + (cur === undefined ? ' hidden' : '') + '>×</button></div>';
   }
   if (group) html += roHtml(group);
@@ -167,7 +154,7 @@ function ovRenderPanel() {
 // nach jedem update(): neu zeichnen, wenn sich etwas Relevantes geändert hat; Fokus und Reiter bleiben
 function ovPanelSync() {
   const p = ovPart(), r = lastResult;
-  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, printerLimitKey(r.printer), r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel, r.limits.vol], typeof LANG !== 'undefined' ? LANG : '']) : '';
+  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, r.printer.id === 'orca' && r.printer.orca ? r.printer.orca.name : r.printer.id, r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel], JSON.stringify(ovCapped), typeof LANG !== 'undefined' ? LANG : '']) : '';
   $('ovPanel').classList.toggle('hidden', !p);
   if (key === ovPanelKey) return;
   ovPanelKey = key;
@@ -277,7 +264,7 @@ $('ovRows').addEventListener('click', e => {
 
 // Eingaben des Dialogs → {Schlüssel: Wert} oder null (ungültige Eingabe gemeldet)
 function ovCollect() {
-  const out = {}, bad = [], capped = [], badEls = [];
+  const out = {}, bad = [], badEls = [];
   for (const f of ovFields()) {
     const [k, label, , min, max0, step, , opts] = f, el = $('ovRows').querySelector('[data-ov="' + k + '"]'), s = el ? el.value.trim() : '';
     if (!s) continue;
@@ -285,7 +272,7 @@ function ovCollect() {
     let v = num(s);
     // über dem Maximum des Druckers: auf das Maximum setzen und sagen
     const lm = ovLimitOf(f), max = lm ? Math.min(max0, lm) : max0;
-    if (lm && v > max) { v = max; el.value = String(max); capped.push(label + ' ' + de(max, 0) + ' ' + f[2]); }
+    if (lm && v > max) { v = max; el.value = String(max); ovCapped[k] = max; } else delete ovCapped[k];
     if (isNaN(v) || v < min || v > max) { bad.push(label + ' (' + de(min, min < 1 ? 2 : 0) + '–' + de(max, 0) + ')'); badEls.push(el); continue; }
     // auf die Schrittweite des Felds runden (Schichthöhe 0,02 mm, Rückzug 0,1 mm – bisher wurde alles außer der
     // Schichthöhe ganzzahlig, aus 1,3 mm Rückzug wurde 1 mm)
@@ -293,7 +280,6 @@ function ovCollect() {
     out[k] = Math.round(v * 10 ** dec) / 10 ** dec;
   }
   if (bad.length) { formError(t('Bitte prüfen: {list}', { list: bad.join(', ') }), $('ovRows'), badEls); return null; }
-  if (capped.length) toast(t('Maximum des Druckers: {list}', { list: capped.join(', ') }));
   return out;
 }
 function ovApply(quiet) {
