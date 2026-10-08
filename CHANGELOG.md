@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 
 ## [Unveröffentlicht]
 
+### Neu
+- **3D-Fortschritt: Riemen, Schleppkette und Filament:** Kobra S1/S1 Max mit den zwei CoreXY-Riemen übereinander (Motoren hinten, Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf) – die Zähne laufen mit, Riemen A mit x + y, B mit x − y, die Rollen drehen sich. Bettschubser mit X-Riemen an der Traverse und Y-Riemen unter dem Bett. Dazu eine Schleppkette vom Rahmen zum Kopf und daneben der PTFE-Schlauch mit dem Filament in der Farbe der gerade gedruckten Bahn.
+
 ### Geändert
 - **Veröffentlichen nur nach grünen Tests:** Das Container-Image baut erst, wenn die Tests auf GitHub (Node, Python, OrcaSlicer, Browser) für den Stand auf main grün sind; danach legt derselbe Workflow das GitHub-Release an (vorher eigener Workflow release.yml).
 

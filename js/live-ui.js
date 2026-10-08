@@ -164,7 +164,7 @@ function lvBed() {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 function lvHeadInit() {
-  for (const k of ['head', 'gantry', 'bed', 'frameFixed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
+  for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
@@ -246,8 +246,110 @@ function lvHeadInit() {
   if (lv.plate) { lv.scene.remove(lv.plate); lv.plate.geometry.dispose(); lv.plate.material.dispose(); }
   lv.plate = new THREE.Mesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), new THREE.MeshLambertMaterial({ color: 0x1d272d }));
   lv.plate.position.set((bx0 + bx1) / 2, (by0 + by1) / 2, -0.03);
-  lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate);
+  lvMechInit(md, { bx0, bx1, by0, by1, m, cx, beam });
+  lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate, lv.mechG);
   lvTheme();
+}
+/* Riemen, Schleppkette und Filamentschlauch (2026-10-08, Spielerei): CoreXY mit zwei Riemen übereinander – Motoren hinten,
+   Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf; Riemen A läuft mit x + y, B mit x − y (CoreXY), die Zähne
+   wandern mit. Bettschubser: X-Riemen an der Traverse (läuft mit x), Y-Riemen unter dem Bett (läuft mit y). Schleppkette
+   vom Rahmen hinten oben zum Kopf, daneben der PTFE-Schlauch mit dem Filament in der Farbe der gerade gedruckten Bahn. */
+const LV_BELT_PITCH = 4, LV_BELT_H = 6, LV_BELT_T = 1.4, LV_CHAIN_LINKS = 26;
+let lvBeltTex = null;
+function lvBeltTexture() {
+  if (lvBeltTex) return lvBeltTex;
+  const c = document.createElement('canvas'); c.width = 32; c.height = 8;
+  const g = c.getContext('2d'); g.fillStyle = '#16191b'; g.fillRect(0, 0, 32, 8); g.fillStyle = '#4a5156'; g.fillRect(0, 0, 12, 8);
+  lvBeltTex = new THREE.CanvasTexture(c); lvBeltTex.wrapS = THREE.RepeatWrapping;
+  return lvBeltTex;
+}
+// Riemen: offene Linienzüge (2D, Höhe z) aus Quadern mit wandernden Zähnen, Rollen an den Ecken
+function lvBelt(parent, z, paths) {
+  const box = new THREE.BoxGeometry(1, 1, 1), belt = { z, segs: [], rolls: [] };
+  const roll = new THREE.CylinderGeometry(4.2, 4.2, LV_BELT_H + 2, 14), rollM = new THREE.MeshStandardMaterial({ color: 0xb9c1c6, metalness: 0.5, roughness: 0.35, flatShading: true });
+  for (const n of paths(0, 0)) for (let k = 0; k < n.length - 1; k++) {
+    const tex = lvBeltTexture().clone(); tex.needsUpdate = true;
+    const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    parent.add(mesh); belt.segs.push(mesh);
+  }
+  for (const n of paths(0, 0)) for (let k = 1; k < n.length - 1; k++) { const r = new THREE.Mesh(roll, rollM); r.rotation.x = Math.PI / 2; parent.add(r); belt.rolls.push(r); }
+  belt.paths = paths;
+  return belt;
+}
+function lvBeltSet(b, px, py, travel) {
+  let si = 0, ri = 0;
+  for (const n of b.paths(px, py)) {
+    let acc = 0;
+    for (let k = 0; k < n.length - 1; k++) {
+      const [x0, y0] = n[k], [x1, y1] = n[k + 1], len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0)), mesh = b.segs[si++];
+      mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, b.z); mesh.rotation.z = Math.atan2(y1 - y0, x1 - x0); mesh.scale.set(len, LV_BELT_T, LV_BELT_H);
+      const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = (acc - travel) / LV_BELT_PITCH;
+      acc += len;
+    }
+    for (let k = 1; k < n.length - 1; k++) { const r = b.rolls[ri++]; r.position.set(n[k][0], n[k][1], b.z); r.rotation.y = -travel / 4.2; }
+  }
+}
+function lvMechInit(md, g) {
+  const { bx0, bx1, by0, by1, m, cx, beam } = g;
+  lv.mechG = new THREE.Group(); lv.mechG.visible = false;
+  lv.belts = [];
+  if (md.kin === 'bed') {
+    // X-Riemen hinter den Stangen der Traverse (Motor links), Y-Riemen unter dem Bett (im festen Rahmen)
+    const xl = bx0 - m - 4 - cx, xr = bx1 + m - 6 - cx;   // Koordinaten der Traverse (beam.position.x = cx)
+    lv.belts.push({ b: lvBelt(beam, 0, (px) => [[[px - 14, 12], [xl, 12], [xl, 18], [xr, 18], [xr, 12], [px + 14, 12]]]), go: p => [p.x - cx, 0, p.x] });
+    if (lv.frameFixed) {
+      const yl = (by1 - by0) * 0.55, zb = -45 + 22;
+      lv.belts.push({ b: lvBelt(lv.frameFixed, zb, () => [[[0, -6], [0, -yl], [6, -yl], [6, yl], [0, yl], [0, 6]]].map(n => n.map(([x, y]) => [x + cx, y]))), go: p => [0, 0, p.y] });
+    }
+  } else {
+    const xL = bx0 - m, xR = bx1 + m, yB = by1 + m - 8, yF = by0 - m + 4;
+    lv.belts.push({ b: lvBelt(lv.gantry, 12, (px, py) => [[[xR - 10, yB], [xR - 10, yF], [xR - 18, yF], [xR - 18, py + 5], [px + 12, py + 5]], [[px - 12, py + 5], [xL + 18, py + 5], [xL + 18, yB], [xR - 10, yB]]]), go: p => [p.x, p.y, p.x + p.y] });
+    lv.belts.push({ b: lvBelt(lv.gantry, 20, (px, py) => [[[xL + 10, yB], [xL + 10, yF], [xL + 18, yF], [xL + 18, py - 5], [px - 12, py - 5]], [[px + 12, py - 5], [xR - 18, py - 5], [xR - 18, yB], [xL + 10, yB]]]), go: p => [p.x, p.y, p.x - p.y] });
+  }
+  // Schleppkette: Glieder entlang einer Kurve vom Rahmen hinten oben zum Kopf
+  const link = new THREE.BoxGeometry(9, 7, 13),   // lange Seite entlang z: lookAt richtet z auf die Kurve
+     linkM = new THREE.MeshStandardMaterial({ color: 0x24292d, roughness: 0.65 });
+  lv.chain = [];
+  for (let k = 0; k < LV_CHAIN_LINKS; k++) { const l = new THREE.Mesh(link, linkM); lv.mechG.add(l); lv.chain.push(l); }
+  lv.tubeM = new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false });
+  lv.filM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+  lv.tube = null; lv.fil = null;
+  lv.mechAnchor = md.kin === 'bed' ? { x: cx, y: 0, z: md.size[2] + 70 + 14, fixed: true } : { x: cx, y: by1 + m + 4, z: 46, fixed: false };
+}
+// Kurve der Kette: hinten oben → Bogen → senkrecht von oben auf den Kopf
+function lvChainCurve(a, h) {
+  const up = Math.max(40, (a.z - h.z) * 0.5 + 40);
+  return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(a.x, a.y - 70, a.z + 30),
+    new THREE.Vector3(h.x, h.y + 10, h.z + up), new THREE.Vector3(h.x, h.y + 6, h.z));
+}
+function lvMechUpdate(p) {
+  if (!lv.mechG) return;
+  lv.mechG.visible = lv.head.visible;
+  if (!lv.head.visible) return;
+  for (const { b, go } of lv.belts) { const [px, py, tr] = go(p); lvBeltSet(b, px, py, tr); }
+  // Anker in Weltkoordinaten: CoreXY am Rahmen (fährt in Z mit der Traverse), Bettschubser am oberen Querholm (fährt in Y)
+  const A = lv.mechAnchor, a = A.fixed ? { x: A.x, y: A.y + p.y, z: A.z } : { x: A.x, y: A.y, z: p.z + LV_GANTRY_Z + A.z };
+  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 2 }, c = lvChainCurve(a, top), q = new THREE.Vector3();
+  lv.chain.forEach((l, k) => {
+    const t = (k + 0.5) / LV_CHAIN_LINKS; c.getPoint(t, l.position); c.getTangent(t, q);
+    l.lookAt(l.position.x + q.x, l.position.y + q.y, l.position.z + q.z);
+  });
+  // Schlauch mit Filament neben der Kette (seitlich versetzt), endet oben im Kopf
+  const off = new THREE.Vector3(9, 0, 0), ct = new THREE.CubicBezierCurve3(c.v0.clone().add(off), c.v1.clone().add(off), c.v2.clone().add(off), c.v3.clone().add(new THREE.Vector3(4, 0, -6)));
+  for (const k of ['tube', 'fil']) if (lv[k]) { lv.mechG.remove(lv[k]); lv[k].geometry.dispose(); }
+  lv.tube = new THREE.Mesh(new THREE.TubeGeometry(ct, 40, 2.4, 10), lv.tubeM);
+  lv.fil = new THREE.Mesh(new THREE.TubeGeometry(ct, 40, 0.9, 6), lv.filM);
+  lv.tube.renderOrder = 3;
+  lv.mechG.add(lv.fil, lv.tube);
+}
+// Filamentfarbe im Schlauch: Werkzeug der gerade gedruckten Bahn
+function lvFilamentAt(seg) {
+  if (!lv.filM || seg == null || !lv.data || !lv.data.a) return;
+  const k = lv.data.a[2 * seg + 1];
+  if (k === lv.filTool) return;
+  lv.filTool = k;
+  const c = typeof toolColour === 'function' ? toolColour(k) : null;
+  if (c) lv.filM.color.set(c);
 }
 // Kopf und Mechanik an die Stelle p (Düsenspitze)
 function lvPlaceHead(p) {
@@ -257,6 +359,7 @@ function lvPlaceHead(p) {
   // CoreXY: Traverse fährt in Y; Bettschubser: der ganze Aufbau steht relativ zum Kopf, das Bett (mit dem Teil) fährt
   if (lv.kin === 'bed') { lv.gantry.position.y = p.y; lv.gantry.userData.beam.position.y = 0; if (lv.frameFixed) { lv.frameFixed.position.y = p.y; lv.frameFixed.visible = lv.head.visible; } }
   else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y; }
+  lvMechUpdate(p);
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
 function lvVisible(rgb) {
@@ -443,7 +546,7 @@ function lvHeadSet(st, cur, L, T) {
     }
     lv.hs = hs;
   } else {
-    if (!(L > 0)) { lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; } lvRender(); return null; }
+    if (!(L > 0)) { lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; if (lv.mechG) lv.mechG.visible = false; } lvRender(); return null; }
     if (cur !== lv.layerAt) { lv.layerAt = cur; lv.layerSince = Date.now(); }
     const rest = +(st.job && st.job.remaining_min) || 0, left = Math.max(1, (T || lv.data.layers.length) - L + 1);
     lv.hs = { real: false, li: cur, dur: rest > 0 ? rest * 60 / left : 60, info: { real: false, li: cur } };
@@ -477,7 +580,8 @@ function lvHeadTick(now) {
     if (!d || Math.hypot(p.x - d.x, p.y - d.y) > 120) lv.disp = { x: p.x, y: p.y, z: p.z };
     else { const a = 1 - Math.exp(-dt / LV_SMOOTH_S); d.x += (p.x - d.x) * a; d.y += (p.y - d.y) * a; d.z += (p.z - d.z) * a; }
     lvPlaceHead(lv.disp);
-    if (p.seg != null && h.li === lv.shown) lvColourTo(p.seg);   // abgefahrene Bahnen orange (die aktuelle erst danach)
+    if (p.seg != null && h.li === lv.shown) lvColourTo(p.seg);
+    lvFilamentAt(p.seg);   // abgefahrene Bahnen orange (die aktuelle erst danach)
     lvDraw();
   }
   lv.lastTick = now;
@@ -572,7 +676,7 @@ function liveUpdate(st) {
   if (!card) return;
   if (!job || !job.name) {
     lv.at = null;
-    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; }
+    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; if (lv.mechG) lv.mechG.visible = false; }
     $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden');
     $('wbLiveInfo').textContent = '';
     return;
