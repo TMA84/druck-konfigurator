@@ -567,17 +567,18 @@ function lvEnclosureInit(g) {
     const b1 = new THREE.Mesh(new THREE.BoxGeometry(A.w, A.d, 90), body); b1.position.z = 45; unit.add(b1);
     const b2 = new THREE.Mesh(hood, lid); b2.position.z = 90; b2.renderOrder = 7; unit.add(b2);   // klare Haube
     const he = new THREE.LineSegments(new THREE.EdgesGeometry(hood, 25), new THREE.LineBasicMaterial({ color: 0xe8f4fa, transparent: true, opacity: 0.55 })); he.position.z = 90; unit.add(he);   // Kanten der Haube
-    const front = new THREE.Mesh(new THREE.BoxGeometry(A.w * 0.5, 4, 26), new THREE.MeshStandardMaterial({ color: 0x15181a })); front.position.set(0, -A.d / 2 - 1, 45); unit.add(front);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(A.w * 0.5, 4, 22), new THREE.MeshStandardMaterial({ color: 0x15181a })); front.position.set(0, -A.d / 2 - 1, 28); unit.add(front);
     for (let k = 0; k < 4; k++) {
       const sx = (k - 1.5) * (A.w - 40) / 4, sp = new THREE.Group(); sp.position.set(sx, 0, 20 + A.spoolR); unit.add(sp);
       const fil = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR - 14, A.spoolR - 14, A.spoolW - 8, 32), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6 }));
       fil.rotation.z = Math.PI / 2; sp.add(fil);
       const core = new THREE.Mesh(new THREE.CylinderGeometry(LV_SPOOL_CORE, LV_SPOOL_CORE, A.spoolW - 6, 24), new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.5 }));
       core.rotation.z = Math.PI / 2; sp.add(core);
-      // Restmenge als Schild über der Spule (Text wird bei Änderung neu gezeichnet)
+      // Restmenge als Schild (Text wird bei Änderung neu gezeichnet)
       const cv = document.createElement('canvas'); cv.width = 128; cv.height = 48;
-      const lbl = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false }));
-      lbl.scale.set(64, 24, 1); lbl.position.set(sx, 0, A.h + 22); lbl.renderOrder = 9; unit.add(lbl);
+      // vorn auf der ACE-Front unter der Spule (Fläche zeigt nach vorn, −y)
+      const lbl = new THREE.Mesh(new THREE.PlaneGeometry(72, 27), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true }));
+      lbl.rotation.x = Math.PI / 2; lbl.position.set(sx, -A.d / 2 - 2.5, 70); unit.add(lbl);
       for (const s2 of [-1, 1]) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(A.spoolR, A.spoolR, 2, 32), new THREE.MeshStandardMaterial({ color: 0x1b1e20, roughness: 0.5, transparent: true, opacity: 0.85 })); fl.rotation.z = Math.PI / 2; fl.position.x = s2 * A.spoolW / 2; sp.add(fl); }
       // Schlauch vom Slot (hinten am ACE) zum Verteiler, Filament darin in Slotfarbe
       const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 60), mid = new THREE.Vector3((ax + sx + hub.x) / 2, y1 + 60, Math.max(uz + 60, z1 + 30));

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.3] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Restmenge vorn auf der ACE:** Die Grammzahlen stehen als Schilder auf der Front jeder Einheit, je eines unter seiner Spule (statt schwebend über den Spulen).
+
 ## [10.39.2] – 2026-10-08
 
 ### Neu
