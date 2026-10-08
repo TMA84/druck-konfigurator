@@ -3,16 +3,19 @@
 # amd64 und arm64 jeweils auf eigener Maschine (kein QEMU – OrcaSlicer entpacken ginge emuliert sehr langsam),
 # danach ein gemeinsames Multi-Arch-Tag. Nutzen: NAS-Container (docker compose) und das Home-Assistant-Add-on
 # (TMA84/ha-addons, Ordner druck-konfigurator).
+# Gebaut wird erst, wenn die Tests (.github/workflows/tests.yml) für diesen Stand auf main grün sind – kein Image und
+# damit kein Release aus einem Stand mit Fehlern. Zuletzt legt der Job release die Version als GitHub-Release an. Von Hand: Run workflow (ohne Tests).
 name: Container-Image
 
 on:
-  push:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [main]
-    paths-ignore: ['**.md', 'docs/**', 'tests/**']
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # Release-Tag (Job release)
   packages: write
 
 concurrency:
@@ -21,6 +24,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +36,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Version und Name
         id: meta
@@ -95,4 +101,41 @@ jobs:
         run: |
           set -euo pipefail
           img="${{ needs.build.outputs.image }}"; v="${{ needs.build.outputs.version }}"
-          docker buildx imagetools create -t "$img:$v" -t "$img:latest" -t "$img:sha-${GITHUB_SHA::7}" "$img:$v-amd64" "$img:$v-arm64"
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          docker buildx imagetools create -t "$img:$v" -t "$img:latest" -t "$img:sha-${sha::7}" "$img:$v-amd64" "$img:$v-arm64"
+
+  # GitHub-Release je Version: oberste Version aus CHANGELOG.md („## [X.Y.Z] – Datum“) als Tag vX.Y.Z, Text = Abschnitt
+  # dieser Version. Gibt es den Tag schon (oder steht oben „Unveröffentlicht“), passiert nichts.
+  release:
+    needs: manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - name: Version und Text aus CHANGELOG.md
+        id: v
+        run: |
+          set -euo pipefail
+          version=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ' || true)
+          top=$(grep -m1 -E '^## \[' CHANGELOG.md || true)
+          if [ -z "$version" ] || ! printf '%s' "$top" | grep -qF "[$version]"; then
+            echo "Oberste Version ist nicht veröffentlicht ($top) – kein Release."; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "Tag v$version gibt es schon – kein Release."; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          awk -v v="## [$version]" 'index($0, v) == 1 { on = 1; next } on && /^## \[/ { exit } on { print }' CHANGELOG.md > notes.md
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/druck-konfigurator:$version"
+          printf '\n---\nContainer-Image: `%s` (amd64, arm64) · Home-Assistant-Add-on: Version %s\n' "$image" "$version" >> notes.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - name: Tag und Release anlegen
+        if: steps.v.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v="${{ steps.v.outputs.version }}"
+          gh release create "v$v" --target "$(git rev-parse HEAD)" --title "$v" --notes-file notes.md --latest

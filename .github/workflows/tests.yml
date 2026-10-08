@@ -3,7 +3,8 @@
 #   python  – Server-Teile (LAN-Modus gegen nachgebauten Drucker, Spulen, Warteschlange, MQTT, Zugriffsschutz …)
 #   orca    – gegen die echte OrcaSlicer-CLI (2.4.2, wie im Dockerfile)
 #   browser – Bedientest tests/ui-smoke.js in Chrome ohne Fenster (tools/headless.js)
-# Kein Test spricht mit einem echten Drucker. Das Container-Image baut .github/workflows/docker-image.yml.
+# Kein Test spricht mit einem echten Drucker. Sind alle grün (Push auf main), baut .github/workflows/docker-image.yml
+# das Container-Image, danach legt .github/workflows/release.yml das Release an.
 name: Tests
 
 on:

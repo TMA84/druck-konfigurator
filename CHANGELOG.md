@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Veröffentlichen nur nach grünen Tests:** Das Container-Image baut erst, wenn die Tests auf GitHub (Node, Python, OrcaSlicer, Browser) für den Stand auf main grün sind; danach legt derselbe Workflow das GitHub-Release an (vorher eigener Workflow release.yml).
+
 ## [10.31.1] – 2026-10-08
 
 ### Neu
