@@ -17,7 +17,7 @@ function updateExportMenu(r){
 }
 $('export3mfCta').addEventListener('click',openExportDialog);
 
-const printerHost=id=>((store.settings.printerHosts||{})[id]||'').trim();
+const printerHost=id=>((store.settings.printerHosts||{})[typeof linkId==='function'?linkId(id):id]||'').trim();
 function slotKey(printerId){return 'exportSlot_'+printerId}
 function chosenSlot(){const c=document.querySelector('input[name="slot"]:checked');return c?+c.value:0}
 
@@ -33,10 +33,10 @@ const ownSlot=s=>({type:s.type,colour:s.colour,present:!!s.type,name:s.type?t('e
    bis 4 (ACE_MAX; ohne Eintrag 4). Meldet der Drucker mehr Slots, merkt sich das Tool die Anzahl
    (store.settings.aceCount[drucker]) – ohne Verbindung gilt sie weiter; von Hand im Dialog Filament-Slots. */
 // als Funktionen: exportTemplate fragt schon beim Laden der Skripte nach, bevor Konstanten hier stehen
-function aceMax(printerId){return ({kobra_s1:2})[printerId]||4}
+function aceMax(printerId){const m=printerId==='orca'&&typeof lanModelOf==='function'&&typeof PRINTERS!=='undefined'?lanModelOf(PRINTERS.orca):null;return m?m.ace:({kobra_s1:2})[printerId]||4}
 var ACE_SLOTS=4;
 function printerSlotCount(printerId,tpl){
-  if(typeof LAN_PRINTERS==='undefined'||!LAN_PRINTERS.includes(printerId))return 0;
+  if(typeof LAN_PRINTERS==='undefined'||!LAN_PRINTERS.includes(linkId(printerId)))return 0;
   const st=slotState,counts=store.settings.aceCount||{},max=aceMax(printerId),live=st&&st.live&&st.printer===printerId?st.live.slots.length:0;
   const boxes=Math.min(max,Math.ceil(live/4));
   if(live&&boxes!==(+counts[printerId]||1)){store.settings.aceCount={...counts,[printerId]:boxes};persist()}
@@ -163,13 +163,13 @@ function purgeItems(tpl,plan){
 function exportMachine(tpl){return [...purgeMachine(tpl),...(typeof costMachine==='function'?costMachine(tpl):[])]}
 function purgeMachine(tpl){
   const base=+tpl.settings.machine_load_filament_time,f=aceFlush(),own=acePurgeOwn();
-  if(lastResult.printer.id!=='kobra_s1'||!(base>0))return [];
+  if(!isLanPrinter(lastResult.printer)||!(base>0))return [];
   const secs=own&&own.seconds>0?own.seconds:f===ACE_FLUSH_DEFAULT?null:aceChangeSeconds(f,base);
   if(secs===null)return [];
   return [{label:t('Filamentwechsel-Zeit ({how})',{how:own&&own.seconds>0?t('eigene Messung'):t('Spülmenge {f}',{f:de(f,1)})}),key:'machine_load_filament_time',value:String(Math.round(secs*1000)/1000)}];
 }
 function renderPurge(tpl,plan,slot){
-  const s1=lastResult.printer.id==='kobra_s1';
+  const s1=isLanPrinter(lastResult.printer);
   const n=s1?estimateColourChanges(purgeItems(tpl,plan),slot,plan.r.layer,plan.r.firstLayer):0;
   $('purgeBox').classList.toggle('hidden',!n);
   if(!n)return;
@@ -305,7 +305,7 @@ function renderSlotDialog(){
   const types=[...new Set(SLOT_TYPES.concat(Object.keys(tpl.filamentPresets||{})))];
   $('slotDlgSource').textContent=live?t('Vom Drucker gelesen ({via}, {time})',{via:live.via==='lan'?t('Werksfirmware'):'Moonraker',time:live.time.toLocaleTimeString(LOCALE(),{hour:'2-digit',minute:'2-digit'})})
     :slotState.note&&slotState.printer===id?slotState.note:printerHost(id)?t('Noch nicht vom Drucker gelesen'):t('Keine Drucker-Verbindung eingerichtet – deine Angaben gelten');
-  const aceRow=typeof LAN_PRINTERS!=='undefined'&&LAN_PRINTERS.includes(id);
+  const aceRow=typeof LAN_PRINTERS!=='undefined'&&LAN_PRINTERS.includes(linkId(id));
   $('slotAceRow').classList.toggle('hidden',!aceRow);
   $('slotAceCount').innerHTML=Array.from({length:aceMax(id)},(_,k)=>'<option value="'+(k+1)+'">'+t('{n} (Slot 1–{last})',{n:k+1,last:(k+1)*ACE_SLOTS})+'</option>').join('');
   $('slotAceCount').value=String(Math.max(1,Math.round(n/ACE_SLOTS)));
@@ -447,9 +447,9 @@ function renderSidePanels(){
       :slotState.note&&slotState.printer===r.printer.id?slotState.note:printerHost(r.printer.id)?'':t('Keine Drucker-Verbindung – ⚙ Einstellungen → Drucker-Verbindung');
     $('slotPanelReload').classList.toggle('hidden',!printerHost(r.printer.id));
     // Ohne Verbindung direkt hier verbinden können (nur Drucker mit Live-Abfrage)
-    $('slotPanelConnect').classList.toggle('hidden',!!printerHost(r.printer.id)||!LINK_PRINTERS.includes(r.printer.id));
+    $('slotPanelConnect').classList.toggle('hidden',!!printerHost(r.printer.id)||!LINK_PRINTERS.includes(linkId(r.printer.id)));
   }
-  const s1=!!r&&r.printer.id==='kobra_s1';
+  const s1=!!r&&isLanPrinter(r.printer);
   $('purgePanel').classList.toggle('hidden',!s1);
   if(!s1)return;
   const f=aceFlush();

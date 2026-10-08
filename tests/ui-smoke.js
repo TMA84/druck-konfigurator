@@ -358,6 +358,12 @@ async function runSmoke(opts={}){
     menuClick('export3mf');await wait(60);$('export3mfSave').click();await wait(150);
     const fo=downloads.filter(d=>d.name.endsWith('.3mf')).pop(),zo=fflate.unzipSync(await blobBytes(fo)),po=JSON.parse(fflate.strFromU8(zo['Metadata/project_settings.config']));
     ok(po.printer_settings_id==='Creality Ender-3 V3 SE 0.4 nozzle'&&/Ender3V3SE/.test(po.print_settings_id)&&JSON.stringify(po.printable_area).includes('220x220'),'3MF mit Ender-Druckerprofil, Prozessprofil und 220er Bett ('+fo.name+')');
+    // Anderer Anycubic mit LAN-Modus (experimentell): Kobra 3 – Druckersteuerung frei, ohne Hilfs-/Gehäuselüfter, Abzeichen in der Auswahl
+    await activateOrcaPrinter('Anycubic','Anycubic Kobra 3 0.4 nozzle');await wait(150);
+    ok(isLanPrinter(lastResult.printer)&&lanModelOf(lastResult.printer).key==='kobra_3'&&linkId('orca')==='kobra_s1','Kobra 3: LAN-Drucker, nutzt die Druckerverbindung');
+    ok(!$('ovRows').querySelector('[data-ov="fan_aux"]')&&!lastResult.fans2,'Kobra 3: keine Hilfs-/Gehäuselüfter-Werte');
+    fillPickerVendors();$('pickSearch').value='';$('pickVendor').value='Anycubic';renderPickerList();
+    ok(/LAN · experimentell/.test($('pickList').textContent),'Druckerauswahl: Abzeichen „LAN · experimentell“');
     document.querySelector('.printer-switch [data-printer="kobra_s1"]').click();await wait(80);
     ok(document.body.dataset.printer==='kobra_s1','Zurück zum Kobra S1');}
 

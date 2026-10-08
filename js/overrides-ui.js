@@ -109,7 +109,7 @@ function ovRenderPanel() {
   const ro = ovReadonlyRows(r), roHtml = th => (ro[th] || []).map(x => '<div class="ov-row ov-ro" data-theme="' + esc(th) + '"><span>' + esc(t(x[0])) + '</span><span class="ov-ro-v">' + x[1] +
     (x[2] ? '<small class="muted">' + x[2] + '</small>' : '') + '</span><span class="ov-sugg"></span><span></span></div>').join('');
   let group = '', html = '';
-  for (const f of ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && r.printer.id === 'kobra_s1'))) {
+  for (const f of ovFields().filter(f => !/^fan_(aux|box)$/.test(f[0]) || (r.printer && (r.printer.id === 'kobra_s1' || ((typeof lanModelOf === 'function' && lanModelOf(r.printer)) || { fans: {} }).fans[f[0].slice(4)])))) {
     const [k, label, unit, min, max, step, grp, opts] = f, cur = own[k];
     if (grp !== group) { if (group) html += roHtml(group); html += '<div class="ov-group" data-theme="' + esc(grp) + '">' + esc(grp) + '</div>'; group = grp; }
     const ph = def[k] ?? sugg[k] ?? '';

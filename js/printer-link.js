@@ -49,7 +49,7 @@ function linkAvailable() { return location.protocol === 'http:'; }
 
 /* ---------- Werksfirmware (LAN-Modus) über den eigenen Server ---------- */
 const LAN_PRINTERS = ['kobra_s1'];
-const linkMode = printerId => ((store.settings.printerLinkMode || {})[printerId]) || 'auto';
+const linkMode = printerId => ((store.settings.printerLinkMode || {})[typeof linkId === 'function' ? linkId(printerId) : printerId]) || 'auto';
 let healthInfo = null;
 // Was kann der Server? {lan: LAN-Modus (paho-mqtt + cryptography), slicer: Orca-Version oder null}
 function serverHealth() {
@@ -92,7 +92,7 @@ async function writeLanSlots(host, slots) {
 // Liefert {slots, host, time, via} oder wirft einen Fehler mit verständlicher Meldung.
 // Kobra S1: je nach Einstellung Werksfirmware (LAN) und/oder Moonraker; „auto“ versucht LAN zuerst.
 async function fetchLiveSlots(printerId, host) {
-  if (LAN_PRINTERS.includes(printerId) && host && linkMode(printerId) !== 'moonraker') {
+  if (LAN_PRINTERS.includes(linkId(printerId)) && host && linkMode(printerId) !== 'moonraker') {
     const mode = linkMode(printerId);
     if (await lanServerAvailable()) {
       try { return await fetchLanStatus(host); }
@@ -108,7 +108,7 @@ async function fetchLiveSlots(printerId, host) {
 }
 
 async function fetchMoonrakerSlots(printerId, host) {
-  const adapter = SLOT_ADAPTERS[printerId];
+  const adapter = SLOT_ADAPTERS[linkId(printerId)];
   if (!adapter) throw Error(t('für diesen Drucker gibt es keine Live-Abfrage'));
   if (!host) throw Error(t('keine IP-Adresse eingetragen'));
   if (!linkAvailable()) throw Error(location.protocol === 'https:'

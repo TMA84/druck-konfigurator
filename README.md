@@ -33,6 +33,7 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 - **Bohrlöcher verstärken:** erkannte Löcher per Häkchen mit einem 100-%-Füllung-Ring versehen (Orca-Modifikator)
 - **3MF für OrcaSlicer:** Werte, Stützen und Slots landen direkt im Projekt
 - **Makerworld-3MF umstellen:** Bambu-Einstellungen raus, eigenes Druckerprofil rein, Platten und Farben bleiben
+- **Weitere Anycubic mit LAN-Modus (experimentell):** Kobra S1 Max, Kobra 3 / Combo / Max und Kobra X – Drucken, Werkbank, ACE, Warteschlange und 3D-Fortschritt (je Bauart CoreXY oder Bettschubser) wie beim Kobra S1; bisher nur am S1 getestet, Rückmeldungen willkommen
 - **Drucker-Verbindung (Kobra S1):** mit der **Werksfirmware im LAN-Modus** die ACE-Belegung live lesen und Slot-Filament sowie „Nachfüllen“ am Drucker ändern – oder über Rinkhals/Moonraker lesen. Ohne Verbindung: Belegung einmal eintragen
 - **Als Container** (z. B. auf dem NAS) oder lokal im Browser, ohne Cloud; das geladene Projekt übersteht ein Neuladen, optional mit PIN geschützt
 - **Deutsch und Englisch, hell und dunkel (Graphit + Petrol), Desktop, Tablet und Handy**

@@ -40,6 +40,11 @@ function renderSendDialog() {
       : esc(t('Drucker ist nicht frei ({what}) – erst den laufenden Vorgang beenden.', { what: st.job ? t('druckt „{name}“', { name: st.job.name }) : t(st.state) }))) +
       ' <button type="button" class="linkbtn" data-send-refresh>' + esc(t('Erneut abfragen')) + '</button>';
   $('sendState').className = 'note' + (free ? '' : ' bad');
+  // Modell: geslict für X, verbunden ist Y → nicht senden; andere Anycubic als der Kobra S1 sind experimentell (js/anycubic-models.js)
+  const want = lastResult ? lanModelOf(lastResult.printer) : null, have = st ? anycubicLanModel(st.model) : null;
+  const mismatch = !!(want && have && want.key !== have.key);
+  if (mismatch) { $('sendState').innerHTML = esc(t('Geslict für {want}, verbunden ist ein {have} – bitte oben den passenden Drucker wählen und neu slicen.', { want: want.label, have: have.label })); $('sendState').className = 'note bad'; }
+  else if (st && have && !have.tested) $('sendState').innerHTML += '<br><small>' + esc(t('{model}: Unterstützung experimentell – bisher nur am Kobra S1 geprüft. Erste Schicht beobachten; Rückmeldung gern als GitHub-Issue.', { model: have.label })) + '</small>';
   const slots = aceSlots(st);
   let warn = 0;
   const rows = (p ? p.grams : []).map((g, tool) => {
@@ -59,6 +64,7 @@ function renderSendDialog() {
   // später starten (js/schedule-ui.js): Drucker muss jetzt nicht frei sein, der Server prüft zur Startzeit
   let later = null;
   try { later = typeof sendLaterState === 'function' ? sendLaterState(p) : null; } catch (e) { console.error(e); }
+  if (mismatch) { $('sendGo').disabled = true; return; }
   if (later) {
     $('sendGo').disabled = !later.ok;
     $('sendGo').textContent = later.now ? (warn ? t('Trotzdem vorwärmen und drucken') : t('Vorwärmen und drucken')) : warn ? t('Trotzdem planen') : t('Planen');

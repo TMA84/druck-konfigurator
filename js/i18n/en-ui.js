@@ -786,3 +786,13 @@ I18N.add({
 I18N.add({
  "Warteschlange wird angelegt …": "Creating queue …",
 });
+I18N.add({
+ "Geslict für {want}, verbunden ist ein {have} – bitte oben den passenden Drucker wählen und neu slicen.": "Sliced for {want}, but a {have} is connected – select the matching printer at the top and slice again.",
+ "{model}: Unterstützung experimentell – bisher nur am Kobra S1 geprüft. Erste Schicht beobachten; Rückmeldung gern als GitHub-Issue.": "{model}: support is experimental – so far only tested on the Kobra S1. Watch the first layer; feedback welcome as a GitHub issue.",
+ "experimentell": "experimental",
+});
+I18N.add({
+ "Drucken, Werkbank, Warteschlange über den LAN-Modus – experimentell, bisher nur am Kobra S1 geprüft": "Printing, workbench, queue via LAN mode – experimental, so far only tested on the Kobra S1",
+ "LAN · experimentell": "LAN · experimental",
+ "Bisher nur am Kobra S1 geprüft – Rückmeldung gern als GitHub-Issue": "So far only tested on the Kobra S1 – feedback welcome as a GitHub issue",
+});

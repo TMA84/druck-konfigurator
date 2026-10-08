@@ -93,6 +93,8 @@ function wbRender() {
 
   // Statusleiste
   $('wbName').textContent = st.name || st.model || 'Kobra S1';
+  { const md = typeof anycubicLanModel === 'function' ? anycubicLanModel(st.model) : null;   // andere Anycubic als der Kobra S1: experimentell
+    if (md && !md.tested) $('wbName').insertAdjacentHTML('beforeend', ' <span class="badge lan-exp" title="' + esc(t('Bisher nur am Kobra S1 geprüft – Rückmeldung gern als GitHub-Issue')) + '">' + esc(t('experimentell')) + '</span>'); }
   $('wbMeta').textContent = [st.name && st.model && st.name !== st.model ? st.model : '', st.firmware ? 'Firmware ' + st.firmware : '', st.ip || wbHost()].filter(Boolean).join(' · ');
   const state = $('wbState');
   const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, planLabel = plan && { heating: t('heizt vor'), drying: t('trocknet') }[plan.state];

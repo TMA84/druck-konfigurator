@@ -125,7 +125,8 @@ function compute(I,geom,ctx){
   /* Kobra S1 (geschlossen, mit Hilfs- und Abluftlüfter): Vorgaben je Filamentart (2026-10-04) – ABS/ASA warm halten
      (Hilfslüfter aus, Abluft fast zu, Bett 100 °C, 10 min vorwärmen, immer Brim), PETG weniger Luft. Das Orca-Profil
      hat für beide Lüfter 60 %. Alles lässt sich unter „Werte für diesen Auftrag“ überschreiben. */
-  const s1=printer.id==='kobra_s1',S1P={pla:{aux:60,box:60},petg:{aux:30,box:40},abs:{aux:0,box:10,bed:100,preheat:10,brim:true},
+  // Vorgaben wie beim Kobra S1 für alle geschlossenen LAN-Anycubic mit Hilfs-/Gehäuselüfter (S1, S1 Max – js/anycubic-models.js)
+  const lm=typeof lanModelOf==='function'?lanModelOf(printer):null,s1=printer.id==='kobra_s1'||!!(lm&&lm.fans.aux&&lm.fans.box),S1P={pla:{aux:60,box:60},petg:{aux:30,box:40},abs:{aux:0,box:10,bed:100,preheat:10,brim:true},
     asa:{aux:0,box:10,bed:100,preheat:10,brim:true},tpu:{aux:30,box:60}}[m.kind]||{aux:60,box:60};
   m=Object.assign({},m);
   m.bed=take('bed',s1&&S1P.bed?Math.max(m.bed,S1P.bed):m.bed);m.fan=take('fan',m.fan);

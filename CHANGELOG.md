@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Neu
+- **Weitere Anycubic-Drucker mit LAN-Modus (experimentell):** Kobra S1 Max, Kobra 3 (Combo/V2), Kobra 3 Max und Kobra X – unter „Anderer Anycubic …“ (Abzeichen „LAN · experimentell“) gelten Drucken, Werkbank, ACE/Spülabfall, Spulen, Warteschlange, geplanter Druck und 3D-Fortschritt wie beim Kobra S1, über dieselbe Drucker-Verbindung. Modelltabelle (js/anycubic-models.js) mit Bauraum, Bauart, Lüftern und ACE-Anzahl aus den Orca-Profilen: S1 Max mit S1-Vorgaben für Hilfs-/Gehäuselüfter, Kobra 3/3 Max/X ohne. Senden-Dialog sperrt, wenn der Druck für ein anderes Modell geslict ist als das verbundene; Werkbank und Senden zeigen „experimentell“.
+- **3D-Fortschritt je Bauart:** Bettschubser (Kobra 3, 3 Max, X) mit Z-Türmen, X-Achse und Y-Schienen unter dem Bett – die X-Achse fährt in Z, das Bett mit dem Teil in Y; CoreXY (S1, S1 Max) wie bisher; Bauraum je Modell.
+
 ## [10.27.3] – 2026-10-08
 
 ### Behoben

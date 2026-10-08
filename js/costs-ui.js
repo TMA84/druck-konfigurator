@@ -61,7 +61,7 @@ function sliceSigs() {
 function costSignature() { const s = sliceSigs(); return s && JSON.stringify(s); }
 
 function costPurge() {
-  if (!lastResult || lastResult.printer.id !== 'kobra_s1') return null; // Spülabfall im Schacht nur mit ACE
+  if (!lastResult || !isLanPrinter(lastResult.printer)) return null; // Spülabfall im Schacht nur mit ACE (alle LAN-Anycubic)
   const own = acePurgeOwn();
   return { gramsPerChange: own && own.grams > 0 ? own.grams : acePurgeGrams(aceFlush()) };
 }
@@ -98,8 +98,8 @@ function renderCostPanel() {
   // Slice-Vorschau (js/preview-ui.js) zum letzten Slicen – auch wenn das Ergebnis veraltet ist
   $('previewOpen').classList.add('hidden');   // die Vorschau steht eingebettet daneben (js/preview-ui.js)
   const badge = $('sliceBadge');
-  // Drucken nur mit aktuellem Slice-Stand und eingerichtetem Kobra S1 (js/send-ui.js)
-  const canPrint = !!(fresh && costState.slice && costState.slice.job && lastResult && lastResult.printer.id === 'kobra_s1' && printerHost('kobra_s1'));
+  // Drucken nur mit aktuellem Slice-Stand und eingerichteter LAN-Verbindung (Kobra S1; andere Anycubic experimentell)
+  const canPrint = !!(fresh && costState.slice && costState.slice.job && lastResult && isLanPrinter(lastResult.printer) && printerHost('kobra_s1'));
   $('sendOpen').classList.toggle('hidden', !canPrint);
   $('queueStart').classList.toggle('hidden', !(canPrint && costState.slice.plates.length > 1));
   $('plateCosts').classList.toggle('hidden', !(costState.slice && costState.slice.plates.length > 1));

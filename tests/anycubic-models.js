@@ -1,0 +1,24 @@
+// Anycubic-Modelle mit LAN-Modus (js/anycubic-models.js): Zuordnung, Bauart, Lüfter, Freigabe. Aufruf: node tests/anycubic-models.js
+'use strict';
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const ctx = vm.createContext({ console });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'anycubic-models.js'), 'utf8') + ';this.M={anycubicLanModel,lanModelOf,isLanPrinter,ANYCUBIC_LAN_MODELS}', ctx);
+const { anycubicLanModel, lanModelOf, isLanPrinter } = ctx.M;
+let passed = 0, failed = 0;
+const check = (n, ok, d) => { if (ok) passed++; else { failed++; console.log('FEHLER', n, d ?? ''); } };
+const key = n => (anycubicLanModel(n) || {}).key;
+check('Kobra S1 (Meldung des Druckers)', key('Anycubic Kobra S1') === 'kobra_s1');
+check('S1 Max nicht als S1', key('Anycubic Kobra S1 Max') === 'kobra_s1_max');
+check('Kobra 3 Combo → Kobra 3', key('Anycubic Kobra 3 Combo') === 'kobra_3');
+check('Kobra 3 Max nicht als Kobra 3', key('Anycubic Kobra 3 Max') === 'kobra_3_max');
+check('Kobra X', key('Anycubic Kobra X') === 'kobra_x');
+check('Kobra 2 Pro: kein LAN-Modus', anycubicLanModel('Anycubic Kobra 2 Pro') === null);
+check('Bauarten: S1 CoreXY, Kobra 3 Bettschubser', anycubicLanModel('Anycubic Kobra S1').kin === 'corexy' && anycubicLanModel('Anycubic Kobra 3').kin === 'bed');
+check('nur der S1 ist getestet', anycubicLanModel('Anycubic Kobra S1').tested && !anycubicLanModel('Anycubic Kobra 3').tested && !anycubicLanModel('Anycubic Kobra S1 Max').tested);
+check('Lüfter laut Orca: S1 Max ja, Kobra X nein', anycubicLanModel('Anycubic Kobra S1 Max').fans.aux && !anycubicLanModel('Anycubic Kobra X').fans.aux);
+check('eigener Kobra S1 ist LAN-Drucker', isLanPrinter({ id: 'kobra_s1' }));
+check('Orca-Anycubic Kobra 3 ist LAN-Drucker', isLanPrinter({ id: 'orca', label: 'Anycubic Kobra 3', orca: { vendor: 'Anycubic' } }));
+check('anderer Hersteller nicht', !isLanPrinter({ id: 'orca', label: 'Bambu Lab X1C', orca: { vendor: 'BBL' } }));
+check('Snapmaker U1 nicht', !isLanPrinter({ id: 'snapmaker_u1' }));
+console.log(passed + '/' + (passed + failed) + ' bestanden');
+process.exit(failed ? 1 : 0);

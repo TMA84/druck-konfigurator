@@ -58,7 +58,8 @@ function renderPickerList() {
   $('pickList').innerHTML = printers.length ? printers.map(([n, p]) => {
     const ok = pickerNozzleOk(p.nozzle);
     return '<li><button type="button" data-pick="' + esc(n) + '"' + (n === cur ? ' aria-current="true"' : '') + (ok ? '' : ' disabled title="' + esc(t('Diese Düsengröße kann das Tool nicht umrechnen')) + '"') + '>' +
-      '<b>' + esc(p.model) + '</b><small>' + t('Düse {d} mm · Bett {w} × {h} mm', { d: de(Number(p.nozzle), 2), w: de(p.bed[0], 0), h: de(p.bed[1], 0) }) + '</small></button></li>';
+      '<b>' + esc(p.model) + (v === 'Anycubic' && typeof anycubicLanModel === 'function' && anycubicLanModel(p.model) ? ' <span class="badge lan-exp" title="' + esc(t('Drucken, Werkbank, Warteschlange über den LAN-Modus – experimentell, bisher nur am Kobra S1 geprüft')) + '">' + esc(t('LAN · experimentell')) + '</span>' : '') +
+      '</b><small>' + t('Düse {d} mm · Bett {w} × {h} mm', { d: de(Number(p.nozzle), 2), w: de(p.bed[0], 0), h: de(p.bed[1], 0) }) + '</small></button></li>';
   }).join('') : '<li class="muted">' + t('Kein Drucker gefunden.') + '</li>';
 }
 function openPrinterPicker() {

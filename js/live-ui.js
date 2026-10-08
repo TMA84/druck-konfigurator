@@ -148,7 +148,15 @@ function lvBuild() {
    offiziellen Maße), darüber die X-Traverse über die ganze Breite und links/rechts die Y-Schienen – beide auf Höhe des
    Kopfes, sie fahren mit der Düse mit. Dazu der Umriss des Druckbetts. Maße in mm, Koordinaten wie die Bahnen. */
 const LV_HEAD = { w: 56, d: 48, h: 70, tip: 8 }, LV_GANTRY_Z = 52, LV_RAIL = 10, LV_FRAME_H = 330;
+// Modell des Druckers für die Nachbildung: gemeldetes Modell, sonst gewählter Drucker, sonst Kobra S1 (js/anycubic-models.js)
+function lvModel() {
+  const st = typeof wb !== 'undefined' && wb.st;
+  return (typeof anycubicLanModel === 'function' && st && anycubicLanModel(st.model)) || (typeof lanModelOf === 'function' && lastResult && lanModelOf(lastResult.printer)) ||
+    { key: 'kobra_s1', kin: 'corexy', size: [250, 250, 250] };
+}
 function lvBed() {
+  const md = lvModel();
+  if (md.key !== 'kobra_s1') return { x0: 0, y0: 0, x1: md.size[0], y1: md.size[1] };   // andere Anycubic: Bauraum aus der Modelltabelle
   const tpl = typeof exportTemplate === 'function' ? exportTemplate(typeof WB_PRINTER !== 'undefined' ? WB_PRINTER : 'kobra_s1', '0.4') : null;
   const pts = tpl ? (tpl.settings.printable_area || []).map(p => p.split('x').map(Number)) : [];
   if (!pts.length) return { x0: 0, y0: 0, x1: 250, y1: 250 };
@@ -156,7 +164,7 @@ function lvBed() {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 function lvHeadInit() {
-  for (const k of ['head', 'gantry', 'bed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
+  for (const k of ['head', 'gantry', 'bed', 'frameFixed']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
@@ -199,8 +207,25 @@ function lvHeadInit() {
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
   const rodY = new THREE.CylinderGeometry(2.4, 2.4, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, -R * 0.6); return r; });
+  const md = lvModel(); lv.kin = md.kin;
+  let frame = new THREE.Group();
+  if (md.kin === 'bed') {
+    /* Bettschubser (Kobra 3, 3 Max, X): zwei Z-Türme links/rechts der X-Achse, oben eine Querstrebe, unten Y-Schienen unter dem
+       Bett und ein Fuß; der ganze Aufbau fährt relativ zum Teil in Y (lvPlaceHead), das Bett mit dem Teil steht still */
+    // fester Rahmen in Bett-Koordinaten (z absolut: Fuß unter dem Bett, Türme bis über den Bauraum); fährt nur in Y mit
+    const z0 = -45, top = md.size[2] + 70, fh = top - z0, tw = 22, ylen = (by1 - by0) * 2 + 60;
+    const bar = (x0, y0, z0, x1, y1, z1, mm) => { const g = new THREE.Mesh(new THREE.BoxGeometry(Math.max(tw, x1 - x0), Math.max(tw, y1 - y0), Math.max(tw, z1 - z0)), mm || mat(0x2a3034, { r: 0.6 })); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); frame.add(g); };
+    for (const x of [bx0 - m, bx1 + m]) bar(x, 0, top - fh, x, 0, top);                       // Türme
+    bar(bx0 - m, 0, top, bx1 + m, 0, top);                                                       // Querstrebe oben
+    for (const x of [cx - (bx1 - bx0) * 0.3, cx + (bx1 - bx0) * 0.3]) bar(x, -ylen / 2, top - fh, x, ylen / 2, top - fh + 12);   // Y-Schienen
+    bar(bx0 - m, -ylen / 2, top - fh - 8, bx1 + m, ylen / 2, top - fh);                          // Fuß
+    for (const x of [bx0 - m + 14, bx1 + m - 14]) { const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 30, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, 16, top - fh / 2); frame.add(sc); }   // Z-Spindeln
+    const mo = new THREE.Mesh(slab(30, 30, 34, 3, 1), mat(0x30373c, { r: 0.5 })); mo.position.set(bx0 - m - 4, 0, -14); beam.add(mo);   // X-Motor (fährt mit der X-Achse)
+    lv.frameFixed = frame; frame = new THREE.Group();
+  } else {
+    lv.frameFixed = null;
   // Rahmen: oben ein Rechteck aus Profilen mit Eckblöcken, vier Säulen, unten ein Rechteck; Z-Spindeln links/rechts
-  const fx0 = bx0 - m - 16, fx1 = bx1 + m + 16, fy0 = by0 - m - 16, fy1 = by1 + m + 16, fw = 13, fh = LV_FRAME_H, top = 12, frame = new THREE.Group();
+  const fx0 = bx0 - m - 16, fx1 = bx1 + m + 16, fy0 = by0 - m - 16, fy1 = by1 + m + 16, fw = 13, fh = Math.max(LV_FRAME_H, md.size[2] + 80), top = 12;
   const bar = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.Mesh(new THREE.BoxGeometry(Math.max(fw, x1 - x0), Math.max(fw, y1 - y0), Math.max(fw, z1 - z0)), frameM); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); frame.add(g); };
   for (const z of [top, top - fh]) { bar(fx0, fy0, z, fx1, fy0, z); bar(fx0, fy1, z, fx1, fy1, z); bar(fx0, fy0, z, fx0, fy1, z); bar(fx1, fy0, z, fx1, fy1, z); }
   for (const x of [fx0, fx1]) for (const y of [fy0, fy1]) bar(x, y, top - fh, x, y, top);
@@ -211,7 +236,9 @@ function lvHeadInit() {
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
   for (const [x, y] of [[cx, by1 + 10], [bx0 - 10, by0 + 25], [bx1 + 10, by0 + 25]]) {
     const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 20, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, y, top - fh / 2); frame.add(sc); }
-  lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...rails, frame); lv.gantry.userData.beam = beam; lv.gantry.visible = false;
+  }
+  lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...(md.kin === 'bed' ? [] : rails), frame);
+  if (lv.frameFixed) { lv.frameFixed.visible = false; lv.scene.add(lv.frameFixed); } lv.gantry.userData.beam = beam; lv.gantry.visible = false;
   // Bett: Umriss auf Höhe 0
   const bedPts = [[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1]].map(([x, y]) => new THREE.Vector3(x, y, 0));
   lv.bed = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(bedPts), new THREE.LineBasicMaterial({ color: 0x5b6b73 }));
@@ -227,7 +254,9 @@ function lvPlaceHead(p) {
   lv.head.position.set(p.x, p.y, p.z);
   lv.gantry.visible = lv.head.visible;
   lv.gantry.position.z = p.z + LV_GANTRY_Z;
-  lv.gantry.userData.beam.position.y = p.y;
+  // CoreXY: Traverse fährt in Y; Bettschubser: der ganze Aufbau steht relativ zum Kopf, das Bett (mit dem Teil) fährt
+  if (lv.kin === 'bed') { lv.gantry.position.y = p.y; lv.gantry.userData.beam.position.y = 0; if (lv.frameFixed) { lv.frameFixed.position.y = p.y; lv.frameFixed.visible = lv.head.visible; } }
+  else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y; }
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
 function lvVisible(rgb) {
@@ -414,7 +443,7 @@ function lvHeadSet(st, cur, L, T) {
     }
     lv.hs = hs;
   } else {
-    if (!(L > 0)) { lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; } lvRender(); return null; }
+    if (!(L > 0)) { lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; } lvRender(); return null; }
     if (cur !== lv.layerAt) { lv.layerAt = cur; lv.layerSince = Date.now(); }
     const rest = +(st.job && st.job.remaining_min) || 0, left = Math.max(1, (T || lv.data.layers.length) - L + 1);
     lv.hs = { real: false, li: cur, dur: rest > 0 ? rest * 60 / left : 60, info: { real: false, li: cur } };
@@ -543,7 +572,7 @@ function liveUpdate(st) {
   if (!card) return;
   if (!job || !job.name) {
     lv.at = null;
-    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; }
+    lv.name = null; lv.data = null; lv.hs = null; lv.disp = null; if (lv.head) { lv.head.visible = false; lv.gantry.visible = false; if (lv.frameFixed) lv.frameFixed.visible = false; }
     $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden');
     $('wbLiveInfo').textContent = '';
     return;
