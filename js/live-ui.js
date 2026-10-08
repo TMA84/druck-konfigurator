@@ -276,7 +276,7 @@ function lvHeadInit() {
     const zTop = -LV_GANTRY_Z + 12, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
     sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc); }
   // Z-Antrieb unten im Gehäuse: Motor hinten rechts, geschlossener Zahnriemen über die Ritzel der drei Spindeln und des Motors
-  lv.zDrive = lvZDrive(frame, zs.concat([[cx + 95, by1 + zy - 6]]), top - fh + 30, motor);
+  lv.zDrive = lvZDrive(frame, zs.concat([[cx + 95, by1 + zy - 6]]), top - fh + 30, () => new THREE.Mesh(slab(42, 42, 40, 4, 1), motor));   // gleiche Form wie die XY-Motoren
   lv.zArms = new THREE.Group();
   const armM = mat(0x3a4146, { r: 0.55 }), nutM = mat(0xc9a14a, { m: 0.5, r: 0.35 });
   for (const [x, y] of zs) {
@@ -323,14 +323,14 @@ function lvLeadScrew(r, len) {
 /* Z-Antrieb (2026-10-08): geschlossener Riemen unten im Gehäuse um die Ritzel (Achse z) an pts (Spindeln + Motor, letzter
    Punkt = Motor). Der Riemen läuft außen um die konvexe Hülle: gerade Stücke tangential, Bögen um die Ritzel. Dreht mit der
    Höhe (lvZDriveSet): eine Spindel-Umdrehung je LV_SCREW_LEAD mm, Riemenweg = Winkel × Ritzelradius. */
-function lvZDrive(parent, pts, z, motorM) {
+function lvZDrive(parent, pts, z, mkMotor) {
   const r = LV_MOTOR_R, cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
   const ring = pts.map((p, i) => ({ p, i, a: Math.atan2(p[1] - cy, p[0] - cx) })).sort((u, v) => u.a - v.a);   // gegen den Uhrzeigersinn
   const pulleys = [], segs = [], box = new THREE.BoxGeometry(1, 1, 1);
   for (const { p, i } of ring) {
     const pu = lvMotorPulley(); pu.rotation.x = Math.PI / 2; pu.position.set(p[0], p[1], z); parent.add(pu); pulleys.push(pu);
     if (i === pts.length - 1) {   // Motor unter seinem Ritzel
-      const mo = new THREE.Mesh(new THREE.BoxGeometry(42, 42, 40), motorM); mo.position.set(p[0], p[1], z - LV_BELT_H / 2 - 8 - 20); parent.add(mo);
+      const mo = mkMotor(); mo.position.set(p[0], p[1], z - LV_BELT_H / 2 - 8 - 40); parent.add(mo);   // abgerundet, Oberseite unter dem Ritzel
     }
   }
   // Weg: je Kante gerade (außen tangential, Normale nach außen), je Ecke Bogen um das Ritzel

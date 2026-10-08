@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.37.1] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Z-Motor:** gleiche Form wie die XY-Motoren (abgerundete Kanten) statt eines scharfkantigen Würfels.
+
 ## [10.37.0] – 2026-10-08
 
 ### Neu
