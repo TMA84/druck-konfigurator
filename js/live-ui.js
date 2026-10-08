@@ -628,17 +628,19 @@ function lvEnclosureInit(g) {
       // hinten aus dem ACE, hinter dem Drucker entlang und von unten in die Zusammenführung (8 Eingänge unten nebeneinander)
       const out = new THREE.Vector3(ax + sx, cy + A.d / 2 + 2, uz + 30), port = hub.clone().add(new THREE.Vector3((u * 4 + k - 3.5) * 5, 0, -22));
       // ein gleichmäßiger Bogen: waagerecht hinten aus dem ACE, senkrecht von unten in den Sammler (Bézier mit Tangenten in beiden Richtungen)
-      const lift = port.z - out.z, curve = new THREE.CubicBezierCurve3(out, new THREE.Vector3(out.x, out.y + 70 + k * 6, out.z),
-        new THREE.Vector3(port.x, port.y + 6 + k * 3, port.z - Math.max(60, lift * 0.7)), port);
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
-      const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
+      // Hebel nach Abstand: weite Bögen auch beim oberen ACE, das kaum tiefer liegt als der Sammler
+      const lift = port.z - out.z, run = Math.hypot(port.x - out.x, port.y - out.y), L = Math.max(lift, run);
+      const curve = new THREE.CubicBezierCurve3(out, new THREE.Vector3(out.x, out.y + 60 + run * 0.12 + k * 5, out.z),
+        new THREE.Vector3(port.x, port.y + 4 + k * 2, port.z - L * 0.55), port);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, 2.3, 10), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
+      const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, 0.9, 6), fm);
       tube.renderOrder = 8; ace.add(fline, tube);
       // Einzug vorn (wie beim ACE Pro): oranger Einlass in der hellen Leiste direkt vor der Spule, das Filament läuft vorn vom Wickel schräg hinein (lvAceColours)
       const funnel = new THREE.Mesh(new THREE.CylinderGeometry(6, 3, 4, 16), new THREE.MeshStandardMaterial({ color: 0xe8552b, roughness: 0.45 }));
-      funnel.position.set(sx, -108, 94); funnel.rotation.x = Math.PI / 2; unit.add(funnel);
+      funnel.position.set(sx, -102, 94); funnel.rotation.x = Math.PI / 2; unit.add(funnel);
       const strand = new THREE.Mesh(new THREE.BufferGeometry(), fm); unit.add(strand);
       lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null,
-        strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -108, 95), k: null });
+        strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -102, 95), k: null });
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, von hinten gesehen links, Mitte der oberen Hälfte
@@ -661,11 +663,11 @@ function lvAceColours(st) {
     const full = LV_ACE.spoolR - 14, k = (LV_SPOOL_CORE + 2 + (full - LV_SPOOL_CORE - 2) * pct) / full;
     sp.filMesh.scale.set(k, 1, k);
     sp.strand.visible = on;
-    if (on && k !== sp.k) {   // Strang läuft vorn vom Wickel ab (vordere Tangente zum Einlass) schräg nach unten in den Einlass
+    if (on && k !== sp.k) {   // Strang läuft vorn vom Wickel ab und senkrecht von oben in den Einlass (unten sanft auf dessen Position)
       sp.k = k;
-      const rw = full * k, dy = sp.inlet.y - sp.spoolC.y, dz = sp.inlet.z - sp.spoolC.z;
-      const f = Math.atan2(dz, dy), al = Math.acos(Math.min(1, rw / Math.hypot(dy, dz))), a = Math.cos(f - al) < Math.cos(f + al) ? f - al : f + al, from = new THREE.Vector3(sp.spoolC.x, sp.spoolC.y + Math.cos(a) * rw, sp.spoolC.z + Math.sin(a) * rw);
-      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(new THREE.LineCurve3(from, sp.inlet), 4, 0.9, 6);
+      const rw = full * k, C = sp.spoolC, I = sp.inlet, P0 = new THREE.Vector3(C.x, C.y - rw, C.z), h = P0.z - I.z;
+      const cv = new THREE.CubicBezierCurve3(P0, new THREE.Vector3(C.x, P0.y, P0.z - h * 0.55), new THREE.Vector3(C.x, I.y, I.z + h * 0.35), I);
+      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(cv, 16, 0.9, 6);
     }
     const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';
     sp.lbl.visible = !!txt;

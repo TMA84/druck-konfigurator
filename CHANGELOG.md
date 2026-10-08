@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.12] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Filament senkrecht in den ACE-Einlass:** Das Filament kommt vorn vom Wickel senkrecht herunter und geht von oben in den orangen Einlass; der Einlass sitzt dichter vor der Spule.
+- **Kein Knick mehr am Sammler:** Die Schläuche vom ACE laufen in weiten Bögen (Hebel nach Abstand) senkrecht von unten in den Sammler – auch das obere ACE, das kaum tiefer liegt – und sind feiner unterteilt, damit sie nicht eckig wirken.
+
 ## [10.39.11] – 2026-10-08
 
 ### Verbessert
