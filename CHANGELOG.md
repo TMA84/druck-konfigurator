@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Weitere Orca-Einstellungen wirkten nicht im Objekt:** Setzte man einen Wert, den das Tool auch selbst berechnet (z. B. Stützen-Typ, kleine Überhänge), blieb in den Objekt-Einstellungen der berechnete stehen – und der hat in Orca Vorrang. Jetzt gilt der zuletzt gesetzte Wert.
+
+### Geändert
+- **„Änderungen für alle Teile des Projekts“ standardmäßig an** (Wahl bleibt gespeichert) – vorher galten Werte nur für das gewählte Teil, andere Teile bekamen z. B. keine Stützen.
+- Werte-Tafel, Reiter Stützen: „Stützen ab Überhang“ heißt jetzt **„Stützen bis Neigung (zur Waagerechten, höher = mehr)“** – Orca stützt Flächen, die flacher sind als der Winkel; 1° stützte fast nichts. Neu: **„Kleine Überhänge weglassen“** (Orca `support_remove_small_overhang`, Vorschlag ja) zum Abschalten, wenn kleine Ecken gestützt werden sollen.
+
 ## [10.27.2] – 2026-10-08
 
 ### Behoben

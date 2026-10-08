@@ -303,7 +303,11 @@ const isObjectKey = k => OBJECT_KEYS.has(k) || /^(support_|tree_support_)/.test(
 
 // Abweichungen eines Teils von den globalen Werten → [{label, key, value}] für model_settings.config
 function objectOverrides(settings, pr, part) {
-  const own = plannedChanges(pr, 0, null).filter(c => !c.perSlot && isObjectKey(c.key) && c.key in settings && String(settings[c.key]) !== c.value);
+  // je Schlüssel der LETZTE Wert (weitere Orca-Einstellungen stehen am Ende und gewinnen gegen berechnete) – 2026-10-08:
+  // vorher blieb der erste übrig, z. B. support_remove_small_overhang = 1 im Objekt trotz Einstellung 0
+  const last = new Map();
+  for (const c of plannedChanges(pr, 0, null)) if (!c.perSlot && isObjectKey(c.key)) last.set(c.key, c);
+  const own = [...last.values()].filter(c => c.key in settings && String(settings[c.key]) !== c.value);
   return part ? supportPaintOverrides(settings, pr, part, own) : own;
 }
 /* Gemalte Stützen (js/paint-ui.js, Ebene „Stützen“): Erzwingen wirkt in Orca nur mit eingeschalteten Stützen. Ist das Teil

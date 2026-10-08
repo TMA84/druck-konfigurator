@@ -8,7 +8,10 @@
 const ORCA_EXTRA = [
   ['support_type', 'Stützen-Typ', 'Stützen', null, 0, 0, [['tree(auto)', 'Baum (automatisch)'], ['normal(auto)', 'Normal (automatisch)'], ['tree(manual)', 'Baum (nur gemalt)'], ['normal(manual)', 'Normal (nur gemalt)']], 'object'],
   ['support_style', 'Stützen-Stil', 'Stützen', null, 0, 0, [['default', 'Standard'], ['grid', 'Gitter'], ['snug', 'Eng anliegend'], ['tree_slim', 'Baum schlank'], ['tree_strong', 'Baum kräftig'], ['tree_hybrid', 'Baum hybrid'], ['organic', 'Organisch']], 'object'],
-  ['support_threshold_angle', 'Stützen ab Überhang', 'Stützen', '°', 0, 90, 1, 'object'],
+  // Orca misst zur Waagerechten: gestützt wird, was flacher ist als der Winkel – höher = mehr Stützen (2026-10-08: 1° sah
+  // nach „ab 1° Überhang“ aus, stützte aber fast nichts)
+  ['support_threshold_angle', 'Stützen bis Neigung (zur Waagerechten, höher = mehr)', 'Stützen', '°', 0, 90, 1, 'object'],
+  ['support_remove_small_overhang', 'Kleine Überhänge weglassen', 'Stützen', null, 0, 0, [['1', 'ja'], ['0', 'nein – auch kleine stützen']], 'object'],
   ['support_on_build_plate_only', 'Stützen nur vom Bett', 'Stützen', null, 0, 0, [['1', 'ja'], ['0', 'auch auf dem Teil']], 'object'],
   ['support_top_z_distance', 'Abstand oben (Z)', 'Stützen', 'mm', 0, 1, 0.02, 'object'],
   ['support_object_xy_distance', 'Abstand seitlich (XY)', 'Stützen', 'mm', 0, 2, 0.05, 'object'],

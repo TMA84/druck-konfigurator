@@ -134,6 +134,8 @@ function ovRenderPanel() {
   ovTab(ovTabNow && $('ovRows').querySelector('[data-theme="' + CSS.escape(ovTabNow) + '"]') ? ovTabNow : t(VALUE_THEMES[0]));
   ovBrimInfo();
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2);
+  // „für alle Teile“: Standard an (2026-10-08 – sonst galten Werte nur für das gewählte Teil), Wahl bleibt gespeichert
+  $('ovAll').checked = store.settings.ovAll !== false;
   const nDef = Object.keys(def).length;
   $('ovDefSave').textContent = t('Als Standard für {mat} merken', { mat: r.m.name });
   $('ovDefReset').classList.toggle('hidden', !nDef);
@@ -285,6 +287,7 @@ function ovApply(quiet) {
   update();
   if (!quiet && touched.size > 1) toast(t('Für {n} Teile übernommen', { n: touched.size }));
 }
+$('ovAll').addEventListener('change', () => { store.settings.ovAll = $('ovAll').checked; persist(); });
 // Änderung gilt sofort: Auswahl, Feld verlassen, Enter, × (Vorschlag)
 $('ovRows').addEventListener('change', e => { if (e.target.closest('[data-ov]')) ovApply(); });
 $('ovRows').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[data-ov]')) { e.preventDefault(); ovApply(); } });

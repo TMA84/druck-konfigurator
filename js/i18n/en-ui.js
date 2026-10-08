@@ -778,3 +778,8 @@ I18N.add({
  "Die ACE meldet bei gleicher Sorte und Farbe dieselben Werte – so beginnt die Zählung für die neue Spule von vorn; die alte wird archiviert.": "The ACE reports the same values for the same type and colour – this restarts counting for the new spool; the old one is archived.",
  "Restmenge laut Verbrauchszählung – anklicken: Spule bearbeiten, neue Spule eingelegt": "Remaining amount from usage tracking – click: edit spool, new spool inserted",
 });
+I18N.add({
+ "Stützen bis Neigung (zur Waagerechten, höher = mehr)": "Support up to slope (from horizontal, higher = more)",
+ "Kleine Überhänge weglassen": "Skip small overhangs",
+ "nein – auch kleine stützen": "no – support small ones too",
+});

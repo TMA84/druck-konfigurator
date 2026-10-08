@@ -640,7 +640,12 @@ async function runSmoke(opts={}){
         ovApply();await wait(80);
         const plan=exportPlan(costDefaultSlot()),pc=plannedChanges(plan.r,plan.slot),v=k=>(pc.find(c=>c.key===k)||{}).value;
         ok(v('hot_plate_temp')==='63'&&v('initial_layer_speed')==='25','Am 2. Teil angepasst: Bett 63 und erste Schicht 25 im Export (globale Werte)');
-        ok(project.parts[1].overrides.w===5&&!(project.parts[0].overrides||{}).w,'Wände nur am 2. Teil (je Teil)');
+        ok($('ovAll').checked&&project.parts[0].overrides&&project.parts[0].overrides.w===5,'Standard „für alle Teile“: Wände an allen Teilen');
+        // nur dieses Teil: Schalter aus
+        project.parts.forEach(q=>{q.overrides=null});update();await wait(50);openOverrideDialog();await wait(50);
+        $('ovAll').checked=false;$('ovAll').dispatchEvent(new Event('change'));set('w',4);ovApply();await wait(80);
+        ok(project.parts[1].overrides.w===4&&!(project.parts[0].overrides||{}).w&&store.settings.ovAll===false,'Schalter aus: Wände nur am 2. Teil, Wahl gespeichert');
+        $('ovAll').checked=true;$('ovAll').dispatchEvent(new Event('change'));
         selectPart(0);await wait(30);}
       project.parts.forEach((q,i)=>{q.overrides=keep[i]});update();await wait(30); }
     // 3D-Fortschritt: Vorschau beim ersten Abruf noch nicht da (geplanter Start) – die Seite fragt später erneut
