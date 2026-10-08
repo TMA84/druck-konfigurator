@@ -2,7 +2,10 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.31.1] – 2026-10-08
+
+### Neu
+- **GitHub-Releases:** Nach jedem fertig gebauten Container-Image legt die Action „Release“ die Version aus CHANGELOG.md als Tag und Release an (Text = Abschnitt dieser Version).
 
 ### Geändert
 - **Höchstwerte ohne eigene Zeile:** „Maximum dieses Druckers“ im Reiter Tempo entfällt (samt eigenen Höchstwerten und Hotend-Maximum) – es gilt die Herstellerangabe. Gibt man in einem Tempo- oder Beschleunigungsfeld mehr ein, wird auf den Höchstwert gesetzt und am Feld steht „Höchstwert laut Hersteller: … – darauf zurückgesetzt“ (Tooltip zeigt den Höchstwert); früher gespeicherte eigene Höchstwerte werden nicht mehr verwendet.
