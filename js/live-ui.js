@@ -342,11 +342,15 @@ function lvPulleyKit() {
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b3135, metalness: 0.3, roughness: 0.5 });
   const steelM = new THREE.MeshStandardMaterial({ color: 0xe1e5e8, metalness: 0.7, roughness: 0.25 });
   // Zahnscheibe: Umriss mit 20 Zähnen, extrudiert und auf die y-Achse gelegt
-  const gear = new THREE.Shape(), N = 20, ro = M, rr = M - 0.9;
-  for (let i = 0; i < N * 4; i++) { const a = i / (N * 4) * Math.PI * 2, rad = (i % 4 === 1 || i % 4 === 2) ? ro : rr; const x = Math.cos(a) * rad, y = Math.sin(a) * rad; i ? gear.lineTo(x, y) : gear.moveTo(x, y); }
-  const gearG = new THREE.ExtrudeGeometry(gear, { depth: h + 0.4, bevelEnabled: false }); gearG.rotateX(-Math.PI / 2); gearG.translate(0, -(h + 0.4) / 2, 0);
+  // Zahnkranz (GT2): Umriss mit N Zähnen, extrudiert und auf die y-Achse gelegt – für Ritzel (20 Zähne) und Umlenkrollen (16)
+  const gearGeo = (N, ro, rr, depth) => {
+    const sh = new THREE.Shape();
+    for (let i = 0; i < N * 4; i++) { const a = i / (N * 4) * Math.PI * 2, rad = (i % 4 === 1 || i % 4 === 2) ? ro : rr; const x = Math.cos(a) * rad, y = Math.sin(a) * rad; i ? sh.lineTo(x, y) : sh.moveTo(x, y); }
+    const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -depth / 2, 0); return g;
+  };
+  const gearG = gearGeo(20, M, M - 0.9, h + 0.4), idlerG = gearGeo(16, R, R - 0.8, h);
   lvPulleyParts = {
-    alu, dark, steelM, gearG,
+    alu, dark, steelM, gearG, idlerG,
     flange: new THREE.CylinderGeometry(R + 1.8, R + 1.8, 0.9, 24), body: new THREE.CylinderGeometry(R, R, h, 24),
     bearing: new THREE.CylinderGeometry(R * 0.62, R * 0.62, 0.4, 20), hole: new THREE.CylinderGeometry(0.7, 0.7, 0.5, 8),
     axle: new THREE.CylinderGeometry(1.2, 1.2, h + 6, 10), bolt: new THREE.CylinderGeometry(2.4, 2.4, 1.6, 6),
@@ -357,7 +361,7 @@ function lvPulleyKit() {
 }
 function lvIdler() {
   const P = lvPulleyKit(), h = LV_BELT_H, g = new THREE.Group(), add = (geo, m, y) => { const o = new THREE.Mesh(geo, m); o.position.y = y; g.add(o); return o; };
-  add(P.body, P.alu, 0); add(P.flange, P.alu, h / 2 + 0.45); add(P.flange, P.alu, -h / 2 - 0.45);
+  add(P.idlerG, P.alu, 0); add(P.flange, P.alu, h / 2 + 0.45); add(P.flange, P.alu, -h / 2 - 0.45);   // Zahnkranz zwischen den Bordscheiben
   add(P.bearing, P.dark, h / 2 + 1.1);
   for (let k = 0; k < 3; k++) { const o = add(P.hole, P.alu, h / 2 + 1.2), a = k / 3 * Math.PI * 2; o.position.x = Math.cos(a) * LV_ROLL_R * 0.4; o.position.z = Math.sin(a) * LV_ROLL_R * 0.4; }
   add(P.axle, P.steelM, 1.5); add(P.bolt, P.steelM, h / 2 + 3.6);
@@ -376,48 +380,67 @@ function lvMotorPulley() {
    fährt der Kopf, ändern sich die Längen der Abschnitte und die Zähne wandern richtig, ohne zu rutschen; die Rollen drehen
    sich um den Weg, der über sie gelaufen ist. */
 function lvBelt(parent, z, paths) {
-  const box = new THREE.BoxGeometry(1, 1, 1), belt = { z, segs: [], rolls: [], paths };
-  for (const n of paths(0, 0)) for (let k = 0; k < n.length - 1; k++) {
-    const tex = lvBeltTexture().clone(); tex.needsUpdate = true;
-    const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
-    parent.add(mesh); belt.segs.push(mesh);
-  }
+  const belt = { z, segs: [], rolls: [], paths, parent, box: new THREE.BoxGeometry(1, 1, 1) };
   for (const n of paths(0, 0)) for (let k = 1; k < n.length - 1; k++) { const r = lvIdler(); r.rotation.x = Math.PI / 2; parent.add(r); belt.rolls.push(r); }
   return belt;
 }
-// legt den Riemen für Kopf (px, py); Ergebnis: Riemenweg bis zum Ende jedes Linienzugs (für die Motorscheibe)
-function lvBeltSet(b, px, py) {
-  let si = 0, ri = 0, mat = 0;
-  const ends = [];
-  for (const n of b.paths(px, py)) {
-    /* Rollen so, dass der Riemen außen anliegt (beide Stücke tangential): an einer Ecke um R / cos(Knick/2) nach innen;
-       zwei Ecken mit kurzem Stück dazwischen in dieselbe Richtung (Umkehr 180°) = eine Rolle, Durchmesser = Strangabstand */
-    const R = LV_ROLL_R, dir = (p, q) => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, l]; };
-    const at = [0]; for (let k = 0; k < n.length - 1; k++) at.push(at[k] + Math.hypot(n[k + 1][0] - n[k][0], n[k + 1][1] - n[k][1]));
-    for (let k = 1; k < n.length - 1; k++) {
-      const r = b.rolls[ri++], a = dir(n[k - 1], n[k]), c = dir(n[k], n[k + 1]), turn = a[0] * c[1] - a[1] * c[0];
-      if (k + 1 < n.length - 1) {
-        const e = dir(n[k + 1], n[k + 2]);
-        if (c[2] < 2 * R * 1.6 + 6 && Math.sign(turn) === Math.sign(c[0] * e[1] - c[1] * e[0])) {
-          const half = c[2] / 2, nx = -c[1] * Math.sign(turn), ny = c[0] * Math.sign(turn);   // nach innen (Seite der Kurve)
-          r.position.set((n[k][0] + n[k + 1][0]) / 2 + nx * half, (n[k][1] + n[k + 1][1]) / 2 + ny * half, b.z);
-          r.scale.set(half / R, 1, half / R); r.visible = true; r.rotation.y = -at[k] / half;
-          const r2 = b.rolls[ri++]; r2.visible = false; k++; continue;
-        }
-      }
-      const bx = c[0] - a[0], by = c[1] - a[1], bl = Math.hypot(bx, by) || 1, cosHalf = Math.max(0.2, Math.sqrt((1 + a[0] * c[0] + a[1] * c[1]) / 2));
-      r.position.set(n[k][0] + bx / bl * R / cosHalf, n[k][1] + by / bl * R / cosHalf, b.z);
-      r.scale.set(1, 1, 1); r.visible = true; r.rotation.y = -at[k] / R;
-    }
-    for (let k = 0; k < n.length - 1; k++) {
-      const [x0, y0] = n[k], [x1, y1] = n[k + 1], len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0)), mesh = b.segs[si++];
-      mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, b.z); mesh.rotation.z = Math.atan2(y1 - y0, x1 - x0); mesh.scale.set(len, LV_BELT_T, LV_BELT_H);
-      const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = mat / LV_BELT_PITCH;
-      mat += len;
-    }
-    ends.push(mat);
+// Riemenstück (Quader mit wandernden Zähnen); fehlende werden bei Bedarf angelegt, überzählige ausgeblendet
+function lvBeltSeg(b, i) {
+  if (!b.segs[i]) {
+    const tex = lvBeltTexture().clone(); tex.needsUpdate = true;
+    const mesh = new THREE.Mesh(b.box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    b.parent.add(mesh); b.segs[i] = mesh;
   }
-  return ends;
+  return b.segs[i];
+}
+/* Riemen um die Rollen: Linienzüge (in Laufrichtung, ab der Klemme) → je Ecke eine Rolle, an der der Riemen tangential
+   anliegt; zwischen den Berührpunkten folgt er dem Kreisbogen (Sehnen à ≤ 11,25°). Zwei Ecken mit kurzem Stück in dieselbe
+   Richtung = Umkehr (Halbkreis, eine Rolle, Durchmesser = Strangabstand). Zwischen zwei Linienzügen (CoreXY: am Motor) läuft
+   der Riemen im Bogen ums Ritzel (Radius joinR). Zahnlage = Riemenweg ab der Klemme. Ergebnis: Riemenweg am Motor. */
+function lvBeltSet(b, px, py, joinR) {
+  const paths = b.paths(px, py), R = LV_ROLL_R, P = [], kind = [];
+  paths.forEach((n, pi) => n.forEach((q, k) => { if (pi && !k) return; P.push(q); kind.push(k === 0 && !pi ? 'end' : (k === n.length - 1 && pi < paths.length - 1 ? 'join' : (k === n.length - 1 ? 'end' : 'roll'))); }));
+  const dir = (p, q) => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, l]; };
+  const corners = [];
+  let ri = 0;
+  for (let k = 1; k < P.length - 1; k++) {
+    const a = dir(P[k - 1], P[k]), c = dir(P[k], P[k + 1]), turn = Math.sign(a[0] * c[1] - a[1] * c[0]) || 1;
+    if (kind[k] === 'roll' && kind[k + 1] === 'roll' && k + 2 < P.length) {
+      const e = dir(P[k + 1], P[k + 2]);
+      if (c[2] < 2 * R * 1.6 + 6 && turn === (Math.sign(c[0] * e[1] - c[1] * e[0]) || 1)) {
+        const half = c[2] / 2, nx = -c[1] * turn, ny = c[0] * turn;
+        // Halbkreis: Mitte zwischen den Strängen, Berührpunkte auf beiden Strängen auf Höhe der Mitte
+        corners.push({ cx: (P[k][0] + P[k + 1][0]) / 2 + nx * half, cy: (P[k][1] + P[k + 1][1]) / 2 + ny * half, r: half,
+          tin: [P[k][0] + nx * half, P[k][1] + ny * half], tout: [P[k + 1][0] + nx * half, P[k + 1][1] + ny * half], sweep: Math.PI * turn, roll: ri, hide: ri + 1 });
+        ri += 2; k++; continue;
+      }
+    }
+    const r = kind[k] === 'join' ? (joinR || R) : R, phi = Math.acos(Math.max(-1, Math.min(1, a[0] * c[0] + a[1] * c[1]))), d = r * Math.tan(phi / 2);
+    const bx = c[0] - a[0], by = c[1] - a[1], bl = Math.hypot(bx, by) || 1, off = r / Math.max(0.2, Math.cos(phi / 2));
+    corners.push({ cx: P[k][0] + bx / bl * off, cy: P[k][1] + by / bl * off, r, tin: [P[k][0] - a[0] * d, P[k][1] - a[1] * d], tout: [P[k][0] + c[0] * d, P[k][1] + c[1] * d],
+      sweep: phi * turn, roll: kind[k] === 'roll' ? ri++ : null });
+  }
+  let si = 0, mat = 0, motorAt = 0, cur = P[0];
+  const line = (p, q) => {
+    const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.max(0.01, Math.hypot(dx, dy)), mesh = lvBeltSeg(b, si++);
+    mesh.visible = true; mesh.position.set((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, b.z); mesh.rotation.z = Math.atan2(dy, dx); mesh.scale.set(len + 0.4, LV_BELT_T, LV_BELT_H);
+    const t = mesh.material.map; t.repeat.set(len / LV_BELT_PITCH, 1); t.offset.x = mat / LV_BELT_PITCH;
+    mat += len;
+  };
+  for (const c of corners) {
+    line(cur, c.tin);
+    if (c.roll != null) { const r = b.rolls[c.roll]; r.visible = true; r.position.set(c.cx, c.cy, b.z); r.scale.set(c.r / R, 1, c.r / R); r.rotation.y = -mat / c.r; }
+    if (c.hide != null) b.rolls[c.hide].visible = false;
+    if (c.roll == null) motorAt = mat;
+    // Bogen um die Rolle (Riemenmitte auf dem Umfang – wie die geraden Stücke, die die Rolle tangential berühren)
+    const rr = c.r, a0 = Math.atan2(c.tin[1] - c.cy, c.tin[0] - c.cx), steps = Math.max(2, Math.ceil(Math.abs(c.sweep) / (Math.PI / 16)));
+    let prev = [c.cx + Math.cos(a0) * rr, c.cy + Math.sin(a0) * rr];
+    for (let s2 = 1; s2 <= steps; s2++) { const an = a0 + c.sweep * s2 / steps, q = [c.cx + Math.cos(an) * rr, c.cy + Math.sin(an) * rr]; line(prev, q); prev = q; }
+    cur = c.tout;
+  }
+  line(cur, P[P.length - 1]);
+  for (let k = si; k < b.segs.length; k++) b.segs[k].visible = false;
+  return [motorAt];
 }
 function lvMechInit(md, g) {
   const { bx0, bx1, by0, by1, m, cx, beam } = g;
@@ -566,7 +589,7 @@ function lvMechUpdate(p) {
   { const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt); }
   if (!lv.head.visible) return;
   for (const { b, go, motor } of lv.belts) {
-    const [px, py] = go(p), ends = lvBeltSet(b, px, py);
+    const [px, py] = go(p), ends = lvBeltSet(b, px, py, motor != null ? LV_MOTOR_R : 0);
     // Motorscheibe dreht um den Riemenweg, der bis zu ihr gelaufen ist (CoreXY: ergibt x + y bzw. x − y)
     if (motor != null && lv.motorCaps[motor]) lv.motorCaps[motor].rotation.y = -ends[0] / LV_MOTOR_R;
   }

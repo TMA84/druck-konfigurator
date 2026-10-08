@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.7] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Riemen läuft rund um die Rollen:** Statt 90°-Ecken folgt der Riemen zwischen den Berührpunkten dem Rollenumfang (Bögen), an den vorderen Umkehrrollen im Halbkreis, am Motor im Bogen ums Ritzel; die Zähne laufen durchgehend mit (geprüft: keine Lücke, Riemen genau auf dem Umfang).
+- **3D-Fortschritt, Umlenkrollen mit Zähnen:** Zahnkranz (16 Zähne) zwischen den Bordscheiben statt glatter Lauffläche.
+
 ## [10.36.6] – 2026-10-08
 
 ### Behoben
