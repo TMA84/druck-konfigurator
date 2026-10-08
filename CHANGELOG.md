@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.7] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Zusammenführung versetzt:** Sie sitzt jetzt weiter links an der Rückwand (von vorn gesehen), etwa in der Mitte der oberen Hälfte. Die ACE-Schläuche kommen von unten hinein, oben geht ein Schlauch über die Rückwand zum Druckkopf.
+
 ## [10.39.6] – 2026-10-08
 
 ### Verbessert

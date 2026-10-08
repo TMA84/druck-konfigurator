@@ -580,7 +580,7 @@ function lvEnclosureInit(g) {
   enc.visible = store.settings.liveEnclosure !== false; lv.gantry.add(enc); lv.enclosureG = enc;
   // ACE-Einheiten oben auf dem Deckel, Spulen in Slotfarbe, Schläuche zum Verteiler hinten oben
   /* neben dem Drucker (rechts, LV_ACE.gap Abstand), auf derselben Standfläche, übereinander; klare, gerundete Haube */
-  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx + 40, y1 + 14, z1 - 70), ax = x1 + A.gap + A.w / 2;
+  const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx - 90, y1 + 14, z0 + (z1 - z0) * 0.75), ax = x1 + A.gap + A.w / 2;
   const body = new THREE.MeshStandardMaterial({ color: 0x2d3236, roughness: 0.5 });
   const lid = new THREE.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
   const hood = (() => {   // Profil (y, z): Rechteck mit großen Radien oben, entlang x extrudiert
@@ -632,9 +632,9 @@ function lvEnclosureInit(g) {
         strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -84, 38), k: null });
     }
   }
-  const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand
+  const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, links, Mitte der oberen Hälfte
   // Zusammenführung oben raus, über die Rückwand: lvMechUpdate setzt diese Punkte (Rahmen-Koordinaten) vor den Kopfschlauch – ein Schlauch am Stück
-  lv.hubPath = [hub.clone().add(new THREE.Vector3(0, 0, 22)), new THREE.Vector3(hub.x, hub.y, z1 + 15), new THREE.Vector3(hub.x - 30, y1 - 25, z1 + 8)];
+  lv.hubPath = [hub.clone().add(new THREE.Vector3(0, 0, 22)), new THREE.Vector3(hub.x, hub.y + 4, z1 - 10), new THREE.Vector3(hub.x + 10, hub.y - 6, z1 + 18), new THREE.Vector3(hub.x + 20, y1 - 30, z1 + 6)];
   ace.visible = store.settings.liveAce !== false; lv.gantry.add(ace); lv.aceG = ace;
   lvAceColours(typeof wb !== 'undefined' && wb.st);
 }
