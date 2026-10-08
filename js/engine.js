@@ -220,9 +220,10 @@ function compute(I,geom,ctx){
   // Stützen-Typ „Normal“ (weitere Orca-Einstellungen): Beschriftung passend
   if(supOn&&String(ov['x:support_type']||'').startsWith('normal'))sup=sup.replace('Baumstützen','normale Stützen');
   // „Nur kritische Bereiche“ (Orca: Stützen nur für Spitzen und Auskragungen, normale Überhänge nicht) –
-  // Vorschlag an wie in v4, je Auftrag umschaltbar (Werte anpassen). Geprüft 2026-09-29: ACE-Guide mit an 0, mit aus 110 Stützbahnen.
-  sugg.critical='on';
-  const supCritical=has('critical')?ov.critical==='on':true;
+  // Vorschlag AUS (2026-10-08, vorher an wie in v4): mit „an“ stützte Orca schräge Überhänge über dem Grenzwinkel gar
+  // nicht – 55°-Schräge: 0 Stützbahnen, mit „aus“ 98 (Orca-CLI). Zum Sparen je Auftrag einschaltbar (Werte-Tafel, Stützen).
+  sugg.critical='off';
+  const supCritical=has('critical')?ov.critical==='on':false;
 
   // Haftung
   let brim='Nicht nötig',brimNote='';

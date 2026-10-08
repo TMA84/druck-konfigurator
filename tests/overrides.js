@@ -27,9 +27,9 @@ check('ohne Anpassung keine Markierung', plain.rows.every(x => x[3] !== true) &&
 check('gleicher Wert wie Vorschlag zählt nicht als Abweichung', K.compute({ ...I, overrides: { nozzle: plain.nozzle } }, null, c).changed.length === 0);
 const off = K.compute({ ...I, object: 'overhang', overrides: { support: 'off' } }, null, c);
 check('Stützen aus trotz Freiform', val(off, 'enable_support') === '0' && off.sup.startsWith('Aus'), off.sup);
-check('Nur kritische Bereiche: Vorschlag an', val(r, 'support_critical_regions_only') === '1' && r.supCritical === true, val(r, 'support_critical_regions_only'));
-const noCrit = K.compute({ ...I, overrides: { support: 'on', critical: 'off' } }, null, c);
-check('Nur kritische Bereiche je Auftrag aus', val(noCrit, 'support_critical_regions_only') === '0' && noCrit.changed.includes('critical'), noCrit.changed);
+check('Nur kritische Bereiche: Vorschlag aus (sonst keine Stützen an schrägen Überhängen)', val(r, 'support_critical_regions_only') === '0' && r.supCritical === false, val(r, 'support_critical_regions_only'));
+const crit = K.compute({ ...I, overrides: { support: 'on', critical: 'on' } }, null, c);
+check('Nur kritische Bereiche je Auftrag an', val(crit, 'support_critical_regions_only') === '1' && crit.changed.includes('critical'), crit.changed);
 check('Füllmuster-Zuordnung', K.orcaInfillPattern('Waben') === 'honeycomb' && K.orcaInfillPattern('Gyroid oder Kubisch') === 'gyroid' && K.orcaInfillPattern('Blitz') === 'lightning');
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

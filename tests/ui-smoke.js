@@ -612,8 +612,8 @@ async function runSmoke(opts={}){
     ovTab('Tempo');
     ok(!$('ovPanel').classList.contains('hidden')&&document.activeElement&&document.activeElement.dataset.ov==='sp_outer','„✎ anpassen“ öffnet beim Abschnitt Tempo');
     const crit=$('ovRows').querySelector('[data-ov="critical"]');ok(!$('ovPanel').classList.contains('hidden')&&!!crit,'„Nur kritische Bereiche“ in Werte anpassen');
-    crit.value='off';crit.dispatchEvent(new Event('input',{bubbles:true}));ovApply();await wait(80);
-    ok(lastResult.supCritical===false&&(project.parts[project.selected].overrides||{}).critical==='off','nur kritische Bereiche je Auftrag aus');
+    crit.value='on';crit.dispatchEvent(new Event('input',{bubbles:true}));ovApply();await wait(80);
+    ok(lastResult.supCritical===true&&(project.parts[project.selected].overrides||{}).critical==='on','nur kritische Bereiche je Auftrag an');
     // Filament ↔ Slot: PETG gewählt, im Slot steckt PLA (eigene Angabe) – Hinweis bei den Druckwerten und in ③, Übernehmen stellt um
     { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),p=project.parts[project.selected],m0=p.input.material,sl=p.slot??costDefaultSlot();
       const rows=Array.from({length:4},()=>null);rows[sl]={type:'PLA',colour:'#FFFFFF'};store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:rows};
