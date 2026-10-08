@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.2] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Kollisionen mit dem Druckkopf:** Die Z-Spindeln enden knapp unter der Düse (höher fährt das Bett nicht) statt bis zur Traverse zu reichen; die seitlichen Riemenstränge und die Motoren liegen außerhalb des Kopfwegs (≥ 5 mm Abstand, auch in den Ecken).
+- **3D-Fortschritt, Seitenlüfter:** Die flache Düse sitzt etwa auf Höhe der Druckkopf-Düse.
+
 ## [10.36.1] – 2026-10-08
 
 ### Behoben
