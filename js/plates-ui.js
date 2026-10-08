@@ -159,6 +159,10 @@ function plateSvg(tpl, lay, idx, slots, def) {
   const rects = idx.map(i => {
     const p = project.parts[i], pl = lay.places[i], s = slots[p.slot ?? def], [fw, fd] = footprint(p.geom, pl), g = { x: fw, y: fd };
     const col = s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : '#9aa8bc';
+    // echte Grundfläche (js/nest.js) – ineinander gelegte Teile sieht man sonst nur als überlappende Rechtecke
+    const d = typeof footprintPath === 'function' ? footprintPath(p.geom, placeAng(pl)) : null;
+    if (d) return '<path data-pick="' + i + '" transform="translate(' + (pl.lx - g.x / 2 - x0).toFixed(1) + ' ' + (bd - (pl.ly - y0) - g.y / 2).toFixed(1) + ')" d="' + d + '" fill="' + col + '"' +
+      (i === project.selected ? ' class="sel"' : '') + '><title>' + esc(p.name) + '</title></path>';
     return '<rect data-pick="' + i + '" x="' + (pl.lx - g.x / 2 - x0).toFixed(1) + '" y="' + (bd - (pl.ly - y0) - g.y / 2).toFixed(1) + '" width="' + g.x.toFixed(1) + '" height="' + g.y.toFixed(1) +
       '" rx="2" fill="' + col + '"' + (i === project.selected ? ' class="sel"' : '') + '><title>' + esc(p.name) + '</title></rect>';
   }).join('');

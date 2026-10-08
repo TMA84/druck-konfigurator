@@ -546,6 +546,8 @@ function packPlates(geoms, groups, tpl, sets) {
   let setsKept = null;  // null = keine Sätze; true = zusammengehalten; false = hätte mehr als eine Platte zusätzlich gekostet
   for (const [gi, idx] of groups.entries()) {
     let bins = packGroup(geoms, idx, bw, bd, gap);
+    // Grundfläche statt Hüllrechteck (js/nest.js), wenn das Platten spart – nicht bei „Objekt für Objekt“ (Kopf-Freiraum rechteckig)
+    if (bins.length > 1 && !printSeq.byObject && typeof nestGroup === 'function') { const nb = nestGroup(geoms, idx, bw, bd, gap); if (nb && nb.length < bins.length) bins = nb; }
     const mine = sets && sets.map(s => s.filter(i => idx.includes(i))).filter(s => s.length > 1);
     if (mine && mine.length) {
       const kept = packSets(geoms, idx, mine, bw, bd, gap);

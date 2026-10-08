@@ -754,6 +754,8 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .plate-svg .bed { fill: var(--paper); stroke: var(--rule-strong); stroke-width: 1.5; }
 .plate-svg rect[data-pick] { stroke: rgba(0,0,0,.45); stroke-width: 1; cursor: pointer; }
 .plate-svg rect.sel { stroke: var(--accent); stroke-width: 3; }
+.plate-svg path[data-pick] { cursor: pointer; filter: drop-shadow(0 0 .6px rgba(0,0,0,.6)); }
+.plate-svg path.sel { filter: drop-shadow(0 0 1.5px var(--accent)) drop-shadow(0 0 1.5px var(--accent)); }
 .plate-card .note { margin: 4px 0; padding: 4px 8px; }
 .plate-parts { list-style: none; margin: 2px 0 0; padding: 0; font-size: 12.5px; }
 .plate-parts li { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 0; }
