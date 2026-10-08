@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.4] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Riemenrollen:** Umlenkrollen mit Bordscheiben, Lauffläche, Lagerscheibe (drei Löcher – Drehung sichtbar), Achse und Sechskantkopf; Motorritzel als GT2-Zahnscheibe (20 Zähne) mit Bordscheibe und Nabe mit Madenschraube.
+- **3D-Fortschritt, Eckwagen an den Y-Schienen:** offene schwarze Gehäuse mit Führung um die Y-Stange, Boden- und Deckplatte und Außenwand – die beweglichen Umlenkrollen sitzen darin (nach Foto des Kobra S1).
+
 ## [10.36.3] – 2026-10-08
 
 ### Verbessert

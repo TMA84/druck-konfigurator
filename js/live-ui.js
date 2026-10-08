@@ -218,7 +218,18 @@ function lvHeadInit() {
   const beam = new THREE.Group(), rodX = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, len, 20);
   // zwei X-Stangen übereinander (wie am Kobra S1), der Kopf gleitet darauf
   for (const dz of LV_ROD_Z) { const r = new THREE.Mesh(rodX, rodM); r.rotation.z = Math.PI / 2; r.position.set(0, 0, dz); beam.add(r); }
-  for (const sx of [-1, 1]) { const car = new THREE.Mesh(slab(R * 2.8, R * 3.6, LV_ROD_Z[1] + 16, 3, 0.6), black); car.position.set(sx * len / 2, 0, -8); beam.add(car); }
+  /* Eckwagen an den Y-Schienen (nach Foto): offenes Gehäuse – Führung um die Y-Stange, Boden- und Deckplatte, Außenwand;
+     darin die beiden Umlenkrollen der Riemen (lvMechInit, bei x = Schiene ± LV_BELT_GAP), zur Mitte hin offen und sichtbar.
+     Koordinaten der Traverse: Riemen bei y = −9 − LV_BEAM_DY */
+  const by_ = -9 - LV_BEAM_DY, cy0 = by_ - 12, cy1 = 16, cd = cy1 - cy0, cmid = (cy0 + cy1) / 2;
+  for (const sx of [-1, 1]) {
+    const car = new THREE.Group(), xr = sx * len / 2, inner = -sx, box = (w, d, h, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), black); o.position.set(x, y, z); car.add(o); };
+    box(16, cd, 16, xr, cmid, LV_ROD_Z[1]);                                                  // Führung um die Y-Stange
+    box(34, cd, 3, xr + inner * 9, cmid, LV_BELT_Z.B - LV_BELT_H / 2 - 4);                    // Bodenplatte unter den Rollen
+    box(34, cd, 3, xr + inner * 9, cmid, LV_BELT_Z.A + LV_BELT_H / 2 + 6);                    // Deckplatte über den Rollen
+    box(3, cd, LV_BELT_Z.A - LV_BELT_Z.B + LV_BELT_H + 10, xr - inner * 7, cmid, (LV_BELT_Z.A + LV_BELT_Z.B) / 2 + 1);   // Außenwand
+    box(10, 12, LV_ROD_Z[1] + 8, xr + inner * 4, 0, LV_ROD_Z[1] / 2);                          // Halter der X-Stangen
+    beam.add(car); }
   beam.position.x = cx;
   // Y: je Seite eine Stange durch die Eckwagen
   const rodY = new THREE.CylinderGeometry(LV_ROD_R, LV_ROD_R, ylen, 20), rails = [bx0 - m, bx1 + m].map(x => { const r = new THREE.Mesh(rodY, rodM); r.position.set(x, cy, md.kin === 'bed' ? -R * 0.6 : LV_ROD_Z[1]); return r; });
@@ -251,7 +262,7 @@ function lvHeadInit() {
     my = Math.max(fy1 - 42, by1 + LV_HEAD.d / 2 + 5 + 21);   // Motor (42 mm) hinter dem Kopf, auch wenn er ganz hinten steht
   for (const [x, bz] of [[mxL, LV_BELT_Z.B], [mxR, LV_BELT_Z.A]]) {
     const mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, my, bz - LV_BELT_H / 2 - 14 - 40); frame.add(mo);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(LV_MOTOR_R, LV_MOTOR_R, LV_BELT_H + 2, 20), mat(0xd5dbde, { m: 0.5, r: 0.3, flat: true })); cap.rotation.x = Math.PI / 2; cap.position.set(x, my, bz); frame.add(cap);
+    const cap = lvMotorPulley(); cap.rotation.x = Math.PI / 2; cap.position.set(x, my, bz); frame.add(cap);
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, my, bz - LV_BELT_H / 2 - 7); frame.add(shaft);
     lv.motorCaps.push(cap); }
   lv.xy = { mxL, mxR, my, yF: fy0 + 34, fx0, fx1, fy0, fy1, top };
@@ -318,19 +329,58 @@ function lvBeltTexture() {
   lvBeltTex = new THREE.CanvasTexture(c); lvBeltTex.wrapS = THREE.RepeatWrapping;
   return lvBeltTex;
 }
+/* Umlenkrolle und Motorritzel (2026-10-08): Achse y (wie CylinderGeometry), gedreht wird um y.
+   Rolle: Bordscheiben oben/unten, glatte Lauffläche, Lagerscheibe mit drei Löchern (Drehung sichtbar), Achse mit Sechskantkopf.
+   Ritzel: GT2-Zahnscheibe (20 Zähne) mit Bordscheibe unten und Nabe mit Madenschraube oben. Geometrien einmal, geteilt. */
+let lvPulleyParts = null;
+function lvPulleyKit() {
+  if (lvPulleyParts) return lvPulleyParts;
+  const h = LV_BELT_H, R = LV_ROLL_R, M = LV_MOTOR_R;
+  const alu = new THREE.MeshStandardMaterial({ color: 0xd8dde0, metalness: 0.3, roughness: 0.38 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2b3135, metalness: 0.3, roughness: 0.5 });
+  const steelM = new THREE.MeshStandardMaterial({ color: 0xe1e5e8, metalness: 0.7, roughness: 0.25 });
+  // Zahnscheibe: Umriss mit 20 Zähnen, extrudiert und auf die y-Achse gelegt
+  const gear = new THREE.Shape(), N = 20, ro = M, rr = M - 0.9;
+  for (let i = 0; i < N * 4; i++) { const a = i / (N * 4) * Math.PI * 2, rad = (i % 4 === 1 || i % 4 === 2) ? ro : rr; const x = Math.cos(a) * rad, y = Math.sin(a) * rad; i ? gear.lineTo(x, y) : gear.moveTo(x, y); }
+  const gearG = new THREE.ExtrudeGeometry(gear, { depth: h + 0.4, bevelEnabled: false }); gearG.rotateX(-Math.PI / 2); gearG.translate(0, -(h + 0.4) / 2, 0);
+  lvPulleyParts = {
+    alu, dark, steelM, gearG,
+    flange: new THREE.CylinderGeometry(R + 1.8, R + 1.8, 0.9, 24), body: new THREE.CylinderGeometry(R, R, h, 24),
+    bearing: new THREE.CylinderGeometry(R * 0.62, R * 0.62, 0.4, 20), hole: new THREE.CylinderGeometry(0.7, 0.7, 0.5, 8),
+    axle: new THREE.CylinderGeometry(1.2, 1.2, h + 6, 10), bolt: new THREE.CylinderGeometry(2.4, 2.4, 1.6, 6),
+    mflange: new THREE.CylinderGeometry(M + 1.6, M + 1.6, 0.9, 28), hub: new THREE.CylinderGeometry(M * 0.85, M * 0.85, 5, 24),
+    screw: new THREE.CylinderGeometry(0.9, 0.9, 1.4, 8), shaft: new THREE.CylinderGeometry(1.25, 1.25, h + 7, 12)
+  };
+  return lvPulleyParts;
+}
+function lvIdler() {
+  const P = lvPulleyKit(), h = LV_BELT_H, g = new THREE.Group(), add = (geo, m, y) => { const o = new THREE.Mesh(geo, m); o.position.y = y; g.add(o); return o; };
+  add(P.body, P.alu, 0); add(P.flange, P.alu, h / 2 + 0.45); add(P.flange, P.alu, -h / 2 - 0.45);
+  add(P.bearing, P.dark, h / 2 + 1.1);
+  for (let k = 0; k < 3; k++) { const o = add(P.hole, P.alu, h / 2 + 1.2), a = k / 3 * Math.PI * 2; o.position.x = Math.cos(a) * LV_ROLL_R * 0.4; o.position.z = Math.sin(a) * LV_ROLL_R * 0.4; }
+  add(P.axle, P.steelM, 1.5); add(P.bolt, P.steelM, h / 2 + 3.6);
+  return g;
+}
+function lvMotorPulley() {
+  const P = lvPulleyKit(), h = LV_BELT_H, g = new THREE.Group(), add = (geo, m, y) => { const o = new THREE.Mesh(geo, m); o.position.y = y; g.add(o); return o; };
+  add(P.gearG, P.alu, 0); add(P.mflange, P.alu, -h / 2 - 0.45);
+  add(P.hub, P.alu, h / 2 + 2.5);
+  const set = add(P.screw, P.dark, h / 2 + 2.5); set.rotation.z = Math.PI / 2; set.position.x = LV_MOTOR_R * 0.85;   // Madenschraube in der Nabe
+  add(P.shaft, P.steelM, 0);
+  return g;
+}
 /* Riemen: Linienzüge (2D, Höhe z), in Laufrichtung des Riemens hintereinander, beginnend an einer Klemme (Kopf bzw. Bett).
    Ein Zahn sitzt immer gleich weit (entlang des Riemens) von der Klemme – die Zahnlage ergibt sich so aus der Geometrie:
    fährt der Kopf, ändern sich die Längen der Abschnitte und die Zähne wandern richtig, ohne zu rutschen; die Rollen drehen
    sich um den Weg, der über sie gelaufen ist. */
 function lvBelt(parent, z, paths) {
   const box = new THREE.BoxGeometry(1, 1, 1), belt = { z, segs: [], rolls: [], paths };
-  const roll = new THREE.CylinderGeometry(LV_ROLL_R, LV_ROLL_R, LV_BELT_H + 2, 14), rollM = new THREE.MeshStandardMaterial({ color: 0xb9c1c6, metalness: 0.5, roughness: 0.35, flatShading: true });
   for (const n of paths(0, 0)) for (let k = 0; k < n.length - 1; k++) {
     const tex = lvBeltTexture().clone(); tex.needsUpdate = true;
     const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
     parent.add(mesh); belt.segs.push(mesh);
   }
-  for (const n of paths(0, 0)) for (let k = 1; k < n.length - 1; k++) { const r = new THREE.Mesh(roll, rollM); r.rotation.x = Math.PI / 2; parent.add(r); belt.rolls.push(r); }
+  for (const n of paths(0, 0)) for (let k = 1; k < n.length - 1; k++) { const r = lvIdler(); r.rotation.x = Math.PI / 2; parent.add(r); belt.rolls.push(r); }
   return belt;
 }
 // legt den Riemen für Kopf (px, py); Ergebnis: Riemenweg bis zum Ende jedes Linienzugs (für die Motorscheibe)
