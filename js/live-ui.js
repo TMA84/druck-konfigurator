@@ -261,15 +261,16 @@ function lvHeadInit() {
   // Motoren und seitliche Riemenstränge außerhalb des Kopfwegs: innerer Strang ≥ 5 mm neben dem Kopf am Bettrand
   // (Kopf ±LV_HEAD.w/2 um die Düse); die Riemen laufen unter den Y-Stangen, dürfen sie also in x überdecken
   /* Riemenlauf nach der Anycubic-Skizze (2026-10-08): je Seite außen und innen ein Strang (innen = Wagenrolle), hinten zwei
-     Rollen nebeneinander mit dem Motor dazwischen davor („Omega“), vorn eine Umkehrrolle. Die Motoren sitzen OBEN auf dem
-     Rahmen, Welle nach unten (Explosionsbild) – über dem Kopfweg, keine Kollision. Innere Stränge außerhalb des Kopfwegs. */
+     Rollen nebeneinander mit dem Motor dazwischen davor („Omega“), vorn eine Umkehrrolle. Die Motoren sitzen UNTER den Riemen,
+     Welle nach oben – so weit hinten, dass der Kopf auch hinten in der Ecke frei bleibt. Innere Stränge außerhalb des Kopfwegs. */
   const G = LV_BELT_SPAN, xLi = bx0 - LV_HEAD.w / 2 - 16, xLo = xLi - G, xRi = bx1 + LV_HEAD.w / 2 + 16, xRo = xRi + G;   // Wagenrollen (Mitte 5 mm innen) bleiben neben Kopf und Hotend-Lüfter
-  const yb = fy1 - 22, yF = fy0 + 34, mL = [xLo + 34, yb - 16], mR = [xRo - 34, yb - 16], zMot = top + 4;
+  const yb = fy1 - 22, yF = fy0 + 34, mL = [xLo + 34, yb - 10], mR = [xRo - 34, yb - 10];
   for (const [[x, y], bz] of [[mL, LV_BELT_Z.B], [mR, LV_BELT_Z.A]]) {
-    const mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, y, zMot); frame.add(mo);
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(54, fy1 - y + 27, 3), black); plate.position.set(x, (y - 27 + fy1) / 2, zMot - 1.5); frame.add(plate);   // Halteblech zum hinteren Rahmen
+    // unter dem Riemen, Welle nach oben zum Ritzel; Halteblech auf dem Motor zum hinteren Rahmen
+    const zMot = bz - LV_BELT_H / 2 - 14 - 40, mo = new THREE.Mesh(slab(42, 42, 40, 4, 1), motor); mo.position.set(x, y, zMot); frame.add(mo);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(48, fy1 - y + 21, 3), black); plate.position.set(x, (y - 21 + fy1) / 2, zMot + 41.5); frame.add(plate);   // ab der Motorkante – nicht in den Kopfweg
     const cap = lvMotorPulley(); cap.rotation.x = Math.PI / 2; cap.position.set(x, y, bz); frame.add(cap);
-    const sl = zMot - bz, shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, sl, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, y, bz + sl / 2); frame.add(shaft);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 12), steel); shaft.rotation.x = Math.PI / 2; shaft.position.set(x, y, bz - LV_BELT_H / 2 - 7); frame.add(shaft);
     lv.motorCaps.push(cap); }
   lv.xy = { xLi, xLo, xRi, xRo, yb, yF, mL, mR, fx0, fx1, fy0, fy1, top };
   // Y-Stangen mit Endblöcken an den Rahmenecken (vorn/hinten oben)
@@ -634,11 +635,11 @@ function lvFansInit(md, g) {
   const duct = new THREE.Mesh(new THREE.BoxGeometry(26, 70, 102), dark); duct.position.set(fx1 - 30, cy, zAux - 45); side.add(duct);
   const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 155); side.add(wheel);
   { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 155); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
-  const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 52, cy, zAux); side.add(slot);   // flache Düse
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 26, cy, zAux);   // nah an der Wand: außerhalb des Kopfwegs side.add(slot);   // flache Düse
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(6, 84),   // nach der Drehung um y: 6 mm hoch, 84 mm breit (waagerechter Schlitz)
-    new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 69.2, cy, zAux); side.add(mouth);
+    new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 43.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
-  lv.air.push(lvAirStream(lv.gantry, [fx1 - 72, cy, zAux], [-1, 0, -0.04], 230, [40, 3], 'aux_fan_speed_pct'));
+  lv.air.push(lvAirStream(lv.gantry, [fx1 - 46, cy, zAux], [-1, 0, -0.04], 250, [40, 3], 'aux_fan_speed_pct'));
   // Ansaugung: Luft aus dem Bauraum strömt als Kegel auf das Lüfterrad zu
   lv.air.push(Object.assign(lvAirStream(lv.gantry, [fx1 - 190, cy, zAux - 155], [1, 0, 0], 145, [48, 48], 'aux_fan_speed_pct'), { funnel: 1 }));
   /* Gehäuselüfter in der Rückwand: Rahmen mit Lüfterrad (dreht nach box_fan_level), davor ein dünnes Gitter. Abluft: innen

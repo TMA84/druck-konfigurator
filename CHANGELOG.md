@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.38.2] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, XY-Motoren unter den Riemen:** Welle nach oben zum Ritzel, Halteblech zum hinteren Rahmen (vorher oben auf dem Rahmen); weit genug hinten, dass der Kopf auch in den hinteren Ecken frei bleibt.
+- **3D-Fortschritt, Seitendüse:** näher an der Wand – der Kopf stieß ganz rechts daran.
+
 ## [10.38.1] – 2026-10-08
 
 ### Verbessert
