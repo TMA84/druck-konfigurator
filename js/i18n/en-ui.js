@@ -796,3 +796,7 @@ I18N.add({
  "LAN · experimentell": "LAN · experimental",
  "Bisher nur am Kobra S1 geprüft – Rückmeldung gern als GitHub-Issue": "So far only tested on the Kobra S1 – feedback welcome as a GitHub issue",
 });
+I18N.add({
+ "Der Slice-Stand war nicht mehr auf dem Server (z. B. nach einem Neustart) – wird neu berechnet …": "The slice was no longer on the server (e.g. after a restart) – slicing again …",
+ "Bitte die Warteschlange neu anlegen.": "Please create the queue again.",
+});

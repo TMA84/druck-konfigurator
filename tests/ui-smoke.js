@@ -700,6 +700,15 @@ async function runSmoke(opts={}){
         sendInfo={...sendInfo,state:'busy'};sched.v=null;sendLaterReset();await wait(100);$('sendHeat').checked=true;$('sendHeat').dispatchEvent(new Event('input'));
         ok($('sendGo').disabled&&/nicht frei/.test($('sendHeatInfo').textContent),'Vorwärmen sofort: Drucker beschäftigt → gesperrt');
         sched.v=null;schedRender();window.fetch=of;if($('sendDlg').open)$('sendDlg').close(); }
+      // Slice-Stand nicht mehr auf dem Server (z. B. nach einem Add-on-Neustart): einmal neu slicen, dann mit neuem Auftrag starten
+      { const ol=window.lanApi,orc=window.runCosts,calls=[],cs0=costState;const sc0={job:'aaaaaaaaaaaaaaaa',plates:[{plate:1,grams:[5],total_g:5,time_s:60,changes:0}]};costState={...costState,slice:sc0,materials:{}};
+        window.lanApi=async(u,o)=>{if(String(u).startsWith('api/anycubic/print')){const b=JSON.parse(o.body);calls.push(b.job);if(calls.length===1)throw Error('Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen');return {job:{name:'neu'}}}return ol(u,o)};
+        window.runCosts=async()=>{costState={...costState,slice:{...sc0,job:'0123456789abcdef'},sig:costSignature(),error:''}};
+        openSendDialog=window.openSendDialog;sendCtx={slice:sc0,materials:costState.materials,name:'t',onStarted:null};if(!$('sendDlg').open)$('sendDlg').showModal();
+        sendInfo={...sendInfo,state:'free',printing:false};sendLaterReset();await wait(50);renderSendDialog();
+        $('sendGo').click();await wait(500);
+        ok(calls.length===2&&calls[1]==='0123456789abcdef'&&calls[0]!==calls[1],'Slice-Stand weg: neu geslict und mit neuem Auftrag gestartet ('+calls.join(' → ')+')');
+        window.lanApi=ol;window.runCosts=orc;costState=cs0;if($('sendDlg').open)$('sendDlg').close();if(document.body.dataset.tab!=='slice')setTab('slice'); }
       { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials,tab=document.body.dataset.tab;let adopted=0,resliced=0;
         store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:[null,{type:'PLA',colour:'#00FF00',override:true},{type:'PETG',colour:'#FFFFFF',override:true},null]};
         window.runCosts=async()=>{resliced++};window.openSendDialog=()=>{};window.adoptSlotMaterials=()=>{adopted++};

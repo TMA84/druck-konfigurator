@@ -112,7 +112,16 @@ $('sendGo').addEventListener('click', async () => {
     toast(r.job ? t('Druck gestartet: {name}', { name: r.job.name }) : (r.note ? t(r.note) : t('Gesendet')));
     setTab('printer');
   } catch (e) {
-    $('sendState').textContent = t('Nicht gestartet: {msg}', { msg: t(e.message) }); $('sendState').className = 'note bad';
+    // Slice-Stand nicht mehr auf dem Server (Neustart, aufgeräumt): einmal neu slicen und gleich erneut starten
+    if (/nicht \(mehr\) vorhanden/.test(e.message) && !sendCtx.onStarted && project && !sendCtx.resliced) {
+      $('sendState').textContent = t('Der Slice-Stand war nicht mehr auf dem Server (z. B. nach einem Neustart) – wird neu berechnet …'); $('sendState').className = 'note';
+      btn.textContent = t('Slicen …');
+      costState.sig = null;
+      await runCosts();
+      if (costState.slice && costState.slice.job && !costState.error) { sendCtx.slice = costState.slice; sendCtx.resliced = true; btn.disabled = false; $('sendGo').click(); return; }
+    }
+    $('sendState').textContent = t('Nicht gestartet: {msg}', { msg: t(e.message) }) + (sendCtx.onStarted && /nicht \(mehr\) vorhanden/.test(e.message) ? ' ' + t('Bitte die Warteschlange neu anlegen.') : '');
+    $('sendState').className = 'note bad';
     btn.disabled = false; btn.textContent = t('Erneut versuchen');
   }
 });

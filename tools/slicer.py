@@ -27,7 +27,10 @@ KEEP_JOBS = 8              # so viele Slice-Aufträge (G-Code) bleiben für Vors
 # weg – jedes neue Slicen räumt die ältesten der KEEP_JOBS auf, und das temporäre Verzeichnis überlebt keinen Neustart)
 PINNED_DIR = os.environ.get("SLICE_PINNED_DIR") or os.path.join(
     os.environ.get("DATA_DIR") or os.path.join(os.path.expanduser("~"), ".druck-konfigurator"), "queue-jobs")
-JOBS_DIR = os.environ.get("SLICE_JOBS_DIR", os.path.join(tempfile.gettempdir(), "druck-konfigurator-jobs"))
+# Mit DATA_DIR (Container, Home-Assistant-Add-on: /data) im Datenordner – überlebt Neustarts und Updates (2026-10-08:
+# nach einem Add-on-Update war der Slice-Stand der offenen Seite weg: „Slice-Auftrag nicht (mehr) vorhanden“)
+JOBS_DIR = os.environ.get("SLICE_JOBS_DIR") or (os.path.join(os.environ["DATA_DIR"], "slice-jobs") if os.environ.get("DATA_DIR")
+                                                else os.path.join(tempfile.gettempdir(), "druck-konfigurator-jobs"))
 JOB_ID = re.compile(r"^[0-9a-f]{16}$")
 TIMEOUT_S = 900
 TAIL_BYTES = 2 * 1024 * 1024   # Statistik und Einstellungen stehen am Ende des G-Codes
