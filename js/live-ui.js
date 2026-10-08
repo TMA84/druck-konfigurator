@@ -578,6 +578,16 @@ function lvEnclosureInit(g) {
   box(x1 - x0, y1 - y0, 3, cx, cy, z1, glass);                                                                         // Glasdeckel
   box(x1 - x0, 12, 6, cx, y0 + 6, z1, rim); box(x1 - x0, 12, 6, cx, y1 - 6, z1, rim);
   enc.visible = store.settings.liveEnclosure !== false; lv.gantry.add(enc); lv.enclosureG = enc;
+  // Display oben rechts vorn auf einem Fuß (wie am S1), leicht nach hinten geneigt; zeigt Fortschritt, Schicht, Restzeit (lvDisplay)
+  { const dg = new THREE.Group(), dark = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.4, metalness: 0.3 });
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(70, 26, 16), new THREE.MeshStandardMaterial({ color: 0xb9c0c4, roughness: 0.35, metalness: 0.6 })); foot.position.z = 8; dg.add(foot);
+    const scr = new THREE.Group(); scr.position.set(0, 4, 16 + 44); scr.rotation.x = -0.28; dg.add(scr);
+    const bez = new THREE.Mesh(new THREE.BoxGeometry(136, 8, 88), dark); scr.add(bez);
+    const cv = document.createElement('canvas'); cv.width = 320; cv.height = 200;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(128, 80), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+    face.rotation.x = Math.PI / 2; face.position.y = -4.2; scr.add(face);
+    dg.position.set(x1 - 78, y0 + 50, z1 + 2); lv.gantry.add(dg);
+    lv.display = { g: dg, cv, tex: face.material.map, key: null }; lvDisplay(typeof wb !== 'undefined' && wb.st); }
   // ACE-Einheiten oben auf dem Deckel, Spulen in Slotfarbe, Schläuche zum Verteiler hinten oben
   /* neben dem Drucker (rechts, LV_ACE.gap Abstand), auf derselben Standfläche, übereinander; klare, gerundete Haube */
   const ace = new THREE.Group(), A = LV_ACE, hub = new THREE.Vector3(cx + 100, y1 + 14, z0 + (z1 - z0) * 0.75), ax = x1 + A.gap + A.w / 2;
@@ -648,6 +658,28 @@ function lvEnclosureInit(g) {
   lv.hubTop = hub.clone().add(new THREE.Vector3(0, 0, 22));
   ace.visible = store.settings.liveAce !== false; lv.gantry.add(ace); lv.aceG = ace;
   lvAceColours(typeof wb !== 'undefined' && wb.st);
+}
+// Display am Drucker: Fortschritt in % mit Balken, Schicht und Restzeit; ohne Auftrag „Bereit“ (zeichnet nur bei Änderung neu)
+function lvDisplay(st) {
+  const D = lv.display; if (!D) return;
+  const job = st && st.job, pct = job ? Math.max(0, Math.min(100, Math.round(+job.progress || 0))) : null;
+  const own = job && typeof lvRemaining === 'function' && !job.paused ? lvRemaining(st) : null, rem = own ? Math.round(own.s / 60) : job && job.remaining_min;
+  const line1 = job ? (job.paused ? t('Pausiert') : t('Druckt')) : st && st.connected === false ? t('Nicht verbunden') : t('Bereit');
+  const line2 = job ? t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' }) : '';
+  const line3 = job && rem != null ? (typeof wbMin === 'function' ? wbMin(rem) : rem + ' min') : '';
+  const key = [line1, pct, line2, line3].join('|');
+  if (key === D.key) return; D.key = key;
+  const g = D.cv.getContext('2d'), W = 320, H = 200;
+  g.fillStyle = '#0d1114'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#8fd3c7'; g.font = '600 22px system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(line1, 16, 14);
+  if (job) {
+    g.fillStyle = '#ffffff'; g.font = 'bold 64px system-ui, sans-serif'; g.fillText(pct + ' %', 16, 44);
+    g.fillStyle = '#2a3338'; g.beginPath(); g.roundRect(16, 120, W - 32, 14, 7); g.fill();
+    g.fillStyle = job.paused ? '#f0b44c' : '#2bc4a8'; g.beginPath(); g.roundRect(16, 120, Math.max(14, (W - 32) * pct / 100), 14, 7); g.fill();
+    g.fillStyle = '#c9d2d6'; g.font = '20px system-ui, sans-serif'; g.fillText(line2, 16, 148);
+    if (line3) { g.textAlign = 'right'; g.fillText(line3, W - 16, 148); g.textAlign = 'left'; }
+  } else { g.fillStyle = '#56636a'; g.font = '20px system-ui, sans-serif'; g.fillText('Kobra S1', 16, 150); }
+  D.tex.needsUpdate = true; lvRender();
 }
 // Spulenfarben aus dem Druckerstand (st.ace: Einheiten mit Slots), fehlende Spulen ausgeblendet, zweite Einheit nur, wenn gemeldet
 function lvAceColours(st) {
@@ -1243,7 +1275,7 @@ async function lvLoad(name) {
 
 // Aus der Werkbank bei jedem Stand (alle 3 s): passende Vorschau laden, Schicht nachführen
 function liveUpdate(st) {
-  lvAceColours(st);
+  lvAceColours(st); lvDisplay(st);
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {

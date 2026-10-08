@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.14] – 2026-10-08
+
+### Neu
+- **3D-Fortschritt, Display am Drucker:** Oben rechts vorn auf dem Drucker steht wie am S1 ein kleines Display auf einem Fuß. Es zeigt den Fortschritt in Prozent mit Balken, die Schicht und die Restzeit (pausiert: gelber Balken); ohne Auftrag „Bereit“.
+
 ## [10.39.13] – 2026-10-08
 
 ### Verbessert
