@@ -49,6 +49,16 @@ ENTITIES = [
     ("layer", "sensor", "Schicht", None, None, None, "mdi:layers-triple"),
     ("nozzle_temp", "sensor", "Düse", "°C", "temperature", "measurement", None),
     ("bed_temp", "sensor", "Druckbett", "°C", "temperature", "measurement", None),
+    # Werte wie in der Werkbank (2026-10-08): Ziele, Lüfter, Geschwindigkeitsstufe, Dauer, Filament, Licht
+    ("nozzle_target", "sensor", "Düse Ziel", "°C", "temperature", "measurement", "mdi:thermometer-chevron-up"),
+    ("bed_target", "sensor", "Druckbett Ziel", "°C", "temperature", "measurement", "mdi:thermometer-chevron-up"),
+    ("fan_part", "sensor", "Bauteillüfter", "%", None, "measurement", "mdi:fan"),
+    ("fan_aux", "sensor", "Hilfslüfter", "%", None, "measurement", "mdi:fan"),
+    ("fan_box", "sensor", "Gehäuselüfter", "%", None, "measurement", "mdi:fan"),
+    ("speed_mode", "sensor", "Druckgeschwindigkeit", None, None, None, "mdi:speedometer"),
+    ("elapsed_min", "sensor", "Druckdauer bisher", "min", "duration", None, "mdi:timer-outline"),
+    ("filament_m", "sensor", "Filament dieser Druck", "m", "distance", None, "mdi:printer-3d-nozzle"),
+    ("light", "binary_sensor", "Licht", None, "light", None, "mdi:lightbulb"),
     ("queue_state", "sensor", "Warteschlange", None, None, None, "mdi:format-list-numbered"),
     ("queue_remaining_min", "sensor", "Warteschlange Restzeit", "min", "duration", None, "mdi:timer-sand"),
     ("plates", "sensor", "Platten fertig", None, None, None, "mdi:layers-outline"),
@@ -64,6 +74,29 @@ ENTITIES = [
     ("month_prints", "sensor", "Drucke diesen Monat", None, None, "total", "mdi:counter"),
 ]
 PRINTER_STATE = {"free": "frei", "busy": "beschäftigt", "offline": "offline"}
+SPEED_MODE = {1: "Leise", 2: "Standard", 3: "Sport"}   # wie die Werkbank (js/workbench-ui.js WB_SPEED)
+
+
+def num(v, nd=None):
+    return (round(v, nd) if nd is not None else v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def machine_values(st):
+    """Ziele, Lüfter, Geschwindigkeit, Dauer, Filament, Licht und je ACE Temperatur und Trocknen (aceN_temp, aceN_drying)."""
+    st = st or {}
+    temps, fans, job = st.get("temps") or {}, st.get("fans") or {}, st.get("job") or {}
+    light = (st.get("lights") or [None])[0] or {}
+    out = {"nozzle_target": num(temps.get("target_nozzle_temp")), "bed_target": num(temps.get("target_hotbed_temp")),
+           "fan_part": num(fans.get("fan_speed_pct")), "fan_aux": num(fans.get("aux_fan_speed_pct")), "fan_box": num(fans.get("box_fan_level")),
+           "speed_mode": SPEED_MODE.get(st.get("speed_mode"), st.get("speed_mode")) if st.get("speed_mode") is not None else None,
+           "elapsed_min": num(job.get("elapsed_min")) if job else None,
+           "filament_m": round(job["filament_mm"] / 1000, 2) if job and isinstance(job.get("filament_mm"), (int, float)) else None,
+           "light": ("ON" if light.get("status") else "OFF") if light else None}
+    for i, b in enumerate(st.get("ace") or [], 1):
+        dry = b.get("drying") or {}
+        out["ace%d_temp" % i] = num(b.get("temp"))
+        out["ace%d_drying" % i] = ("trocknet %s °C, noch %s min" % (dry.get("target_temp"), dry.get("remain_time"))) if dry.get("status") else "aus"
+    return out
 EVENT_TYPES = ["pausiert", "fortgesetzt", "fertig", "abgebrochen"]
 FINISHED = {"fertig", "finished", "complete", "completed", 2}
 ABORTED = {"abgebrochen", "stoped", "stopped", "canceled", "cancelled", 3}
@@ -186,7 +219,7 @@ def payload(st, queue, now=None, spool_view=None, plan=None):
             if plan and plan.get("state") in ("wait", "drying", "heating") else None,
             "schedule_state": SCHEDULE_STATE.get((plan or {}).get("state"), "keiner"), "schedule_note": (plan or {}).get("note"),
             "plates_total": sm.get("total") or 0, "queue_current": sm.get("current"), "queue_next": sm.get("next"),
-            "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view))
+            "bed_clear": "ON" if sm.get("bed_clear") or (queue or {}).get("bed_clear") else "OFF"}, **month_values(spool_view), **machine_values(st))
 
 
 def slot_payloads(st, spool_view):
@@ -249,6 +282,7 @@ class Publisher:
 
     def discovery(self, st, slots):
         """{Thema: Nutzdaten} für alle Entitäten."""
+        aces = len((st or {}).get("ace") or [])
         base, prefix, dev = self.cfg["base"], self.cfg["prefix"], self.device(st)
         common = {"availability_topic": self.t_avail, "payload_available": "online", "payload_not_available": "offline",
                   "device": dev, "origin": ORIGIN}
@@ -281,6 +315,14 @@ class Publisher:
                 out["%s/button/%s/%s/config" % (prefix, base, key)] = dict(
                     common, name=name, unique_id=base + "_" + key, default_entity_id="button." + base + "_" + key,
                     command_topic=self.t_cmd, payload_press=key, icon=icon)
+        for i in range(1, aces + 1):
+            for key, name, unit, dclass, icon in (("ace%d_temp" % i, "ACE %d Temperatur" % i, "°C", "temperature", "mdi:thermometer"),
+                                                  ("ace%d_drying" % i, "ACE %d Trocknen" % i, None, None, "mdi:heat-wave")):
+                c = dict(common, name=name, unique_id=base + "_" + key, default_entity_id="sensor." + base + "_" + key,
+                         state_topic=self.t_state, value_template="{{ value_json.%s }}" % key, icon=icon)
+                if unit:
+                    c.update(unit_of_measurement=unit, device_class=dclass, state_class="measurement")
+                out["%s/sensor/%s/%s/config" % (prefix, base, key)] = c
         for n in slots:
             key = "slot%d_remaining" % n
             out["%s/sensor/%s/%s/config" % (prefix, base, key)] = dict(
@@ -353,7 +395,7 @@ class Publisher:
         state = payload(st, self.queue_fn(), now, spool_view, self.plan_fn() if self.plan_fn else None)
         slots = slot_payloads(st, spool_view)
         dev = self.device(st)
-        key = (dev["name"], dev.get("sw_version"), tuple(slots))
+        key = (dev["name"], dev.get("sw_version"), tuple(slots), len((st or {}).get("ace") or []))
         if self.need_discovery or key != self.disc_key:
             for topic, cfg in self.discovery(st, slots).items():
                 self._pub(topic, cfg, retain=True)

@@ -230,7 +230,8 @@ check("ohne Drucker keine Slot-Sensoren außer bekannten", wait(lambda: disc("se
 status["st"] = ST
 check("Discovery neu mit Modell", wait(lambda: disc("sensor", "slot4_remaining") is not None))
 keys = ["printer_state", "progress", "remaining_min", "finish", "job", "layer", "nozzle_temp", "bed_temp", "queue_state",
-        "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints", "pause_reason"]
+        "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints", "pause_reason",
+        "nozzle_target", "bed_target", "fan_part", "fan_aux", "fan_box", "speed_mode", "elapsed_min", "filament_m"]
 check("alle Sensoren angemeldet", all(disc("sensor", k) for k in keys), [k for k in keys if not disc("sensor", k)])
 check("Discovery retained", all(disc("sensor", k)[2] for k in keys) and disc("binary_sensor", "bed_clear")[2])
 c = json.loads(disc("sensor", "progress")[1])
@@ -247,7 +248,7 @@ s1 = json.loads(disc("sensor", "slot1_remaining")[1])
 check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attributes_topic"] == "dk_test/slot/1" and s1["unit_of_measurement"] == "g"
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
-check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1, sorted(set(uids)))   # + Druck-Ereignis
+check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1 + 1 + 2, sorted(set(uids)))   # + Druck-Ereignis, Licht, ACE 1 Temperatur/Trocknen
 evc = json.loads(disc("event", "print_event")[1])
 check("Druck-Ereignis (MQTT-Event)", evc["state_topic"] == "dk_test/event" and evc["event_types"] == ["pausiert", "fortgesetzt", "fertig", "abgebrochen"], evc)
 mc = json.loads(disc("sensor", "month_cost_eur")[1])
@@ -350,6 +351,12 @@ check("Druck weg, letzter abgebrochen → abgebrochen", [e for e, _ in ev(S(J())
 check("Status fertig, Druck noch da → fertig", [e for e, _ in ev(S(J()), S(J(status="fertig", state="finished")))] == ["fertig"])
 check("kein Wechsel → nichts", ev(S(J()), S(J(progress=41))) == [])
 check("offline dazwischen → nichts", ev(S(J()), {"connected": False}) == [] and ev(None, S(J())) == [])
+mv = ha_mqtt.machine_values({"temps": {"target_nozzle_temp": 215, "target_hotbed_temp": 50}, "fans": {"fan_speed_pct": 100, "aux_fan_speed_pct": 60, "box_fan_level": 40},
+    "speed_mode": 2, "lights": [{"type": 2, "status": 1}], "job": {"elapsed_min": 96, "filament_mm": 14166},
+    "ace": [{"temp": 31, "drying": {"status": 0}}, {"temp": 45, "drying": {"status": 1, "target_temp": 55, "remain_time": 120}}]})
+check("Werte wie in der Werkbank", mv == {"nozzle_target": 215, "bed_target": 50, "fan_part": 100, "fan_aux": 60, "fan_box": 40, "speed_mode": "Standard",
+    "elapsed_min": 96, "filament_m": 14.17, "light": "ON", "ace1_temp": 31, "ace1_drying": "aus", "ace2_temp": 45, "ace2_drying": "trocknet 55 °C, noch 120 min"}, mv)
+check("ohne Stand: leer", ha_mqtt.machine_values(None)["fan_part"] is None and ha_mqtt.machine_values(None)["light"] is None)
 check("Pausengrund im Stand nur bei Pause", ha_mqtt.payload(S(J(paused=True), pause_reason="x"), None)["pause_reason"] == "x" and ha_mqtt.payload(S(J(), pause_reason="x"), None)["pause_reason"] is None)
 
 print("%d/%d bestanden" % (passed, passed + failed))

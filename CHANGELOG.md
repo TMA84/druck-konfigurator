@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.0] – 2026-10-08
+
+### Neu
+- **Mehr Werte in Home Assistant:** Ziel-Temperaturen von Düse und Bett, Bauteil-, Hilfs- und Gehäuselüfter (%), Druckgeschwindigkeit (Leise/Standard/Sport), Druckdauer bisher, Filament dieses Drucks (m), Licht (an/aus) und je ACE-Einheit Temperatur und Trocknen – dieselben Werte wie in der Werkbank.
+
 ## [10.35.2] – 2026-10-08
 
 ### Verbessert

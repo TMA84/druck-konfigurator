@@ -456,7 +456,10 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Sensor | Inhalt |
 |---|---|
 | Druckerzustand, Fortschritt, Restzeit, Fertig um, Auftrag, Schicht | laufender Druck |
-| Düse, Heizbett | Temperaturen |
+| Düse, Heizbett, Düse Ziel, Druckbett Ziel | Temperaturen (aktuell und Ziel) |
+| Bauteillüfter, Hilfslüfter, Gehäuselüfter | Lüfter in % |
+| Druckgeschwindigkeit, Druckdauer bisher, Filament dieser Druck, Licht | Stufe Leise/Standard/Sport, Minuten seit Start, Meter Filament, Licht an/aus |
+| ACE 1/2 Temperatur, ACE 1/2 Trocknen | je ACE-Einheit: Temperatur und Trocknen (aus / Temperatur und Restzeit) |
 | Warteschlange, Restzeit Warteschlange, Platten fertig/gesamt | Warteschlange |
 | **Bett abräumen** (an/aus) | an, sobald eine Platte der Warteschlange fertig ist – bis die nächste startet |
 | **Pausengrund** | warum der Druck pausiert (leer, solange er nicht pausiert) – siehe unten |
