@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unveröffentlicht]
+## [10.27.2] – 2026-10-08
 
 ### Behoben
 - **Keine Stützen an schrägen Überhängen, auch wenn sie ausdrücklich gewählt waren:** Der Vorschlag „Nur kritische Bereiche“ war an – damit stützt Orca nur Spitzen und Auskragungen; eine 55°-Schräge (über dem Grenzwinkel 45°) bekam keine einzige Stütze, mit „aus“ 98 Stützbahnen (Orca-CLI). Vorschlag jetzt **aus**; zum Sparen je Auftrag in der Werte-Tafel (Reiter Stützen) einschaltbar.
