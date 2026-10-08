@@ -631,13 +631,13 @@ function lvEnclosureInit(g) {
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.3, transparent: true, opacity: 0.35, depthWrite: false }));
       const fm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 }), fline = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.9, 6), fm);
       tube.renderOrder = 8; ace.add(fline, tube);
-      // Einzug vorn unten vor den Rollen (Trichter zeigt nach hinten zur Spule); das Filament läuft unten vom Wickel ab hinein (lvAceColours)
-      const feed = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 22), new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.5 })); feed.position.set(sx, -96, 38); unit.add(feed);
-      const funnel = new THREE.Mesh(new THREE.CylinderGeometry(6, 2.5, 8, 16), new THREE.MeshStandardMaterial({ color: 0xc9a14a, metalness: 0.4, roughness: 0.4 }));
-      funnel.position.set(sx, -88, 38); unit.add(funnel);
+      // Einzug vorn: schwarze Führung vor der Spule bis etwa zur Spulenmitte, das Filament läuft oben vorn vom Wickel ab und oben hinein (lvAceColours)
+      const feed = new THREE.Mesh(new THREE.BoxGeometry(26, 14, 134), new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.5 })); feed.position.set(sx, -109, 18 + 67); unit.add(feed);
+      const funnel = new THREE.Mesh(new THREE.CylinderGeometry(5, 2, 5, 16), new THREE.MeshStandardMaterial({ color: 0xc9a14a, metalness: 0.4, roughness: 0.4 }));
+      funnel.position.set(sx, -109, 152 + 2); funnel.rotation.x = Math.PI / 2 + 0.6; unit.add(funnel);
       const strand = new THREE.Mesh(new THREE.BufferGeometry(), fm); unit.add(strand);
       lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null,
-        strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -84, 38), k: null });
+        strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -109, 153), k: null });
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, von hinten gesehen links, Mitte der oberen Hälfte
@@ -660,10 +660,10 @@ function lvAceColours(st) {
     const full = LV_ACE.spoolR - 14, k = (LV_SPOOL_CORE + 2 + (full - LV_SPOOL_CORE - 2) * pct) / full;
     sp.filMesh.scale.set(k, 1, k);
     sp.strand.visible = on;
-    if (on && k !== sp.k) {   // Strang läuft unten vom Wickel ab (untere Tangente zum Einzug) und vorn unten in den Einzug
+    if (on && k !== sp.k) {   // Strang läuft oben vorn vom Wickel ab (obere Tangente zum Einzug) und oben in die Führung
       sp.k = k;
       const rw = full * k, dy = sp.inlet.y - sp.spoolC.y, dz = sp.inlet.z - sp.spoolC.z;
-      const f = Math.atan2(dz, dy), al = Math.acos(Math.min(1, rw / Math.hypot(dy, dz))), a = Math.sin(f - al) < Math.sin(f + al) ? f - al : f + al, from = new THREE.Vector3(sp.spoolC.x, sp.spoolC.y + Math.cos(a) * rw, sp.spoolC.z + Math.sin(a) * rw);
+      const f = Math.atan2(dz, dy), al = Math.acos(Math.min(1, rw / Math.hypot(dy, dz))), a = Math.sin(f - al) > Math.sin(f + al) ? f - al : f + al, from = new THREE.Vector3(sp.spoolC.x, sp.spoolC.y + Math.cos(a) * rw, sp.spoolC.z + Math.sin(a) * rw);
       sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(new THREE.LineCurve3(from, sp.inlet), 4, 0.9, 6);
     }
     const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';

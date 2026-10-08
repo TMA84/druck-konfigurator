@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.10] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, ACE-Einzug vorn oben:** Vor jeder Spule steht eine schwarze Führung, etwa bis zur Spulenmitte hoch. Das Filament läuft oben vorn vom Wickel ab und oben in die Führung, wie beim ACE Pro.
+
 ## [10.39.9] – 2026-10-08
 
 ### Verbessert
