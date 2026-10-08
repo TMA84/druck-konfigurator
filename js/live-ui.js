@@ -166,7 +166,7 @@ function lvBed() {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 function lvHeadInit() {
-  for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
+  for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG', 'zArms']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
   lv.motorCaps = [];
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
@@ -247,8 +247,18 @@ function lvHeadInit() {
     lv.motorCaps.push(cap); }
   lv.xy = { mxL, mxR, my, yF: fy0 + 34 };
   // drei Z-Spindeln wie am Kobra S1: hinten in der Mitte, vorne links und vorne rechts
-  for (const [x, y] of [[cx, fy1 - 22], [fx0 + 30, fy0 + 60], [fx1 - 30, fy0 + 60]]) {
+  // direkt am Druckbett: das Bett hängt mit Haltern und Spindelmuttern daran (lv.zArms, bleiben beim Bett)
+  const zs = [[cx, by1 + 18], [bx0 - 18, by0 + 30], [bx1 + 18, by0 + 30]];
+  for (const [x, y] of zs) {
     const sc = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, fh - 30, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, y, top - fh / 2); frame.add(sc); }
+  lv.zArms = new THREE.Group();
+  const armM = mat(0x3a4146, { r: 0.55 }), nutM = mat(0xc9a14a, { m: 0.5, r: 0.35 });
+  for (const [x, y] of zs) {
+    // Halter vom Bettrand zur Spindel, Messingmutter um die Spindel – auf Höhe des Betts, fest mit dem Teil
+    const ex = Math.max(bx0, Math.min(bx1, x)), ey = Math.max(by0, Math.min(by1, y)), dx = x - ex, dy = y - ey, L = Math.hypot(dx, dy);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(L + 14, 16, 8), armM); arm.position.set((x + ex) / 2, (y + ey) / 2, -8); arm.rotation.z = Math.atan2(dy, dx); lv.zArms.add(arm);
+    const nut = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 14, 16), nutM); nut.rotation.x = Math.PI / 2; nut.position.set(x, y, -8); lv.zArms.add(nut);
+  }
   }
   lv.gantry = new THREE.Group(); lv.gantry.add(beam, ...(md.kin === 'bed' ? [] : rails), frame);
   if (lv.frameFixed) { lv.frameFixed.visible = false; lv.scene.add(lv.frameFixed); } lv.gantry.userData.beam = beam; lv.gantry.visible = false;
@@ -261,6 +271,7 @@ function lvHeadInit() {
   lv.plate.position.set((bx0 + bx1) / 2, (by0 + by1) / 2, -0.03);
   lvMechInit(md, { bx0, bx1, by0, by1, m, cx, beam });
   lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate, lv.mechG);
+  if (lv.zArms) lv.scene.add(lv.zArms);
   lvTheme();
 }
 /* Riemen, Schleppkette und Filamentschlauch (2026-10-08, Spielerei): CoreXY mit zwei Riemen übereinander – Motoren hinten,

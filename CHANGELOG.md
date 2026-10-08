@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.33.3] – 2026-10-08
+
+### Behoben
+- **3D-Fortschritt, Z-Spindeln am Druckbett:** Die drei Spindeln (hinten mittig, vorn links und rechts) stehen jetzt direkt am Bett; Halter mit Messing-Spindelmutter verbinden das Bett mit jeder Spindel und bleiben beim Bett (vorher standen die Spindeln frei im Rahmen, ohne Verbindung zum Bett).
+
 ## [10.33.2] – 2026-10-08
 
 ### Behoben
