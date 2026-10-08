@@ -173,7 +173,7 @@ function lvBed() {
 }
 function lvHeadInit() {
   for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG', 'zArms']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
-  lv.motorCaps = [];
+  lv.motorCaps = []; lv.zScrews = [];
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
      Alu-Profil mit Nut und Laufwagen, Y-Schienen als Stahlstangen. */
@@ -233,7 +233,7 @@ function lvHeadInit() {
     bar(bx0 - m, 0, top, bx1 + m, 0, top);                                                       // Querstrebe oben
     for (const x of [cx - (bx1 - bx0) * 0.3, cx + (bx1 - bx0) * 0.3]) bar(x, -ylen / 2, top - fh, x, ylen / 2, top - fh + 12);   // Y-Schienen
     bar(bx0 - m, -ylen / 2, top - fh - 8, bx1 + m, ylen / 2, top - fh);                          // Fuß
-    for (const x of [bx0 - m + 14, bx1 + m - 14]) { const sc = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, fh - 30, 16), steel); sc.rotation.x = Math.PI / 2; sc.position.set(x, 16, top - fh / 2); frame.add(sc); }   // Z-Spindeln
+    for (const x of [bx0 - m + 14, bx1 + m - 14]) { const sc = lvLeadScrew(4, fh - 30); sc.rotation.x = Math.PI / 2; sc.position.set(x, 16, top - fh / 2); frame.add(sc); }   // Z-Spindeln
     const mo = new THREE.Mesh(slab(30, 30, 34, 3, 1), mat(0x30373c, { r: 0.5 })); mo.position.set(bx0 - m - 4, 0, -14); beam.add(mo);   // X-Motor (fährt mit der X-Achse)
     lv.frameFixed = frame; frame = new THREE.Group();
   } else {
@@ -260,7 +260,7 @@ function lvHeadInit() {
   const zs = [[cx, by1 + 18], [bx0 - 18, by0 + 30], [bx1 + 18, by0 + 30]];
   for (const [x, y] of zs) {
     // enden knapp unter der Düse (höher fährt das Bett nicht) – sonst ragen sie in den Weg des Kopfes
-    const zTop = -LV_GANTRY_Z - 10, zBot = top - fh + 15, sc = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, zTop - zBot, 16), steel);
+    const zTop = -LV_GANTRY_Z - 10, zBot = top - fh + 15, sc = lvLeadScrew(4, zTop - zBot);
     sc.rotation.x = Math.PI / 2; sc.position.set(x, y, (zTop + zBot) / 2); frame.add(sc); }
   lv.zArms = new THREE.Group();
   const armM = mat(0x3a4146, { r: 0.55 }), nutM = mat(0xc9a14a, { m: 0.5, r: 0.35 });
@@ -284,6 +284,26 @@ function lvHeadInit() {
   lv.scene.add(lv.head, lv.gantry, lv.bed, lv.plate, lv.mechG);
   if (lv.zArms) lv.scene.add(lv.zArms);
   lvTheme();
+}
+/* Z-Spindel (Trapezgewinde Tr8, 2026-10-08): Kern und erhabene Gänge als Schraubenlinie (echte Geometrie, kein Bild) –
+   4 Gänge mit je LV_SCREW_LEAD mm Steigung (= 2 mm Teilung wie beim Tr8x8). Dreht sich mit der Höhe (lvMechUpdate):
+   eine Umdrehung je LV_SCREW_LEAD mm Hub, läuft so sichtbar durch die Mutter am Bett. */
+const LV_SCREW_LEAD = 8, LV_SCREW_STARTS = 4;
+class LvHelix extends THREE.Curve {
+  constructor(r, len, turns, phase) { super(); this.r = r; this.len = len; this.turns = turns; this.phase = phase; }
+  getPoint(t, out = new THREE.Vector3()) {
+    const a = this.phase + t * this.turns * Math.PI * 2;
+    return out.set(this.r * Math.cos(a), (t - 0.5) * this.len, this.r * Math.sin(a));
+  }
+}
+function lvLeadScrew(r, len) {
+  const g = new THREE.Group(), steelM = new THREE.MeshStandardMaterial({ color: 0xc3cacf, metalness: 0.6, roughness: 0.32 });
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(r - 0.9, r - 0.9, len, 18), new THREE.MeshStandardMaterial({ color: 0x8e979c, metalness: 0.6, roughness: 0.4 })));
+  const turns = len / LV_SCREW_LEAD;
+  for (let k = 0; k < LV_SCREW_STARTS; k++)
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new LvHelix(r - 0.75, len, turns, k / LV_SCREW_STARTS * Math.PI * 2), Math.ceil(turns * 14), 0.62, 5), steelM));
+  lv.zScrews.push(g);
+  return g;
 }
 /* Riemen, Schleppkette und Filamentschlauch (2026-10-08, Spielerei): CoreXY mit zwei Riemen übereinander – Motoren hinten,
    Umlenkrollen vorn und an den Eckwagen, beide Enden am Kopf; Riemen A läuft mit x + y, B mit x − y (CoreXY), die Zähne
@@ -469,6 +489,8 @@ function lvChainCurve(a, h, xmin) {
 function lvMechUpdate(p) {
   if (!lv.mechG) return;
   lv.mechG.visible = lv.head.visible;
+  // Z-Spindeln drehen mit der Höhe (rotation.y = um die eigene Achse, wie die Rollen)
+  for (const sc of lv.zScrews || []) sc.rotation.y = -(p.z / LV_SCREW_LEAD) * Math.PI * 2;
   { const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt); }
   if (!lv.head.visible) return;
   for (const { b, go, motor } of lv.belts) {

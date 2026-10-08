@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.36.3] – 2026-10-08
+
+### Verbessert
+- **3D-Fortschritt, Z-Spindeln:** sind echte Trapezgewindespindeln (Tr8: Kern mit vier erhabenen Gängen als Schraubenlinie) und drehen sich mit der Höhe – 8 mm Hub je Umdrehung –, dabei laufen sie sichtbar durch die Messingmutter am Bett.
+
 ## [10.36.2] – 2026-10-08
 
 ### Behoben
