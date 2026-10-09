@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.41.2] – 2026-10-09
+
+### Geändert
+- **3D-Fortschritt: Filamentfluss bis in den Druckkopf:** Die Leuchtstreifen laufen jetzt auch vom Sammler über die Kette in den Kopf bis zur Düse, in der Farbe des gerade gedruckten Filaments.
+
 ## [10.41.1] – 2026-10-09
 
 ### Geändert

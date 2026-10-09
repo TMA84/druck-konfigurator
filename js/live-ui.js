@@ -756,6 +756,7 @@ function lvAceColours(st) {
       fx.lbl.material.map.needsUpdate = true;
     }
   });
+  if (lv.filGlow) lv.filGlow.visible = lvAceFlowing();   // Fluss zum Kopf endet mit dem Druck
   lvAceAnimate();
   lvRender();
 }
@@ -796,6 +797,7 @@ function lvAceAnimate() {
         // Streifen laufen von der Spule zum Drucker (u wächst Richtung Drucker); Strang und Schlauch gleich schnell
         for (const m of [sp.flow, sp.flowS]) m.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;
       }
+      if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;   // Kopfschlauch (lvMechUpdate)
       for (const fx of lv.aceUnitsFx || []) if (fx.dry) fx.lid.emissiveIntensity = 0.35 + 0.25 * Math.sin(ph * 1.6);
       lvRender();
     }
@@ -1011,7 +1013,16 @@ function lvMechUpdate(p) {
   lv.fil = new THREE.Mesh(new THREE.TubeGeometry(cf, 80, 0.9, 6), lv.filM);
   lv.tube.renderOrder = 3;
   lv.mechG.add(lv.fil, lv.tube);
+  // fließendes Filament bis in den Kopf (wie in den ACE-Schläuchen, lvAceAnimate), nur solange ein Slot aktiv druckt
+  if (lv.filGlow) { lv.mechG.remove(lv.filGlow); lv.filGlow.geometry.dispose(); lv.filGlow = null; }
+  if (lvAceFlowing()) {
+    if (!lv.filFlow) { lv.filFlow = lvFlowMat(300); lv.filGlowM = lvGlowMat(lv.filFlow); }
+    lv.filFlow.emissiveMap.repeat.x = Math.max(1, cf.getLength() / LV_FLOW_MM);
+    lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3);
+    lv.filGlow = new THREE.Mesh(new THREE.TubeGeometry(cf, 80, 2.0, 8), lv.filGlowM); lv.filGlow.renderOrder = 4; lv.mechG.add(lv.filGlow);
+  }
 }
+function lvAceFlowing() { return !!(lv.aceSpools && lv.aceG && lv.aceG.visible && lv.aceSpools.some(sp => sp.active)); }
 // Filamentfarbe im Schlauch: Werkzeug der gerade gedruckten Bahn
 function lvFilamentAt(seg) {
   if (!lv.filM || seg == null || !lv.data || !lv.data.a) return;
