@@ -34,6 +34,15 @@ class DruckwerkstattCard extends HTMLElement {
       + '<ha-card><div class="box"><iframe title="Druckwerkstatt 3D" allow="fullscreen"></iframe><div class="msg">Druckwerkstatt wird geladen …</div></div></ha-card>';
     this._box = root.querySelector('.box'); this._frame = root.querySelector('iframe'); this._msg = root.querySelector('.msg');
     this._layout();
+    // iOS übernimmt eine spätere Größenänderung der Kachel nicht in die eingebettete Seite – feste Pixelgröße setzen
+    // und die Seite (gleicher Ursprung) neu messen lassen
+    new ResizeObserver(() => this._fit()).observe(this._box);
+  }
+  _fit() {
+    const w = this._box.clientWidth, h = this._box.clientHeight;
+    if (!w || !h) return;
+    this._frame.style.width = w + 'px'; this._frame.style.height = h + 'px';
+    try { this._frame.contentWindow.dispatchEvent(new Event('resize')); } catch (e) { /* noch nicht geladen */ }
   }
   _layout() {
     // Höhe aus dem Seitenverhältnis, aber mindestens die ganze Kachel (min-height 100 %, greift nur bei fester Kachelhöhe
@@ -60,7 +69,7 @@ class DruckwerkstattCard extends HTMLElement {
       if (!info.ingress_url) throw Error('Das Add-on hat keinen Ingress');
       await this._session();
       const src = info.ingress_url + '?ansicht=3d';
-      if (this._frame.getAttribute('src') !== src) this._frame.setAttribute('src', src);
+      if (this._frame.getAttribute('src') !== src) { this._frame.onload = () => this._fit(); this._frame.setAttribute('src', src); }
       this._msg.style.display = 'none';
       this._timer = setInterval(() => this._keep(), DW_KEEPALIVE_MS);
     } catch (e) {

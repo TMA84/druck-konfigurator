@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.40.3] – 2026-10-09
+
+### Behoben
+- **Dashboard-Karte „Druckwerkstatt 3D“ auf dem iPhone:** Die 3D-Ansicht blieb in der Kachel bei ihrer ersten, kleineren Größe stehen, der Rest der Kachel blieb weiß. Die Karte gibt der eingebetteten Seite jetzt eine feste Pixelgröße und passt sie bei jeder Größenänderung an. Die Seite selbst nimmt 100 % statt 100vh.
+
 ## [10.40.2] – 2026-10-09
 
 ### Behoben
