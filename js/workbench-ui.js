@@ -34,11 +34,16 @@ async function wbPoll() {
   if (document.body.dataset.tab !== 'printer') return;
   const host = wbHost();
   if (!host || !(await lanServerAvailable())) { wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : ''); return; }
-  // pos=1: Kopfposition auch während des Drucks (Schalter in der 3D-Ansicht, js/live-ui.js)
+  // pos=1: Kopfposition auch während des Drucks, solange die 3D-Ansicht offen ist (js/live-ui.js)
   const pos = typeof livePosWanted === 'function' && livePosWanted() ? '&pos=1' : '';
-  const prev = wb.st;
-  try { wb.st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); wb.err = ''; }
-  catch (e) { wb.err = t(e.message); }
+  const prev = wb.st, n0 = wb.cmdN || 0;
+  let st = null, err = '';
+  try { st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); }
+  catch (e) { err = t(e.message); }
+  /* Stand von vor oder während eines Befehls verwerfen – er setzte z. B. den Lichtschalter zurück, obwohl der Drucker schon
+     umgeschaltet hatte (2026-10-09). wbCmd holt danach selbst frisch (finally → wbPoll). */
+  if (wb.cmdBusy || (wb.cmdN || 0) !== n0) return;
+  if (err) wb.err = err; else { wb.st = st; wb.err = ''; }
   if (!wb.err) wbEvents(prev, wb.st);
   wbRender();
   if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
@@ -123,6 +128,7 @@ function wbRender() {
   state.className = 'wb-pill' + (job && !job.paused ? ' live' : '');
   const light = (st.lights || [])[0];
   $('wbLight').disabled = !light; if (light && document.activeElement !== $('wbLight')) $('wbLight').checked = light.status === 1;
+  $('wbLightOut').textContent = !light ? '–' : $('wbLight').checked ? t('an') : t('aus');
   if (!$('wbRawOut').classList.contains('hidden')) $('wbRawOut').textContent = JSON.stringify(st.raw, null, 1);
 
   // Druckauftrag
@@ -195,12 +201,13 @@ function wbRender() {
 async function wbCmd(btn, type, action, data, done) {
   const host = wbHost(); if (!host) return;
   if (btn) btn.disabled = true;
+  wb.cmdN = (wb.cmdN || 0) + 1; wb.cmdBusy = (wb.cmdBusy || 0) + 1;   // laufende Abfragen verwerfen (wbPoll)
   try {
     const r = await lanCommand(host, type, action, data);
     if (!r.ok) throw Error(r.msg || t('vom Drucker abgelehnt ({code})', { code: r.state || r.code }));
     if (done) toast(done);
   } catch (e) { toast(t('Nicht ausgeführt: {msg}', { msg: t(e.message) })); }
-  finally { if (btn) btn.disabled = false; document.querySelectorAll('[data-touched]').forEach(el => delete el.dataset.touched); wbPoll(); }
+  finally { wb.cmdBusy--; if (btn) btn.disabled = false; document.querySelectorAll('[data-touched]').forEach(el => delete el.dataset.touched); wbPoll(); }
 }
 
 $('wbPause').addEventListener('click', e => wbCmd(e.currentTarget, 'print', 'pause', {}, t('Druck pausiert')));
@@ -224,6 +231,7 @@ document.querySelectorAll('[data-wb-fan]').forEach(inp => {
   inp.addEventListener('change', () => wbCmd(null, 'fan', 'setSpeed', { [inp.dataset.wbFan]: +inp.value }));
 });
 $('wbLight').addEventListener('change', e => {
+  $('wbLightOut').textContent = e.currentTarget.checked ? t('an') : t('aus');
   const l = (wb.st && wb.st.lights || [])[0] || { type: 2 };
   wbCmd(e.currentTarget, 'light', 'control', { type: l.type, status: e.currentTarget.checked ? 1 : 0, brightness: 100 });
 });

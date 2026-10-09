@@ -120,7 +120,7 @@ I18N.add({
   "An Drucker senden …": "Send to printer …",
   "Drucker-Werkbank": "Printer workbench",
   "Druckauftrag, Kamera, Temperaturen, Achsen und ACE deines Kobra S1 – über den LAN-Modus der Werksfirmware.": "Print job, camera, temperatures, axes and ACE of your Kobra S1 – via the LAN mode of the stock firmware.",
-  "Licht im Drucker": "Printer light",
+  "Licht im Drucker (nur an/aus – der Kobra S1 dimmt nicht)": "Printer light (on/off only – the Kobra S1 does not dim)",
   "Licht": "Light",
   "Verbindung …": "Connection …",
   "Rohdaten": "Raw data",

@@ -35,6 +35,7 @@ I18N.add({
   'Drucker lehnt die MQTT-Anmeldung ab': 'The printer rejects the MQTT login',
   'Keine Verbindung zum Drucker': 'No connection to the printer',
   'Drucker hat den Befehl nicht bestätigt': "The printer didn't confirm the command",
+  'Drucker hat das Licht nicht umgeschaltet': "The printer didn't switch the light",
   'Befehl braucht multi_color_box mit Box-id': 'The command needs multi_color_box with a box id',
   'Während eines Drucks gesperrt': 'Locked while printing',
   'Es läuft kein Druckauftrag': 'No print job is running',

@@ -245,7 +245,6 @@
       <div class="wb-bar-main"><b id="wbName">Kobra S1</b><span id="wbMeta" class="muted small"></span></div>
       <span id="wbState" class="wb-pill"></span>
       <span id="wbConn" class="wb-pill"></span>
-      <label class="wb-toggle wb-light" title="Licht im Drucker"><input type="checkbox" id="wbLight"> Licht</label>
       <span class="wb-bar-links"><button class="linkbtn" type="button" data-action="link">Verbindung …</button><button class="linkbtn" type="button" id="wbRaw">Rohdaten</button></span>
     </header>
     <pre id="wbRawOut" class="wb-raw hidden"></pre>
@@ -288,6 +287,7 @@
         <label>Bauteil <input type="range" min="0" max="100" step="5" id="wbFan0" data-wb-fan="fan_speed_pct"><output></output></label>
         <label>Zusatz <input type="range" min="0" max="100" step="5" id="wbFan1" data-wb-fan="aux_fan_speed_pct"><output></output></label>
         <label>Gehäuse <input type="range" min="0" max="100" step="5" id="wbFan2" data-wb-fan="box_fan_level"><output></output></label>
+        <label class="wb-light-row" title="Licht im Drucker (nur an/aus – der Kobra S1 dimmt nicht)">Licht <input type="checkbox" role="switch" class="wb-switch" id="wbLight"><output id="wbLightOut"></output></label>
       </div>
       <p class="muted small" id="wbSpeed"></p>
     </section>

@@ -118,7 +118,7 @@ class FakeBroker(threading.Thread):
         self.temps = {"curr_nozzle_temp": 26, "target_nozzle_temp": 0, "curr_hotbed_temp": 24, "target_hotbed_temp": 0}
         self.fans = {"fan_speed_pct": 0, "aux_fan_speed_pct": 0, "box_fan_level": 0}
         self.light, self.pos, self.moves, self.starts = {"type": 2, "status": 0, "brightness": 0}, {"x": 10, "y": 20, "z": 5}, [], []
-        self.silent, self.ignore = set(), set()   # (Art, Aktion): ausführen ohne Antwort / gar nicht ausführen
+        self.silent, self.ignore, self.noop = set(), set(), set()   # (Art, Aktion): ausführen ohne Antwort / gar nicht ausführen / „done“ ohne Wirkung
         self.conns = []
 
     def drop(self):
@@ -195,6 +195,8 @@ class FakeBroker(threading.Thread):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"lights": [dict(self.light)]}})
                 elif (kind, action) in self.ignore:
                     pass
+                elif (kind, action) in self.noop:   # quittiert mit „done“, ändert aber nichts
+                    self.reply(conn, kind, {"type": kind, "action": action, "state": "done", "code": 200, "msgid": msg["msgid"], "data": dict(self.light)})
                 elif (kind, action) == ("light", "control") and (kind, action) in self.silent:
                     self.light.update(msg["data"])   # führt aus, bestätigt aber nicht (andere Firmware)
                 elif (kind, action) == ("light", "control"):
@@ -359,6 +361,10 @@ try:
 except lan.LanError as e:
     check("Licht, das der Drucker nicht schaltet, gilt als nicht bestätigt", e.kind == "timeout" and "nicht bestätigt" in str(e), str(e))
 broker.ignore.clear()
+broker.noop.add(("light", "control"))
+res = lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})   # ist aus – bleibt aus
+check("Licht mit „done“ quittiert, aber nicht umgeschaltet: gemeldet statt stumm ok", not res["ok"] and res["state"] == "not_applied", res)
+broker.noop.clear()
 lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
 st = lan.status("127.0.0.1")
 check("Lüfter 40 % und Licht an", st["fans"]["fan_speed_pct"] == 40 and st["lights"] and st["lights"][0]["status"] == 1, (st["fans"], st["lights"]))

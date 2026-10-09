@@ -634,7 +634,6 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-bar-main .muted { color: #b9bcc2; }
 .wb-bar .linkbtn { color: var(--bar-link, #7fe0d6); }   /* helles Petrol auf der dunklen Leiste */
 .wb-bar-links { display: flex; gap: 14px; }
-.wb-light { color: #fff; }
 .wb-pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,.12); color: #e8e8e8; white-space: nowrap; }
 .wb-pill.good { background: #1f5f35; color: #d6f5df; }
 .wb-pill.bad { background: #7a241c; color: #ffe0dc; }
@@ -685,6 +684,14 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-fans label { display: grid; grid-template-columns: 70px 1fr 40px; gap: 8px; align-items: center; }
 .wb-fans input { accent-color: var(--accent); }
 .wb-fans output { font-variant-numeric: tabular-nums; text-align: right; }
+/* Lichtschalter (2026-10-09, vorher Häkchen oben in der Leiste): Schiebeschalter in der Zeile unter den Lüftern */
+.wb-fans .wb-light-row { cursor: pointer; }
+.wb-switch { appearance: none; -webkit-appearance: none; justify-self: start; position: relative; width: 40px; height: 22px; margin: 0; border-radius: 11px; background: var(--rule-strong); cursor: pointer; transition: background .15s; }
+.wb-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.35); transition: transform .15s; }
+.wb-switch:checked { background: var(--accent); }
+.wb-switch:checked::after { transform: translateX(18px); }
+.wb-switch:disabled { opacity: .45; cursor: default; }
+.wb-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .wb-toggle { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 13.5px; }
 .wb-toggle input { accent-color: var(--accent); }
 .wb-heat > p { margin: 0; }

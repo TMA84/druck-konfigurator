@@ -715,6 +715,9 @@ def command(host, kind, action, data):
             link.request(kind_q, action_q, None, timeout=4)
         except LanError:
             pass
+    if ok and (kind, action) == ("light", "control") and not _took_effect(link, kind, action, payload):
+        # „done“ quittiert, aber anderer Zustand gemeldet (nach dem Nachfragen oben) – sonst sprang der Schalter stumm zurück
+        return {"ok": False, "state": "not_applied", "code": rep.get("code"), "msg": "Drucker hat das Licht nicht umgeschaltet", "reply": rep.get("data")}
     if kind == "skip":
         # Merken, was gesendet wurde – die Firmware quittiert je nach Version nicht; die Anzeige zeigt es als „gesendet“
         job = link.project() or {}

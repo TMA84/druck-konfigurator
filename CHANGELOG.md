@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.5] – 2026-10-09
+
+### Behoben
+- **Werkbank: Lichtschalter sprang zurück:** Der Drucker schaltete das Licht, aber eine Statusabfrage, die schon vorher unterwegs war, setzte den Schalter danach wieder auf den alten Stand. Abfragen, die während eines Befehls laufen, verwirft die Werkbank jetzt. Quittiert der Drucker das Licht mit „done“, schaltet aber nicht um, meldet die Werkbank das („Drucker hat das Licht nicht umgeschaltet“).
+
+### Geändert
+- **Lichtschalter in „Temperaturen & Lüfter“:** Statt des Häkchens oben in der Leiste gibt es jetzt einen Schiebeschalter unter den Lüftern, mit „an/aus“ daneben. Dimmen kann der Kobra S1 nicht: Am Drucker getestet (2026-10-09) antwortet er auf 30 % mit 100 %, deshalb gibt es keinen Helligkeitsregler.
+
 ## [10.42.4] – 2026-10-09
 
 ### Geändert
