@@ -41,8 +41,20 @@ class DruckwerkstattCard extends HTMLElement {
   _fit() {
     const w = this._box.clientWidth, h = this._box.clientHeight;
     if (!w || !h) return;
-    this._frame.style.width = w + 'px'; this._frame.style.height = h + 'px';
+    // CSS-Zoom der Oberfläche (z. B. lovelace-global-mod „zoom-drawer“: home-assistant-main { zoom: 0.75 }) für die
+    // eingebettete Seite aufheben – iOS rechnet ihn doppelt, die 3D-Ansicht blieb bei 75 % der Kachel (2026-10-09)
+    const z = this._zoom();
+    this._frame.style.zoom = z === 1 ? '' : String(1 / z);
+    this._frame.style.width = (w * z) + 'px'; this._frame.style.height = (h * z) + 'px';
     try { this._frame.contentWindow.dispatchEvent(new Event('resize')); } catch (e) { /* noch nicht geladen */ }
+  }
+  _zoom() {
+    let z = 1;
+    for (let n = this._box; n; n = n.parentElement || (n.getRootNode && n.getRootNode().host) || null) {
+      const v = n.nodeType === 1 && n !== this._frame ? parseFloat(getComputedStyle(n).zoom) : 1;
+      if (v > 0 && v !== 1) z *= v;
+    }
+    return z;
   }
   _layout() {
     // Höhe aus dem Seitenverhältnis, aber mindestens die ganze Kachel (min-height 100 %, greift nur bei fester Kachelhöhe

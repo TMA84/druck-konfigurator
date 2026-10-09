@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.40.4] – 2026-10-09
+
+### Behoben
+- **Dashboard-Karte „Druckwerkstatt 3D“ auf dem iPhone, eigentliche Ursache:** Ist die Oberfläche von Home Assistant per CSS-Zoom verkleinert (z. B. lovelace-global-mod „zoom-drawer“: `home-assistant-main { zoom: 0.75 }`), rechnet iOS den Zoom in der eingebetteten Seite doppelt. Die 3D-Ansicht blieb bei 75 % der Kachel, der Rest blieb weiß. Die Karte hebt den Zoom für die eingebettete Seite jetzt auf.
+
 ## [10.40.3] – 2026-10-09
 
 ### Behoben
