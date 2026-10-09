@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.1] – 2026-10-09
+
+### Behoben
+- **3D-Fortschritt in schmaler Ansicht (Handy, Dashboard-Kachel):** Die Zeile „Schicht … von … · Z … · Kopf …“ überdeckte unten die Häkchen „Gehäuse/ACE/Echte Kopfposition“. Bis 620 px Breite steht sie jetzt darüber und bricht bei Bedarf um.
+
 ## [10.42.0] – 2026-10-09
 
 ### Neu
