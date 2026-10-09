@@ -81,6 +81,7 @@ I18N.addRx([
   [/^Dieser Befehl ist nicht freigegeben: (.*)$/s, 'This command isn’t allowed: $1'],
   [/^Hochladen fehlgeschlagen: (.*)$/s, (m, a) => 'Upload failed: ' + t(a)],
   [/^Drucker lehnt die Datei ab: (.*)$/s, 'The printer rejects the file: $1'],
+  [/^Upload-Adresse zeigt nicht auf den Drucker \((.*) statt (.*)\)$/, "The upload address doesn't point to the printer ($1 instead of $2)"],
   [/^Der Drucker ist nicht frei \((.*)\) – erst den laufenden Vorgang beenden$/s, 'The printer isn’t free ($1) – finish the current task first'],
   [/^Der G-Code ist für „(.*)“ geslict, verbunden ist „(.*)“$/s, 'The G-code was sliced for “$1”, but “$2” is connected'],
   [/^Drucker hat den Start abgelehnt: (.*)$/s, 'The printer rejected the start: $1'],

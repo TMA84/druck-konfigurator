@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.39.15] – 2026-10-09
+
+### Behoben
+- **Druck senden nach Neustart des Druckers:** „Upload-Adresse zeigt nicht auf den Drucker“ – das Add-on hatte die Upload-Adresse aus der Zeit des Neustarts behalten. Passt sie nicht zum Drucker, holt es sie jetzt frisch vom Drucker; die Meldung nennt bei Bedarf beide Adressen.
+
 ## [10.39.14] – 2026-10-08
 
 ### Neu

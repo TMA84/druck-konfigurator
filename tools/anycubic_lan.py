@@ -809,6 +809,18 @@ def _md5(path):
     return h.hexdigest()
 
 
+def _on_printer(link, hostname):
+    """Zeigt die Adresse auf den verbundenen Drucker? (gleicher Name, gemeldete IP oder gleiche aufgelöste IP)"""
+    if not hostname:
+        return False
+    if hostname in (link.host, link.data("info").get("ip")):
+        return True
+    try:
+        return socket.gethostbyname(hostname) == socket.gethostbyname(link.host)
+    except (OSError, UnicodeError):
+        return False
+
+
 def _upload(link, path, filename):
     """G-Code streamend hochladen (multipart/form-data, ohne Zusatzpakete)."""
     import http.client
@@ -816,8 +828,12 @@ def _upload(link, path, filename):
     if not url:
         raise LanError("Drucker nennt keine Upload-Adresse (LAN-Modus an?)", "unsupported")
     u = urllib.parse.urlparse(url)
-    if u.hostname not in (link.host, link.data("info").get("ip")):
-        raise LanError("Upload-Adresse zeigt nicht auf den Drucker", "forbidden")
+    if not _on_printer(link, u.hostname):
+        # gemerkte Adresse veraltet (z. B. aus dem Neustart des Druckers, 2026-10-09) – frisch aus /info holen
+        url = link._upload_url = discovery(link.host).get("fileUploadurl")
+        u = urllib.parse.urlparse(url or "")
+        if not _on_printer(link, u.hostname):
+            raise LanError("Upload-Adresse zeigt nicht auf den Drucker (%s statt %s)" % (u.hostname or "keine", link.host), "forbidden")
     check_host(u.hostname)
     boundary = "----druckkonfigurator" + secrets.token_hex(12)
     safe = re.sub(r"[^\w.\-]+", "_", filename)

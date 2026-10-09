@@ -427,8 +427,10 @@ try:
 except lan.LanError as e:
     check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", e.kind == "forbidden" and "Slot 5" in str(e) and len(uploads) == n_up, str(e))
 os.unlink(g5.name)
+lan.get_link("127.0.0.1")._upload_url = "http://192.168.250.250:18910/gcode_upload?s=OLD"   # veraltet (nach Neustart des Druckers)
 res = lan.print_gcode("127.0.0.1", gtmp.name, "Schild_Platte1.gcode", {"auto_leveling": 1, "timelapse": 0})
 up = uploads[-1] if uploads else {}
+check("veraltete Upload-Adresse frisch aus /info geholt", up.get("token") == "SECRET", up.get("token"))
 check("Hochgeladen mit Token, multipart, Länge", up.get("token") == "SECRET" and up.get("ctype", "").startswith("multipart/form-data") and up.get("length") == str(os.path.getsize(gtmp.name)) and b"G1 X1 Y1 E1" in up.get("body", b""), {k: v for k, v in up.items() if k != "body"})
 topic, data = broker.starts[-1] if broker.starts else ("", {})
 check("Start im Kanal slicer", "/slicer/printer/20025/" + DEVICE + "/print" in topic, topic)
