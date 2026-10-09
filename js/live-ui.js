@@ -659,12 +659,14 @@ function lvEnclosureInit(g) {
       const funnel = new THREE.Mesh(new THREE.CylinderGeometry(6, 3, 4, 16), new THREE.MeshStandardMaterial({ color: 0xe8552b, roughness: 0.45 }));
       funnel.position.set(sx, -102, 94); funnel.rotation.x = Math.PI / 2; unit.add(funnel);
       const strand = new THREE.Mesh(new THREE.BufferGeometry(), fm); unit.add(strand);
-      // Lichtpulse, die im Schlauch vom aktiven Slot zum Drucker laufen (lvAceTick)
-      const pulses = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(4.2, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }));
-        m.renderOrder = 9; m.visible = false; ace.add(m); return m; });
+      // fließendes Filament (nur aktiver Slot): eigenes Material mit wanderndem Leuchtstreifen, Schlauch und Strang zur Spule
+      const flow = lvFlowMat(curve.getLength()), flowS = lvFlowMat(150);
+      // weicher Leuchtschein um den fließenden Faden (additiv, dieselbe wandernde Textur)
+      const glow = new THREE.Mesh(new THREE.TubeGeometry(curve, 72, 2.2, 8), lvGlowMat(flow)), glowS = new THREE.Mesh(new THREE.BufferGeometry(), lvGlowMat(flowS));
+      glow.renderOrder = glowS.renderOrder = 9; glow.visible = glowS.visible = false; ace.add(glow); unit.add(glowS);
       lv.aceSpools.push({ unit: u, slot: k, fil: fil.material, filMesh: fil, line: fm, group: sp, tubes: [tube, fline], lbl, cv, txt: null,
         strand, spoolC: new THREE.Vector3(sx, 0, 20 + A.spoolR), inlet: new THREE.Vector3(sx, -102, 95), k: null,
-        funnel: funnel.material, curve, pulses, loaded: false, active: false });
+        funnel: funnel.material, flow, flowS, glow, glowS, loaded: false, active: false });
     }
   }
   const hubM = new THREE.Mesh(new THREE.BoxGeometry(48, 18, 44), body); hubM.position.copy(hub); ace.add(hubM);   // Zusammenführung hinten an der Rückwand, von hinten gesehen links, Mitte der oberen Hälfte
@@ -708,8 +710,10 @@ function lvAceColours(st) {
     if (sp.loaded) { sp.funnel.color.set(s.colour); sp.funnel.emissive.set(s.colour); sp.funnel.emissiveIntensity = 0.8; }
     else { sp.funnel.color.set(0xe8552b); sp.funnel.emissiveIntensity = 0; }
     sp.lbl.material.opacity = boxes.some(b => (b.slots || []).some(x => x.loaded)) && !sp.loaded ? 0.45 : 1;   // andere Slots gedimmt
-    if (!sp.active) sp.pulses.forEach(m => { m.visible = false; });
-    else sp.pulses.forEach(m => m.material.color.set(s.colour).lerp(new THREE.Color(0xffffff), 0.55));
+    if (sp.active) for (const m of [sp.flow, sp.flowS]) { m.color.set(s.colour); m.emissive.set(s.colour).lerp(new THREE.Color(0xffffff), 0.5); }
+    if (sp.active) for (const o of [sp.glow, sp.glowS]) o.material.color.set(s.colour).lerp(new THREE.Color(0xffffff), 0.3);
+    sp.glow.visible = sp.glowS.visible = sp.active;
+    sp.tubes[1].material = sp.active ? sp.flow : sp.line; sp.strand.material = sp.active ? sp.flowS : sp.line;
     // Restmenge (Filamentverwaltung, js/spools-ui.js): Wickel so dick wie der Rest, Schild mit Gramm (rot unter 200 g)
     const rec = on && typeof spoolInSlot === 'function' ? spoolInSlot(sp.unit * 4 + sp.slot) : null;
     const pct = rec && rec.net_g > 0 ? Math.max(0, Math.min(1, rec.remaining_g / rec.net_g)) : (on ? 1 : 0);
@@ -721,7 +725,10 @@ function lvAceColours(st) {
       const rw = full * k, C = sp.spoolC, I = sp.inlet, ry = C.y - I.y, pts = [];
       for (let q = 0; q <= 12; q++) { const t = q / 12 * Math.PI / 2; pts.push(new THREE.Vector3(C.x, C.y - ry * Math.sin(t), C.z + rw * Math.cos(t))); }
       for (let q = 1; q <= 3; q++) pts.push(new THREE.Vector3(C.x, I.y, C.z + (I.z - C.z) * q / 3));
-      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 40, 0.9, 6);
+      const sc = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      sp.strand.geometry.dispose(); sp.strand.geometry = new THREE.TubeGeometry(sc, 40, 0.9, 6);
+      sp.glowS.geometry.dispose(); sp.glowS.geometry = new THREE.TubeGeometry(sc, 40, 2.2, 8);
+      sp.flowS.emissiveMap.repeat.x = sc.getLength() / LV_FLOW_MM;
     }
     const txt = on ? (rec ? Math.round(rec.remaining_g) + ' g' : '') : '';
     sp.lbl.visible = !!txt;
@@ -753,7 +760,23 @@ function lvAceColours(st) {
   lvRender();
 }
 // Bewegung der ACE: aktive Spule dreht ab, Pulse im Schlauch, Einlass pulsiert, Haube glüht beim Trocknen (~30 Bilder/s, nur wenn nötig)
-const LV_ACE_SPIN = 0.9, LV_ACE_PULSE_S = 2.4;
+const LV_ACE_SPIN = 0.9, LV_FLOW_MM = 70, LV_FLOW_V = 80;   // Abstand der Leuchtstreifen und ihr Tempo (mm, mm/s)
+// Leuchtstreifen als Textur entlang des Fadens (u = Länge): weicher Kopf, langer Schweif dahinter, dazwischen dunkel
+let lvFlowTexBase = null;
+function lvFlowMat(len) {
+  if (!lvFlowTexBase) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 4;
+    const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
+    gr.addColorStop(0, '#000'); gr.addColorStop(0.35, '#000'); gr.addColorStop(0.82, '#8a8a8a'); gr.addColorStop(0.9, '#fff'); gr.addColorStop(1, '#000');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 4);
+    lvFlowTexBase = new THREE.CanvasTexture(cv);
+  }
+  const tex = lvFlowTexBase.clone(); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(Math.max(1, len / LV_FLOW_MM), 1); tex.needsUpdate = true;
+  return new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, emissive: 0xffffff, emissiveIntensity: 1.6, emissiveMap: tex });
+}
+function lvGlowMat(flow) {
+  return new THREE.MeshBasicMaterial({ color: 0xffffff, map: flow.emissiveMap, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+}
 function lvAceAnimate() {
   if (lv.aceAnim) return;
   const busy = () => lv.aceSpools && lv.aceG && lv.aceG.visible && lv.mode === 'live' && !document.hidden
@@ -770,7 +793,8 @@ function lvAceAnimate() {
         if (sp.active) sp.funnel.emissiveIntensity = 0.9 + 0.6 * Math.sin(ph * 3);
         if (!sp.active) continue;
         sp.group.rotation.x += LV_ACE_SPIN * dt;   // oben läuft das Filament nach vorn (−y) ab
-        sp.pulses.forEach((m, i) => { const u = ((ph / LV_ACE_PULSE_S) + i / sp.pulses.length) % 1; m.position.copy(sp.curve.getPointAt(u)); m.visible = true; });
+        // Streifen laufen von der Spule zum Drucker (u wächst Richtung Drucker); Strang und Schlauch gleich schnell
+        for (const m of [sp.flow, sp.flowS]) m.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;
       }
       for (const fx of lv.aceUnitsFx || []) if (fx.dry) fx.lid.emissiveIntensity = 0.35 + 0.25 * Math.sin(ph * 1.6);
       lvRender();

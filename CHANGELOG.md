@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.41.1] – 2026-10-09
+
+### Geändert
+- **3D-Fortschritt: schönerer Filamentfluss:** Statt einzelner Punkte fließt der Faden selbst. Weiche Leuchtstreifen mit Schweif laufen in der Filamentfarbe von der Spule über den Einlass durch den Schlauch zum Drucker, umgeben von einem sanften Leuchtschein.
+
 ## [10.41.0] – 2026-10-09
 
 ### Neu
