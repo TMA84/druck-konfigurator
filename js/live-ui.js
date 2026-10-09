@@ -1472,7 +1472,7 @@ function liveUpdate(st) {
     const real = lvIdle(st);
     if (real == null) { $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden'); $('wbLiveInfo').textContent = ''; return; }
     $('wbLiveNote').classList.add('hidden');
-    $('wbLiveInfo').textContent = t('Kein Druck aktiv') + ' · ' + (real ? t('Kopf: echte Position') : t('Kopf geparkt'));
+    $('wbLiveInfo').textContent = t('Kein Druck aktiv');   // ohne Kopf-/Z-Angabe (2026-10-09)
     return;
   }
   // fehlte die Vorschau, alle 20 s erneut fragen (der Server legt sie beim Start ab – ein früher Abruf kam zu früh)
@@ -1493,11 +1493,10 @@ function liveUpdate(st) {
   // neue Schicht: blass; was der Kopf abfährt, färbt lvHeadTick nach und nach orange (ohne Kopf: ganz orange)
   if (li !== lv.shown || !!head !== (lv.shownDone != null)) lvColour(li, head ? lv.data.layers[li][1] : null);
   lv.at = { li, frac: onPath ? head.frac : 0.5 };   // für die eigene Restzeit (lvRemaining)
-  const z = lv.data.layers[li] ? lv.data.layers[li][0] : 0;
-  $('wbLiveInfo').textContent = (!(L >= 1) ? t('Vorbereitung vor der ersten Schicht') + (job.status ? ' (' + t(job.status) + ')' : '')
-    : onPath ? t('Schicht {l} von {n} ({p} %) · Z {z} mm', { l: li + 1, n, p: Math.round(head.frac * 100), z: de(z, 2) })
-    : t('Schicht {l} von {n} · Z {z} mm', { l: L || cur + 1, n: T || n, z: de(z, 2) })) +
-    (head ? ' · ' + (head.real ? t('Kopf: echte Position') : t('Kopf: geschätzt')) : '');
+  // Statuszeile nur mit Schicht (und wie weit sie ist) – Z-Höhe und Art der Kopfposition entfielen 2026-10-09
+  $('wbLiveInfo').textContent = !(L >= 1) ? t('Vorbereitung vor der ersten Schicht') + (job.status ? ' (' + t(job.status) + ')' : '')
+    : onPath ? t('Schicht {l} von {n} ({p} %)', { l: li + 1, n, p: Math.round(head.frac * 100) })
+    : t('Schicht {l} von {n}', { l: L || cur + 1, n: T || n });
 }
 
 /* Eigene Restzeit (Tab ④ „Verbleibend“, „Fertig um“): Orcas Gesamtzeit (orca_s) verteilt nach dem Anteil jeder Schicht

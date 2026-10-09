@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.3] – 2026-10-09
+
+### Geändert
+- **3D-Fortschritt: kürzere Statuszeile:** Unten rechts steht nur noch die Schicht (z. B. „Schicht 118 von 375 (39 %)“). Z-Höhe und „Kopf: echte Position/geschätzt/geparkt“ entfallen, ohne Druck steht dort nur „Kein Druck aktiv“.
+
 ## [10.42.2] – 2026-10-09
 
 ### Geändert

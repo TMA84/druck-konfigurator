@@ -104,7 +104,6 @@ I18N.add({
   'Lade 3D-Ansicht …': 'Loading 3D view …',
   'Kein Druck aktiv.': 'No print running.',
   'Für diesen Druck gibt es keine 3D-Ansicht – sie steht nur für Drucke bereit, die aus dem Tool gestartet wurden.': 'There is no 3D view for this print – it is only available for prints started from the tool.',
-  'Schicht {l} von {n} · Z {z} mm': 'Layer {l} of {n} · Z {z} mm',
   'Keine Vorschau für diesen Druck (nur für Drucke aus dem Tool)': 'No preview for this print (only for prints started from the tool)'
 });
 // Begriffe, die mehrere Bereiche nutzen – nur hier (2026-09-29 zusammengeführt, vorher doppelt mit abweichendem Englisch)
@@ -213,14 +212,11 @@ I18N.add({
  "„{name}“ entfernt": "“{name}” removed",
  "Rückgängig": "Undo",
  "Kommende Schichten": "Upcoming layers",
- "Schicht {l} von {n} ({p} %) · Z {z} mm": "Layer {l} of {n} ({p} %) · Z {z} mm",
+ "Schicht {l} von {n} ({p} %)": "Layer {l} of {n} ({p} %)",
  "durchsichtig": "transparent",
  "ausblenden": "hide",
  "voll": "solid",
- "Kopf: echte Position": "head: real position",
- "Kopf: geschätzt": "head: estimated",
  "Kein Druck aktiv": "No print running",
- "Kopf geparkt": "head parked",
  "Druckt": "Printing",
  "Bereit": "Ready",
  "Trocknet": "Drying",
