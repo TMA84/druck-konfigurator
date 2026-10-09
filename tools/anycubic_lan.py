@@ -276,8 +276,8 @@ class PrinterLink:
                         break
                     for kind, action in POLL_QUERIES:
                         self.publish(kind, action, None)
-                    # Kopfposition: ohne Druck immer; während des Drucks nur auf Wunsch (Schalter „Echte Kopfposition“
-                    # in der 3D-Ansicht; am S1 mit Firmware 2.7.2.7 geprüft 2026-09-29: frische Werte während des Drucks)
+                    # Kopfposition: ohne Druck immer; während des Drucks, solange die 3D-Ansicht sie anfragt (pos=1)
+                    # – am S1 mit Firmware 2.7.2.7 geprüft 2026-09-29: frische Werte während des Drucks
                     if self.reports.get("info") and (self._printing() is False or time.time() < self.pos_until):
                         self.publish("axis", "query", None)
                     for _ in range(POLL_S * 10):

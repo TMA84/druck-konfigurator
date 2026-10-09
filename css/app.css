@@ -850,7 +850,6 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-live-info:empty { display: none; }
 .wb-live-ghost { position: absolute; right: 12px; top: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 6px; align-items: center; }
 .wb-live-ghost select { font: inherit; font-size: 12px; padding: 1px 4px; background: #22252b; color: #e6e8ec; border: 1px solid #3a3e46; border-radius: 4px; }
-.wb-live-pos { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
 .wb-acetabs { display: flex; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
 .wb-acetabs.hidden { display: none; }
 .wb-acetabs button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--ink); cursor: pointer; }
@@ -1248,8 +1247,8 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .bad-input, input.bad-input { border-color: var(--bad, #c0392b) !important; box-shadow: 0 0 0 2px rgba(192, 57, 43, .18); }
 .form-err { margin: 6px 0; }
 .ov-sugg .ov-cap { display: block; color: var(--warn); font-size: 11px; margin-top: 2px; }
-.wb-live-show { position: absolute; left: 12px; bottom: 40px; display: inline-flex; gap: 6px; font-size: 12px; }
+.wb-live-show { position: absolute; left: 12px; bottom: 10px; display: inline-flex; gap: 6px; font-size: 12px; }
 .wb-live-show label { color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
 /* schmale Ansicht (Handy, Dashboard-Kachel): Schichtzeile über die Häkchen links unten statt daneben – sie überdeckten sich (2026-10-09) */
 .wb-live { container-type: inline-size; }
-@container (max-width: 620px) { .wb-live-info { bottom: 72px; max-width: calc(100% - 24px); } }
+@container (max-width: 620px) { .wb-live-info { bottom: 42px; max-width: calc(100% - 24px); } }

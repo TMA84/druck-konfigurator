@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.2] – 2026-10-09
+
+### Geändert
+- **3D-Fortschritt: echte Kopfposition immer an:** Der Schalter „Echte Kopfposition“ entfällt. Solange die 3D-Ansicht offen ist, fragt der Server die Kopfposition auch während des Drucks alle 5 s ab (am Kobra S1 seit 2026-09-29 geprüft und bisher schon Standard). Die Häkchen „Gehäuse/ACE“ rücken nach unten.
+
 ## [10.42.1] – 2026-10-09
 
 ### Behoben

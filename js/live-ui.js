@@ -4,15 +4,15 @@
    Kamera-Karte (Kamera | 3D-Fortschritt). Die Vorschau hebt der Server beim Start auf (api/printing/preview,
    tools/serve.py remember_print) – deshalb nur für Drucke, die aus dem Tool gestartet wurden.
    Datenformat und Farben wie in ③ (js/preview-ui.js: parsePreview, hexToRgb01, toolColour).
-   Druckkopf (Abschnitt „Druckkopf“ unten): mit „Echte Kopfposition“ (Standard an; der Server fragt die Position dann auch
-   während des Drucks ab, api/anycubic/status?pos=1 – am Kobra S1 mit Firmware 2.7.2.7 geprüft am 2026-09-29) auf der
-   gemeldeten Bahn, sonst geschätzt über die erwartete Schichtzeit. */
+   Druckkopf (Abschnitt „Druckkopf“ unten): immer an der echten Kopfposition (der Server fragt sie bei offener 3D-Ansicht auch
+   während des Drucks ab, api/anycubic/status?pos=1 – am Kobra S1 mit Firmware 2.7.2.7 geprüft am 2026-09-29; der Schalter
+   „Echte Kopfposition“ entfiel 2026-10-09) auf der gemeldeten Bahn; fehlt eine frische Position, geschätzt über die Schichtzeit. */
 
 const lv = { prep: { job: null, s: null }, name: null, data: null, missing: false, renderer: null, scene: null, camera: null, controls: null, mesh: null, grid: null,
   layerOf: null, shown: -2, shownDone: null, track: null, raf: 0, mode: null, loading: false, pos: null, cx: 0, cy: 0, head: null, layerAt: -1, layerSince: 0,
   hs: null, anim: 0, dirty: null, disp: null, lastTick: 0 };   // hs: Zustand der Kopfbewegung (lvHeadSet/lvHeadTick)
 const LV_POS_FRESH_S = 10;
-const livePosWanted = () => store.settings.livePos !== false && lv.mode === 'live';
+const livePosWanted = () => lv.mode === 'live';   // echte Kopfposition immer (Schalter entfernt 2026-10-09)
 /* Darstellung (2026-10-07): Bahnen als beleuchtete Raupen (je Bahn ein Quader mit Linienbreite × Schichthöhe, ein
    InstancedMesh) statt 1-Pixel-Linien; über LV_FAT_MAX Bahnen die schnellen Linien wie bisher. */
 const LV_FAT_MAX = 600000, LV_LINE_W = 0.44;
@@ -1153,7 +1153,6 @@ function lvVisible(rgb) {
    Zuletzt glättet ein Filter die gezeigte Stelle (Zeitkonstante LV_SMOOTH_S) – Restsprünge werden zu kurzem Gleiten.
    Ansichtskoordinaten: G-Code minus Mitte (lv.cx/cy). Die Schleife läuft nur, solange der Kopf sichtbar ist. */
 const LV_SNAP_MM = 8, LV_BLEND_MS = 1500, LV_SMOOTH_S = 0.2, LV_MAX_CORR_S = 4, LV_NEAR_S = 6;
-const livePosOn = () => store.settings.livePos !== false;     // Standard: an (am Kobra S1 geprüft)
 
 /* Geschwindigkeiten (mm/s) und Beschleunigungen (mm/s²) je Linienart aus den Druckereinstellungen (Orca-Vorlage des
    Druckers) – Geschwindigkeit nur für Vorschauen ohne Vorschub je Bahn, Beschleunigung immer (steht nicht in der Vorschau).
@@ -1288,7 +1287,7 @@ function lvLayerByZ(z) {
 /* Neuer Stand vom Drucker → Zustand der Kopfbewegung (lv.hs). Rückgabe {real, snapped, li, frac} für Anzeige und Farben. */
 function lvHeadSet(st, cur, L, T) {
   const p = st.position, age = st.position_age_s, now = performance.now(), h = lv.hs;
-  const real = livePosOn() && p && age != null && age < LV_POS_FRESH_S && Number.isFinite(+p.x);
+  const real = p && age != null && age < LV_POS_FRESH_S && Number.isFinite(+p.x);
   if (real) {
     /* Schicht aus der Kopfhöhe nur, wenn wirklich gedruckt wird (ab Schicht 1) und die Höhe zum Modell passt – beim Bett
        vermessen/Aufheizen steht der Kopf mitten über dem Bett (S1: Z ≈ 380 mm); das rastete auf der obersten Schicht
@@ -1552,13 +1551,8 @@ function liveMode(mode) {
 document.querySelectorAll('[data-wb-view]').forEach(b => b.addEventListener('click', () => liveMode(b.dataset.wbView)));
 $('wbLiveGhost').value = lvGhostMode();
 $('wbLiveGhost').addEventListener('change', e => { store.settings.liveGhost = e.currentTarget.value; persist(); lvGhostApply(); });
-$('wbLivePos').checked = livePosOn();
 for (const [id, key, grp] of [['wbLiveEnc', 'liveEnclosure', 'enclosureG'], ['wbLiveAce', 'liveAce', 'aceG']]) {
   $(id).checked = store.settings[key] !== false;
   $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; if (lv.head && lv.head.visible) lvMechUpdate(lv.head.position); lvRefit(); lvRender(); } });
 }
-$('wbLivePos').addEventListener('change', e => {
-  store.settings.livePos = e.currentTarget.checked; persist();
-  if (e.currentTarget.checked) toast(t('Kopfposition wird auch während des Drucks abgefragt (alle 5 s)'));
-});
 liveMode(!EMBED_3D && store.settings.wbView === 'cam' ? 'cam' : 'live');

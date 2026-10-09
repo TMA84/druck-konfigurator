@@ -227,8 +227,6 @@ I18N.add({
  "Abgebrochen": "Cancelled",
  "Nicht verbunden": "Not connected",
  "Schicht {l} von {n}": "Layer {l} of {n}",
- "Kopfposition wird auch während des Drucks abgefragt (alle 5 s)": "The head position is also queried while printing (every 5 s)",
- "Echte Kopfposition": "Real head position",
  "Fragt die Kopfposition auch während des Drucks ab (alle 5 s)": "Also queries the head position while printing (every 5 s)",
  "Für diesen Drucker gibt es keine Slots": "This printer has no slots",
  "Slot wählen": "Choose slot",
