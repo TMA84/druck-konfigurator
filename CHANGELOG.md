@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.41.0] – 2026-10-09
+
+### Neu
+- **3D-Fortschritt: ACE in Bewegung:** Beim Drucken dreht sich die Spule im geladenen Slot (helle Speichen auf den Flanschen), im Schlauch zum Drucker laufen Lichtpulse in der Filamentfarbe, und der Einlass des Slots leuchtet pulsierend. Die anderen Slots sind gedimmt. Beim Trocknen glüht die Haube der Einheit warm-orange, dazu ein Schild „Trocknet 48 °C → 55 °C“. Die Bewegung läuft nur beim Drucken oder Trocknen und nur, solange die Ansicht sichtbar ist (etwa 30 Bilder/s).
+
 ## [10.40.4] – 2026-10-09
 
 ### Behoben

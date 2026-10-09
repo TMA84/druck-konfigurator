@@ -223,6 +223,7 @@ I18N.add({
  "Kopf geparkt": "head parked",
  "Druckt": "Printing",
  "Bereit": "Ready",
+ "Trocknet": "Drying",
  "Nicht verbunden": "Not connected",
  "Schicht {l} von {n}": "Layer {l} of {n}",
  "Kopfposition wird auch während des Drucks abgefragt (alle 5 s)": "The head position is also queried while printing (every 5 s)",
