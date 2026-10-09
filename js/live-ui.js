@@ -691,7 +691,8 @@ function lvDisplay(st) {
   const fin = !job && lv.fx && lv.fx.endAt && Date.now() - lv.fx.endAt < LV_END_MS ? lv.fx.end : null;   // gerade fertig/abgebrochen (lvFx)
   const line1 = job ? (job.paused ? t('Pausiert') : t('Druckt')) : fin ? (fin === 'ok' ? t('Fertig') + ' ✓' : t('Abgebrochen')) : st && st.connected === false ? t('Nicht verbunden') : t('Bereit');
   const why = job && job.paused && st.pause_reason ? String(st.pause_reason) : '';
-  const line2 = job ? (why ? (why.length > 30 ? why.slice(0, 29) + '…' : why) : t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' })) : '';
+  const prep = job && !(+job.layer >= 1) ? t('Vorbereitung') + (job.status ? ' (' + t(job.status) + ')' : '') : '';   // vor der ersten Schicht
+  const line2 = job ? (why ? (why.length > 30 ? why.slice(0, 29) + '…' : why) : prep || t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' })) : '';
   const line3 = job && rem != null ? (typeof wbMin === 'function' ? wbMin(rem) : rem + ' min') : '';
   const key = [line1, pct, line2, line3].join('|');
   if (key + (fin || '') === D.key) return; D.key = key + (fin || '');
@@ -1470,9 +1471,8 @@ function liveUpdate(st) {
     // ohne Druckauftrag: Drucker, Gehäuse und ACE trotzdem zeigen (leeres Bett, Kopf an der gemeldeten Stelle oder geparkt)
     lv.at = null; lv.name = null;
     const real = lvIdle(st);
-    if (real == null) { $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden'); $('wbLiveInfo').textContent = ''; return; }
+    if (real == null) { $('wbLiveNote').textContent = t('Kein Druck aktiv.'); $('wbLiveNote').classList.remove('hidden'); return; }
     $('wbLiveNote').classList.add('hidden');
-    $('wbLiveInfo').textContent = t('Kein Druck aktiv');   // ohne Kopf-/Z-Angabe (2026-10-09)
     return;
   }
   // fehlte die Vorschau, alle 20 s erneut fragen (der Server legt sie beim Start ab – ein früher Abruf kam zu früh)
@@ -1480,7 +1480,7 @@ function liveUpdate(st) {
   if (lv.loading) return;
   if (lv.missing || !lv.data) {
     $('wbLiveNote').textContent = t('Für diesen Druck gibt es keine 3D-Ansicht – sie steht nur für Drucke bereit, die aus dem Tool gestartet wurden.');
-    $('wbLiveNote').classList.remove('hidden'); $('wbLiveInfo').textContent = '';
+    $('wbLiveNote').classList.remove('hidden');
     return;
   }
   $('wbLiveNote').classList.add('hidden');
@@ -1493,10 +1493,7 @@ function liveUpdate(st) {
   // neue Schicht: blass; was der Kopf abfährt, färbt lvHeadTick nach und nach orange (ohne Kopf: ganz orange)
   if (li !== lv.shown || !!head !== (lv.shownDone != null)) lvColour(li, head ? lv.data.layers[li][1] : null);
   lv.at = { li, frac: onPath ? head.frac : 0.5 };   // für die eigene Restzeit (lvRemaining)
-  // Statuszeile nur mit Schicht (und wie weit sie ist) – Z-Höhe und Art der Kopfposition entfielen 2026-10-09
-  $('wbLiveInfo').textContent = !(L >= 1) ? t('Vorbereitung vor der ersten Schicht') + (job.status ? ' (' + t(job.status) + ')' : '')
-    : onPath ? t('Schicht {l} von {n} ({p} %)', { l: li + 1, n, p: Math.round(head.frac * 100) })
-    : t('Schicht {l} von {n}', { l: L || cur + 1, n: T || n });
+  // keine Statuszeile mehr: Fortschritt, Schicht und Restzeit stehen im Display am Drucker (lvDisplay, 2026-10-09)
 }
 
 /* Eigene Restzeit (Tab ④ „Verbleibend“, „Fertig um“): Orcas Gesamtzeit (orca_s) verteilt nach dem Anteil jeder Schicht

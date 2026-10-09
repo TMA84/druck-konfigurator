@@ -212,7 +212,6 @@ I18N.add({
  "„{name}“ entfernt": "“{name}” removed",
  "Rückgängig": "Undo",
  "Kommende Schichten": "Upcoming layers",
- "Schicht {l} von {n} ({p} %)": "Layer {l} of {n} ({p} %)",
  "durchsichtig": "transparent",
  "ausblenden": "hide",
  "voll": "solid",
@@ -220,6 +219,7 @@ I18N.add({
  "Druckt": "Printing",
  "Bereit": "Ready",
  "Trocknet": "Drying",
+ "Vorbereitung": "Preparing",
  "Abgebrochen": "Cancelled",
  "Nicht verbunden": "Not connected",
  "Schicht {l} von {n}": "Layer {l} of {n}",
@@ -540,9 +540,6 @@ I18N.add({
  "Werksprofil": "factory profile"
 });
 
-I18N.add({
- "Vorbereitung vor der ersten Schicht": "Preparing before the first layer"
-});
 
 I18N.add({
  "Bett vorwärmen (z. B. ABS/ASA, Haube zu)": "Preheat bed (e.g. ABS/ASA, hood closed)",

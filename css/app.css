@@ -846,8 +846,6 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-live { position: relative; background: #14161a; height: 100%; min-height: 280px; max-height: 400px; }
 .wb-live.hidden, .wb-video.hidden { display: none; }
 .wb-live canvas { display: block; width: 100%; height: 100%; }
-.wb-live-info { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
-.wb-live-info:empty { display: none; }
 .wb-live-ghost { position: absolute; right: 12px; top: 10px; font-size: 12px; color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 6px; align-items: center; }
 .wb-live-ghost select { font: inherit; font-size: 12px; padding: 1px 4px; background: #22252b; color: #e6e8ec; border: 1px solid #3a3e46; border-radius: 4px; }
 .wb-acetabs { display: flex; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
@@ -1249,6 +1247,3 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .ov-sugg .ov-cap { display: block; color: var(--warn); font-size: 11px; margin-top: 2px; }
 .wb-live-show { position: absolute; left: 12px; bottom: 10px; display: inline-flex; gap: 6px; font-size: 12px; }
 .wb-live-show label { color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
-/* schmale Ansicht (Handy, Dashboard-Kachel): Schichtzeile über die Häkchen links unten statt daneben – sie überdeckten sich (2026-10-09) */
-.wb-live { container-type: inline-size; }
-@container (max-width: 620px) { .wb-live-info { bottom: 42px; max-width: calc(100% - 24px); } }

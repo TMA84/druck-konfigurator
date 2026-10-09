@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.4] – 2026-10-09
+
+### Geändert
+- **3D-Fortschritt ohne Statuszeile:** Die Zeile unten rechts entfällt ganz. Fortschritt, Schicht und Restzeit stehen im kleinen Display am Drucker. Vor der ersten Schicht zeigt das Display jetzt „Vorbereitung (heizt vor …)“ statt „Schicht 0 von …“.
+
 ## [10.42.3] – 2026-10-09
 
 ### Geändert
