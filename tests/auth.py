@@ -203,6 +203,63 @@ if not serve.auth_pin():
     check("API weiter ohne Cache", _get("/api/health")[1].get("Cache-Control") == "no-store")
     check("kein Zugriff außerhalb des Ordners", _get("/../../etc/passwd")[0] in (400, 403, 404))
 
+# Nur ansehen: Home-Assistant-Benutzer ohne Admin-Rechte (tools/ha_users.py) – Ingress hier von 127.0.0.1
+import ha_users  # noqa: E402
+import base64 as _b64, hashlib as _hl, struct as _st, socketserver as _ss
+
+
+class _FakeWs(_ss.StreamRequestHandler):   # Websocket von Home Assistant: auth, config/auth/list (lange Antwort)
+    def handle(self):
+        head = b""
+        while not head.endswith(b"\r\n\r\n"):
+            head += self.rfile.read(1)
+        key = re.search(rb"Sec-WebSocket-Key: (\S+)", head).group(1)
+        acc = _b64.b64encode(_hl.sha1(key + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest())
+        self.wfile.write(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + acc + b"\r\n\r\n")
+        def send(obj):
+            d = json.dumps(obj).encode()
+            self.wfile.write(b"\x81" + (bytes([len(d)]) if len(d) < 126 else b"\x7e" + _st.pack("!H", len(d))) + d)
+        def recv():
+            b0, b1 = self.rfile.read(2)
+            n = b1 & 0x7F
+            n = _st.unpack("!H", self.rfile.read(2))[0] if n == 126 else n
+            m = self.rfile.read(4)
+            return json.loads(bytes(b ^ m[i % 4] for i, b in enumerate(self.rfile.read(n))))
+        send({"type": "auth_required"})
+        a = recv()
+        send({"type": "auth_ok" if a.get("access_token") == "sup-token" else "auth_invalid"})
+        q = recv()
+        users = [{"id": "admin1", "group_ids": ["system-admin"]}, {"id": "user1", "group_ids": ["system-users"]}] + \
+            [{"id": "pad%d" % i, "name": "x" * 40, "group_ids": ["system-users"]} for i in range(10)]
+        send({"id": q["id"], "type": "result", "success": True, "result": users})
+
+
+ws_srv = _ss.ThreadingTCPServer(("127.0.0.1", 0), _FakeWs)
+threading.Thread(target=ws_srv.serve_forever, daemon=True).start()
+ha_users.SUPERVISOR = ("127.0.0.1", ws_srv.server_address[1])
+os.environ["SUPERVISOR_TOKEN"] = "sup-token"
+check("Benutzerliste über den Websocket", ha_users._fetch_users() == dict({"admin1": True, "user1": False}, **{"pad%d" % i: False for i in range(10)}))
+proxy, serve.INGRESS_PROXY = serve.INGRESS_PROXY, "127.0.0.1"
+ing = lambda uid=None: dict({"X-Ingress-Path": "/api/hassio_ingress/abc"}, **({"X-Remote-User-Id": uid} if uid else {}))
+st, h, _ = req("GET", "/", headers=ing("user1"))
+check("ohne Admin: Seite → ?ansicht=3d", st == 303 and h.get("Location") == "?ansicht=3d", (st, h.get("Location")))
+check("ohne Admin: 3D-Ansicht offen", req("GET", "/?ansicht=3d", headers=ing("user1"))[0] == 200)
+check("ohne Admin: Skripte und Stand lesbar", req("GET", "/js/live-ui.js", headers=ing("user1"))[0] == 200 and req("GET", "/api/queue", headers=ing("user1"))[0] == 200)
+check("ohne Admin: Spulen-Export gesperrt", req("GET", "/api/spools/export", headers=ing("user1"))[0] == 403)
+check("ohne Admin: Kamera gesperrt", req("GET", "/api/anycubic/camera?host=127.0.0.1", headers=ing("user1"))[0] == 403)
+st, _, data = req("POST", "/api/queue", "{}", dict(ing("user1"), **{"Content-Type": "application/json"}))
+check("ohne Admin: Ändern gesperrt", st == 403 and b"Nur ansehen" in data, st)
+check("ohne Admin: Druck senden gesperrt", req("POST", "/api/anycubic/print", "{}", dict(ing("user1"), **{"Content-Type": "application/json"}))[0] == 403)
+check("ohne Benutzer-ID: nur ansehen", req("GET", "/", headers=ing())[0] == 303)
+check("Admin: ganze Seite", req("GET", "/", headers=ing("admin1"))[0] == 200)
+check("Admin: Ändern erlaubt", req("POST", "/api/queue", "{}", dict(ing("admin1"), **{"Content-Type": "application/json"}))[0] != 403)
+ha_users._cache.update(at=0)
+ha_users.SUPERVISOR = ("127.0.0.1", 1)   # Home Assistant nicht erreichbar → nur ansehen
+check("ohne Antwort von Home Assistant: nur ansehen", req("GET", "/", headers=ing("admin1"))[0] == 303)
+check("direkter Port unverändert (kein Ingress)", (serve.__setattr__("INGRESS_PROXY", proxy), req("GET", "/")[0])[1] == 200)
+os.environ.pop("SUPERVISOR_TOKEN")
+ws_srv.shutdown()
+
 srv.shutdown()
 print("%d ok, %d fehlgeschlagen" % (passed, failed))
 sys.exit(1 if failed else 0)

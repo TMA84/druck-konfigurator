@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.40.0] – 2026-10-09
+
+### Neu
+- **3D-Fortschritt für alle Benutzer von Home Assistant:** Das Panel der Druckwerkstatt steht jetzt jedem Benutzer offen. Benutzer ohne Admin-Rechte landen in der 3D-Ansicht (`?ansicht=3d`) und können nur ansehen; Ändern, Drucken, Befehle, Kamera und Dateien sperrt der Server für sie (403). Admins sehen alles wie bisher. Die Rechte fragt das Add-on bei Home Assistant ab (`homeassistant_api`); ohne Antwort gilt „nur ansehen“.
+
 ## [10.39.15] – 2026-10-09
 
 ### Behoben

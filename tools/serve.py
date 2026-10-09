@@ -50,6 +50,7 @@ import anycubic_lan  # noqa: E402
 import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
+import ha_users  # noqa: E402
 import prefs  # noqa: E402
 import printqueue  # noqa: E402
 import schedule  # noqa: E402
@@ -84,6 +85,8 @@ STATIC_GZIP = {".js", ".css", ".html", ".json", ".svg", ".md", ".txt"}
 _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
+# Nur ansehen (Benutzer ohne Admin-Rechte): Lesen für den 3D-Fortschritt, ohne Kamera, Dateien und Änderungen
+VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/printing/preview", "/api/printing/objects", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
 QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 
@@ -201,6 +204,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return False
         return SESSION_COOKIE in c and session_valid(c[SESSION_COOKIE].value)
 
+    # ---------- Nur ansehen: Home-Assistant-Benutzer ohne Admin-Rechte (tools/ha_users.py) ----------
+    def _viewer(self):
+        """Über den Ingress von einem Benutzer ohne Admin-Rechte → True (nur 3D-Fortschritt, nichts ändern)."""
+        if not ha_users.available() or not is_ingress(self.client_address[0], self.headers):
+            return False
+        # je Anfrage (der Proxy verwendet Verbindungen für verschiedene Benutzer weiter); ha_users hält die Liste vor
+        return not ha_users.is_admin(self.headers.get("X-Remote-User-Id"))
+
+    def _viewer_gate(self):
+        """True, wenn die Anfrage hier schon beantwortet wurde (gesperrt oder auf ?ansicht=3d umgeleitet)."""
+        if not self._viewer():
+            return False
+        url = urllib.parse.urlparse(self.path)
+        if self.command in ("GET", "HEAD") and url.path in ("/", "/index.html") and "ansicht=3d" not in url.query:
+            self.send_response(303)
+            self.send_header("Location", "?ansicht=3d")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return True
+        if self.command in ("GET", "HEAD") and (not url.path.startswith("/api/") or url.path in VIEWER_GET):
+            return False
+        self._json(403, {"error": "Nur ansehen – ändern dürfen nur Admins von Home Assistant", "kind": "forbidden"})
+        return True
+
     def _auth_gate(self):
         """True, wenn die Anfrage hier schon beantwortet wurde (Anmeldeseite, 401, Umleitung)."""
         if not auth_pin():
@@ -256,7 +283,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self):
-        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
             return
         url = urllib.parse.urlparse(self.path)
         if not url.path.startswith("/api/") and os.environ.get("KONFIGURATOR_CACHE", "1") != "0" and self._static(url):
@@ -264,7 +291,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().do_HEAD()
 
     def do_GET(self):
-        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
             return
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/health":
@@ -274,6 +301,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if url.path == "/api/anycubic/status":
             q = urllib.parse.parse_qs(url.query)
             host, pos = q.get("host", [""])[0], q.get("pos", [""])[0] == "1"
+            if self._viewer():   # nur ansehen: eingestellter Drucker, keine zusätzlichen Abfragen
+                host, pos = printer_host() or host, False
             return self._api(lambda: anycubic_lan.status(host, pos=pos))
         if url.path == "/api/printing/preview":
             # Schichtvorschau des laufenden Drucks (nur für Drucke, die das Tool gestartet hat) – Live-Ansicht in ④
@@ -361,7 +390,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile, 1024 * 1024)
 
     def do_POST(self):
-        if self._auth_gate():   # Zugriffsschutz (KONFIGURATOR_PIN)
+        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
             return
         path = urllib.parse.urlparse(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
