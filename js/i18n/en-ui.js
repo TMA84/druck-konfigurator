@@ -224,6 +224,7 @@ I18N.add({
  "Druckt": "Printing",
  "Bereit": "Ready",
  "Trocknet": "Drying",
+ "Abgebrochen": "Cancelled",
  "Nicht verbunden": "Not connected",
  "Schicht {l} von {n}": "Layer {l} of {n}",
  "Kopfposition wird auch während des Drucks abgefragt (alle 5 s)": "The head position is also queried while printing (every 5 s)",

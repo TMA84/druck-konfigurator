@@ -208,6 +208,7 @@ function lvHeadInit() {
   fan.children[2].position.z = 0.2;
   fan.rotation.x = Math.PI / 2; fan.position.set(0, -(H.d / 2) - 2.2, fanZ); lv.headFan = fan; lv.rotors = [];
   lv.head = new THREE.Group(); lv.head.add(tip, heat, body, ring, fan); lv.head.visible = false;
+  lv.hotM = [heat.material, tip.material];   // glühen nach Düsentemperatur (lvFx)
   // Mechanik (Koordinaten relativ zur Traverse, die mit dem Kopf in Z fährt)
   const bed = lvBed(), bx0 = bed.x0 - lv.cx, bx1 = bed.x1 - lv.cx, by0 = bed.y0 - lv.cy, by1 = bed.y1 - lv.cy, R = LV_RAIL;
   const md = lvModel(); lv.kin = md.kin;
@@ -578,6 +579,13 @@ function lvEnclosureInit(g) {
   box(x1 - x0, y1 - y0, 3, cx, cy, z1, glass);                                                                         // Glasdeckel
   box(x1 - x0, 12, 6, cx, y0 + 6, z1, rim); box(x1 - x0, 12, 6, cx, y1 - 6, z1, rim);
   enc.visible = store.settings.liveEnclosure !== false; lv.gantry.add(enc); lv.enclosureG = enc;
+  // Gehäuselicht (lights vom Drucker): warmes Licht oben im Bauraum und eine Leuchtleiste vorn unter dem Deckel (lvFx)
+  { const light = new THREE.PointLight(0xffe7c2, 0, Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 0.75, 1); light.position.set(cx, cy, z1 - 40);   // reicht nur über den Bauraum
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 - 60, 6, 3), new THREE.MeshBasicMaterial({ color: 0x3a3f43 })); strip.position.set(cx, y0 + 24, z1 - 6);
+    lv.gantry.add(light, strip); lv.encLight = { light, strip }; }
+  // Statusrahmen um das Gehäuse: gelb bei Pause, rot bei Fehler/Abbruch, grün bei Druckende (lvFx), sonst unsichtbar
+  { const ol = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(x1 - x0 + 8, y1 - y0 + 8, z1 - z0 + 8)), new THREE.LineBasicMaterial({ color: 0xffc23d, transparent: true, opacity: 0, depthWrite: false }));
+    ol.position.set(cx, cy, (z0 + z1) / 2); ol.visible = false; ol.renderOrder = 10; lv.gantry.add(ol); lv.statusLine = ol; }
   // Display oben rechts vorn auf einem Fuß (wie am S1), leicht nach hinten geneigt; zeigt Fortschritt, Schicht, Restzeit (lvDisplay)
   { const dg = new THREE.Group(), dark = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.4, metalness: 0.3 });
     const foot = new THREE.Mesh(new THREE.BoxGeometry(70, 26, 16), new THREE.MeshStandardMaterial({ color: 0xb9c0c4, roughness: 0.35, metalness: 0.6 })); foot.position.z = 8; dg.add(foot);
@@ -680,11 +688,13 @@ function lvDisplay(st) {
   const D = lv.display; if (!D) return;
   const job = st && st.job, pct = job ? Math.max(0, Math.min(100, Math.round(+job.progress || 0))) : null;
   const own = job && typeof lvRemaining === 'function' && !job.paused ? lvRemaining(st) : null, rem = own ? Math.round(own.s / 60) : job && job.remaining_min;
-  const line1 = job ? (job.paused ? t('Pausiert') : t('Druckt')) : st && st.connected === false ? t('Nicht verbunden') : t('Bereit');
-  const line2 = job ? t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' }) : '';
+  const fin = !job && lv.fx && lv.fx.endAt && Date.now() - lv.fx.endAt < LV_END_MS ? lv.fx.end : null;   // gerade fertig/abgebrochen (lvFx)
+  const line1 = job ? (job.paused ? t('Pausiert') : t('Druckt')) : fin ? (fin === 'ok' ? t('Fertig') + ' ✓' : t('Abgebrochen')) : st && st.connected === false ? t('Nicht verbunden') : t('Bereit');
+  const why = job && job.paused && st.pause_reason ? String(st.pause_reason) : '';
+  const line2 = job ? (why ? (why.length > 30 ? why.slice(0, 29) + '…' : why) : t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' })) : '';
   const line3 = job && rem != null ? (typeof wbMin === 'function' ? wbMin(rem) : rem + ' min') : '';
   const key = [line1, pct, line2, line3].join('|');
-  if (key === D.key) return; D.key = key;
+  if (key + (fin || '') === D.key) return; D.key = key + (fin || '');
   const g = D.cv.getContext('2d'), W = 320, H = 200;
   g.fillStyle = '#0d1114'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#8fd3c7'; g.font = '600 22px system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(line1, 16, 14);
@@ -694,6 +704,8 @@ function lvDisplay(st) {
     g.fillStyle = job.paused ? '#f0b44c' : '#2bc4a8'; g.beginPath(); g.roundRect(16, 120, Math.max(14, (W - 32) * pct / 100), 14, 7); g.fill();
     g.fillStyle = '#c9d2d6'; g.font = '20px system-ui, sans-serif'; g.fillText(line2, 16, 148);
     if (line3) { g.textAlign = 'right'; g.fillText(line3, W - 16, 148); g.textAlign = 'left'; }
+  } else if (fin) { g.fillStyle = fin === 'ok' ? '#7be0a0' : '#ff7a6b'; g.font = 'bold 40px system-ui, sans-serif'; g.fillText(fin === 'ok' ? '✓' : '✕', 16, 60);
+    g.fillStyle = '#c9d2d6'; g.font = '20px system-ui, sans-serif'; const nm = String((st.last_job && st.last_job.name) || ''); g.fillText(nm.length > 26 ? nm.slice(0, 25) + '…' : nm, 16, 150);
   } else { g.fillStyle = '#56636a'; g.font = '20px system-ui, sans-serif'; g.fillText('Kobra S1', 16, 150); }
   D.tex.needsUpdate = true; lvRender();
 }
@@ -757,6 +769,11 @@ function lvAceColours(st) {
     }
   });
   if (lv.filGlow) lv.filGlow.visible = lvAceFlowing();   // Fluss zum Kopf endet mit dem Druck
+  // Farbwechsel: anderer Slot geladen, während gedruckt wird → altes Filament zurück, neues vor, Spülmenge (lvAceAnimate)
+  const now = lv.aceSpools.find(sp => sp.loaded) || null;
+  if (printing && lv.aceLast && now && now !== lv.aceLast && !lv.swap)
+    lv.swap = { from: lv.aceLast, to: now, t0: performance.now(), c0: lv.aceLast.fil.color.clone(), c1: now.fil.color.clone(), drops: [] };
+  if (now) lv.aceLast = now;
   lvAceAnimate();
   lvRender();
 }
@@ -780,8 +797,8 @@ function lvGlowMat(flow) {
 }
 function lvAceAnimate() {
   if (lv.aceAnim) return;
-  const busy = () => lv.aceSpools && lv.aceG && lv.aceG.visible && lv.mode === 'live' && !document.hidden
-    && (lv.aceSpools.some(sp => sp.active) || (lv.aceUnitsFx || []).some(fx => fx.dry));   // nur beim Drucken/Trocknen (Akku am Handy)
+  const busy = () => lv.mode === 'live' && !document.hidden && (lvFxBusy() || lv.aceSpools && lv.aceG && lv.aceG.visible)
+    && ((lv.aceSpools || []).some(sp => sp.active) || (lv.aceUnitsFx || []).some(fx => fx.dry) || lvFxBusy());   // nur wenn sich etwas tut (Akku am Handy)
   if (!busy()) return;
   let last = 0;
   const tick = (now) => {
@@ -790,15 +807,17 @@ function lvAceAnimate() {
     if (now - last >= 33) {
       const dt = last ? Math.min(0.1, (now - last) / 1000) : 0, ph = now / 1000;
       last = now;
-      for (const sp of lv.aceSpools) {
+      for (const sp of lv.aceSpools || []) {
         if (sp.active) sp.funnel.emissiveIntensity = 0.9 + 0.6 * Math.sin(ph * 3);
         if (!sp.active) continue;
+        if (lv.swap && sp === lv.swap.to && (now - lv.swap.t0) / 1000 < LV_SWAP_BACK_S) continue;   // neuer Slot wartet, bis das alte Filament zurück ist
         sp.group.rotation.x += LV_ACE_SPIN * dt;   // oben läuft das Filament nach vorn (−y) ab
         // Streifen laufen von der Spule zum Drucker (u wächst Richtung Drucker); Strang und Schlauch gleich schnell
         for (const m of [sp.flow, sp.flowS]) m.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;
       }
       if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;   // Kopfschlauch (lvMechUpdate)
       for (const fx of lv.aceUnitsFx || []) if (fx.dry) fx.lid.emissiveIntensity = 0.35 + 0.25 * Math.sin(ph * 1.6);
+      lvSwapTick(now, dt); lvFxTick(ph);
       lvRender();
     }
     lv.aceAnim = requestAnimationFrame(tick);
@@ -806,6 +825,76 @@ function lvAceAnimate() {
   lv.aceAnim = requestAnimationFrame(tick);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) lvAceAnimate(); });
+
+/* Farbwechsel (lv.swap aus lvAceColours): 0–2,5 s läuft das alte Filament rückwärts zur ACE (Spule spult auf),
+   2,5–5 s das neue schnell vor, ab 3,5 s fallen Tropfen der Spülmenge (alte → neue Farbe) unter der Düse heraus */
+const LV_SWAP_BACK_S = 2.5, LV_SWAP_FEED_S = 5, LV_SWAP_END_S = 7;
+function lvSwapTick(now, dt) {
+  const w = lv.swap; if (!w) return;
+  const a = (now - w.t0) / 1000, back = a < LV_SWAP_BACK_S, feed = !back && a < LV_SWAP_FEED_S;
+  const show = (sp, on) => { sp.tubes[1].material = on ? sp.flow : sp.line; sp.strand.material = on ? sp.flowS : sp.line; sp.glow.visible = sp.glowS.visible = on; };
+  if (back) {
+    show(w.from, true); show(w.to, false);
+    for (const m of [w.from.flow, w.from.flowS]) { m.color.copy(w.c0); m.emissive.copy(w.c0).lerp(new THREE.Color(0xffffff), 0.5); m.emissiveMap.offset.x += 3 * LV_FLOW_V / LV_FLOW_MM * dt; }
+    for (const o of [w.from.glow, w.from.glowS]) o.material.color.copy(w.c0).lerp(new THREE.Color(0xffffff), 0.3);
+    w.from.group.rotation.x -= LV_ACE_SPIN * 3 * dt;
+    if (lv.filFlow) lv.filFlow.emissiveMap.offset.x += 4 * LV_FLOW_V / LV_FLOW_MM * dt;   // auch im Kopfschlauch rückwärts
+  } else if (feed) {
+    show(w.from, false); show(w.to, true);
+    for (const m of [w.to.flow, w.to.flowS]) m.emissiveMap.offset.x -= 2 * LV_FLOW_V / LV_FLOW_MM * dt;   // zusätzlich zum normalen Fluss
+    if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= 3 * LV_FLOW_V / LV_FLOW_MM * dt;
+  }
+  if (a >= 3.5 && a < LV_SWAP_END_S - 1 && lv.head && lv.head.visible && w.drops.length < 7 && a - (w.lastDrop || 0) > 0.45) {
+    w.lastDrop = a;
+    const k = Math.min(1, w.drops.length / 6), m = new THREE.Mesh(new THREE.SphereGeometry(4.5, 10, 8), new THREE.MeshStandardMaterial({ color: w.c0.clone().lerp(w.c1, k), roughness: 0.5, transparent: true }));
+    m.position.copy(lv.head.position).add(new THREE.Vector3(0, 0, -2)); lv.scene.add(m); w.drops.push({ m, v: 0, t: a });
+  }
+  for (const d of w.drops) { d.v += 600 * dt; d.m.position.z -= d.v * dt; d.m.material.opacity = Math.max(0, 1 - (a - d.t) / 1.4); d.m.visible = d.m.material.opacity > 0; }
+  if (a >= LV_SWAP_END_S) {
+    for (const d of w.drops) { lv.scene.remove(d.m); d.m.geometry.dispose(); d.m.material.dispose(); }
+    lv.swap = null; lvAceColours(typeof wb !== 'undefined' && wb.st);
+  }
+}
+
+/* Hitze, Gehäuselicht, Status (aus jedem Druckerstand, liveUpdate): Heizblock/Düse glühen nach Temperatur, die Platte
+   schimmert warm, beim Aufheizen pulsiert es; Licht wie am Drucker; Rahmen gelb (Pause), rot (Fehler/Abbruch), grün (fertig) */
+const LV_END_MS = 60000, LV_HOT = new THREE.Color(0xff5a14);
+function lvFx(st) {
+  const fx = lv.fx = lv.fx || {}, T = (st && st.temps) || {}, num = v => (v == null || v === '' || isNaN(+v) ? 0 : +v);
+  fx.noz = num(T.curr_nozzle_temp); fx.nozT = num(T.target_nozzle_temp); fx.bed = num(T.curr_hotbed_temp); fx.bedT = num(T.target_hotbed_temp);
+  fx.heating = (fx.nozT > 0 && fx.nozT - fx.noz > 5) || (fx.bedT > 0 && fx.bedT - fx.bed > 3);
+  const job = st && st.job, lj = st && st.last_job;
+  // Druckende: vorher lief ein Auftrag, jetzt keiner – Ergebnis aus last_job (fertig / abgebrochen)
+  if (fx.hadJob && !job && lj) { fx.end = lj.status === 'fertig' ? 'ok' : lj.status === 'abgebrochen' ? 'abort' : null; fx.endAt = fx.end ? Date.now() : 0; }
+  if (job) { fx.end = null; fx.endAt = 0; }
+  // Fehler: Verbindung zum Drucker mitten im Druck verloren (Druckerfehler selbst meldet die Firmware hier nicht)
+  fx.err = !!(st && st.connected === false && (fx.hadJob || fx.err));
+  fx.hadJob = !!(job && job.name) || (fx.err && fx.hadJob);
+  fx.paused = !!(job && job.paused);
+  const L = (st && st.lights) || [], on = L.find(l => l && +l.status === 1);
+  fx.light = on ? Math.max(0.15, Math.min(1, (+on.brightness || 100) / 100)) : 0;
+  lvFxApply(0); lvAceAnimate();
+}
+function lvFxBusy() {
+  const fx = lv.fx; if (!fx) return !!lv.swap;
+  return !!lv.swap || fx.heating || fx.paused || fx.err || (fx.endAt && Date.now() - fx.endAt < LV_END_MS);
+}
+function lvFxApply(ph) {
+  const fx = lv.fx; if (!fx) return;
+  const pulse = fx.heating ? 0.8 + 0.2 * Math.sin(ph * 4) : 1;
+  const kn = Math.max(0, Math.min(1, (fx.noz - 60) / 220)), kb = Math.max(0, Math.min(1, (fx.bed - 35) / 65));
+  (lv.hotM || []).forEach((m, i) => { m.emissive.copy(LV_HOT); m.emissiveIntensity = kn * (i ? 0.7 : 1.1) * pulse; });
+  if (lv.plate && lv.plate.material.emissive) { lv.plate.material.emissive.copy(LV_HOT); lv.plate.material.emissiveIntensity = kb * 0.28 * pulse; }
+  if (lv.encLight) { lv.encLight.light.intensity = fx.light * 2.4; lv.encLight.strip.material.color.set(fx.light ? 0xfff3dd : 0x3a3f43); }
+  const ol = lv.statusLine;
+  if (ol) {
+    const ended = fx.endAt && Date.now() - fx.endAt < LV_END_MS;
+    const col = fx.err || (ended && fx.end === 'abort') ? 0xff4a3d : fx.paused ? 0xffc23d : ended ? 0x4fe08a : null;
+    ol.visible = col != null;
+    if (col != null) { ol.material.color.set(col); ol.material.opacity = 0.55 + 0.4 * Math.sin(ph * (fx.err ? 5 : 2.5)); }
+  }
+}
+function lvFxTick(ph) { lvFxApply(ph); if (lv.display && lv.fx && lv.fx.endAt && typeof wb !== 'undefined') lvDisplay(wb.st); }
 function lvMechInit(md, g) {
   const { bx0, bx1, by0, by1, m, cx, beam } = g;
   lv.mechG = new THREE.Group(); lv.mechG.visible = false;
@@ -1375,7 +1464,7 @@ async function lvLoad(name) {
 
 // Aus der Werkbank bei jedem Stand (alle 3 s): passende Vorschau laden, Schicht nachführen
 function liveUpdate(st) {
-  lvAceColours(st); lvDisplay(st);
+  lvFx(st); lvAceColours(st); lvDisplay(st);
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {

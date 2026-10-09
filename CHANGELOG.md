@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.0] – 2026-10-09
+
+### Neu
+- **3D-Fortschritt: Hitze sichtbar:** Heizblock und Düse glühen je nach Düsentemperatur rot-orange, die Druckplatte schimmert warm nach Betttemperatur. Beim Aufheizen pulsiert der Schein.
+- **3D-Fortschritt: Gehäuselicht:** Ist die Beleuchtung am Drucker an, leuchtet der Bauraum warm, dazu eine helle Leiste vorn unter dem Deckel (Helligkeit wie gemeldet).
+- **3D-Fortschritt: Farbwechsel animiert:** Wechselt der Drucker mitten im Druck den Slot, läuft das alte Filament sichtbar zurück zur ACE (die Spule spult auf), das neue läuft schnell vor, und unter der Düse fallen Tropfen der Spülmenge von der alten zur neuen Farbe.
+- **3D-Fortschritt: Pause, Fehler, Fertig:** Bei einer Pause pulsiert ein gelber Rahmen um das Gehäuse, und das Display zeigt den Grund. Bricht die Verbindung mitten im Druck ab oder wird der Druck abgebrochen, ist der Rahmen rot. Nach dem Druckende ist er eine Minute lang grün, und das Display zeigt „Fertig ✓“ mit dem Namen des Drucks.
+
 ## [10.41.2] – 2026-10-09
 
 ### Geändert
