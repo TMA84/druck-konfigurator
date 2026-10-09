@@ -451,6 +451,13 @@ Als **Home-Assistant-Add-on** (Repository `https://github.com/TMA84/ha-addons`) 
 
 **3D-Fortschritt im Dashboard:** Die Adresse des Tools mit `?ansicht=3d` zeigt nur den 3D-Fortschritt des laufenden Drucks, bildschirmfüllend – als **Webseiten-Karte** im Dashboard: `/api/hassio_ingress/<Kennung des Add-ons>/?ansicht=3d` (die Kennung steht in der Adresszeile, wenn du das Add-on über die Seitenleiste öffnest).
 
+**Dashboard-Karte für alle Benutzer:** Eine Webseiten-Karte mit der Ingress-Adresse funktioniert nur für Benutzer, die das Panel schon geöffnet haben – sonst „401 Unauthorized“. Die Karte `custom:druckwerkstatt-card` legt die Sitzung selbst an. Das Add-on legt sie bei jedem Start unter `/local/druckwerkstatt/druckwerkstatt-card.js` ab; einmal als Ressource eintragen (Einstellungen → Dashboards → Ressourcen, JavaScript-Modul), dann im Dashboard:
+
+```yaml
+type: custom:druckwerkstatt-card
+aspect_ratio: 80%
+```
+
 **Für alle Benutzer von Home Assistant:** Die Druckwerkstatt steht für jeden Benutzer in der Seitenleiste. Admins sehen alles. Benutzer ohne Admin-Rechte sehen nur den 3D-Fortschritt und können nichts ändern: keine Drucke, keine Befehle an den Drucker, keine Kamera, keine Spulen. Das Add-on fragt dafür bei Home Assistant nach, wer Admin ist. Gelingt das nicht, gilt das Panel für alle nur zum Ansehen; über den direkten Port mit PIN bleibt dann alles erreichbar.
 
 Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensoren an Home Assistant (Gerät „Druck-Konfigurator Anycubic Kobra S1“):

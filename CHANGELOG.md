@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.40.1] – 2026-10-09
+
+### Neu
+- **Dashboard-Karte „Druckwerkstatt 3D“ (`custom:druckwerkstatt-card`):** zeigt den 3D-Fortschritt auch Benutzern ohne Admin-Rechte im Dashboard. Die Webseiten-Karte mit der Ingress-Adresse meldete bei ihnen „401 Unauthorized“, weil Home Assistant die Ingress-Sitzung nur beim Öffnen des Add-on-Panels anlegt. Die Karte legt die Sitzung selbst an und hält sie offen. Das Add-on legt die Datei bei jedem Start unter `/local/druckwerkstatt/druckwerkstatt-card.js` ab.
+
 ## [10.40.0] – 2026-10-09
 
 ### Neu
