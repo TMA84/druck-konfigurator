@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.40.2] – 2026-10-09
+
+### Behoben
+- **Dashboard-Karte „Druckwerkstatt 3D“ füllt die ganze Kachel:** Auf dem Handy war die Kachel höher als das Seitenverhältnis (z. B. in der Panel-Ansicht), darunter blieb ein leerer Streifen. Das Seitenverhältnis gilt jetzt als Mindesthöhe, die Karte füllt die Kachel immer ganz aus.
+
 ## [10.40.1] – 2026-10-09
 
 ### Neu

@@ -28,7 +28,7 @@ class DruckwerkstattCard extends HTMLElement {
 
   _build() {
     const root = this.attachShadow({ mode: 'open' });
-    root.innerHTML = '<style>ha-card{overflow:hidden;height:100%}.box{position:relative;width:100%;height:100%}'
+    root.innerHTML = '<style>:host{display:block;height:100%}ha-card{overflow:hidden;height:100%}.box{position:relative;box-sizing:border-box;width:100%;height:100%;min-height:100%}'
       + 'iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#14161a}'
       + '.msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;color:var(--secondary-text-color)}</style>'
       + '<ha-card><div class="box"><iframe title="Druckwerkstatt 3D" allow="fullscreen"></iframe><div class="msg">Druckwerkstatt wird geladen …</div></div></ha-card>';
@@ -36,7 +36,8 @@ class DruckwerkstattCard extends HTMLElement {
     this._layout();
   }
   _layout() {
-    // feste Höhe aus dem Seitenverhältnis – in Abschnitten (sections) füllt die Karte ihre Zeilen
+    // Höhe aus dem Seitenverhältnis, aber mindestens die ganze Kachel (min-height 100 %, greift nur bei fester Kachelhöhe
+    // wie in Abschnitten) – auf dem Handy ist die Kachel höher als 80 % der schmalen Breite (2026-10-09)
     const r = String(this._config.aspect_ratio || '').trim();
     this._box.style.height = ''; this._box.style.paddingTop = '';
     if (r) { this._box.style.height = '0'; this._box.style.paddingTop = /%$/.test(r) ? r : (parseFloat(r) * 100) + '%'; }
