@@ -179,6 +179,15 @@ def redact(obj):
 # und sich nach IDLE_S ohne Zugriff selbst beendet. Neue Anmeldung bei Verbindungsabbruch (Zugangsdaten wechseln).
 POLL_S = 5
 IDLE_S = 600
+# Licht aus halten (Issue #1, 2026-10-14): am Kobra S1 ging das Licht nach dem Ausschalten nach einigen Sekunden wieder an –
+# vermutlich schaltet es die Firmware für die Kamera (video/startCapture, auch bei jedem Neuverbinden) wieder ein. Der Wunsch
+# „aus“ bleibt gemerkt; LIGHT_HOLD_S nach dem Ausschalten und LIGHT_CAM_HOLD_S nach jedem Kamerastart schaltet die Verbindung
+# das Licht wieder aus (je Fenster höchstens LIGHT_HOLD_TRIES-mal). Geht es außerhalb eines Fensters an, hat es jemand am
+# Drucker eingeschaltet – dann gilt das, und der Wunsch entfällt.
+LIGHT_HOLD_S = 60
+LIGHT_CAM_HOLD_S = 25
+LIGHT_HOLD_TRIES = 6
+LIGHT_HOLD_GAP_S = 3
 POLL_QUERIES = [("info", "query"), ("multiColorBox", "getInfo"), ("peripherie", "query"), ("tempature", "query"),
                 ("fan", "query"), ("light", "query")]
 FIRST_DATA_S = 12
@@ -203,6 +212,7 @@ class PrinterLink:
         # mitschickt (Grund, Code, Text); eigene Befehle mit Zeitpunkt (Pause aus Werkbank oder Home Assistant erkennen)
         self.print_log = collections.deque(maxlen=20)
         self.sent = {}             # (Art, Aktion) → Zeitpunkt des letzten eigenen Befehls
+        self.light_off = None      # Wunsch „Licht aus“: {"payload", "until" (Ende des Fensters), "tries", "last"} (_hold_light)
         self.paused_since = None   # seit wann der laufende Druck pausiert (aus info.project.pause)
         self.connected = threading.Event()
         self.first = threading.Event()
@@ -280,6 +290,7 @@ class PrinterLink:
                     # – am S1 mit Firmware 2.7.2.7 geprüft 2026-09-29: frische Werte während des Drucks
                     if self.reports.get("info") and (self._printing() is False or time.time() < self.pos_until):
                         self.publish("axis", "query", None)
+                    self._hold_light()
                     for _ in range(POLL_S * 10):
                         if self.stopped or not self.connected.is_set():
                             break
@@ -389,6 +400,23 @@ class PrinterLink:
                 lst = self.waiters_ka.get((kind, action)) or []
                 if w in lst:
                     lst.remove(w)
+
+    def _hold_light(self):
+        """Licht wieder ausschalten, wenn der Drucker es kurz nach „aus“ (oder nach einem Kamerastart) selbst einschaltet."""
+        w, now = self.light_off, time.time()
+        if not w:
+            return
+        light = self.data("light")
+        lights = light.get("lights") if isinstance(light.get("lights"), list) else [light]
+        on = any(isinstance(l, dict) and l.get("type") == w["payload"]["type"] and l.get("status") == 1 for l in lights)
+        if on and now > w["until"]:
+            self.light_off = None      # außerhalb des Fensters eingeschaltet: am Drucker gewollt
+            return
+        if on and w["tries"] < LIGHT_HOLD_TRIES and now - w["last"] >= LIGHT_HOLD_GAP_S:
+            w["tries"] += 1
+            w["last"] = now
+            self.publish("light", "control", dict(w["payload"]))
+            self.publish("light", "query", None)
 
     # -- Lesen --
     def data(self, kind):
@@ -715,6 +743,9 @@ def command(host, kind, action, data):
             link.request(kind_q, action_q, None, timeout=4)
         except LanError:
             pass
+    if (kind, action) == ("light", "control"):
+        # „aus“ eine Weile halten (_hold_light); „an“ hebt den Wunsch auf
+        link.light_off = {"payload": dict(payload), "until": time.time() + LIGHT_HOLD_S, "tries": 0, "last": time.time()} if payload["status"] == 0 else None
     if ok and (kind, action) == ("light", "control") and not _took_effect(link, kind, action, payload):
         # „done“ quittiert, aber anderer Zustand gemeldet (nach dem Nachfragen oben) – sonst sprang der Schalter stumm zurück
         return {"ok": False, "state": "not_applied", "code": rep.get("code"), "msg": "Drucker hat das Licht nicht umgeschaltet", "reply": rep.get("data")}
@@ -776,6 +807,8 @@ def camera_url(host):
         link.request("video", "startCapture", {}, timeout=8)
     except LanError:
         pass   # läuft sie schon, antwortet der Drucker teils nicht – dann trotzdem versuchen
+    if link.light_off:   # Kamerastart schaltet das Licht ggf. ein – neues Fenster zum Halten
+        link.light_off.update(until=max(link.light_off["until"], time.time() + LIGHT_CAM_HOLD_S), tries=0)
     return url
 
 

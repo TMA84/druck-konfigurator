@@ -119,6 +119,7 @@ class FakeBroker(threading.Thread):
         self.fans = {"fan_speed_pct": 0, "aux_fan_speed_pct": 0, "box_fan_level": 0}
         self.light, self.pos, self.moves, self.starts = {"type": 2, "status": 0, "brightness": 0}, {"x": 10, "y": 20, "z": 5}, [], []
         self.silent, self.ignore, self.noop = set(), set(), set()   # (Art, Aktion): ausführen ohne Antwort / gar nicht ausführen / „done“ ohne Wirkung
+        self.relight = None   # s: Licht nach „aus“ so viel später von selbst wieder an (wie der Kobra S1, Issue #1)
         self.conns = []
 
     def drop(self):
@@ -201,6 +202,8 @@ class FakeBroker(threading.Thread):
                     self.light.update(msg["data"])   # führt aus, bestätigt aber nicht (andere Firmware)
                 elif (kind, action) == ("light", "control"):
                     self.light.update(msg["data"])
+                    if self.relight and msg["data"].get("status") == 0:
+                        threading.Timer(self.relight, lambda: self.light.update(status=1, brightness=100)).start()
                     # wie die Werksfirmware 2.7.2.7: Bestätigung ohne die msgid der Anfrage
                     self.reply(conn, kind, {"type": kind, "action": "control", "state": "done", "code": 200, "msgid": "", "data": dict(self.light)})
                 elif (kind, action) == ("axis", "query"):
@@ -368,6 +371,22 @@ broker.noop.clear()
 lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
 st = lan.status("127.0.0.1")
 check("Lüfter 40 % und Licht an", st["fans"]["fan_speed_pct"] == 40 and st["lights"] and st["lights"][0]["status"] == 1, (st["fans"], st["lights"]))
+# Issue #1: Firmware schaltet das Licht kurz nach „aus“ wieder ein → die Verbindung schaltet es wieder aus
+lan.POLL_S = 1
+offs = lambda: sum(1 for _t, m in broker.commands if (m.get("type"), m.get("action")) == ("light", "control") and (m.get("data") or {}).get("status") == 0)
+broker.relight = 1.0
+n0 = offs()
+lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 0})
+broker.relight = None
+time.sleep(6)
+st = lan.status("127.0.0.1")
+check("Licht, das die Firmware wieder einschaltet, wird wieder ausgeschaltet", st["lights"][0]["status"] == 0 and offs() - n0 >= 2, (st["lights"], offs() - n0))
+link = lan.get_link("127.0.0.1")
+link.light_off["until"] = 0                     # Fenster vorbei – jetzt schaltet es jemand am Drucker ein
+broker.light.update(status=1, brightness=100); n1 = offs(); time.sleep(2.5)
+st = lan.status("127.0.0.1")
+check("außerhalb des Fensters am Drucker eingeschaltet: bleibt an, Wunsch „aus“ entfällt", st["lights"][0]["status"] == 1 and offs() == n1 and link.light_off is None, (st["lights"], offs() - n1, link.light_off))
+lan.POLL_S = 5
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})
 lan.command("127.0.0.1", "axis", "move", {"axis": 3, "move_type": 2})
 st = lan.status("127.0.0.1")

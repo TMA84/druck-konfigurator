@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.6] – 2026-10-14
+
+### Behoben
+- **Licht ging nach dem Ausschalten von selbst wieder an** ([#1](https://github.com/TMA84/druck-konfigurator/issues/1)): Der Kobra S1 schaltete das Licht einige Sekunden nach „aus“ wieder ein, vermutlich für die Kamera, die die Werkbank startet. Die Druckwerkstatt merkt sich jetzt den Wunsch „aus“. Schaltet der Drucker das Licht innerhalb von 60 s nach dem Ausschalten oder 25 s nach einem Kamerastart wieder ein, schaltet sie es erneut aus, höchstens sechsmal je Zeitfenster. Wer das Licht außerhalb dieser Fenster am Drucker einschaltet, behält es an.
+
 ## [10.42.5] – 2026-10-09
 
 ### Behoben
