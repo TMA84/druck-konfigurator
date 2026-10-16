@@ -793,6 +793,24 @@ def _took_effect(link, kind, action, payload):
     return False
 
 
+LIGHT_CAM_DELAYS_S = (0.5, 1.5, 3.0)   # nach dem Kamerastart: so oft nachsehen und ggf. ausschalten
+
+
+def _light_off_after_cam(link):
+    """Kurz nach video/startCapture das Licht wieder ausschalten, falls die Firmware es dafür eingeschaltet hat."""
+    t0 = time.time()
+    for d in LIGHT_CAM_DELAYS_S:
+        time.sleep(max(0, t0 + d - time.time()))
+        w = link.light_off
+        if not w or not link.client:
+            return
+        try:
+            link.publish("light", "control", dict(w["payload"]))
+            link.publish("light", "query", None)
+        except LanError:
+            return
+
+
 def camera_url(host):
     """Kamera-Adresse (HTTP-FLV, Port 18088) – nur auf dem Drucker selbst; startet die Übertragung."""
     link = _ready(host)
@@ -807,8 +825,11 @@ def camera_url(host):
         link.request("video", "startCapture", {}, timeout=8)
     except LanError:
         pass   # läuft sie schon, antwortet der Drucker teils nicht – dann trotzdem versuchen
-    if link.light_off:   # Kamerastart schaltet das Licht ggf. ein – neues Fenster zum Halten
+    if link.light_off:
+        # Kamerastart schaltet am Kobra S1 das Licht ein (bestätigt 2026-10-16: „nach jedem Neuladen der Kamera erst wieder an“):
+        # neues Fenster zum Halten und gleich nachschalten, nicht erst bei der nächsten Abfrage (bis zu POLL_S später)
         link.light_off.update(until=max(link.light_off["until"], time.time() + LIGHT_CAM_HOLD_S), tries=0)
+        threading.Thread(target=_light_off_after_cam, args=(link,), daemon=True).start()
     return url
 
 

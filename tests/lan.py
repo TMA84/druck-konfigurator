@@ -386,6 +386,14 @@ link.light_off["until"] = 0                     # Fenster vorbei – jetzt schal
 broker.light.update(status=1, brightness=100); n1 = offs(); time.sleep(2.5)
 st = lan.status("127.0.0.1")
 check("außerhalb des Fensters am Drucker eingeschaltet: bleibt an, Wunsch „aus“ entfällt", st["lights"][0]["status"] == 1 and offs() == n1 and link.light_off is None, (st["lights"], offs() - n1, link.light_off))
+# Kamerastart schaltet das Licht ein (Kobra S1): gleich danach wieder aus, nicht erst bei der nächsten Abfrage
+link.light_off = {"payload": {"type": 2, "status": 0, "brightness": 0}, "until": time.time() + 30, "tries": 0, "last": time.time()}
+broker.light.update(status=1, brightness=100)   # wie nach video/startCapture
+lan.LIGHT_CAM_DELAYS_S, delays = (0.1,), lan.LIGHT_CAM_DELAYS_S
+lan._light_off_after_cam(link); time.sleep(0.5)
+lan.LIGHT_CAM_DELAYS_S = delays
+check("nach dem Kamerastart sofort wieder aus", broker.light["status"] == 0, broker.light)
+link.light_off = None
 lan.POLL_S = 5
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})
 lan.command("127.0.0.1", "axis", "move", {"axis": 3, "move_type": 2})

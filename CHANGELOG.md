@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.8] – 2026-10-16
+
+### Behoben
+- **Licht nach jedem Kamerastart wieder an** ([#1](https://github.com/TMA84/druck-konfigurator/issues/1)): Am Kobra S1 bestätigt, dass der Kamerastart (`video/startCapture`, auch beim Neuladen der Kamera) das Licht einschaltet. Bisher schaltete die Druckwerkstatt es erst bei der nächsten Abfrage wieder aus, also bis zu 5 s später. Jetzt prüft sie 0,5, 1,5 und 3 s nach dem Kamerastart und schaltet es dann gleich wieder aus.
+
 ## [10.42.7] – 2026-10-16
 
 ### Behoben
