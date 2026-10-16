@@ -154,7 +154,18 @@ function selectPart(i){
 /* Farben innerhalb eines Teils (wie die Unterobjekte in OrcaSlicer): Körper, Farb-Modifikatoren des Designers (z. B. ein
    Schriftzug in der 3MF – gelten projektweit über designMap) und erhabene Beschriftung. eff = Slot, der tatsächlich gilt. */
 // Höchster Punkt eines Dreiecksbereichs über der Unterkante des Teils – Farben nur in den ersten Schichten sieht man nur von unten
-const lowCache=new WeakMap();
+const lowCache=new WeakMap(),paintAreaCache=new WeakMap();
+/* Anteil der Oberfläche je Farbe des Designers bei Bemalung je Dreieck (paintState: Filament 1-basiert, 0 = wie das Objekt) –
+   zeigt in der Teilekarte, welche Farbe z. B. die Schrift ist (2026-10-16, TopFront225: Schrift 12 %, Körper 88 %) */
+function paintAreas(p){
+  if(!p.paintState||!p.geom)return {};
+  let c=paintAreaCache.get(p.geom);if(c&&c.state===p.paintState)return c.out;
+  const pos=p.geom.pos,a={},n=Math.min(p.paintState.length,pos.length/9);let all=0;
+  for(let i=0;i<n;i++){const o=i*9,ux=pos[o+3]-pos[o],uy=pos[o+4]-pos[o+1],uz=pos[o+5]-pos[o+2],vx=pos[o+6]-pos[o],vy=pos[o+7]-pos[o+1],vz=pos[o+8]-pos[o+2];
+    const ar=Math.hypot(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx)/2,s=p.paintState[i],d=s?s-1:p.dSlot;if(d==null)continue;a[d]=(a[d]||0)+ar;all+=ar}
+  const out={};for(const d in a)out[d]=all?Math.max(1,Math.round(a[d]/all*100)):0;
+  paintAreaCache.set(p.geom,{state:p.paintState,out});return out;
+}
 function zTop(pos,from,to,base){let m=-Infinity;for(let i=from*9+2;i<to*9;i+=3)if(pos[i]>m)m=pos[i];return m-base}
 function lowColours(p){
   let c=lowCache.get(p.geom);if(c)return c;
@@ -169,16 +180,19 @@ function partColours(p){
   const lowTxt=t('in den ersten Schichten – von unten sichtbar');
   const base0=out.length;
   (p.bodies||[]).forEach((b,j)=>out.push({kind:'body',key:j,slot:b.slot??null,eff:b.slot??own,label:t(b.name),sub:lc.bodies[j]&&b.count<p.geom.n/2?lowTxt:''}));
-  // Bemalung je Dreieck: jede Farbe des Designers (Zuordnung gilt projektweit wie bei Modifikatoren)
-  // Bemalung je Dreieck: Zuordnung oben unter „Filamente des Modells“ (wie in OrcaSlicer) – hier nur die Farbpunkte
-  if((p.paintSlots||[]).length)out.push({kind:'info',key:0,label:t('bemalt mit {n} Farben',{n:p.paintSlots.length}),sub:t('Zuordnung oben unter Filamente'),effs:p.paintSlots.map(d=>map[d]??d)});
+  /* Bemalung je Dreieck: je Farbe des Designers eine Zeile mit Slot (Klick → Slot wählen, gilt projektweit wie bei
+     Modifikatoren und oben unter „Filamente“) und Anteil der Oberfläche – vorher nur Farbpunkte mit Verweis nach oben,
+     so ließ sich z. B. die Schrift nicht in der Teilekarte umfärben (2026-10-16) */
+  const pa=paintAreas(p),paintD=[...new Set(p.paintSlots||[])];
+  paintD.forEach(d=>out.push({kind:'mod',key:d,dcol:dcol(d),slot:map[d]??d,eff:map[d]??d,label:t('Farbe {n} des Designers',{n:d+1}),
+    sub:(pa[d]!=null?t('{p} % der Oberfläche',{p:pa[d]})+' · ':'')+((p.modSlots||[]).includes(d)?t('bemalt und Modifikator'):t('bemalt'))+' · '+t('gilt für alle Teile mit dieser Farbe')}));
   // eigene Bemalung (Werkzeugleiste „Bemalen“, js/paint-ui.js): Slots direkt
   const ownPaint=typeof paintUserSlots==='function'?paintUserSlots(p):[];
   if(ownPaint.length)out.push({kind:'info',key:1,label:t('selbst bemalt ({n} Farben)',{n:ownPaint.length}),sub:t('Bemalen in der Werkzeugleiste'),effs:ownPaint});
   // Teil ohne eigene Körper, aber mit Modifikator, Beschriftung oder eigener Bemalung: der Grundkörper ist die erste Farbe (Slot des Teils)
   if(!p.bodies&&!(p.paintSlots||[]).length&&((p.modSlots||[]).length||ownPaint.length||(p.texts||[]).some(x=>x.mode!=='engraved')))out.push({kind:'base',key:0,slot:p.slot??null,eff:own,label:t('Grundkörper'),sub:t('Slot des Teils')});
   if(out.length&&out[out.length-1].kind==='base')out.unshift(out.pop());
-  [...new Set(p.modSlots||[])].forEach(d=>out.push({kind:'mod',key:d,dcol:dcol(d),slot:map[d]??d,eff:map[d]??d,label:t('Farbe {n} des Designers',{n:d+1}),sub:(lc.mods[d]?lowTxt+' · ':'')+t('Modifikator, gilt für alle Teile mit dieser Farbe')}));
+  [...new Set(p.modSlots||[])].filter(d=>!paintD.includes(d)).forEach(d=>out.push({kind:'mod',key:d,dcol:dcol(d),slot:map[d]??d,eff:map[d]??d,label:t('Farbe {n} des Designers',{n:d+1}),sub:(lc.mods[d]?lowTxt+' · ':'')+t('Modifikator, gilt für alle Teile mit dieser Farbe')}));
   (p.texts||[]).filter(x=>x.mode!=='engraved').forEach(x=>out.push({kind:'text',key:x.id,slot:x.slot??null,eff:x.slot??own,label:'„'+x.text+'“',sub:t('Beschriftung')}));
   return out;
 }

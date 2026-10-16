@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.7] – 2026-10-16
+
+### Behoben
+- **Bemalte 3MF: Farben direkt in der Teilekarte umstellen:** Bei Modellen, die der Designer per Bemalung je Dreieck eingefärbt hat (z. B. eine Schrift im Bambu Studio), zeigte die Teilekarte nur „bemalt mit 2 Farben“ mit zwei Farbpunkten und einem Verweis auf „Filamente“. Der Slot-Knopf des Teils änderte dabei so gut wie nichts. Jetzt hat jede Farbe des Designers eine eigene Zeile mit Slot zum Anklicken und dem Anteil an der Oberfläche, z. B. „Farbe 1 des Designers · 5 % der Oberfläche“ für die Schrift. Die Zuordnung gilt wie unter „Filamente“ für alle Teile mit dieser Farbe.
+
 ## [10.42.6] – 2026-10-14
 
 ### Behoben
