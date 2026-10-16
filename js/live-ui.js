@@ -819,6 +819,7 @@ function lvAceAnimate() {
       if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;   // Kopfschlauch (lvMechUpdate)
       for (const fx of lv.aceUnitsFx || []) if (fx.dry) fx.lid.emissiveIntensity = 0.35 + 0.25 * Math.sin(ph * 1.6);
       lvSwapTick(now, dt); lvFxTick(ph);
+      if (lvFansOn()) lvFanTick();
       lvRender();
     }
     lv.aceAnim = requestAnimationFrame(tick);
@@ -877,8 +878,8 @@ function lvFx(st) {
   lvFxApply(0); lvAceAnimate();
 }
 function lvFxBusy() {
-  const fx = lv.fx; if (!fx) return !!lv.swap;
-  return !!lv.swap || fx.heating || fx.paused || fx.err || (fx.endAt && Date.now() - fx.endAt < LV_END_MS);
+  const fx = lv.fx; if (!fx) return !!lv.swap || lvFansOn();
+  return !!lv.swap || fx.heating || fx.paused || fx.err || (fx.endAt && Date.now() - fx.endAt < LV_END_MS) || lvFansOn();
 }
 function lvFxApply(ph) {
   const fx = lv.fx; if (!fx) return;
@@ -1020,6 +1021,16 @@ function lvFansInit(md, g) {
   fan.position.set(bxx, byy, zBox); lv.gantry.add(fan);
   lv.air.push(Object.assign(lvAirStream(lv.gantry, [bxx, byy - 140, zBox], [0, 1, 0], 210, [44, 36], 'box_fan_level'), { funnel: 140 / 210 }));
 }
+/* Lüfter und Luftstrom weiterdrehen – aus der Kopfbewegung (lvMechUpdate) und aus der Effekt-Schleife (lvAceAnimate):
+   mit echter Kopfposition steht die Kopfbewegung zwischen zwei Meldungen still, die Lüfter blieben dann nach ein paar
+   Sekunden stehen (2026-10-16). Gemeinsame Zeit lv.airT – laufen beide, dreht nichts doppelt so schnell. */
+function lvFanTick() {
+  const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt);
+}
+function lvFansOn() {
+  const f = (typeof wb !== 'undefined' && wb.st && wb.st.fans) || {};
+  return !!(lv.head && lv.head.visible && lv.mechG && lv.mechG.visible && Object.values(f).some(v => +v > 0));
+}
 function lvAirTick(dt) {
   const st = typeof wb !== 'undefined' && wb.st, fans = (st && st.fans) || {};
   for (const ro of lv.rotors || []) { const pct = ro.key ? Math.max(0, Math.min(100, +fans[ro.key] || 0)) : 100; ro.obj.rotation.z -= dt * 30 * pct / 100; }
@@ -1055,7 +1066,7 @@ function lvMechUpdate(p) {
   // Z-Spindeln drehen mit der Höhe (rotation.y = um die eigene Achse, wie die Rollen)
   for (const sc of lv.zScrews || []) sc.rotation.y = -(p.z / LV_SCREW_LEAD) * Math.PI * 2;
   lvZDriveSet(lv.zDrive, p.z);   // Z-Riemen unten läuft mit
-  { const now = performance.now(), dt = lv.airT ? Math.min(0.1, (now - lv.airT) / 1000) : 0; lv.airT = now; lvAirTick(dt); }
+  lvFanTick();
   if (!lv.head.visible) return;
   for (const { b, go, motor } of lv.belts) {
     const [px, py] = go(p), ends = lvBeltSet(b, px, py, motor != null ? LV_MOTOR_R : 0);

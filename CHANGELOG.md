@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.42.9] – 2026-10-16
+
+### Behoben
+- **3D-Fortschritt: Lüfter blieben nach ein paar Sekunden stehen:** Die Lüfterräder und der Luftstrom drehten nur mit der Kopfbewegung. Mit echter Kopfposition steht die Kopfbewegung zwischen zwei Meldungen still, und mit ihr blieben z. B. der Gehäuselüfter und der Luftstrom stehen. Jetzt drehen sie in der eigenen Effekt-Schleife weiter, solange ein Lüfter läuft.
+
 ## [10.42.8] – 2026-10-16
 
 ### Behoben
