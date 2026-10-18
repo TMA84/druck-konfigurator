@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.43.0] – 2026-10-18
+
+### Neu
+- **OBJ öffnen:** Neben STL, 3MF und ZIP lassen sich jetzt OBJ-Dateien laden, auch in ZIPs. Getrennte Objekte (`o`, sonst Gruppen `g`) werden einzelne Teile mit ihrem Namen, Vielecke werden in Dreiecke zerlegt, und Meter-Dateien werden wie bei STL auf mm umgerechnet. Farben und Materialien (MTL) werden nicht übernommen.
+- **G-Code drucken:** Fertig geslicten G-Code, z. B. aus OrcaSlicer, über **Datei → G-Code drucken …**, den Knopf in der Karte **Druckauftrag** oder per Drag & Drop an den Drucker senden. Der Dialog „An Drucker senden“ zeigt Druckzeit und Filament je Werkzeug aus dem G-Code. Jedes Werkzeug lässt sich auf einen beliebigen ACE-Slot legen, mit Warnung, wenn das Material nicht passt. Der Server prüft vor dem Start, ob der Drucker frei ist und ob der G-Code für dieses Modell geslicet wurde. Schichtvorschau, 3D-Fortschritt und Objekte überspringen funktionieren wie bei eigenen Drucken. „Später starten“ und „Bett vorwärmen“ gibt es dafür noch nicht.
+
 ## [10.42.9] – 2026-10-16
 
 ### Behoben

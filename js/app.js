@@ -16,8 +16,10 @@ $('clear').addEventListener('click',()=>{input.value='';project=null;if(typeof s
 
 const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error(t('Lesefehler')));r.readAsArrayBuffer(file)});
 
-// Eine oder mehrere Dateien (STL, 3MF, ZIP) → Projekt mit Teileliste
+// Eine oder mehrere Dateien (STL, OBJ, 3MF, ZIP) → Projekt mit Teileliste
 async function loadFiles(files){
+  // fertiger G-Code ist kein Modell: gleich „G-Code drucken“ (js/gcode-ui.js)
+  if(files.length===1&&/\.(gcode|gco|g)$/i.test(files[0].name)&&typeof gcodeOpenFile==='function'){addMode=false;return gcodeOpenFile(files[0])}
   $('fileinfo').textContent=files.length===1?t('Lese {name} …',{name:files[0].name}):t('Lese {n} Dateien …',{n:files.length});
   try{
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));

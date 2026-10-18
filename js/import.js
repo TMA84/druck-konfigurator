@@ -10,7 +10,7 @@ const WELD_MM = 1e-4;       // Eckpunkte näher als das gelten als identisch
 const TOUCH_MM = 0.05;      // Körper mit weniger Abstand gelten als ein Teil
 const MIN_BODY_TRIS = 4;    // kleinere Splitter sind kein eigenständiges Teil
 const UNIT_MM = { micron: 0.001, millimeter: 1, centimeter: 10, inch: 25.4, foot: 304.8, meter: 1000 };
-const MODEL_EXT = /\.(stl|3mf)$/i;
+const MODEL_EXT = /\.(stl|obj|3mf)$/i;
 
 /* ---------- STL in Körper zerlegen ---------- */
 function bboxOf(pos, tris) {
@@ -309,6 +309,40 @@ function stlParts(fileName, bytes, notes = []) {
     ...(g.bodies.length > 1 ? { bodies: g.bodies.map((count, j) => ({ name: 'Körper ' + (j + 1), count })) } : {}) }));
 }
 
+/* OBJ (Wavefront, 2026-10-18): nur die Geometrie – v und f (Vielecke als Fächer in Dreiecke, Indizes auch negativ und
+   mit /vt/vn), Farben/Materialien (usemtl, MTL) bleiben außen vor. Getrennte Objekte (o, sonst g) werden eigene Teile;
+   ohne Gruppen wie bei STL: getrennte Körper als Teile. Achsen wie in OrcaSlicer unverändert (Z oben), Meter → mm wie STL. */
+function objParts(fileName, bytes, notes = []) {
+  const text = new TextDecoder().decode(bytes), v = [], groups = [];
+  let cur = null, by = null, hasO = /^o\s/m.test(text);
+  const open = name => { cur = { name, tris: [] }; groups.push(cur); };
+  const idx = (s, n) => { const i = parseInt(s, 10); return i < 0 ? n + i : i - 1; };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] === '#') continue;
+    const sp = line.split(/\s+/), k = sp[0];
+    if (k === 'v') v.push(+sp[1], +sp[2], +sp[3]);
+    else if ((k === 'o' || (k === 'g' && !hasO)) && sp.length > 1) open(sp.slice(1).join(' '));
+    else if (k === 'f' && sp.length >= 4) {
+      if (!cur) open('');
+      const n = v.length / 3, ids = sp.slice(1).map(x => idx(x.split('/')[0], n));
+      if (ids.some(i => !(i >= 0 && i < n))) throw Error(t('{file}: Fläche verweist auf einen Punkt, den es nicht gibt.', { file: fileName }));
+      for (let j = 1; j + 1 < ids.length; j++) for (const i of [ids[0], ids[j], ids[j + 1]]) cur.tris.push(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+    }
+  }
+  const used = groups.filter(g => g.tris.length);
+  if (!used.length) throw Error(t('{file}: keine Flächen in der OBJ.', { file: fileName }));
+  const base = fileName.replace(/^.*[\\/]/, ''), all = new Float32Array(used.reduce((a, g) => a + g.tris.length, 0));
+  let o = 0; for (const g of used) { all.set(g.tris, o); o += g.tris.length; }
+  const mm = stlToMm(all, fileName, notes), f = mm === all ? 1 : 1000;   // Meter: alle Gruppen gleich umrechnen
+  if (used.length === 1) {
+    const groupsB = splitBodyGroups(mm);
+    return groupsB.map((g, i) => ({ name: groupsB.length > 1 ? base + ' · Teil ' + (i + 1) : (used[0].name || base), pos: g.pos,
+      ...(g.bodies.length > 1 ? { bodies: g.bodies.map((count, j) => ({ name: 'Körper ' + (j + 1), count })) } : {}) }));
+  }
+  return used.map((g, i) => ({ name: g.name || base + ' · Teil ' + (i + 1), pos: f === 1 ? Float32Array.from(g.tris) : Float32Array.from(g.tris, x => x * f) }));
+}
+
 // entries: [{name, bytes: Uint8Array}] – ausgewählte oder gezogene Dateien
 function importModels(entries, zipLib) {
   const notes = [];
@@ -317,10 +351,10 @@ function importModels(entries, zipLib) {
     if (/\.zip$/i.test(e.name)) {
       const zip = zipLib.unzipSync(e.bytes);
       const inner = Object.keys(zip).filter(k => MODEL_EXT.test(k) && !/(^|\/)(__MACOSX|\.)/.test(k) && zip[k].length);
-      if (!inner.length) notes.push(t('{file}: keine STL/3MF darin.', { file: e.name }));
+      if (!inner.length) notes.push(t('{file}: keine STL/OBJ/3MF darin.', { file: e.name }));
       files.push(...inner.map(k => ({ name: k.replace(/^.*\//, ''), bytes: zip[k], from: e.name })));
     } else if (MODEL_EXT.test(e.name)) files.push(e);
-    else notes.push(t('{file}: nur STL, 3MF oder ZIP.', { file: e.name }));
+    else notes.push(t(/\.(gcode|gco|g)$/i.test(e.name) ? '{file}: fertiger G-Code – unter ④ Drucker → „G-Code drucken …“ senden.' : '{file}: nur STL, OBJ, 3MF oder ZIP.', { file: e.name }));
   }
   // Makerworld-ZIPs enthalten oft dasselbe Modell als 3MF und als STLs: genau eine 3MF hat Vorrang.
   const tmf = files.filter(f => /\.3mf$/i.test(f.name));
@@ -337,7 +371,8 @@ function importModels(entries, zipLib) {
       const r = parse3MF(f.name, zipLib.unzipSync(f.bytes), zipLib);
       parts.push(...r.parts); notes.push(...r.notes);
       if (files.length === 1) threemf = r.threemf;
-    } else parts.push(...stlParts(f.name, f.bytes, notes));
+    } else if (/\.obj$/i.test(f.name)) parts.push(...objParts(f.name, f.bytes, notes));
+    else parts.push(...stlParts(f.name, f.bytes, notes));
   }
   if (files.length > 1 && tmf.length) notes.push(t('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.'));
   const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : t('{n} Teile', { n: parts.length });

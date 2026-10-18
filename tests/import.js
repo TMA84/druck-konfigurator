@@ -140,7 +140,23 @@ r = imp([{ name: 'zoll.3mf', bytes: fflate.zipSync({ '3D/3dmodel.model': u8(inch
 // 7) Fehlerfälle
 let err = '';
 try { imp([{ name: 'foto.png', bytes: new Uint8Array(4) }]); } catch (e) { err = e.message; }
-check('Falscher Dateityp meldet Fehler', /nur STL, 3MF oder ZIP/.test(err), err);
+check('Falscher Dateityp meldet Fehler', /nur STL, OBJ, 3MF oder ZIP/.test(err), err);
+err = '';
+try { imp([{ name: 'fertig.gcode', bytes: new Uint8Array(4) }]); } catch (e) { err = e.message; }
+check('G-Code als Modell: Hinweis auf „G-Code drucken“', /G-Code drucken/.test(err), err);
+
+// 7b) OBJ: Quader als Vierecke (Fächer in Dreiecke), Indizes mit /vt/vn und negativ, zwei Objekte → zwei Teile
+{ const quad = (o, x0) => ['o ' + o, ...[[0,0,0],[10,0,0],[10,5,0],[0,5,0],[0,0,2],[10,0,2],[10,5,2],[0,5,2]].map(([x, y, z]) => 'v ' + (x + x0) + ' ' + y + ' ' + z),
+    'f -8/1/1 -5/1/1 -6/1/1 -7/1/1', 'f -4 -3 -2 -1', 'f -8 -7 -3 -4', 'f -7 -6 -2 -3', 'f -6 -5 -1 -2', 'f -5 -8 -4 -1'];
+  const objTxt = ['# Test', ...quad('Deckel', 0), ...quad('Boden', 20)].join('\n');
+  const r7 = imp([{ name: 'kasten.obj', bytes: u8(objTxt) }]);
+  check('OBJ: zwei Objekte → zwei Teile mit Namen', r7.parts.length === 2 && r7.parts[0].name === 'Deckel' && r7.parts[1].name === 'Boden', r7.parts.map(p => p.name).join());
+  check('OBJ: Vierecke als je 2 Dreiecke (12 je Quader)', r7.parts.every(p => p.pos.length === 12 * 9), r7.parts.map(p => p.pos.length / 9).join());
+  check('OBJ: Maße 10 × 5 × 2 mm', r7.parts[0] && dims(r7.parts[0].pos) === '10x5x2', r7.parts[0] && dims(r7.parts[0].pos));
+  const r8 = imp([{ name: 'ein.obj', bytes: u8(quad('', 0).slice(1).join('\n')) }]);
+  check('OBJ ohne Objekte: ein Teil mit Dateinamen', r8.parts.length === 1 && r8.parts[0].name === 'ein.obj', r8.parts.map(p => p.name).join());
+  let e8 = ''; try { imp([{ name: 'leer.obj', bytes: u8('v 0 0 0\n') }]); } catch (e) { e8 = e.message; }
+  check('OBJ ohne Flächen: verständlicher Fehler', /keine Flächen/.test(e8), e8); }
 
 // 8) Echte Makerworld-3MF (optional)
 // STL in Meter (Blender, Onshape …): 43 × 78 × 3,5 mm als 0,043 × 0,078 × 0,0035 gespeichert → auf mm umgerechnet, mit Hinweis

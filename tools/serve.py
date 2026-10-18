@@ -8,9 +8,11 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/anycubic/status?host=<ip>      → Stand für Werkbank und Belegung (stehende Verbindung, alle 5 s)
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS)
-  POST /api/anycubic/print  {host, job, plate, name, options}  → G-Code einer geslicten Platte hochladen und drucken
+  POST /api/anycubic/print  {host, job, plate, name, options, own?, slots?}  → G-Code einer geslicten Platte hochladen und drucken
+                             (own: eigener G-Code, Name ohne „_Platte1“; slots: {Werkzeug: ACE-Slot})
   POST /api/anycubic/command  {host, type, action, data}  → nur freigegebene Einstellungen (WRITABLE)
   POST /api/slice  (3MF als application/octet-stream)  → Verbrauch je Slot und Druckzeit je Platte (OrcaSlicer), job-Id
+  POST /api/gcode?name=<Datei>  (G-Code als application/octet-stream) → fertiger G-Code als Auftrag mit einer Platte (wie /api/slice)
        ?plates=2,3&count=4&reuse=<job>                  → nur diese Platten neu slicen, die übrigen aus <job> übernehmen
   GET  /api/slice/<job>/plate_<n>.preview              → kompakte Schichtvorschau (tools/gcode_preview.py)
   GET  /api/slice/<job>/plate_<n>.gcode                → G-Code zum Herunterladen
@@ -407,6 +409,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
             reuse = q.get("reuse", [""])[0] or None
             return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
+        if path == "/api/gcode":
+            # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
+            if ctype != "application/octet-stream":
+                return self._json(415, {"error": "G-Code als application/octet-stream erwartet", "kind": "bad_request"})
+            if length > slicer.MAX_BYTES:
+                return self._json(413, {"error": "G-Code zu groß (höchstens 200 MB)", "kind": "bad_request"})
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            name = q.get("name", [""])[0][:120]
+
+            def take():
+                res = slicer.import_gcode(self.rfile.read(length), name)
+                gcode = slicer.job_file(res["job"], 1, "gcode")
+                res["facts"] = {k: v for k, v in anycubic_lan.gcode_facts(gcode).items() if k != "size"}
+                return res
+            return self._api(take)
         if path == "/api/spools":
             if ctype != "application/json" or length > MAX_SPOOL_BODY:
                 return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
@@ -448,11 +465,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 gcode = slicer.job_file(str(req.get("job", "")), str(req.get("plate", "")), "gcode")
                 if not gcode:
                     raise slicer.SliceError("Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen", "bad_request")
-                name = re.sub(r"[^\w.\-]+", "_", str(req.get("name") or "druck"))[:80] + "_Platte" + str(int(req["plate"])) + ".gcode"
+                # eigener G-Code („G-Code drucken“): Name wie die Datei, ohne „_Platte1“
+                name = re.sub(r"[^\w.\-]+", "_", str(req.get("name") or "druck"))[:80] + ("" if req.get("own") else "_Platte" + str(int(req["plate"]))) + ".gcode"
                 with_thumbnail(str(req.get("job", "")), str(req.get("plate", "")), gcode)   # Bild fürs Display des Druckers
                 # Vorschau und Objekte VOR dem Start ablegen – sobald der Drucker den Auftrag meldet, fragt die Seite danach
                 remember_print(name, str(req.get("job", "")), int(req["plate"]))
-                res = anycubic_lan.print_gcode(req["host"], gcode, name, req.get("options") or {})
+                res = anycubic_lan.print_gcode(req["host"], gcode, name, req.get("options") or {}, req.get("slots"))
                 if res.get("filename") and res["filename"] != name:
                     remember_print(res["filename"], str(req.get("job", "")), int(req["plate"]))
                 return res

@@ -459,9 +459,13 @@ try:
     lan.print_gcode("127.0.0.1", g5.name, "slot5.gcode"); check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", False)
 except lan.LanError as e:
     check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", e.kind == "forbidden" and "Slot 5" in str(e) and len(uploads) == n_up, str(e))
+try:   # fertiger G-Code mit eigener Zuordnung („G-Code drucken“): Werkzeug 5 auf Slot 9 gibt es nicht
+    lan.print_gcode("127.0.0.1", g5.name, "slot9.gcode", None, {"4": 8}); check("Zuordnung auf fehlenden Slot abgelehnt", False)
+except lan.LanError as e:
+    check("Zuordnung auf fehlenden Slot abgelehnt", e.kind == "forbidden" and "Slot 9" in str(e) and len(uploads) == n_up, str(e))
 os.unlink(g5.name)
 lan.get_link("127.0.0.1")._upload_url = "http://192.168.250.250:18910/gcode_upload?s=OLD"   # veraltet (nach Neustart des Druckers)
-res = lan.print_gcode("127.0.0.1", gtmp.name, "Schild_Platte1.gcode", {"auto_leveling": 1, "timelapse": 0})
+res = lan.print_gcode("127.0.0.1", gtmp.name, "Schild_Platte1.gcode", {"auto_leveling": 1, "timelapse": 0}, {"2": 1})
 up = uploads[-1] if uploads else {}
 check("veraltete Upload-Adresse frisch aus /info geholt", up.get("token") == "SECRET", up.get("token"))
 check("Hochgeladen mit Token, multipart, Länge", up.get("token") == "SECRET" and up.get("ctype", "").startswith("multipart/form-data") and up.get("length") == str(os.path.getsize(gtmp.name)) and b"G1 X1 Y1 E1" in up.get("body", b""), {k: v for k, v in up.items() if k != "body"})
@@ -469,7 +473,7 @@ topic, data = broker.starts[-1] if broker.starts else ("", {})
 check("Start im Kanal slicer", "/slicer/printer/20025/" + DEVICE + "/print" in topic, topic)
 check("Start mit Datei, Größe, MD5, taskid -1", data.get("filename") == "Schild_Platte1.gcode" and data.get("filesize") == os.path.getsize(gtmp.name) and len(data.get("md5", "")) == 32 and data.get("taskid") == "-1", data)
 m = data.get("ams_settings", {})
-check("Werkzeuge 0 und 2 → ACE-Slots 0 und 2, Farbe und Typ aus dem G-Code", m.get("use_ams") and [(x["paint_index"], x["ams_index"], x["material_type"], x["paint_color"]) for x in m["ams_box_mapping"]] == [(0, 0, "PLA", [255, 0, 0, 255]), (2, 2, "PETG", [0, 0, 255, 255])], m)
+check("Werkzeug 0 → Slot 0, Werkzeug 2 per Zuordnung → Slot 1, Farbe und Typ aus dem G-Code", m.get("use_ams") and [(x["paint_index"], x["ams_index"], x["material_type"], x["paint_color"]) for x in m["ams_box_mapping"]] == [(0, 0, "PLA", [255, 0, 0, 255]), (2, 1, "PETG", [0, 0, 255, 255])], m)
 check("Bettnivellierung an, Zeitraffer aus", data.get("task_settings", {}).get("auto_leveling") == 1 and data["task_settings"]["timelapse"]["status"] == 0)
 check("Druck läuft danach", res["ok"] and res["job"] and res["job"]["name"] == "Schild_Platte1", res)
 

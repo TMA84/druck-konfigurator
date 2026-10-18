@@ -6,12 +6,15 @@
 
 const SEND_PRINTER = 'kobra_s1';
 let sendInfo = null; // Stand des Druckers beim Öffnen
+let sendFootStd = '';
 // Was gedruckt wird: letzter Slice-Stand oder der einer Warteschlange (js/queue-ui.js) mit Rückmeldung beim Start
-let sendCtx = { slice: null, materials: null, name: '', onStarted: null };
+// own: fertiger G-Code („G-Code drucken …“, js/gcode-ui.js) – Werkzeug → Slot frei wählbar (map), Material aus dem G-Code
+let sendCtx = { slice: null, materials: null, name: '', onStarted: null, own: false, map: {} };
 
 async function openSendDialog(plate, opts) {
   const o = opts || {};
-  sendCtx = { slice: o.slice || (costState && costState.slice), materials: o.materials || costState.materials, name: o.name || (project ? project.name : ''), onStarted: o.onStarted || null };
+  sendCtx = { slice: o.slice || (costState && costState.slice), materials: o.materials || costState.materials, name: o.name || (project ? project.name : ''), onStarted: o.onStarted || null,
+    own: !!o.own, map: o.map || {}, colours: o.colours || [] };
   const s = sendCtx.slice;
   if (!s || !s.job) { toast(t('Zuerst „Kosten berechnen“ – dabei wird geslict')); return; }
   const host = printerHost(SEND_PRINTER);
@@ -22,6 +25,8 @@ async function openSendDialog(plate, opts) {
   try { if (typeof sendLaterReset === 'function') sendLaterReset(); } catch (e) { console.error(e); }
   $('sendPlate').disabled = !!o.onStarted;   // aus der Warteschlange: genau diese Platte
   $('sendSub').textContent = sendCtx.name + ' → ' + host;
+  sendFootStd = sendFootStd || $('sendFoot').innerHTML;
+  $('sendFoot').innerHTML = sendCtx.own ? esc(t('Das Tool lädt diesen G-Code unverändert auf den Drucker und startet ihn – Temperaturen und Material wie im G-Code. Bett frei? Richtige Druckplatte? Passt das Filament in den gewählten Slots?')) : sendFootStd;
   $('sendState').textContent = t('Frage den Drucker ab …'); $('sendState').className = 'note';
   $('sendMap').innerHTML = ''; $('sendGo').disabled = true;
   $('sendDlg').showModal();
@@ -42,25 +47,29 @@ function renderSendDialog() {
   $('sendState').className = 'note' + (free ? '' : ' bad');
   // Modell: geslict für X, verbunden ist Y → nicht senden; andere Anycubic als der Kobra S1 sind experimentell (js/anycubic-models.js)
   const want = lastResult ? lanModelOf(lastResult.printer) : null, have = st ? anycubicLanModel(st.model) : null;
-  const mismatch = !!(want && have && want.key !== have.key);
+  const mismatch = !sendCtx.own && !!(want && have && want.key !== have.key);   // eigener G-Code: prüft der Server
   if (mismatch) { $('sendState').innerHTML = esc(t('Geslict für {want}, verbunden ist ein {have} – bitte oben den passenden Drucker wählen und neu slicen.', { want: want.label, have: have.label })); $('sendState').className = 'note bad'; }
   else if (st && have && !have.tested) $('sendState').innerHTML += '<br><small>' + esc(t('{model}: Unterstützung experimentell – bisher nur am Kobra S1 geprüft. Erste Schicht beobachten; Rückmeldung gern als GitHub-Issue.', { model: have.label })) + '</small>';
   const slots = aceSlots(st);
   let warn = 0;
   const rows = (p ? p.grams : []).map((g, tool) => {
     if (!(g > 0)) return '';
-    const mat = sendCtx.materials && sendCtx.materials[tool], ace = slots[tool];
+    const to = sendCtx.map[tool] ?? tool, mat = sendCtx.materials && sendCtx.materials[tool], ace = slots[to];
     const want = mat ? (ORCA_KIND[mat.kind] || mat.name) : '', have = ace && ace.present ? ace.type : '';
     const bad = !have || (mat && !slotMatchesKind(have, mat.kind));
     if (bad) warn++;
     const sw = c => '<span class="pslot" style="display:inline-block;width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,.35);vertical-align:middle;background:' + esc(c || '#dddddd') + '"></span> ';
-    return '<tr><td>T' + tool + '</td><td>' + esc(want || '?') + '<small>' + de(g, 1) + ' g</small></td><td' + (bad ? ' class="warn"' : '') + '>Slot ' + (tool + 1) + ': ' +
-      (have ? sw(ace.colour) + esc(have) : t('leer')) + (bad ? '<small>' + (have ? t('anderes Material als im G-Code') : t('kein Filament im Slot')) + '</small>' : '') + '</td></tr>';
+    // eigener G-Code: Slot wählbar (Auswahl mit Material und Farbe je Slot), Farbe aus dem G-Code daneben
+    const pick = sendCtx.own && slots.length ? '<select data-send-tool="' + tool + '" aria-label="' + esc(t('Slot für Werkzeug {n}', { n: 'T' + tool })) + '">' +
+      slots.map((s, i) => '<option value="' + i + '"' + (i === to ? ' selected' : '') + '>Slot ' + (i + 1) + ': ' + esc(s.present ? s.type || '?' : t('leer')) + '</option>').join('') + '</select> ' : 'Slot ' + (to + 1) + ': ';
+    const gcol = sendCtx.own && sendCtx.colours[tool] ? sw(sendCtx.colours[tool]) : '';
+    return '<tr><td>T' + tool + '</td><td>' + gcol + esc(want || '?') + '<small>' + de(g, 1) + ' g</small></td><td' + (bad ? ' class="warn"' : '') + '>' + pick +
+      (have ? sw(ace.colour) + (sendCtx.own ? '' : esc(have)) : sendCtx.own ? '' : t('leer')) + (bad ? '<small>' + (have ? t('anderes Material als im G-Code') : t('kein Filament im Slot')) + '</small>' : '') + '</td></tr>';
   }).join('');
   $('sendMap').innerHTML = '<table class="changes"><thead><tr><th>' + t('Werkzeug') + '</th><th>G-Code</th><th>ACE</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     (p && typeof spoolShortage === 'function' && spoolShortage(p.grams).length ? '<p class="note bad">' + esc(spoolShortagePrefix(spoolShortage(p.grams)) + ' ' + spoolShortageText(spoolShortage(p.grams))) + '</p>' : '') +
     (warn ? '<p class="note bad">' + t('{n} Slot(s) passen nicht zum G-Code. Temperaturen im G-Code gelten für das geslicte Material – erst Filament tauschen oder neu slicen.', { n: warn }) +
-      (!sendCtx.onStarted && project ? ' <button type="button" class="btn sec" data-send-adopt>' + esc(t('Filament aus der ACE übernehmen und neu slicen')) + '</button>' : '') + '</p>' : '');
+      (!sendCtx.onStarted && !sendCtx.own && project ? ' <button type="button" class="btn sec" data-send-adopt>' + esc(t('Filament aus der ACE übernehmen und neu slicen')) + '</button>' : '') + '</p>' : '');
   // später starten (js/schedule-ui.js): Drucker muss jetzt nicht frei sein, der Server prüft zur Startzeit
   let later = null;
   try { later = typeof sendLaterState === 'function' ? sendLaterState(p) : null; } catch (e) { console.error(e); }
@@ -77,6 +86,7 @@ function renderSendDialog() {
 }
 
 $('sendPlate').addEventListener('change', renderSendDialog);
+$('sendMap').addEventListener('change', e => { const s = e.target.closest('[data-send-tool]'); if (!s) return; sendCtx.map[+s.dataset.sendTool] = +s.value; renderSendDialog(); });
 /* Material passt nicht: eigene Angaben, die der ACE widersprechen, verwerfen, die Teile auf das Filament der Slots
    umstellen (adoptSlotMaterials), neu slicen und den Dialog mit dem neuen G-Code wieder öffnen – gesendet wird erst auf Klick */
 async function sendAdopt() {
@@ -95,7 +105,7 @@ async function sendAdopt() {
 }
 $('sendDlg').addEventListener('click', e => {
   if (e.target.closest('[data-send-adopt]')) { sendAdopt(); return; }
-  if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted });
+  if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted, own: sendCtx.own, map: sendCtx.map, colours: sendCtx.colours });
 });
 $('sendGo').addEventListener('click', async () => {
   // Benachrichtigung bei Pause/Fertig (js/workbench-ui.js wbEvents) – fragen, solange ein Klick die Erlaubnis trägt
@@ -107,7 +117,8 @@ $('sendGo').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = t('Lade hoch …');
   try {
     const r = await lanApi('api/anycubic/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      host, job: sendCtx.slice.job, plate, name: sendCtx.name ? sendCtx.name.replace(/\.(stl|3mf|zip)$/i, '') : 'druck',
+      host, job: sendCtx.slice.job, plate, name: sendCtx.name ? sendCtx.name.replace(/\.(stl|obj|3mf|zip|gcode|gco|g)$/i, '') : 'druck',
+      ...(sendCtx.own ? { own: true, slots: sendCtx.map } : {}),
       options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } }) });
     $('sendDlg').close();
     if (sendCtx.onStarted) sendCtx.onStarted(plate);
@@ -115,7 +126,7 @@ $('sendGo').addEventListener('click', async () => {
     setTab('printer');
   } catch (e) {
     // Slice-Stand nicht mehr auf dem Server (Neustart, aufgeräumt): einmal neu slicen und gleich erneut starten
-    if (/nicht \(mehr\) vorhanden/.test(e.message) && !sendCtx.onStarted && project && !sendCtx.resliced) {
+    if (/nicht \(mehr\) vorhanden/.test(e.message) && !sendCtx.onStarted && !sendCtx.own && project && !sendCtx.resliced) {
       $('sendState').textContent = t('Der Slice-Stand war nicht mehr auf dem Server (z. B. nach einem Neustart) – wird neu berechnet …'); $('sendState').className = 'note';
       btn.textContent = t('Slicen …');
       costState.sig = null;

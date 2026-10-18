@@ -92,7 +92,9 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 | **STL** | Wird eingelesen; stecken mehrere getrennte Körper darin, werden sie als einzelne Teile erkannt. |
 | **mehrere STLs** | Alle zusammen als ein Projekt mit Teileliste. |
 | **3MF** | Objekte, Platten und Slot-Zuweisung werden übernommen (Modifier und Hilfskörper werden nicht als Teil gezählt). |
-| **ZIP** (z. B. von Makerworld) | Wird entpackt. Liegt genau eine 3MF darin, wird diese verwendet, sonst alle STLs. |
+| **OBJ** | Wie STL. Getrennte Objekte (`o`, sonst Gruppen `g`) werden einzelne Teile mit ihrem Namen, Vielecke werden in Dreiecke zerlegt. Farben und Materialien (MTL) werden nicht übernommen, die Achsen bleiben wie in der Datei (Z oben). |
+| **ZIP** (z. B. von Makerworld) | Wird entpackt. Liegt genau eine 3MF darin, wird diese verwendet, sonst alle STLs und OBJs. |
+| **G-Code** | Ist schon geslicet und kein Modell – öffnet direkt **G-Code drucken** (siehe unten unter ④ Drucker). |
 
 Körper, die sich berühren oder überlappen, bleiben ein Teil – z. B. Hohlkörper oder unverschmolzene Exporte aus Tinkercad.
 
@@ -434,6 +436,8 @@ Im Schritt **③ Slicen & Kosten** startet **Drucken …** (unter Ausgabe, oder 
 2. Die Tabelle zeigt je Werkzeug im G-Code, aus welchem **ACE-Slot** gedruckt wird (Werkzeug T0 = Slot 1 usw.) und was dort steckt. Passt Material oder Slot nicht (leer, anderes Material), steht es rot da – die Temperaturen im G-Code gelten für das geslicte Material. Dann Filament tauschen oder **Filament aus der ACE übernehmen und neu slicen**: Das stellt die Teile auf das Filament in den Slots um, verwirft eigene Slot-Angaben, die der ACE widersprechen, slict neu und öffnet den Dialog wieder (gesendet wird erst auf deinen Klick). „Trotzdem drucken“ geht auf eigene Verantwortung.
 3. **Bett automatisch vermessen** (empfohlen), optional **Flusskalibrierung** und **Zeitraffer**.
 4. **Jetzt drucken** lädt den G-Code auf den Drucker und startet ihn; danach wechselt das Tool in den Tab **Drucker**.
+
+**G-Code drucken** (Karte **Druckauftrag** in ④ Drucker oder **Datei → G-Code drucken …**, auch per Drag & Drop): fertig geslicten G-Code, z. B. aus OrcaSlicer, an den Drucker schicken, ohne ihn im Tool zu bearbeiten. Der Dialog zeigt Druckzeit und Filament je Werkzeug aus dem Kommentarblock des G-Codes. Jedes Werkzeug (T0, T1 …) lässt sich auf einen beliebigen ACE-Slot legen, mit Warnung, wenn das Material im Slot nicht zum G-Code passt. Temperaturen und Material bleiben wie im G-Code. Vor dem Start prüft der Server, ob der Drucker frei ist und ob der G-Code für dieses Druckermodell geslicet wurde. Schichtvorschau, 3D-Fortschritt und Objekte überspringen funktionieren wie bei eigenen Drucken. „Später starten“ und „Bett vorwärmen“ gibt es hier nicht.
 
 **Bett vorwärmen** (unter „Vor dem Druck“, z. B. für ABS/ASA mit geschlossener Haube): Temperatur (Vorgabe aus den Druckwerten) und Dauer (Vorgabe 10 min). Mit **Vorwärmen und drucken** heizt der Server sofort das Bett auf, wartet die Dauer ab, prüft noch einmal (Drucker frei, Filament passt) und startet dann – auch wenn die Seite zu ist; in der Werkbank steht er unter **Geplanter Druck** (absagbar). Zusammen mit **Später starten** liegt das Vorwärmen direkt vor der Startzeit. Startet der Druck nicht oder sagst du ab, schaltet der Server die Bettheizung wieder aus; läuft beim geplanten Vorwärmen noch ein anderer Druck, heizt er nicht.
 

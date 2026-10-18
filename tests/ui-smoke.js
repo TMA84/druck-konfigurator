@@ -73,7 +73,7 @@ async function runSmoke(opts={}){
   sel('nozD','0.4');
 
   /* 5) Modell laden */
-  await dropFile(new File(['x'],'test.obj'));ok($('fileinfo').textContent.includes('nur STL, 3MF oder ZIP'),'Falsches Format wird abgelehnt');
+  await dropFile(new File(['x'],'test.txt'));ok($('fileinfo').textContent.includes('nur STL, OBJ, 3MF oder ZIP'),'Falsches Format wird abgelehnt');
   await dropFile(new File(['x'],'teil.3mf'));ok($('fileinfo').textContent.includes('konnte nicht gelesen'),'Kaputte 3MF: verständliche Fehlermeldung');
   // Mehrere Teile: zwei STLs plus ZIP mit einer STL mit zwei getrennten Körpern
   const zipBytes=fflate.zipSync({'set/doppel.stl':new Uint8Array(await stlFile('d.stl',[[0,0,0,10,10,10],[30,0,0,40,10,4]]).arrayBuffer())});

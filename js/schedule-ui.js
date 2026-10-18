@@ -26,13 +26,15 @@ function sendLaterReset() {
   // materials: Objekt Slot → Filament (letzte Kostenberechnung bzw. Warteschlange), keine Liste
   const kinds = Object.values(sendCtx.materials || {}).filter(Boolean).map(m => m.kind);
   $('sendDryTemp').value = String(Math.max(...kinds.map(k => DRY_DEFAULT_C[k] || 45), 45)); $('sendDryH').value = '4';
-  $('sendLaterBox').classList.toggle('hidden', !!sendCtx.onStarted);   // aus der Warteschlange: nicht planbar
+  // aus der Warteschlange oder eigener G-Code (Slots frei zugeordnet, die der Plan nicht kennt): nicht planbar
+  $('sendLaterBox').classList.toggle('hidden', !!(sendCtx.onStarted || sendCtx.own));
   // Vorwärmen: Bett wie in den Druckwerten (mit Anpassung), 10 min
   const bed = lastResult && lastResult.m ? +lastResult.m.bed : 0;
   // Kobra-S1-Vorgabe (js/engine.js preheatMin): ABS/ASA 10 min vorwärmen – schon angehakt
   const pre = lastResult && lastResult.preheatMin > 0 && !sendCtx.onStarted ? lastResult.preheatMin : 0;
   $('sendHeat').checked = pre > 0; $('sendHeatBed').value = String(Math.min(110, Math.max(40, bed || 100))); $('sendHeatMin').value = String(pre || 10);
-  $('sendHeat').closest('label').classList.toggle('hidden', !!sendCtx.onStarted); $('sendHeatRow').classList.toggle('hidden', !pre);
+  if (sendCtx.own) $('sendHeat').checked = false;
+  $('sendHeat').closest('label').classList.toggle('hidden', !!(sendCtx.onStarted || sendCtx.own)); $('sendHeatRow').classList.toggle('hidden', !pre || !!sendCtx.own);
   schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && renderSendDialog());
 }
 // Zustand für den Knopf: null = jetzt drucken; sonst {ok, why, req}

@@ -928,9 +928,10 @@ def _upload(link, path, filename):
     return ((doc.get("data") or {}).get("gcode")) or safe
 
 
-def print_gcode(host, path, filename, options=None):
+def print_gcode(host, path, filename, options=None, slots_map=None):
     """G-Code einer geslicten Platte hochladen und drucken. Nur wenn der Drucker frei ist und der G-Code
-    für dieses Modell geslict wurde. options: auto_leveling, timelapse, flow_calibration (0/1)."""
+    für dieses Modell geslict wurde. options: auto_leveling, timelapse, flow_calibration (0/1).
+    slots_map: {Werkzeug: ACE-Slot} (beide 0-basiert, fertiger G-Code) – ohne: Werkzeug n druckt aus Slot n."""
     link = _ready(host)
     o = options or {}
     if not link.connected.is_set():
@@ -947,13 +948,18 @@ def print_gcode(host, path, filename, options=None):
     # (ACE 2 = Slot 5–8, ams_index 4–7; mit zwei Einheiten noch nicht am echten Drucker geprüft). Farben und Typ zur Kontrolle.
     ace = ace_boxes({"multiColorBox": [link.reports["multiColorBox"]]} if "multiColorBox" in link.reports else {})
     slots = all_slots(ace)
-    missing = [t + 1 for t in facts["tools"] if slots and t >= len(slots)]
+    smap = {}
+    for k, v in (slots_map or {}).items():
+        if str(k).isdigit() and isinstance(v, int) and 0 <= v < 16:
+            smap[int(k)] = v
+    to = lambda t: smap.get(t, t)
+    missing = [to(t) + 1 for t in facts["tools"] if slots and to(t) >= len(slots)]
     if missing:
         raise LanError("Der G-Code nutzt Slot %s – am Drucker gibt es nur %d Slots" % (", ".join(map(str, missing)), len(slots)), "forbidden")
     stored = _upload(link, path, filename)
     rgb = lambda h: [int(h[i:i + 2], 16) for i in (1, 3, 5)] if re.fullmatch(r"#[0-9a-fA-F]{6}", h or "") else [255, 255, 255]
-    mapping = [{"paint_index": t, "ams_index": t, "paint_color": rgb(facts["colours"][t] if t < len(facts["colours"]) else "") + [255],
-                "ams_color": rgb(slots[t]["colour"] if t < len(slots) else "") + [255],
+    mapping = [{"paint_index": t, "ams_index": to(t), "paint_color": rgb(facts["colours"][t] if t < len(facts["colours"]) else "") + [255],
+                "ams_color": rgb(slots[to(t)]["colour"] if to(t) < len(slots) else "") + [255],
                 "material_type": (facts["types"][t] if t < len(facts["types"]) else "PLA")} for t in facts["tools"] or [0]]
     flag = lambda k, d=0: 1 if o.get(k, d) else 0
     data = {"taskid": "-1", "url": "", "filename": stored, "md5": _md5(path), "filepath": None, "filetype": 1, "project_type": 1,

@@ -37,8 +37,9 @@
     <div class="menu">
       <button type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="menuDatei">Datei</button>
       <div class="menu-list" role="menu" id="menuDatei">
-        <button type="button" role="menuitem" data-action="open">Modell öffnen … <small>STL, 3MF, ZIP</small></button>
+        <button type="button" role="menuitem" data-action="open">Modell öffnen … <small>STL, OBJ, 3MF, ZIP</small></button>
         <button type="button" role="menuitem" data-action="add">Modell hinzufügen … <small>weiteres Modell ins Projekt – kombiniert drucken</small></button>
+        <button type="button" role="menuitem" id="gcodeOpen">G-Code drucken … <small>fertig geslicten G-Code an den Drucker senden</small></button>
         <button type="button" role="menuitem" id="clear">Modell entfernen</button>
         <hr>
         <button type="button" role="menuitem" id="export3mf" disabled>3MF für OrcaSlicer … <small id="export3mfNote">zuerst ein Modell laden</small></button>
@@ -263,7 +264,7 @@
       <h3 id="wbJobT" class="wb-eyebrow">Druckauftrag</h3>
       <div id="wbJob"></div>
       <div id="wbObjects" class="wb-objects hidden"></div>
-      <div class="wb-actions"><button class="btn sec" type="button" id="wbPause">Pausieren</button><button class="btn sec" type="button" id="wbResume">Fortsetzen</button><button class="btn danger" type="button" id="wbStop">Abbrechen</button></div>
+      <div class="wb-actions"><button class="btn sec" type="button" id="wbPause">Pausieren</button><button class="btn sec" type="button" id="wbResume">Fortsetzen</button><button class="btn danger" type="button" id="wbStop">Abbrechen</button><button class="btn sec" type="button" id="wbGcode" title="Fertig geslicten G-Code (z. B. aus OrcaSlicer) an den Drucker senden">G-Code drucken …</button></div>
     </section>
     <section class="wb-card wb-cam" aria-labelledby="wbCamT">
       <h3 id="wbCamT" class="visually-hidden">Kamera</h3>
@@ -419,11 +420,11 @@
           </div>
           <p id="txWarn" class="note bad small hidden"></p>
         </section>
-        <p class="muted drop-hint">STL, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
+        <p class="muted drop-hint">STL, OBJ, 3MF oder Makerworld-ZIP einfach ins Fenster ziehen – auch mehrere Dateien.</p>
       </div>
   </aside>
   <div id="stage">
-    <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
+    <div id="viewerEmpty" data-action="open">Noch kein Modell geladen.<br><small>STL, OBJ, 3MF oder ZIP hier ablegen oder klicken zum Auswählen</small></div>
     <p id="volWarn" class="hud vol-warn hidden" role="status"></p>
     <div id="controls" class="hud toolbar" role="toolbar" aria-label="Werkzeuge">
       <span class="tb-group" role="group" aria-label="Verlauf"><button type="button" id="tbUndo" title="Rückgängig (Strg/⌘+Z)" aria-label="Rückgängig (Strg/⌘+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="tb-label">Rückgängig</span></button><button type="button" id="tbRedo" title="Wiederholen (Strg/⌘+Umschalt+Z)" aria-label="Wiederholen (Strg/⌘+Umschalt+Z)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span class="tb-label">Wiederholen</span></button></span>
@@ -468,7 +469,8 @@
 </section>
 </main>
 
-<input id="file" type="file" accept=".stl,.3mf,.zip" multiple class="hidden">
+<input id="file" type="file" accept=".stl,.obj,.3mf,.zip" multiple class="hidden">
+<input id="gcodeFile" type="file" accept=".gcode,.gco,.g" class="hidden">
 <input type="file" id="importFile" accept=".json,application/json" class="hidden">
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="tip" class="tip" role="tooltip" hidden></div>
@@ -555,7 +557,7 @@
         <p id="sendLaterInfo" class="muted small"></p>
       </div>
     </div>
-    <p class="muted small">Das Tool lädt den G-Code dieser Platte auf den Drucker und startet ihn – genau der Stand der letzten Kostenberechnung. Bett frei? Richtige Druckplatte? Filament in den Slots?</p>
+    <p class="muted small" id="sendFoot">Das Tool lädt den G-Code dieser Platte auf den Drucker und startet ihn – genau der Stand der letzten Kostenberechnung. Bett frei? Richtige Druckplatte? Filament in den Slots?</p>
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn" type="button" id="sendGo">Jetzt drucken</button></div></dialog>
 
@@ -710,6 +712,7 @@
 <script src="js/live-ui.js"></script>
 <script src="js/skip-ui.js"></script>
 <script src="js/send-ui.js"></script>
+<script src="js/gcode-ui.js"></script>
 <script src="js/queue-ui.js"></script>
 <script src="js/schedule-ui.js"></script>
 <script src="js/spools-ui.js"></script>

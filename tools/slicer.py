@@ -211,6 +211,21 @@ def job_file(job, plate, ext):
     return prev
 
 
+def import_gcode(data, name=""):
+    """Fertigen G-Code (2026-10-18, „G-Code drucken“) als Auftrag mit einer Platte ablegen – danach wie geslict:
+    Vorschau (job_file … preview), Drucken über /api/anycubic/print, 3D-Fortschritt. Rückgabe wie slice_3mf (eine Platte)."""
+    if not data or len(data) > MAX_BYTES:
+        raise SliceError("G-Code fehlt oder ist zu groß (höchstens 200 MB)", "bad_request")
+    head = data[:4096].decode("utf-8", "replace")
+    if not re.search(r"^\s*(;|G[0-9]|M[0-9]|T[0-9])", head, re.M):
+        raise SliceError("Das sieht nicht nach G-Code aus", "bad_request")
+    job, path = _new_job_dir()
+    dest = os.path.join(path, "plate_1.gcode")
+    with open(dest, "wb") as f:
+        f.write(data)
+    return {"job": job, "name": name, "plates": [{"plate": 1, "reused": False, **_plate_stats(dest)}]}
+
+
 def _plate_stats(path):
     with open(path, "rb") as f:
         f.seek(max(0, os.path.getsize(path) - TAIL_BYTES))
