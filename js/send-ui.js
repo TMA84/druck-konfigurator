@@ -54,7 +54,7 @@ function renderSendDialog() {
   let warn = 0;
   const rows = (p ? p.grams : []).map((g, tool) => {
     if (!(g > 0)) return '';
-    const to = sendCtx.map[tool] ?? tool, mat = sendCtx.materials && sendCtx.materials[tool], ace = slots[to];
+    const to = (sendCtx.map || {})[tool] ?? tool, mat = sendCtx.materials && sendCtx.materials[tool], ace = slots[to];
     const want = mat ? (ORCA_KIND[mat.kind] || mat.name) : '', have = ace && ace.present ? ace.type : '';
     const bad = !have || (mat && !slotMatchesKind(have, mat.kind));
     if (bad) warn++;
@@ -62,7 +62,7 @@ function renderSendDialog() {
     // eigener G-Code: Slot wählbar (Auswahl mit Material und Farbe je Slot), Farbe aus dem G-Code daneben
     const pick = sendCtx.own && slots.length ? '<select data-send-tool="' + tool + '" aria-label="' + esc(t('Slot für Werkzeug {n}', { n: 'T' + tool })) + '">' +
       slots.map((s, i) => '<option value="' + i + '"' + (i === to ? ' selected' : '') + '>Slot ' + (i + 1) + ': ' + esc(s.present ? s.type || '?' : t('leer')) + '</option>').join('') + '</select> ' : 'Slot ' + (to + 1) + ': ';
-    const gcol = sendCtx.own && sendCtx.colours[tool] ? sw(sendCtx.colours[tool]) : '';
+    const gcol = sendCtx.own && (sendCtx.colours || [])[tool] ? sw(sendCtx.colours[tool]) : '';
     return '<tr><td>T' + tool + '</td><td>' + gcol + esc(want || '?') + '<small>' + de(g, 1) + ' g</small></td><td' + (bad ? ' class="warn"' : '') + '>' + pick +
       (have ? sw(ace.colour) + (sendCtx.own ? '' : esc(have)) : sendCtx.own ? '' : t('leer')) + (bad ? '<small>' + (have ? t('anderes Material als im G-Code') : t('kein Filament im Slot')) + '</small>' : '') + '</td></tr>';
   }).join('');
@@ -86,7 +86,7 @@ function renderSendDialog() {
 }
 
 $('sendPlate').addEventListener('change', renderSendDialog);
-$('sendMap').addEventListener('change', e => { const s = e.target.closest('[data-send-tool]'); if (!s) return; sendCtx.map[+s.dataset.sendTool] = +s.value; renderSendDialog(); });
+$('sendMap').addEventListener('change', e => { const s = e.target.closest('[data-send-tool]'); if (!s) return; (sendCtx.map = sendCtx.map || {})[+s.dataset.sendTool] = +s.value; renderSendDialog(); });
 /* Material passt nicht: eigene Angaben, die der ACE widersprechen, verwerfen, die Teile auf das Filament der Slots
    umstellen (adoptSlotMaterials), neu slicen und den Dialog mit dem neuen G-Code wieder öffnen – gesendet wird erst auf Klick */
 async function sendAdopt() {
