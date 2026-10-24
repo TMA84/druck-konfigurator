@@ -123,7 +123,7 @@ function wbRender() {
     if (md && !md.tested) $('wbName').insertAdjacentHTML('beforeend', ' <span class="badge lan-exp" title="' + esc(t('Bisher nur am Kobra S1 geprüft – Rückmeldung gern als GitHub-Issue')) + '">' + esc(t('experimentell')) + '</span>'); }
   $('wbMeta').textContent = [st.name && st.model && st.name !== st.model ? st.model : '', st.firmware ? 'Firmware ' + st.firmware : '', st.ip || wbHost()].filter(Boolean).join(' · ');
   const state = $('wbState');
-  const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, planLabel = plan && { heating: t('heizt vor'), drying: t('trocknet') }[plan.state];
+  const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, planLabel = plan && { heating: t('heizt vor'), drying: t('trocknet'), starting: t('startet') }[plan.state];
   state.textContent = wb.err ? t('nicht erreichbar') : job ? (job.paused ? t('pausiert') : t(job.status || job.state || 'aktiv')) : planLabel || (st.state === 'free' ? t('bereit') : st.state || '?');
   state.className = 'wb-pill' + (job && !job.paused ? ' live' : '');
   const light = (st.lights || [])[0];
@@ -148,9 +148,9 @@ function wbRender() {
       (job.filament_mm ? '<div><dt>' + t('Filament bisher') + '</dt><dd>' + de(job.filament_mm / 1000, 1) + ' m</dd></div>' : '') + '</dl>';
   } else {
     // kein Druck, aber ein Plan läuft (js/schedule-ui.js): heizt vor / trocknet / wartet – statt „Kein Druck aktiv“
-    const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, active = plan && ['wait', 'drying', 'heating'].includes(plan.state);
+    const plan = typeof sched !== 'undefined' && sched.v && sched.v.plan, active = plan && ['wait', 'drying', 'heating', 'starting'].includes(plan.state);
     const msg = !active ? t('Kein Druck aktiv. Drucken lässt sich aus dem Schritt <b>③ Slicen &amp; Kosten</b>.')
-      : esc(t({ heating: 'Bett heizt vor – Druck startet um {s}', drying: 'Filament trocknet – Druck startet um {s}', wait: 'Druck geplant – Start um {s}' }[plan.state], { s: schedWhen(plan.start_at) })) +
+      : esc(t({ heating: 'Bett heizt vor – Druck startet um {s}', drying: 'Filament trocknet – Druck startet um {s}', wait: 'Druck geplant – Start um {s}', starting: 'Druck wird gestartet – G-Code geht an den Drucker' }[plan.state], { s: schedWhen(plan.start_at) })) +
         (plan.start_at > Date.now() / 1000 ? ' (' + esc(t('in {t}', { t: duration(plan.start_at - Date.now() / 1000) })) + ')' : '') + '<br><small>' + esc(plan.name) + ' · ' + esc(t('Platte {n}', { n: plan.plate })) + '</small>';
     $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + msg + '</p>';
   }

@@ -558,6 +558,8 @@ I18N.add({
  "Bett jetzt auf {c} °C, nach {m} min Druckstart. ": "Bed to {c} °C now, print starts after {m} min. ",
  "Bett heizt vor – Druckstart um {s}": "Bed preheating – print starts at {s}",
  "heizt vor": "preheating",
+ "startet": "starting",
+ "Druck wird gestartet – G-Code geht an den Drucker": "Starting print – sending G-code to the printer",
  "vorwärmen {c} °C, {m} min": "preheat {c} °C, {m} min",
  "Vorwärmen und drucken": "Preheat and print",
  "Trotzdem vorwärmen und drucken": "Preheat and print anyway"

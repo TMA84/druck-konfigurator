@@ -41,7 +41,7 @@ function syncSpoolConfig() {
   const host = typeof printerHost === 'function' ? printerHost('kobra_s1') : null;
   if (!host || !spoolData) return;
   const own = typeof acePurgeOwn === 'function' ? acePurgeOwn() : null;
-  const cfg = { action: 'config', host, flush: typeof aceFlush === 'function' ? aceFlush() : 1.5, purge_g: own && own.grams > 0 ? own.grams : null };
+  const cfg = { action: 'config', host, flush: typeof aceFlush === 'function' ? aceFlush() : 1.5, purge_g: own && own.grams > 0 ? Math.min(own.grams, 100) : null };
   // Standardpreis (€/kg) aus „Preise & Sätze“ für die Kosten der Druckhistorie bei Spulen ohne eigenen Preis
   const price = typeof costCfg === 'function' ? costCfg().pricePerKg : null;
   if (price > 0) cfg.price_default = price;

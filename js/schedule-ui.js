@@ -17,7 +17,7 @@ async function schedLoad() {
   if (typeof wb !== 'undefined' && wb.st && !wb.st.job && typeof wbRender === 'function') wbRender();   // Druckauftrag: „heizt vor …“
   return sched.v;
 }
-const schedBusy = () => !!(sched.v && sched.v.plan && ['wait', 'drying', 'heating'].includes(sched.v.plan.state));
+const schedBusy = () => !!(sched.v && sched.v.plan && ['wait', 'drying', 'heating', 'starting'].includes(sched.v.plan.state));
 
 // ---------- Sendedialog ----------
 function sendLaterReset() {
@@ -96,7 +96,7 @@ function schedRender() {
   card.classList.toggle('hidden', !p);
   if (!p) return;
   const active = ['wait', 'drying', 'heating'].includes(p.state), now = Date.now() / 1000;
-  const label = { wait: t('geplant'), drying: t('trocknet'), heating: t('heizt vor'), started: t('gestartet'), failed: t('nicht gestartet'), cancelled: t('abgesagt') }[p.state] || p.state;
+  const label = { wait: t('geplant'), drying: t('trocknet'), heating: t('heizt vor'), starting: t('startet'), started: t('gestartet'), failed: t('nicht gestartet'), cancelled: t('abgesagt') }[p.state] || p.state;
   $('schedSum').textContent = label + ' · ' + t('Start {s}', { s: schedWhen(p.start_at) }) +
     (active && p.start_at > now ? ' (' + t('in {t}', { t: duration(p.start_at - now) }) + ')' : '') +
     (p.preheat ? ' · ' + t('vorwärmen {c} °C, {m} min', { c: p.preheat.bed, m: p.preheat.minutes }) : '') +
