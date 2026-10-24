@@ -22,6 +22,8 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/printing/objects?name=<Auftrag>          → Objekte dieses Drucks (Name, Mitte, Umriss) zum Überspringen
   GET  /api/queue                                      → Druckwarteschlange des Servers (tools/printqueue.py) mit Restzeit
   POST /api/queue  {action: create|started|skip|again|end, …} → Warteschlange anlegen/ändern (Druckstart bleibt ein Klick)
+  GET  /api/backup                                     → Sicherung (Spulen, Historie, Standardwerte) als JSON-Datei (tools/backup.py)
+  POST /api/backup  {mode: merge|replace, data}        → Sicherung einspielen (erst alles prüfen, dann schreiben)
 
 Aufruf: python tools/serve.py [PORT]
   Standard: nur auf diesem Rechner (127.0.0.1). Im Container / auf dem NAS: KONFIGURATOR_HOST=0.0.0.0.
@@ -55,6 +57,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anycubic_lan  # noqa: E402
+import backup  # noqa: E402
 import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
@@ -69,6 +72,7 @@ import spools  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_BODY = 64 * 1024
 MAX_SPOOL_BODY = 4 * 1024 * 1024   # Import der Filamentverwaltung (bis 500 Drucke Historie in einem Stück)
+MAX_BACKUP_BODY = backup.MAX_BYTES  # Sicherung einspielen (Spulen, Historie, Standardwerte, Teil des Browsers)
 STATUS_FOR = {"forbidden": 403, "missing_libs": 501, "unreachable": 502, "lan_off": 409, "unsupported": 409,
               "rejected": 502, "bad_response": 502, "timeout": 504, "no_slicer": 501, "bad_request": 400, "failed": 422}
 WATCHER = None   # printqueue.Watcher: fragt den Drucker für Warteschlange und Home Assistant ab (main)
@@ -216,6 +220,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
         except ClientGone:
             raise
+        except backup.BackupError as e:
+            return self._json(400, {"error": str(e), "kind": "bad_request"})
         except (printqueue.QueueError, schedule.ScheduleError, prefs.PrefsError) as e:
             return self._json(409, {"error": str(e), "kind": "bad_request"})
         except (ValueError, KeyError, TypeError) as e:
@@ -420,6 +426,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if url.path == "/api/backup":
+            # Sicherung mit persönlichen Daten: nicht für „nur ansehen“ (fehlt in VIEWER_GET), nicht von fremden Seiten
+            if self._cross_site():
+                return self._json(403, {"error": "Sicherung nur von der eigenen Seite", "kind": "forbidden"})
+            name, body = backup.build()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Disposition", 'attachment; filename="%s"' % name)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if url.path == "/api/anycubic/camera":
             if self._cross_site():   # startet die Kamera am Drucker – nur von der eigenen Seite
                 return self._json(403, {"error": "Kamera nur von der eigenen Seite", "kind": "forbidden"})
@@ -499,8 +516,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._upload(path, length)
             finally:
                 UPLOAD_SLOTS.release()
-        limit = MAX_SPOOL_BODY if path == "/api/spools" else MAX_BODY
-        if path not in ("/api/spools", "/api/queue", "/api/prefs", "/api/schedule", "/api/anycubic/print", "/api/anycubic/command"):
+        limit = MAX_SPOOL_BODY if path == "/api/spools" else MAX_BACKUP_BODY if path == "/api/backup" else MAX_BODY
+        if path not in ("/api/spools", "/api/backup", "/api/queue", "/api/prefs", "/api/schedule", "/api/anycubic/print", "/api/anycubic/command"):
             self.close_connection = True
             return self._json(404, {"error": "unbekannt", "kind": "not_found"})
         # Nur Aufrufe der eigenen Seite (application/json ist kein „einfacher“ Typ – einfacher Schutz gegen fremde Webseiten)
@@ -516,6 +533,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     req["host"] = anycubic_lan.check_host(req["host"])   # nur private Adressen
                 return spools.api_post(req)
             return self._api(change)
+        if path == "/api/backup":
+            def restore():
+                req = backup.parse(self.rfile.read(length))
+                return backup.restore(req.get("data"), req.get("mode"))
+            return self._api(restore)
         if path == "/api/queue":
             return self._api(lambda: queue_post(self._body(length)))
         if path == "/api/prefs":

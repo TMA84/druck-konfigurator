@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unreleased]
+
+### Neu
+- **Sicherung und Umzug:** ⚙ Einstellungen → **Sicherung speichern** legt alles Dauerhafte in eine Datei: Spulen mit Druckhistorie und Preisen, eigene Standardwerte je Drucker/Filament, dazu aus dem Browser die eigenen Filamentprofile, Kosten- und Preiseinstellungen, Filament-Slots, Drucker-Adressen und die letzte Auswahl. **Sicherung einspielen …** zeigt den Inhalt und fragt: **Zusammenführen** oder **Ersetzen** (mit Rückfrage). Der Server prüft die ganze Datei, bevor er etwas schreibt – eine fehlerhafte Datei ändert nichts. Nicht in der Sicherung: Warteschlange, geplanter Druck (würde auf dem neuen Server von selbst starten), Zwischenspeicher, das geladene Modell und Zugangsdaten (PIN, MQTT). Benutzer „nur ansehen“ in Home Assistant können weder sichern noch einspielen.
+
 ## [10.45.2] – 2026-10-24
 
 ### Behoben

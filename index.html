@@ -73,6 +73,10 @@
         <button type="button" role="menuitem" data-action="history">Druckhistorie &amp; Statistik …</button>
         <button type="button" role="menuitem" data-action="purge">Farbwechsel &amp; Spülmenge …</button>
         <button type="button" role="menuitem" data-action="costs">Preise &amp; Sätze …</button>
+        <hr>
+        <span class="menu-group">Sicherung &amp; Umzug</span>
+        <button type="button" role="menuitem" id="backupSave" title="Spulen, Druckhistorie, Standardwerte, eigene Profile und Einstellungen als eine Datei – z. B. für den Umzug Mac ↔ Home Assistant">Sicherung speichern</button>
+        <button type="button" role="menuitem" id="backupLoad">Sicherung einspielen …</button>
       </div>
     </div>
     <button type="button" class="menu-btn help-btn" data-action="help" aria-label="Hilfe">?</button>
@@ -472,6 +476,7 @@
 <input id="file" type="file" accept=".stl,.obj,.3mf,.zip" multiple class="hidden">
 <input id="gcodeFile" type="file" accept=".gcode,.gco,.g" class="hidden">
 <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+<input type="file" id="backupFile" accept=".json,application/json" class="hidden">
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="tip" class="tip" role="tooltip" hidden></div>
 
@@ -602,6 +607,10 @@
   </div>
   <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn sec" type="button" id="pgReset">Standard (1,5, ohne eigene Messung)</button><button class="btn" type="button" id="pgSave">Speichern</button></div></dialog>
 
+<dialog id="backupDlg" aria-labelledby="backupTitle"><div class="ed-head"><h2 id="backupTitle">Sicherung einspielen</h2><div class="muted">Warteschlange, geplanter Druck und das geladene Modell sind nicht Teil der Sicherung und bleiben, wie sie sind.</div></div>
+  <div class="ed-body" id="backupBody"></div>
+  <div class="ed-foot"><button class="btn sec" type="button" data-close>Abbrechen</button><button class="btn sec" type="button" id="backupReplace" title="Spulen, Historie, Standardwerte und Profile genau wie in der Datei – der bisherige Stand geht verloren">Ersetzen</button><button class="btn" type="button" id="backupMerge" title="Spulen abgleichen (neuerer Stand gewinnt), Unbekanntes dazunehmen, nichts löschen">Zusammenführen</button></div></dialog>
+
 <dialog id="profilesDlg" aria-labelledby="profilesTitle"><div class="ed-head"><h2 id="profilesTitle">Meine Profile</h2><div class="muted">Jedes Filament lässt sich mit eigenen Werten überschreiben oder neu anlegen. Die Werte bleiben nur in diesem Browser gespeichert – über <b>⚙ Einstellungen → Profile exportieren</b> sichern oder teilen.</div></div>
   <div class="ed-body"><div id="myList"></div></div>
   <div class="ed-foot"><button class="btn" type="button" data-close>Schließen</button></div></dialog>
@@ -726,6 +735,7 @@
 <script src="js/schedule-ui.js"></script>
 <script src="js/spools-ui.js"></script>
 <script src="js/history-ui.js"></script>
+<script src="js/backup-ui.js"></script>
 <script src="js/printer-picker.js"></script>
 <script src="js/project-store.js"></script>
 </body>

@@ -389,7 +389,7 @@ Die ACE meldet keine Restmenge. Die **Restmenge errechnet** das Tool: Füllgewic
 - **Neue Spule gleicher Sorte und Farbe:** Die ACE meldet dann dieselben Werte wie für die alte – das Tool kann sie nicht unterscheiden. Klick auf der ACE-Karte auf die Restmenge des Slots (oder im Spulen-Dialog auf **Bearbeiten**) und dann auf **Neue Spule eingelegt**: Die alte Spule wird archiviert, im Slot beginnt eine frische (Füllgewicht, Marke und Preis übernommen, Füllgewicht wird wie bei jeder neuen Spule abgefragt).
 - **Neue Spule erkannt:** Auf der ACE-Karte (④) und im Dialog erscheint „Neue Spule in Slot N erkannt – wie viel ist drauf?“ mit **Voll (1000 g)** oder **Restmenge eingeben …** – so beginnt die Rechnung mit dem richtigen Gewicht.
 - **Warnen unter … g** (Standard 100 g): darunter wird die Anzeige rot, und vor dem Drucken warnt das Tool, wenn eine Spule nicht reicht („Zu wenig Filament“) oder danach unter die Schwelle fiele („Filament wird knapp“).
-- **Exportieren / Importieren** überträgt die Spulen zwischen zwei Servern (z. B. vom Mac ins Home-Assistant-Add-on): **Zusammenführen** gleicht Spulen ab (neuerer Stand gewinnt) und fügt unbekannte hinzu, **Ersetzen** übernimmt alles.
+- **Exportieren / Importieren** überträgt die Spulen zwischen zwei Servern (z. B. vom Mac ins Home-Assistant-Add-on): **Zusammenführen** gleicht Spulen ab (neuerer Stand gewinnt) und fügt unbekannte hinzu, **Ersetzen** übernimmt alles. Für den ganzen Umzug (auch Profile und Einstellungen) gibt es die [Sicherung](#sicherung-und-umzug).
 
 - **Als Filamentprofil anlegen** (im Bearbeiten-Formular, wenn Marke oder Name eingetragen sind) macht aus der Spule ein eigenes Filamentprofil mit den Startwerten des Typs; „Filament aus dem ACE übernehmen“ nimmt dann dieses Profil.
 
@@ -406,6 +406,22 @@ Die Daten liegen auf dem Server in `~/.druck-konfigurator/spools.json`, im Conta
 - Monat wählen (oder im Diagramm auf einen Balken klicken) filtert die Tabelle; **Als CSV exportieren** speichert sie für Excel.
 
 Mit Home Assistant gibt es dazu die Sensoren **Filament diesen Monat**, **Kosten diesen Monat** und **Drucke diesen Monat**.
+
+### Sicherung und Umzug
+
+**⚙ Einstellungen → Sicherung speichern** lädt eine Datei `druckwerkstatt-sicherung-<Datum>.json` herunter. Sie enthält:
+
+- vom Server: alle Spulen mit Restmengen, Preisen und der ganzen Druckhistorie, Spülmenge und Warnschwelle sowie die eigenen Standardwerte je Drucker und Filament („Als Standard merken“);
+- aus diesem Browser: die eigenen Filamentprofile, Kosten und Preise, Filament-Slots, ACE-Anzahl, eigene Spülmenge, Düsen-Umrechnung, Drucker-Adressen und die zuletzt gewählten Werte (Drucker, Filament, Düse …).
+
+**Nicht** in der Sicherung: Warteschlange und geplanter Druck (sie gehören zu einem Slice-Auftrag auf diesem Server; ein eingespielter Plan würde auf dem neuen Server von selbst starten), das gerade geladene Modell (dafür den 3MF-Export nutzen), Zwischenspeicher wie Slice-Aufträge und Vorschauen, Sprache und Darstellung sowie Zugangsdaten: PIN, MQTT-Zugang und erlaubte Servernamen stehen nur in den Einstellungen des Servers bzw. Add-ons.
+
+**⚙ Einstellungen → Sicherung einspielen …** zeigt, was in der Datei steckt, und fragt nach der Art:
+
+- **Zusammenführen** gleicht die Spulen ab wie beim Spulen-Import (neuerer Stand gewinnt, Unbekanntes kommt dazu), vereinigt die Historie und nimmt Standardwerte und Profile dazu – gleichnamige aus der Datei gewinnen. Gelöscht wird nichts.
+- **Ersetzen** übernimmt Spulen, Historie, Standardwerte und Profile genau wie in der Datei (mit Rückfrage). Druckeradresse und laufende Zählung des Servers bleiben.
+
+Der Server prüft die ganze Datei, bevor er etwas schreibt. Ist etwas ungültig, meldet er, was, und es ändert sich nichts. Danach lädt die Seite neu. **Umzug Mac → Home Assistant:** am Mac sichern, im Add-on einspielen (Ersetzen). Sichern und Einspielen dürfen nur Admins; mit PIN braucht es die Anmeldung.
 
 ### Drucker-Werkbank (Tab „Drucker“)
 

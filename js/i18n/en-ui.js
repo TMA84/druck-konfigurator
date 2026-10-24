@@ -856,3 +856,49 @@ I18N.add({
  "Lese {name} … {p} %": "Reading {name} … {p} %",
  "Lese {n} Dateien … {p} %": "Reading {n} files … {p} %",
 });
+
+// Sicherung und Umzug (js/backup-ui.js, index.html, Meldungen von tools/backup.py)
+I18N.add({
+  'Sicherung & Umzug': 'Backup &amp; move',
+  'Sicherung speichern': 'Save backup',
+  'Sicherung einspielen …': 'Restore backup …',
+  'Sicherung einspielen': 'Restore backup',
+  'Spulen, Druckhistorie, Standardwerte, eigene Profile und Einstellungen als eine Datei – z. B. für den Umzug Mac ↔ Home Assistant': 'Spools, print history, defaults, your own profiles and settings in one file – e.g. to move between Mac and Home Assistant',
+  'Warteschlange, geplanter Druck und das geladene Modell sind nicht Teil der Sicherung und bleiben, wie sie sind.': "The queue, scheduled print and the loaded model aren't part of the backup and stay as they are.",
+  'Spulen, Historie, Standardwerte und Profile genau wie in der Datei – der bisherige Stand geht verloren': 'Spools, history, defaults and profiles exactly as in the file – the current data is lost',
+  'Spulen abgleichen (neuerer Stand gewinnt), Unbekanntes dazunehmen, nichts löschen': 'Match spools (newer data wins), add unknown items, delete nothing',
+  'Sicherung gespeichert': 'Backup saved',
+  'Sicherung nicht möglich: {msg}': 'Backup failed: {msg}',
+  'Datei {file}, gesichert am {date}:': 'File {file}, saved on {date}:',
+  'Spulen': 'Spools',
+  'Drucke in der Historie': 'Prints in the history',
+  'eigene Standardwerte (Drucker/Filament)': 'your own defaults (printer/filament)',
+  'eigene Filamentprofile': 'your own filament profiles',
+  'Einstellungen (Kosten, Preise, Slots, Drucker-Adressen …)': 'Settings (costs, prices, slots, printer addresses …)',
+  'Zusammenführen gleicht Spulen ab (neuerer Stand gewinnt) und nimmt Unbekanntes dazu. Ersetzen übernimmt alles genau wie in der Datei – der bisherige Stand geht verloren. Danach lädt die Seite neu.': 'Merge matches spools (newer data wins) and adds unknown items. Replace takes everything exactly as in the file – the current data is lost. The page reloads afterwards.',
+  'Wirklich ersetzen? Spulen, Druckhistorie, Standardwerte und eigene Profile werden durch den Stand der Datei ersetzt.': 'Really replace? Spools, print history, defaults and your own profiles will be replaced by the data in the file.',
+  'Sicherung eingespielt – Seite lädt neu': 'Backup restored – reloading the page',
+  'Einspielen fehlgeschlagen: {msg}': 'Restore failed: {msg}',
+  'Datei zu groß (höchstens 8 MB)': 'File too large (max. 8 MB)',
+  'Keine Sicherung der Druckwerkstatt': 'Not a Druckwerkstatt backup',
+  'Keine Sicherung der Druckwerkstatt (JSON-Objekt erwartet)': 'Not a Druckwerkstatt backup (JSON object expected)',
+  'Sicherung aus einer neueren Version der Druckwerkstatt – bitte zuerst aktualisieren': 'Backup from a newer version of Druckwerkstatt – please update first',
+  'Sicherung ohne Serverteil': 'Backup without server part',
+  'Sicherung ohne gültige Version': 'Backup without a valid version',
+  'Sicherung zu tief verschachtelt': 'Backup nested too deeply',
+  'Keine gültige JSON-Datei': 'Not a valid JSON file',
+  'JSON-Objekt erwartet': 'JSON object expected',
+  'Browserteil der Sicherung ungültig': 'Browser part of the backup is invalid',
+  'Browserteil der Sicherung zu groß (höchstens 2 MB)': 'Browser part of the backup too large (max. 2 MB)',
+  'Spulen: kein Objekt': 'Spools: not an object',
+  'Standardwerte: unbekannter Inhalt': 'Defaults: unknown content',
+  'Die Sicherung enthält nichts für den Server': 'The backup contains nothing for the server',
+  'Art „merge“ oder „replace“ angeben': 'Specify “merge” or “replace”',
+  'Sicherung nur von der eigenen Seite': 'Backup only from this page'
+});
+I18N.addRx([
+  [/^Spulen: (.*)$/s, (m, a) => 'Spools: ' + t(a)],
+  [/^Standardwerte: (.*)$/s, (m, a) => 'Defaults: ' + t(a)],
+  [/^Unbekannter Teil in der Sicherung: (.*)$/s, 'Unknown part in the backup: $1'],
+  [/^Sicherung nicht gespeichert: (.*)$/s, 'Backup not saved: $1']
+]);
