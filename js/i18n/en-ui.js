@@ -851,3 +851,8 @@ I18N.add({
  "Gehäuse mit Glastür und Glasdeckel einblenden": "Show enclosure with glass door and lid",
  "ACE-Einheiten mit Spulen und Schläuchen einblenden": "Show ACE units with spools and tubes",
 });
+/* Modell im Hintergrund lesen (js/app.js importInWorker) */
+I18N.add({
+ "Lese {name} … {p} %": "Reading {name} … {p} %",
+ "Lese {n} Dateien … {p} %": "Reading {n} files … {p} %",
+});

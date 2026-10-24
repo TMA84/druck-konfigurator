@@ -12,15 +12,47 @@ document.addEventListener('drop',e=>{
   const files=e.dataTransfer&&e.dataTransfer.files;if(files&&files.length)loadFiles([...files]);
 });
 input.addEventListener('change',()=>{if(input.files.length)loadFiles([...input.files])});
-$('clear').addEventListener('click',()=>{input.value='';project=null;if(typeof setPrintSequence==='function')setPrintSequence(false);geom=null;$('fileinfo').textContent=t('Noch keine Datei geladen.');clearModel();update()});
+$('clear').addEventListener('click',()=>{loadSeq++;importStop();input.value='';project=null;if(typeof setPrintSequence==='function')setPrintSequence(false);geom=null;$('fileinfo').textContent=t('Noch keine Datei geladen.');clearModel();update()});
 
 const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error(t('Lesefehler')));r.readAsArrayBuffer(file)});
 
 // Eine oder mehrere Dateien (STL, OBJ, 3MF, ZIP) → Projekt mit Teileliste
-// loadSeq: wird eine neue Datei gewählt, solange eine ältere noch gelesen wird, gewinnt die neue (die ältere verfällt)
+/* Große Modelle liest ein Web Worker (js/import-worker.js: dieselben Lesefunktionen plus makeGeom) – das Fenster bleibt bedienbar
+   und zeigt den Fortschritt. Kleine Dateien, file:// und Browser ohne Worker lesen wie bisher direkt (gleiches Ergebnis).
+   IMPORT_WORKER_MIN: ab dieser Größe (ZIP/3MF gepackt, zählen fünffach) im Hintergrund */
+let IMPORT_WORKER_MIN=4*1024*1024,importWorker=null;
+const importWorkerOk=()=>typeof Worker!=='undefined'&&location.protocol!=='file:';
+// laufendes Lesen abbrechen (neuere Datei, „Entfernen“): Worker beenden, das wartende loadFiles bekommt null und verfällt über loadSeq
+function importStop(){if(importWorker){const w=importWorker;importWorker=null;w.terminate();w.done(null)}}
+// entries → dasselbe wie importModels, dazu je Teil die fertige Geometrie (p.geom); null = Worker geht nicht (dann direkt lesen)
+function importInWorker(entries,onProgress){
+  importStop();
+  return new Promise((ok,fail)=>{
+    let w;try{w=new Worker('js/import-worker.js')}catch(e){ok(null);return}
+    let sent=false;
+    const end=()=>{w.terminate();if(importWorker===w)importWorker=null};
+    w.done=ok;importWorker=w;
+    w.onmessage=e=>{
+      const d=e.data;
+      // erst wenn das Skript im Worker geladen ist, die Bytes übergeben (ohne Kopie) – vorher kann noch direkt gelesen werden
+      if(d.ready){if(!sent){sent=true;const i18n=I18N.lang==='de'?[]:[...document.querySelectorAll('script[src*="js/i18n/en-"]')].map(s=>s.src);
+        try{w.postMessage({lang:I18N.lang,i18n,entries},[...new Set(entries.map(e=>e.bytes.buffer))])}catch(err){console.error('import-worker',err);end();ok(null)}}return}
+      if(d.progress!=null){onProgress(d.progress);return}
+      end();
+      if(d.error!=null){fail(d.range?new RangeError(d.error):Error(d.error));return}
+      // Geometrie wie makeGeom(name, pos): name und pos sind die des Teils (dasselbe Array wie origPos)
+      d.imp.parts.forEach((p,i)=>{p.geom={name:p.name,pos:p.pos,...d.geoms[i]}});
+      ok(d.imp);
+    };
+    // Skript nicht ladbar (blockiert, fehlt): direkt lesen – die Bytes sind noch da; danach (Speicher aus) als Lesefehler
+    w.onerror=e=>{e.preventDefault();console.error('import-worker',e.message||e);end();if(!sent)ok(null);else fail(Error(e.message||t('Lesefehler')))};
+  });
+}
+// loadSeq: wird eine neue Datei gewählt, solange eine ältere noch gelesen wird, gewinnt die neue (die ältere verfällt, ihr Worker endet)
 let loadSeq=0;
 async function loadFiles(files){
   const seq=++loadSeq;
+  importStop();
   // fertiger G-Code ist kein Modell: gleich „G-Code drucken“ (js/gcode-ui.js)
   if(files.length===1&&/\.(gcode|gco|g)$/i.test(files[0].name)&&typeof gcodeOpenFile==='function'){addMode=false;return gcodeOpenFile(files[0])}
   $('fileinfo').textContent=files.length===1?t('Lese {name} …',{name:files[0].name}):t('Lese {n} Dateien …',{n:files.length});
@@ -30,7 +62,14 @@ async function loadFiles(files){
     if(big)throw tooBig(big.name);
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
     if(seq!==loadSeq)return;
-    const imp=importModels(entries,fflate);
+    const weight=entries.reduce((s,e)=>s+e.bytes.length*(/\.(zip|3mf)$/i.test(e.name)?5:1),0);
+    let imp=null;
+    if(weight>=IMPORT_WORKER_MIN&&importWorkerOk()){
+      imp=await importInWorker(entries,f=>{if(seq!==loadSeq)return;const p=Math.floor(f*100);
+        $('fileinfo').textContent=files.length===1?t('Lese {name} … {p} %',{name:files[0].name,p}):t('Lese {n} Dateien … {p} %',{n:files.length,p})});
+      if(seq!==loadSeq)return;
+    }
+    if(!imp)imp=importModels(entries,fflate);
     if(seq!==loadSeq)return;
     if(addMode&&project){addMode=false;return addParts(imp)}
     addMode=false;
@@ -53,7 +92,7 @@ async function loadFiles(files){
 let srcSeq=0;
 function partsFromImport(imp){
     const src='s'+Date.now().toString(36)+(srcSeq++),srcName=imp.name;
-    const parts=imp.parts.map((p,i)=>({id:i,src,srcName,name:p.name,origPos:p.pos,R:IDENTITY3,geom:makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
+    const parts=imp.parts.map((p,i)=>({id:i,src,srcName,name:p.name,origPos:p.pos,R:IDENTITY3,geom:p.geom||makeGeom(p.name,p.pos),slot:p.extruder?p.extruder-1:null,plate:p.plate||1,objectId:p.objectId||null,instance:p.instance||0,input:null,bodies:importedBodies(p),painted:!!p.painted,
       // Farben des Designers (0-basiert): Slot des Objekts, der Körper und der Farb-Modifikatoren – für „Farben des Designers → Slot“ (js/design-ui.js)
       dSlot:p.extruder?p.extruder-1:null,modSlots:(p.modifiers||[]).map(e=>e-1),paintTris:!!p.paintTris,
       // Geometrie der Farb-Modifikatoren (nur Anzeige; Slot des Designers, umgelegt über designMap)

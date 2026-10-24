@@ -1,5 +1,14 @@
 'use strict';
 /* STL einlesen und Überhänge analysieren – aus v4, ohne DOM-Zugriffe. */
+/* Fortschritt beim Laden großer Modelle: nur im Hintergrund (js/import-worker.js) gesetzt, sonst null (kein Aufwand).
+   progressAt(f) meldet f ∈ [0, 1] innerhalb des laufenden Abschnitts; progressSub(a, b, fn) rechnet fn als Teilstück a…b davon. */
+let loadProgress=null,progA=0,progB=1;
+function progressAt(f){if(loadProgress)loadProgress(progA+(progB-progA)*Math.max(0,Math.min(1,f)))}
+function progressSub(a,b,fn){
+  if(!loadProgress)return fn();
+  const A=progA,B=progB;progA=A+(B-A)*a;progB=A+(B-A)*b;
+  try{const r=fn();progressAt(1);return r}finally{progA=A;progB=B}
+}
 // STL-Datei → flaches Dreiecksarray (9 Werte je Dreieck)
 function readSTL(buf){
   const bytes=new Uint8Array(buf), dv=new DataView(buf);
@@ -9,7 +18,7 @@ function readSTL(buf){
   const looksBinary=bytes.length>=84&&declared>0&&bytes.length>=binaryExpected;
   if(looksBinary){
     pos=new Float32Array(declared*9);
-    for(let i=0,p=84;i<declared;i++,p+=50){for(let j=0;j<9;j++)pos[i*9+j]=dv.getFloat32(p+12+j*4,true)}
+    for(let i=0,p=84;i<declared;i++,p+=50){for(let j=0;j<9;j++)pos[i*9+j]=dv.getFloat32(p+12+j*4,true);if(!(i&262143))progressAt(i/declared)}
   }else{
     const text=new TextDecoder('utf-8',{fatal:false}).decode(bytes);
     const re=/vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/gi;const arr=[];let m;
@@ -104,10 +113,11 @@ function makeGeom(name,pos){
     bed[i]=Math.max(az,bz,cz)<=mn[2]+bedTol?1:0;
     vol+=(ax*(by*cz-bz*cy)-ay*(bx*cz-bz*cx)+az*(bx*cy-by*cx))/6;
   }
+  progressAt(0.1);
   let bedArea=0;for(let i=0;i<n;i++)if(bed[i]&&ang[i]>80)bedArea+=area[i];
   // Anteil nach unten zeigender Flächen, der nur Innenfläche ist (zählt nicht als Überhang)
   const hidden=new Float32Array(n);
-  if(n>1){const probe=makeDownProbe(pos);for(let i=0;i<n;i++){if(bed[i]||ang[i]<=0||!area[i])continue;let h=0;probe.sample(i,area[i],(r,w)=>{if(r==='inner')h+=w});hidden[i]=h/area[i]}}
+  if(n>1){const probe=makeDownProbe(pos);progressAt(0.4);for(let i=0;i<n;i++){if(!(i&65535))progressAt(0.4+0.6*i/n);if(bed[i]||ang[i]<=0||!area[i])continue;let h=0;probe.sample(i,area[i],(r,w)=>{if(r==='inner')h+=w});hidden[i]=h/area[i]}}
   return {name,pos,n,ang,area,bed,hidden,total,bedArea,vol:Math.abs(vol),x:mx[0]-mn[0],y:mx[1]-mn[1],z:mx[2]-mn[2],mn,mx};
 }
 
