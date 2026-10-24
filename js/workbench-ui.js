@@ -16,7 +16,7 @@ const wbMin = m => m == null ? '–' : m >= 60 ? Math.floor(m / 60) + ' h ' + (m
 const wbDeg = v => v == null ? '–' : Math.round(v) + ' °C';
 
 function onWorkbenchTab(active) {
-  if (active) { wb.camUserOff = false; wbPoll(); }
+  if (active) { wb.camUserOff = false; wbPoll(); if (typeof lvKick === 'function') lvKick(); }   // 3D-Schleifen stehen bei verdecktem Tab (js/live-ui.js lvOnScreen)
   else { clearTimeout(wb.timer); wbCamOff(); }
 }
 /* Kamera startet von selbst, sobald sie zu sehen ist: Tab ④ offen, Ansicht „Kamera“, Drucker verbunden und mit Kamera.

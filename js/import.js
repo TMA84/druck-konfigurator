@@ -41,16 +41,41 @@ const boxInside = (a, b) => [0, 1, 2].every(k => a.mn[k] >= b.mn[k] - TOUCH_MM &
    Ergebnis je Teil: {pos, bodies:[Dreiecksanzahl je Körper]} – die Körper eines Teils liegen
    hintereinander in pos und können beim Export eigene Slots bekommen (Mehrfarbdruck). Eine nach
    innen gerichtete Hülle (Hohlraum) gehört zum Körper, der sie umschließt. */
+/* Gleiche Ecken (auf WELD_MM gerundet): je Ecke das Dreieck, in dem dieselbe Ecke zuerst vorkommt – offene Hashtabelle über die drei
+   gerundeten Zahlen (Int32) statt Text-Schlüssel je Ecke (≈ 5 × schneller). null, wenn eine Zahl nicht in Int32 passt (riesige
+   Koordinaten, NaN): dann wie bisher mit Text-Schlüsseln. Eigene Funktion, damit die Schleifen optimiert werden. */
+function weldFirst(pos, n) {
+  const m = 3 * n, q = new Int32Array(m * 3);
+  for (let k = 0; k < m * 3; k++) { const r = Math.round(pos[k] / WELD_MM); if (!(r >= -2147483648 && r <= 2147483647)) return null; q[k] = r; }
+  let size = 16; while (size < m * 2) size *= 2;
+  const mask = size - 1, slot = new Int32Array(size).fill(-1), first = new Int32Array(m);   // slot: Ecke (t * 3 + v) des ersten Vorkommens
+  for (let e = 0; e < m; e++) {
+    const x = q[3 * e], y = q[3 * e + 1], z = q[3 * e + 2];
+    let h = Math.imul(x, 0x9e3779b1) ^ Math.imul(y, 0x85ebca77) ^ Math.imul(z, 0xc2b2ae3d);
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d); h = (h ^ (h >>> 15)) & mask;   // durchmischen: gerundete Gitter haben gleiche untere Bits
+    let f;
+    while ((f = slot[h]) >= 0 && (q[3 * f] !== x || q[3 * f + 1] !== y || q[3 * f + 2] !== z)) h = (h + 1) & mask;
+    if (f < 0) { slot[h] = e; f = e; }
+    first[e] = (f / 3) | 0;
+  }
+  return first;
+}
 function splitBodyGroups(pos) {
   const n = pos.length / 9;
   const parent = new Int32Array(n).map((_, i) => i);
   const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
-  const seen = new Map();
-  for (let t = 0; t < n; t++) for (let v = 0; v < 3; v++) {
-    const o = t * 9 + v * 3;
-    const key = Math.round(pos[o] / WELD_MM) + ',' + Math.round(pos[o + 1] / WELD_MM) + ',' + Math.round(pos[o + 2] / WELD_MM);
-    const other = seen.get(key);
-    if (other === undefined) seen.set(key, t); else { const a = find(t), b = find(other); if (a !== b) parent[a] = b; }
+  const first = weldFirst(pos, n);
+  if (first) for (let t = 0; t < n; t++) for (let v = 0; v < 3; v++) {
+    const other = first[t * 3 + v];
+    if (other !== t) { const a = find(t), b = find(other); if (a !== b) parent[a] = b; }
+  } else {
+    const seen = new Map();
+    for (let t = 0; t < n; t++) for (let v = 0; v < 3; v++) {
+      const o = t * 9 + v * 3;
+      const key = Math.round(pos[o] / WELD_MM) + ',' + Math.round(pos[o + 1] / WELD_MM) + ',' + Math.round(pos[o + 2] / WELD_MM);
+      const other = seen.get(key);
+      if (other === undefined) seen.set(key, t); else { const a = find(t), b = find(other); if (a !== b) parent[a] = b; }
+    }
   }
   const groups = new Map();
   for (let t = 0; t < n; t++) { const r = find(t); (groups.get(r) || groups.set(r, []).get(r)).push(t); }

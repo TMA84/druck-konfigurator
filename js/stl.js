@@ -99,8 +99,18 @@ function makeGeom(name,pos){
   return {name,pos,n,ang,area,bed,hidden,total,bedArea,vol:Math.abs(vol),x:mx[0]-mn[0],y:mx[1]-mn[1],z:mx[2]-mn[2],mn,mx};
 }
 
+/* Ergebnis je Geometrie und Winkel merken: Teileliste und update() fragen bei jeder Eingabe für jedes Teil. Schlüssel ist das
+   Flächenwinkel-Feld (makeGeom legt es neu an; gedrehte/geänderte Teile bekommen eine neue Geometrie); hidden/total mitgeprüft. */
+const ANALYZE_CACHE=new WeakMap();
 function analyze(geom,th){
   if(!geom)return null;
+  const memo=geom.ang&&ANALYZE_CACHE.get(geom.ang),hit=memo&&memo.hidden===geom.hidden&&memo.total===geom.total&&memo.n===geom.n&&memo.r[th];
+  if(hit)return Object.assign({},hit);
+  const r=analyzeRaw(geom,th);
+  if(geom.ang){const m=memo&&memo.hidden===geom.hidden&&memo.total===geom.total&&memo.n===geom.n?memo:{hidden:geom.hidden,total:geom.total,n:geom.n,r:{}};m.r[th]=r;ANALYZE_CACHE.set(geom.ang,m)}
+  return Object.assign({},r);
+}
+function analyzeRaw(geom,th){
   let flagged=0,ceiling=0;
   for(let i=0;i<geom.n;i++){
     if(geom.bed[i])continue;
