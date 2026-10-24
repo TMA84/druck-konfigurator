@@ -138,8 +138,9 @@ jobs:
       - name: paint-orca.js
         run: node tests/paint-orca.js
 
-      # braucht zwei echte Makerworld-3MF (PORTA3MF/ACE3MF, sonst ~/Downloads) – fehlen sie, meldet der Test
-      # „Datei fehlt … Test übersprungen“ und endet erfolgreich
+      # Makerworld-3MF anordnen, Modell hinzufügen, Kopien, Teil entfernen, Drehen – mit nachgebauten 3MF im Aufbau
+      # der echten Makerworld-Dateien (läuft immer) und geslict; die echten Dateien (PORTA3MF/ACE3MF, sonst ~/Downloads)
+      # prüft der Test nur zusätzlich, wenn sie da sind – hier nicht
       - name: export-project-arrange.js
         run: node tests/export-project-arrange.js
 
