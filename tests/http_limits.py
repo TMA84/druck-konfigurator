@@ -67,8 +67,9 @@ def raw(lines, body=b""):
         data += chunk
     s.close()
     head, _, rest = data.partition(b"\r\n\r\n")
-    status = int(head.split(b" ")[1]) if head.startswith(b"HTTP/") else 0
-    return status, rest
+    if not head.startswith(b"HTTP/"):
+        return 0, data   # ohne Statuszeile (HTTP/0.9-Antwort)
+    return int(head.split(b" ")[1]), rest
 
 
 def post_len(path, length, ctype="application/json", body=b""):
@@ -191,8 +192,9 @@ serve.anycubic_lan.status = orig_status
 check("fremde Seite: nur eingestellter Drucker; eigene Seite frei", calls == [("192.168.1.50", False), ("192.168.1.9", False), ("192.168.1.8", False)], calls)
 
 # 7) Protokoll ohne Pfad (kaputte Anfragezeile) bricht nicht ab
-st, _ = raw(["KAPUTT"])
-check("kaputte Anfragezeile → Antwort 400", st == 400, st)
+# (Python 3.12 antwortet darauf ohne Statuszeile, wie HTTP/0.9 – dann zählt die Fehlerseite)
+st, data = raw(["KAPUTT"])
+check("kaputte Anfragezeile → Antwort 400", st == 400 or b"Error code: 400" in (data or b""), (st, (data or b"")[:80]))
 h = serve.Handler.__new__(serve.Handler)
 h.client_address, h.requestline = ("127.0.0.1", 1), ""
 try:
