@@ -26,15 +26,16 @@ function sendLaterReset() {
   // materials: Objekt Slot → Filament (letzte Kostenberechnung bzw. Warteschlange), keine Liste
   const kinds = Object.values(sendCtx.materials || {}).filter(Boolean).map(m => m.kind);
   $('sendDryTemp').value = String(Math.max(...kinds.map(k => DRY_DEFAULT_C[k] || 45), 45)); $('sendDryH').value = '4';
-  // aus der Warteschlange oder eigener G-Code (Slots frei zugeordnet, die der Plan nicht kennt): nicht planbar
-  $('sendLaterBox').classList.toggle('hidden', !!(sendCtx.onStarted || sendCtx.own));
-  // Vorwärmen: Bett wie in den Druckwerten (mit Anpassung), 10 min
-  const bed = lastResult && lastResult.m ? +lastResult.m.bed : 0;
-  // Kobra-S1-Vorgabe (js/engine.js preheatMin): ABS/ASA 10 min vorwärmen – schon angehakt
-  const pre = lastResult && lastResult.preheatMin > 0 && !sendCtx.onStarted ? lastResult.preheatMin : 0;
+  // aus der Warteschlange: nicht planbar (eigener G-Code schon – der Plan nimmt die Zuordnung Werkzeug → Slot mit)
+  $('sendLaterBox').classList.toggle('hidden', !!sendCtx.onStarted);
+  // Vorwärmen: Bett wie in den Druckwerten (mit Anpassung), 10 min; eigener G-Code: Bett der ersten Schicht aus dem G-Code
+  // (ohne M140/M190 darin kein Vorwärmen)
+  const bed = sendCtx.own ? +sendCtx.bed || 0 : lastResult && lastResult.m ? +lastResult.m.bed : 0, noHeat = !!sendCtx.onStarted || (sendCtx.own && !bed);
+  // Kobra-S1-Vorgabe (js/engine.js preheatMin): ABS/ASA 10 min vorwärmen – schon angehakt (eigener G-Code: Material aus dem G-Code)
+  const pre = noHeat ? 0 : sendCtx.own ? (Object.values(sendCtx.materials || {}).some(m => m && (m.kind === 'abs' || m.kind === 'asa')) ? 10 : 0)
+    : lastResult && lastResult.preheatMin > 0 ? lastResult.preheatMin : 0;
   $('sendHeat').checked = pre > 0; $('sendHeatBed').value = String(Math.min(110, Math.max(40, bed || 100))); $('sendHeatMin').value = String(pre || 10);
-  if (sendCtx.own) $('sendHeat').checked = false;
-  $('sendHeat').closest('label').classList.toggle('hidden', !!(sendCtx.onStarted || sendCtx.own)); $('sendHeatRow').classList.toggle('hidden', !pre || !!sendCtx.own);
+  $('sendHeat').closest('label').classList.toggle('hidden', noHeat); $('sendHeatRow').classList.toggle('hidden', !pre);
   // nur für dieselbe Öffnung des Dialogs (sendReq, js/send-ui.js) und erst mit dem Stand des Druckers
   const req = typeof sendReq !== 'undefined' ? sendReq + 1 : 0;   // openSendDialog zählt gleich danach hoch
   schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && sendInfo && (typeof sendReq === 'undefined' || sendReq === req) && renderSendDialog());
@@ -56,16 +57,18 @@ function sendLaterState(p) {
   else if (dry && !(dry.temp >= 35 && dry.temp <= 70 && dry.minutes >= 30 && dry.minutes <= 1440)) why = t('Trocknen: 35–70 °C, 0,5–24 h.');
   else if (dry && at - dry.minutes * 60 < now - 60) why = t('Zum Trocknen ist bis zum Start zu wenig Zeit.');
   else if (later && !$('sendBedOk').checked) why = t('Bitte bestätigen: Bett frei, richtige Druckplatte liegt – gestartet wird ohne dich.');
-  const wants = (p ? p.grams : []).map((g, tool) => g > 0 && sendCtx.materials && sendCtx.materials[tool] && ORCA_KIND[sendCtx.materials[tool].kind]
-    ? { tool, type: ORCA_KIND[sendCtx.materials[tool].kind] } : null).filter(Boolean);
+  // Material je Werkzeug für die Prüfung vor dem Start; eigener G-Code: Typ aus dem G-Code, wenn die Art unbekannt ist
+  const wantType = m => m && (ORCA_KIND[m.kind] || (sendCtx.own && typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''));
+  const wants = (p ? p.grams : []).map((g, tool) => g > 0 && sendCtx.materials && wantType(sendCtx.materials[tool])
+    ? { tool, type: wantType(sendCtx.materials[tool]) } : null).filter(Boolean);
   const run = p ? p.time_s + (typeof prepS === 'function' ? prepS() : 0) : 0;
   const heatTxt = heat ? (later ? t('Vorwärmen ab {d}, ', { d: schedWhen(at - heat.minutes * 60) }) : t('Bett jetzt auf {c} °C, nach {m} min Druckstart. ', { c: heat.bed, m: heat.minutes })) : '';
   $('sendHeatInfo').textContent = later ? '' : heatTxt;
   if (later) $('sendLaterInfo').textContent = at > now ? heatTxt + (dry ? t('Trocknen ab {d}, ', { d: schedWhen(at - dry.minutes * 60) }) : '') +
     t('Start {s}, fertig ≈ {e}.', { s: schedWhen(at), e: schedWhen(at + run) }) + ' ' + t('Vor dem Start prüft der Server: Drucker frei, Filament passt – sonst startet er nicht.') : '';
   return { ok: !why, why, now: !later, req: { action: 'create', job: sendCtx.slice.job, plate: p ? p.plate : 1, start_at: Math.round(at),
-    bed_clear: later ? $('sendBedOk').checked : true, wants, slots: sendCtx.map || {}, dry: later ? dry : null, preheat: heat,
-    name: sendCtx.name ? sendCtx.name.replace(/\.(stl|3mf|zip)$/i, '') : 'druck',
+    bed_clear: later ? $('sendBedOk').checked : true, wants, slots: sendCtx.map || {}, own: !!sendCtx.own, dry: later ? dry : null, preheat: heat,
+    name: sendCtx.name ? sendCtx.name.replace(/\.(stl|obj|3mf|zip|gcode|gco|g)$/i, '') : 'druck',
     options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } } };
 }
 async function sendSchedule(state) {
@@ -102,7 +105,7 @@ function schedRender() {
   $('schedSum').textContent = label + ' · ' + t('Start {s}', { s: schedWhen(p.start_at) }) +
     (active && p.start_at > now ? ' (' + t('in {t}', { t: duration(p.start_at - now) }) + ')' : '') +
     (p.preheat ? ' · ' + t('vorwärmen {c} °C, {m} min', { c: p.preheat.bed, m: p.preheat.minutes }) : '') +
-    ' · ' + p.name + ' · ' + t('Platte {n}', { n: p.plate }) +
+    ' · ' + (p.own ? p.name + '.gcode' : p.name + ' · ' + t('Platte {n}', { n: p.plate })) +
     (p.dry ? ' · ' + t('trocknen {c} °C, {h} h', { c: p.dry.temp, h: de(p.dry.minutes / 60, p.dry.minutes % 60 ? 1 : 0) }) + (active && !p.dry.sent ? ' ' + t('ab {d}', { d: schedWhen(p.dry.start_at) }) : '') : '');
   $('schedCancel').classList.toggle('hidden', !active); $('schedDismiss').classList.toggle('hidden', active);
   $('schedNote').textContent = p.note || ''; $('schedNote').classList.toggle('hidden', !p.note);

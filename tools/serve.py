@@ -767,7 +767,8 @@ def scheduled_start(plan):
     if not host:
         raise anycubic_lan.LanError("Kein Drucker eingestellt", "unreachable")
     gcode, prev = os.path.join(plan["file"], "plate.gcode"), os.path.join(plan["file"], "plate.preview")
-    name = plan["name"] + "_Platte" + str(plan["plate"]) + ".gcode"
+    # eigener G-Code („G-Code drucken“): Name wie die Datei, ohne „_Platte1“ – wie bei /api/anycubic/print
+    name = plan["name"] + ("" if plan.get("own") else "_Platte" + str(plan["plate"])) + ".gcode"
     # Vorschau und Objekte VOR dem Start ablegen (2026-10-05: geplanter ASA-Druck ohne 3D-Fortschritt – die Seite hatte
     # schon nachgefragt, bevor die Vorschau da war, und es danach nicht mehr versucht)
     remember_print(name, "", plan["plate"], gcode_path=gcode, preview_path=prev)

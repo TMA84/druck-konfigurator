@@ -866,7 +866,12 @@ def gcode_facts(path):
         m = re.search(r"^; " + re.escape(key) + r" = (.*)$", tail, re.M)
         return m.group(1).strip() if m else ""
     grams = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", line("filament used [g]"))]
-    return {"size": size, "tools": [i for i, g in enumerate(grams) if g > 0],
+    # Betttemperatur der ersten Schicht: erstes M140/M190 mit S > 0 im Start-G-Code (fürs Vorwärmen beim geplanten Druck)
+    with open(path, "rb") as f:
+        head = f.read(2 * 1024 * 1024).decode("utf-8", "replace")
+    bed = next((round(float(m.group(1))) for m in re.finditer(r"^[ \t]*M1[49]0\b[^;\n]*?\bS(\d+(?:\.\d+)?)", head, re.M | re.I)
+                if float(m.group(1)) > 0), None)
+    return {"size": size, "tools": [i for i, g in enumerate(grams) if g > 0], "bed": bed,
             "colours": [c.strip() for c in re.split(r"[;,]", line("filament_colour")) if c.strip()],
             "types": [t.strip() for t in re.split(r"[;,]", line("filament_type")) if t.strip()],
             "printer": line("printer_model") or line("printer_settings_id")}
