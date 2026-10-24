@@ -120,6 +120,9 @@ export default [
     },
   })),
 
+  // js/import-worker.js: Web Worker mit denselben Parsern wie die Seite (importScripts util/stl/paint/import + fflate)
+  { files: ['js/import-worker.js'], languageOptions: { globals: { ...globals.worker } } },
+
   {
     files: ['js/nest-worker.js'],
     languageOptions: {
