@@ -12,8 +12,8 @@ der Server die Bettheizung wieder aus (heat_fn(False)).
 Der G-Code wird beim Planen in den Datenordner kopiert (Slice-Aufträge im Zwischenspeicher werden aufgeräumt).
 
 Stand: $DATA_DIR/schedule.json (bzw. $SCHEDULE_FILE), Dateien in $DATA_DIR/scheduled/<id>/.
-{plan: {id, name, file, start_at, created, plate, wants:[{tool, type}], options, dry: {temp, minutes, start_at, sent}|null,
-        state: wait|drying|started|failed|cancelled, note, done_at}|null, seq}
+{plan: {id, name, file, start_at, created, plate, wants:[{tool, type}], slots: {Werkzeug: ACE-Slot}, options,
+        dry: {temp, minutes, start_at, sent}|null, state: wait|drying|heating|starting|started|failed|cancelled, note, done_at}|null, seq}
 """
 import json
 import os
@@ -22,8 +22,12 @@ import threading
 import time
 import uuid
 
-STATES = ("wait", "drying", "heating", "started", "failed", "cancelled")
+import anycubic_lan
+
+STATES = ("wait", "drying", "heating", "starting", "started", "failed", "cancelled")
 ACTIVE = ("wait", "drying", "heating")
+BUSY = ACTIVE + ("starting",)      # „starting“: Upload läuft – nicht absagen, nicht entfernen, kein neuer Plan
+GRACE_S = 300                      # so lange nach der Startzeit auf einen lesbaren Druckerstand warten
 MAX_AHEAD_S = 14 * 24 * 3600        # höchstens zwei Wochen im Voraus
 MIN_DRY_MIN, MAX_DRY_MIN = 30, 24 * 60
 MIN_DRY_C, MAX_DRY_C = 35, 70
@@ -48,13 +52,27 @@ def files_dir(path=None):
     return os.path.join(os.path.dirname(path or data_file()), "scheduled")
 
 
-def load(path=None):
+def _set_aside(path, what):
+    """Kaputte Datei beiseitelegen statt beim nächsten Speichern stumm zu überschreiben (Stand von Hand rettbar)."""
+    dest = path + ".corrupt-" + time.strftime("%Y%m%d-%H%M%S")
     try:
-        with open(path or data_file(), encoding="utf-8") as f:
+        os.replace(path, dest)
+        print(what + ": Datei unlesbar, beiseitegelegt als " + dest + " – weiter mit leerem Stand", flush=True)
+    except OSError as e:
+        print(what + ": Datei unlesbar (" + str(e) + ") – weiter mit leerem Stand", flush=True)
+
+
+def load(path=None):
+    path = path or data_file()
+    try:
+        with open(path, encoding="utf-8") as f:
             st = json.load(f)
-        return st if isinstance(st, dict) else {"plan": None, "seq": 0}
-    except (OSError, ValueError):
+    except OSError:
         return {"plan": None, "seq": 0}
+    except ValueError:
+        _set_aside(path, "Geplanter Druck")
+        return {"plan": None, "seq": 0}
+    return st if isinstance(st, dict) else {"plan": None, "seq": 0}
 
 
 def save(state, path=None):
@@ -63,6 +81,8 @@ def save(state, path=None):
     tmp = p + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())   # sonst nach Stromausfall evtl. leere Datei trotz os.replace
     os.replace(tmp, p)
 
 
@@ -91,7 +111,7 @@ def create(state, req, gcode_src, preview_src=None, path=None, now=None):
     """req: {name, start_at (Unix-Sekunden), plate, wants:[{tool,type}], options, bed_clear: True, dry: {temp, minutes}|None}."""
     now = now or time.time()
     p = state.get("plan")
-    if p and p["state"] in ACTIVE:
+    if p and p["state"] in BUSY:
         raise ScheduleError("Es ist schon ein Druck geplant – erst absagen")
     if req.get("bed_clear") is not True:
         raise ScheduleError("Bitte bestätigen: Bett frei, richtige Druckplatte liegt")
@@ -116,6 +136,11 @@ def create(state, req, gcode_src, preview_src=None, path=None, now=None):
     for w in req.get("wants") or []:
         if isinstance(w, dict) and isinstance(w.get("tool"), int) and 0 <= w["tool"] < 32 and isinstance(w.get("type"), str) and 0 < len(w["type"]) <= 16:
             wants.append({"tool": w["tool"], "type": w["type"]})
+    # Werkzeug → ACE-Slot (beide 0-basiert, durchgehend über alle ACE) wie bei „jetzt drucken“; ohne: Werkzeug n aus Slot n
+    smap = {}
+    for k, v in (req.get("slots") or {}).items() if isinstance(req.get("slots"), dict) else ():
+        if str(k).isdigit() and int(k) < 32 and isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 16:
+            smap[str(int(k))] = v
     opts = {k: 1 if (req.get("options") or {}).get(k) else 0 for k in ("auto_leveling", "flow_calibration", "timelapse")}
     pid = uuid.uuid4().hex[:12]
     d = os.path.join(files_dir(path), pid)
@@ -128,7 +153,7 @@ def create(state, req, gcode_src, preview_src=None, path=None, now=None):
         shutil.copyfile(preview_src, os.path.join(d, "plate.preview"))
     name = "".join(c if c.isalnum() or c in "._-" else "_" for c in str(req.get("name") or "druck"))[:80]
     state["plan"] = {"id": pid, "name": name, "file": d, "plate": int(req.get("plate") or 1), "start_at": start, "created": now,
-                     "wants": wants, "options": opts, "dry": dry, "preheat": heat, "state": "wait", "note": None, "done_at": None}
+                     "wants": wants, "slots": smap, "options": opts, "dry": dry, "preheat": heat, "state": "wait", "note": None, "done_at": None}
     state["seq"] = state.get("seq", 0) + 1
     return state["plan"]
 
@@ -142,22 +167,28 @@ def cancel(state, now=None):
     return True
 
 
-def check_ready(st, wants):
-    """Vor dem Start: Grund, warum nicht gestartet werden darf, oder None."""
+UNREACHABLE = "Drucker nicht erreichbar"
+
+
+def check_ready(st, wants, slots_map=None):
+    """Vor dem Start: Grund, warum nicht gestartet werden darf, oder None. slots_map: {Werkzeug: ACE-Slot}."""
     if not st or not st.get("connected"):
-        return "Drucker nicht erreichbar"
+        return UNREACHABLE
     if st.get("printing") or st.get("job"):
         return "Drucker druckt gerade"
     if st.get("state") not in ("free", None, ""):
         return "Drucker ist nicht frei (%s)" % st.get("state")
-    slots = [s for box in (st.get("ace") or []) for s in (box.get("slots") or [])]
+    # Werkzeug-Nummern sind durchgehend (ACE 2 = 4–7), st["ace"] zählt je Einheit ab 0 – also wie print_gcode umrechnen
+    slots = anycubic_lan.all_slots(st.get("ace") or [])
+    smap = {int(k): v for k, v in (slots_map or {}).items() if str(k).isdigit()}
     for w in wants:
-        s = next((x for x in slots if x.get("index") == w["tool"]), None)
+        n = smap.get(w["tool"], w["tool"])
+        s = next((x for x in slots if x.get("index") == n), None)
         have = str((s or {}).get("type") or "").upper()
         if not s or not s.get("present") or not have:
-            return "Slot %d leer – geslict für %s" % (w["tool"] + 1, w["type"])
+            return "Slot %d leer – geslict für %s" % (n + 1, w["type"])
         if not have.startswith(w["type"].upper()) and not w["type"].upper().startswith(have):
-            return "Slot %d: %s eingelegt, geslict für %s" % (w["tool"] + 1, have, w["type"])
+            return "Slot %d: %s eingelegt, geslict für %s" % (n + 1, have, w["type"])
     return None
 
 
@@ -169,9 +200,9 @@ def _heat_off(p, heat_fn):
             pass
 
 
-def tick(state, st, start_fn, dry_fn, now=None, heat_fn=None):
-    """Einmal: Trocknen und Vorwärmen anstoßen, zur Zeit starten. start_fn(plan) → None oder wirft; dry_fn(on, temp,
-    minutes); heat_fn(on, bed)."""
+def tick(state, st, dry_fn, now=None, heat_fn=None):
+    """Einmal: Trocknen und Vorwärmen anstoßen; zur Zeit und wenn alles passt state „starting“ setzen – den Start selbst
+    macht der Aufrufer (Runner.step, ohne die Sperre), danach finish_start. dry_fn(on, temp, minutes); heat_fn(on, bed)."""
     now = now or time.time()
     p = state.get("plan")
     if not p or p["state"] not in ACTIVE:
@@ -188,33 +219,56 @@ def tick(state, st, start_fn, dry_fn, now=None, heat_fn=None):
         changed = True
     if p.get("preheat") and not p["preheat"].get("sent") and now >= p["preheat"]["start_at"] and now < p["start_at"]:
         why = check_ready(st, [])           # nur heizen, wenn der Drucker frei ist (kein anderer Druck)
-        if why:
+        if why == UNREACHABLE:
+            # eine verpasste Abfrage (WLAN, Neuverbinden) darf den Plan nicht kippen – nächste Runde wieder versuchen
+            if p.get("note") != "Warte auf den Drucker (Vorwärmen)":
+                p["note"] = "Warte auf den Drucker (Vorwärmen)"
+                changed = True
+        elif why:
             p.update(state="failed", note="Nicht vorgewärmt: " + why, done_at=now)
             state["seq"] = state.get("seq", 0) + 1
             return True
-        try:
-            heat_fn(True, p["preheat"]["bed"])
-            p["preheat"]["sent"] = True
-            p["state"] = "heating"
-        except Exception as e:     # nächster Versuch beim nächsten Durchlauf
-            p["note"] = "Vorwärmen nicht gestartet: " + (str(e) or type(e).__name__)
-        changed = True
-    if now >= p["start_at"]:
-        why = check_ready(st, p.get("wants") or [])
-        if why:
-            p.update(state="failed", note="Nicht gestartet: " + why, done_at=now)
-            _heat_off(p, heat_fn)
         else:
             try:
-                start_fn(p)
-                p.update(state="started", note=None, done_at=now)
-            except Exception as e:
-                p.update(state="failed", note="Nicht gestartet: " + (str(e) or type(e).__name__), done_at=now)
-                _heat_off(p, heat_fn)
-        changed = True
+                heat_fn(True, p["preheat"]["bed"])
+                p["preheat"]["sent"] = True
+                p["state"] = "heating"
+                p["note"] = None
+            except Exception as e:     # nächster Versuch beim nächsten Durchlauf
+                p["note"] = "Vorwärmen nicht gestartet: " + (str(e) or type(e).__name__)
+            changed = True
+    if now >= p["start_at"]:
+        why = check_ready(st, p.get("wants") or [], p.get("slots"))
+        if why == UNREACHABLE and now < p["start_at"] + GRACE_S:
+            # Stand gerade nicht lesbar (eine verpasste Abfrage): bis GRACE_S nach der Startzeit weiter versuchen
+            if p.get("note") != "Warte auf den Drucker – Start, sobald er erreichbar ist":
+                p["note"] = "Warte auf den Drucker – Start, sobald er erreichbar ist"
+                changed = True
+        elif why:
+            p.update(state="failed", note="Nicht gestartet: " + why, done_at=now)
+            _heat_off(p, heat_fn)
+            changed = True
+        else:
+            p.update(state="starting", note=None)
+            changed = True
     if changed:
         state["seq"] = state.get("seq", 0) + 1
     return changed
+
+
+def finish_start(state, pid, err, heat_fn=None, now=None):
+    """Ergebnis von start_fn eintragen (err: Ausnahme oder None) – nur, wenn der Plan noch derselbe ist."""
+    now = now or time.time()
+    p = state.get("plan")
+    if not p or p.get("id") != pid or p["state"] != "starting":
+        return False
+    if err is None:
+        p.update(state="started", note=None, done_at=now)
+    else:
+        p.update(state="failed", note="Nicht gestartet: " + (str(err) or type(err).__name__), done_at=now)
+        _heat_off(p, heat_fn)
+    state["seq"] = state.get("seq", 0) + 1
+    return True
 
 
 def api_get(path=None):
@@ -235,6 +289,8 @@ def api_post(req, gcode_for=None, path=None, now=None, on_cancel=None):
             create(state, req, gcode, preview, path, now)
         elif act == "cancel":
             pl = state.get("plan") or {}
+            if pl.get("state") == "starting":
+                raise ScheduleError("Druck wird gerade gestartet – Absagen nicht mehr möglich")
             drying = bool((pl.get("dry") and pl["dry"].get("sent")) or (pl.get("preheat") and pl["preheat"].get("sent")))
             if not cancel(state, now):
                 raise ScheduleError("Kein geplanter Druck")
@@ -245,7 +301,7 @@ def api_post(req, gcode_for=None, path=None, now=None, on_cancel=None):
                     state["plan"]["note"] = "abgesagt – Trocknen bitte am Drucker beenden (" + (str(e) or type(e).__name__) + ")"
         elif act == "dismiss":
             p = state.get("plan")
-            if p and p["state"] not in ACTIVE:
+            if p and p["state"] not in BUSY:     # „starting“: G-Code wird gerade hochgeladen
                 shutil.rmtree(p.get("file") or "", ignore_errors=True)
                 state["plan"] = None
                 state["seq"] = state.get("seq", 0) + 1
@@ -262,6 +318,7 @@ class Runner:
         self.status_fn, self.start_fn, self.dry_fn, self.path, self.tick_s = status_fn, start_fn, dry_fn, path, tick_s
         self.heat_fn = heat_fn
         self.stopped = False
+        self.starting = False
         self.thread = threading.Thread(target=self._run, daemon=True, name="schedule")
 
     def start(self):
@@ -269,18 +326,42 @@ class Runner:
         return self
 
     def step(self, now=None):
+        # Der Start (Upload bis UPLOAD_TIMEOUT_S) läuft ohne _lock – sonst hingen Seite und Home Assistant (api_get) so lange
         with _lock:
             state = load(self.path)
             p = state.get("plan")
+            if p and p["state"] == "starting" and not self.starting:
+                # Server während des Starts beendet: Ausgang unbekannt – nicht noch einmal starten
+                p.update(state="failed", note="Start unterbrochen (Server neu gestartet) – bitte am Drucker prüfen", done_at=now or time.time())
+                state["seq"] = state.get("seq", 0) + 1
+                save(state, self.path)
+                return True
             if not p or p["state"] not in ACTIVE:
                 return False
             due = (now or time.time()) >= min(p["start_at"], (p.get("dry") or {}).get("start_at", p["start_at"]),
                                               (p.get("preheat") or {}).get("start_at", p["start_at"]))
             st = self.status_fn() if due else None
-            if tick(state, st, self.start_fn, self.dry_fn, now, self.heat_fn):
-                save(state, self.path)
+            if not tick(state, st, self.dry_fn, now, self.heat_fn):
+                return False
+            if p["state"] == "starting":
+                self.starting = True
+            save(state, self.path)
+            if not self.starting:
                 return True
-            return False
+            plan = dict(p)
+        try:
+            err = None
+            try:
+                self.start_fn(plan)
+            except Exception as e:
+                err = e
+            with _lock:
+                state = load(self.path)
+                if finish_start(state, plan["id"], err, self.heat_fn, now):
+                    save(state, self.path)
+        finally:
+            self.starting = False
+        return True
 
     def _run(self):
         while not self.stopped:

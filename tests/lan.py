@@ -176,7 +176,9 @@ class FakeBroker(threading.Thread):
                 self.commands.append((topic, msg))
                 kind, action = msg["type"], msg["action"]
                 self.reply(conn, kind, {"msgid": ""})  # reine Quittung – muss ignoriert werden
-                if (kind, action) == ("info", "query"):
+                if (kind, action) in self.ignore:
+                    pass
+                elif (kind, action) == ("info", "query"):
                     self.reply(conn, "info", {"type": "info", "action": "report", "state": "done", "code": 200, "msgid": "x", "data": INFO})
                 elif (kind, action) == ("multiColorBox", "getInfo"):
                     self.reply(conn, kind, {"type": kind, "action": "getInfo", "state": "success", "code": 200, "msgid": msg["msgid"], "data": {"multi_color_box": [self.ace]}})
@@ -194,8 +196,6 @@ class FakeBroker(threading.Thread):
                     self.reply(conn, kind, {"type": kind, "action": "setSpeed", "state": "done", "code": 200, "msgid": msg["msgid"], "data": None})
                 elif (kind, action) == ("light", "query"):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"lights": [dict(self.light)]}})
-                elif (kind, action) in self.ignore:
-                    pass
                 elif (kind, action) in self.noop:   # quittiert mit „done“, ändert aber nichts
                     self.reply(conn, kind, {"type": kind, "action": action, "state": "done", "code": 200, "msgid": msg["msgid"], "data": dict(self.light)})
                 elif (kind, action) == ("light", "control") and (kind, action) in self.silent:
@@ -409,6 +409,11 @@ for bad in ({"axis": 1, "move_type": 1, "distance": 100}, {"axis": 9, "move_type
         lan.command("127.0.0.1", "axis", "move", bad); check("Achsweg abgelehnt " + str(bad), False)
     except lan.LanError as e:
         check("Achsweg abgelehnt " + str(bad), e.kind == "forbidden", e)
+for bad in (float("nan"), float("inf"), 1.5):
+    try:
+        lan.command("127.0.0.1", "light", "control", {"type": 2, "status": bad}); check("Licht-Wert abgelehnt " + str(bad), False)
+    except lan.LanError as e:
+        check("Licht-Wert abgelehnt " + str(bad), e.kind == "forbidden", e)
 try:
     lan.command("127.0.0.1", "fan", "setSpeed", {"fan_speed_pct": 10, "box_fan_level": 10}); check("zwei Lüfter auf einmal abgelehnt", False)
 except lan.LanError as e:
@@ -464,7 +469,20 @@ try:   # fertiger G-Code mit eigener Zuordnung („G-Code drucken“): Werkzeug 
 except lan.LanError as e:
     check("Zuordnung auf fehlenden Slot abgelehnt", e.kind == "forbidden" and "Slot 9" in str(e) and len(uploads) == n_up, str(e))
 os.unlink(g5.name)
-lan.get_link("127.0.0.1")._upload_url = "http://192.168.250.250:18910/gcode_upload?s=OLD"   # veraltet (nach Neustart des Druckers)
+# Start läuft schon (Doppelklick, geplanter Druck zugleich): zweiter sofort abgelehnt, ohne Upload
+link = lan.get_link("127.0.0.1")
+link.start_lock.acquire()
+try:
+    lan.print_gcode("127.0.0.1", gtmp.name, "doppelt.gcode"); check("zweiter Start, während einer läuft, abgelehnt", False)
+except lan.LanError as e:
+    check("zweiter Start, während einer läuft, abgelehnt", e.kind == "forbidden" and "läuft bereits" in str(e) and len(uploads) == n_up, e)
+finally:
+    link.start_lock.release()
+# Ablehnung von einem früheren Start steht noch in reports: darf den neuen Start nicht als abgelehnt melden
+with link.lock:
+    link.reports["print"] = {"type": "print", "action": "start", "state": "failed", "code": 10001, "msgid": "alt", "msg": "alter Fehler"}
+    link.seen["print"] = time.time() - 100
+link._upload_url = "http://192.168.250.250:18910/gcode_upload?s=OLD"   # veraltet (nach Neustart des Druckers)
 res = lan.print_gcode("127.0.0.1", gtmp.name, "Schild_Platte1.gcode", {"auto_leveling": 1, "timelapse": 0}, {"2": 1})
 up = uploads[-1] if uploads else {}
 check("veraltete Upload-Adresse frisch aus /info geholt", up.get("token") == "SECRET", up.get("token"))
@@ -537,6 +555,31 @@ lan.INFO_PORT = good_port
 time.sleep(0.6)
 st = lan.status("127.0.0.1")
 check("Neustart: Verbindung von selbst neu, frischer Stand", st["connected"] and st["state"] == INFO.get("state"), (st.get("connected"), st.get("state")))
+# Dieselbe Verbindung meldet sich neu an, info kommt aber (noch) nicht – nur tempature, ACE …: kein Stand mit printing False
+link = lan.get_link("127.0.0.1")
+broker.ignore.add(("info", "query"))
+lan.FIRST_DATA_S, first_s = 2, lan.FIRST_DATA_S
+broker.drop()
+for _ in range(50):    # erst die Trennung, dann die Neuanmeldung nach dem Rückzug (5 s) abwarten
+    time.sleep(0.1)
+    if not link.connected.is_set():
+        break
+for _ in range(100):
+    time.sleep(0.1)
+    if link.connected.is_set() and "tempature" in link.reports:
+        break
+try:
+    st = lan.status("127.0.0.1")
+    check("Neuverbinden ohne info: kein Stand", False, (st.get("printing"), st.get("missing")))
+except lan.LanError as e:
+    check("Neuverbinden ohne info: kein Stand", lan.get_link("127.0.0.1") is link and "info" not in link.reports and e.kind == "timeout", (e, list(link.reports)))
+broker.ignore.clear()
+lan.FIRST_DATA_S = first_s
+for _ in range(80):
+    time.sleep(0.1)
+    if "info" in link.reports:
+        break
+check("Neuverbinden: mit info wieder Stand", lan.status("127.0.0.1")["connected"])
 real_hs = lan.handshake
 lan.handshake = lambda host: (_ for _ in ()).throw(RuntimeError("kaputt"))
 broker.drop()

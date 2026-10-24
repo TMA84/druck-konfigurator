@@ -137,7 +137,8 @@ with tempfile.TemporaryDirectory() as d:
     check("api_post legt an und speichert", r["note"] == "angelegt" and r["queue"]["items"][0]["plate"] == 2 and os.path.exists(p))
     check("api_get liest", pq.load(p)["queue"]["name"] == "Teil.3mf" and pq.api_get(p)["remaining_s"] == 3600)
     open(p, "w").write("{kaputt")
-    check("kaputte Datei → leer", pq.load(p)["queue"] is None)
+    check("kaputte Datei → leer, beiseitegelegt statt überschrieben", pq.load(p)["queue"] is None and not os.path.exists(p)
+          and any(n.startswith("queue.json.corrupt-") for n in os.listdir(os.path.dirname(p))), os.listdir(os.path.dirname(p)))
     pq.api_post(dict(CREATE), p)
 
     # Beobachter mit nachgestelltem Drucker
@@ -160,6 +161,10 @@ with tempfile.TemporaryDirectory() as d:
     lan.st = PRINTING
     check("Beobachter: gesehen", w.step() == {"kind": "seen", "plate": 2} and pq.load(p)["queue"]["items"][0]["seen"] is True)
     check("Stand ohne Rohdaten", "raw" not in w.latest() and w.latest()["printing"] is True)
+    # nach dem Neuverbinden: Stand ohne info (printing False) – nicht als fertig werten
+    lan.st = dict(FREE, missing=["info"])
+    check("Beobachter: ohne info-Bericht nicht fertig", w.step() is None and pq.load(p)["queue"]["items"][0]["state"] == "printing"
+          and pq.load(p)["bed_clear"] is False and len(events) == 1)
     lan.st = FREE
     ev = w.step()
     check("Beobachter: fertig gespeichert", ev["kind"] == "done" and pq.load(p)["bed_clear"] is True and len(events) == 2)

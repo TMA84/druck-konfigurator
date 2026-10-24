@@ -42,15 +42,29 @@ def empty_state():
     return {"version": 1, "seq": 0, "queue": None, "bed_clear": False, "event": None, "events": []}
 
 
-def load(path=None):
+def _set_aside(path, what):
+    """Kaputte Datei beiseitelegen statt beim nächsten Speichern stumm zu überschreiben (Stand von Hand rettbar)."""
+    dest = path + ".corrupt-" + time.strftime("%Y%m%d-%H%M%S")
     try:
-        with open(path or data_file()) as f:
+        os.replace(path, dest)
+        print(what + ": Datei unlesbar, beiseitegelegt als " + dest + " – weiter mit leerem Stand", flush=True)
+    except OSError as e:
+        print(what + ": Datei unlesbar (" + str(e) + ") – weiter mit leerem Stand", flush=True)
+
+
+def load(path=None):
+    path = path or data_file()
+    try:
+        with open(path) as f:
             s = json.load(f)
-        base = empty_state()
-        base.update(s if isinstance(s, dict) else {})
-        return base
-    except (OSError, ValueError):
+    except OSError:
         return empty_state()
+    except ValueError:
+        _set_aside(path, "Warteschlange")
+        return empty_state()
+    base = empty_state()
+    base.update(s if isinstance(s, dict) else {})
+    return base
 
 
 def save(state, path=None):
@@ -59,6 +73,8 @@ def save(state, path=None):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(state, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())   # sonst nach Stromausfall evtl. leere Datei trotz os.replace
     os.replace(tmp, path)
 
 
@@ -286,6 +302,10 @@ class Watcher:
         except Exception as e:   # Drucker aus / nicht erreichbar: später wieder
             self.status = None
             raise e
+        if "info" in (st.get("missing") or []):
+            # Stand ohne info (kurz nach dem Neuverbinden): printing wäre False, auch mitten im Druck – sonst gälte
+            # die Platte als fertig (Bett frei, Ereignis an Home Assistant). Nächste Runde abwarten.
+            return None
         st = dict(st, time=time.time())
         st.pop("raw", None)
         self.status, self.status_time = st, time.time()

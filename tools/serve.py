@@ -613,7 +613,7 @@ def scheduled_start(plan):
     # Vorschau und Objekte VOR dem Start ablegen (2026-10-05: geplanter ASA-Druck ohne 3D-Fortschritt – die Seite hatte
     # schon nachgefragt, bevor die Vorschau da war, und es danach nicht mehr versucht)
     remember_print(name, "", plan["plate"], gcode_path=gcode, preview_path=prev)
-    res = anycubic_lan.print_gcode(host, gcode, name, plan.get("options") or {})
+    res = anycubic_lan.print_gcode(host, gcode, name, plan.get("options") or {}, plan.get("slots"))
     if res.get("filename") and res["filename"] != name:
         remember_print(res["filename"], "", plan["plate"], gcode_path=gcode, preview_path=prev)
     print("Geplanter Druck gestartet: " + name, flush=True)

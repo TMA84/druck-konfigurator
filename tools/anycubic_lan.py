@@ -12,6 +12,7 @@ Je Drucker hält PrinterLink eine Verbindung offen (Abfrage alle 5 s, Ende nach 
 """
 import base64
 import hashlib
+import math
 import os
 import re
 import ipaddress
@@ -216,6 +217,7 @@ class PrinterLink:
         self.paused_since = None   # seit wann der laufende Druck pausiert (aus info.project.pause)
         self.connected = threading.Event()
         self.first = threading.Event()
+        self.start_lock = threading.Lock()   # nur ein Druckstart zugleich (Doppelklick, Seite + geplanter Druck)
         self.error = None
         self.error_kind = None
         self.error_at = 0
@@ -278,6 +280,10 @@ class PrinterLink:
         backoff = 5
         while not self.stopped:
             try:
+                # Neue Verbindung = neuer Stand: Anfragen warten wieder auf info und ACE. Sonst galt „first“ vom vorigen
+                # Mal weiter, und ein tempature-Bericht vor info ergab mitten im Druck „druckt nicht“ (Warteschlange
+                # meldete die Platte fertig, Filamentverwaltung schrieb einen falschen Druck in den Verlauf).
+                self.first.clear()
                 self._connect()
                 self.error, self.error_kind, backoff = None, None, 5
                 while not self.stopped and self.connected.is_set():
@@ -310,6 +316,8 @@ class PrinterLink:
                     had = bool(self.reports)
                     self.reports.clear()
                     self.seen.clear()
+                if not self.error:
+                    self.first.set()                           # beendet ohne Fehler: niemand soll auf Daten warten
                 if had and not self.error and not self.stopped:
                     self.error, self.error_kind, self.error_at = "Verbindung zum Drucker unterbrochen", "unreachable", time.time()
                 if self.client:
@@ -374,12 +382,13 @@ class PrinterLink:
 
     # -- Senden --
     def publish(self, kind, action, data, msgid=None, channel="web"):
-        if not self.client:
+        client = self.client      # einmal lesen: _run setzt es beim Verbindungsabbruch auf None
+        if not client:
             raise LanError("Keine Verbindung zum Drucker", "unreachable")
         msg = {"type": kind, "action": action, "timestamp": int(time.time() * 1000), "msgid": msgid or str(uuid.uuid4()),
                "data": data if data is not None else {}}
         self.sent[(kind, action)] = time.time()
-        self.client.publish((self.slicer_topic if channel == "slicer" else self.web_topic) + kind, json.dumps(msg), qos=1)
+        client.publish((self.slicer_topic if channel == "slicer" else self.web_topic) + kind, json.dumps(msg), qos=1)
 
     def request(self, kind, action, data, timeout=10, channel="web"):
         if not self.connected.wait(MQTT_CONNECT_TIMEOUT) or not self.client:
@@ -465,9 +474,10 @@ def _ready(host):
             if all(k in link.reports for k, _a in POLL_QUERIES):
                 break
             time.sleep(0.1)
-    if not link.reports and link.error:
+    # ohne info kein verlässlicher Stand: „printing“ wäre False, auch mitten im Druck
+    if "info" not in link.reports and link.error:
         raise LanError(link.error, link.error_kind or "unreachable")
-    if not link.reports:
+    if "info" not in link.reports:
         raise LanError("Drucker antwortet nicht (keine Daten nach %d s)" % FIRST_DATA_S, "timeout")
     return link
 
@@ -645,7 +655,8 @@ MAX_SKIP_PARTS = 64
 
 
 def _int(v, lo, hi, name):
-    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != int(v) or not lo <= v <= hi:
+    # nan/inf (aus JSON: NaN, Infinity) würden bei int() abstürzen statt abgelehnt
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v != int(v) or not lo <= v <= hi:
         raise LanError("%s muss eine ganze Zahl von %d bis %d sein" % (name, lo, hi), "forbidden")
     return int(v)
 
@@ -807,7 +818,9 @@ def _light_off_after_cam(link):
         try:
             link.publish("light", "control", dict(w["payload"]))
             link.publish("light", "query", None)
-        except LanError:
+        except Exception as e:   # eigener Thread: nichts darf ungemeldet verschwinden
+            if not isinstance(e, LanError):
+                print("Licht nach Kamerastart: " + (str(e) or type(e).__name__), flush=True)
             return
 
 
@@ -825,10 +838,11 @@ def camera_url(host):
         link.request("video", "startCapture", {}, timeout=8)
     except LanError:
         pass   # läuft sie schon, antwortet der Drucker teils nicht – dann trotzdem versuchen
-    if link.light_off:
+    w = link.light_off   # einmal lesen: _hold_light setzt es im Verbindungs-Thread auf None
+    if w:
         # Kamerastart schaltet am Kobra S1 das Licht ein (bestätigt 2026-10-16: „nach jedem Neuladen der Kamera erst wieder an“):
         # neues Fenster zum Halten und gleich nachschalten, nicht erst bei der nächsten Abfrage (bis zu POLL_S später)
-        link.light_off.update(until=max(link.light_off["until"], time.time() + LIGHT_CAM_HOLD_S), tries=0)
+        w.update(until=max(w["until"], time.time() + LIGHT_CAM_HOLD_S), tries=0)
         threading.Thread(target=_light_off_after_cam, args=(link,), daemon=True).start()
     return url
 
@@ -933,6 +947,17 @@ def print_gcode(host, path, filename, options=None, slots_map=None):
     für dieses Modell geslict wurde. options: auto_leveling, timelapse, flow_calibration (0/1).
     slots_map: {Werkzeug: ACE-Slot} (beide 0-basiert, fertiger G-Code) – ohne: Werkzeug n druckt aus Slot n."""
     link = _ready(host)
+    # Zweiter Start, während der erste noch hochlädt (Doppelklick, Seite und geplanter Druck zugleich): Der Drucker ist bis
+    # zur Meldung des Auftrags noch „frei“ – ohne Sperre gingen beide Uploads und zwei print/start raus
+    if not link.start_lock.acquire(blocking=False):
+        raise LanError("Start läuft bereits", "forbidden")
+    try:
+        return _print_gcode(link, path, filename, options, slots_map)
+    finally:
+        link.start_lock.release()
+
+
+def _print_gcode(link, path, filename, options, slots_map):
     o = options or {}
     if not link.connected.is_set():
         raise LanError(link.error or "Keine Verbindung zum Drucker", "unreachable")
@@ -946,7 +971,9 @@ def print_gcode(host, path, filename, options=None, slots_map=None):
         link._upload_url = discovery(link.host).get("fileUploadurl")
     # Werkzeug n im G-Code druckt aus ACE-Slot n (so exportiert das Tool), über alle Einheiten durchgezählt
     # (ACE 2 = Slot 5–8, ams_index 4–7; mit zwei Einheiten noch nicht am echten Drucker geprüft). Farben und Typ zur Kontrolle.
-    ace = ace_boxes({"multiColorBox": [link.reports["multiColorBox"]]} if "multiColorBox" in link.reports else {})
+    with link.lock:   # einmal lesen: der Verbindungs-Thread leert reports beim Abbruch
+        box_rep = link.reports.get("multiColorBox")
+    ace = ace_boxes({"multiColorBox": [box_rep]} if box_rep else {})
     slots = all_slots(ace)
     smap = {}
     for k, v in (slots_map or {}).items():
@@ -970,11 +997,16 @@ def print_gcode(host, path, filename, options=None, slots_map=None):
                               "ai_settings": {"status": 0, "count": 0, "type": 0},
                               "drying_settings": {"status": 0, "target_temp": 0, "duration": 0, "remain_time": 0}, "model_objects_skip_parts": []}}
     msgid = str(uuid.uuid4())
+    sent = time.time()
     link.publish("print", "start", data, msgid, channel="slicer")
-    # Bestätigung: der Drucker meldet einen Auftrag (info.project) oder einen print-Bericht zu start
+    # Bestätigung: der Drucker meldet einen Auftrag (info.project) oder einen print-Bericht zu start. Nur Berichte nach
+    # dem Senden zählen – eine Ablehnung von einem früheren Start steht sonst noch in reports und bräche sofort ab.
     deadline = time.time() + START_WAIT_S
     while time.time() < deadline:
-        rep = link.reports.get("print") or {}
+        with link.lock:
+            rep = (link.reports.get("print") or {}) if link.seen.get("print", 0) >= sent else {}
+        if rep.get("msgid") and rep["msgid"] != msgid:
+            rep = {}
         if rep.get("action") == "start" and rep.get("state") == "failed":
             raise LanError("Drucker hat den Start abgelehnt: " + str(rep.get("msg") or rep.get("code")), "rejected")
         if link._printing():

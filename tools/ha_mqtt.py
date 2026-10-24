@@ -22,6 +22,7 @@ der Befehl geht wie aus der Werkbank an den Drucker (tools/anycubic_lan.py comma
 import datetime
 import json
 import os
+import secrets
 import ssl
 import threading
 import time
@@ -197,7 +198,7 @@ def filament_check(queue, spool_view):
     return out
 
 
-SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "heating": "heizt vor", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
+SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "heating": "heizt vor", "starting": "startet", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
 
 
 def payload(st, queue, now=None, spool_view=None, plan=None):
@@ -334,7 +335,9 @@ class Publisher:
     # -- Verbindung --
     def _connect(self):
         cfg = self.cfg
-        c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="druck-konfigurator-" + cfg["base"], protocol=mqtt.MQTTv311)
+        # eigene Kennung je Prozess: zwei Instanzen (Add-on und Testserver) mit gleicher Kennung werfen sich am Broker
+        # gegenseitig hinaus
+        c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="druck-konfigurator-%s-%s" % (cfg["base"], secrets.token_hex(3)), protocol=mqtt.MQTTv311)
         if cfg.get("user"):
             c.username_pw_set(cfg["user"], cfg.get("password"))
         if cfg.get("tls"):

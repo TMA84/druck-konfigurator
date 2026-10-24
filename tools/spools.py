@@ -80,15 +80,29 @@ def empty_state():
             "plans": {}, "price_default": PRICE_DEFAULT}
 
 
-def load(path=None):
+def _set_aside(path, what):
+    """Kaputte Datei beiseitelegen statt beim nächsten Speichern stumm zu überschreiben (Stand von Hand rettbar)."""
+    dest = path + ".corrupt-" + time.strftime("%Y%m%d-%H%M%S")
     try:
-        with open(path or data_file()) as f:
+        os.replace(path, dest)
+        print(what + ": Datei unlesbar, beiseitegelegt als " + dest + " – weiter mit leerem Stand", flush=True)
+    except OSError as e:
+        print(what + ": Datei unlesbar (" + str(e) + ") – weiter mit leerem Stand", flush=True)
+
+
+def load(path=None):
+    path = path or data_file()
+    try:
+        with open(path) as f:
             s = json.load(f)
-        base = empty_state()
-        base.update(s if isinstance(s, dict) else {})
-        return base
-    except (OSError, ValueError):
+    except OSError:
         return empty_state()
+    except ValueError:
+        _set_aside(path, "Filamentverwaltung")
+        return empty_state()
+    base = empty_state()
+    base.update(s if isinstance(s, dict) else {})
+    return base
 
 
 def save(state, path=None):
@@ -97,6 +111,8 @@ def save(state, path=None):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(state, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())   # sonst nach Stromausfall evtl. leere Datei trotz os.replace
     os.replace(tmp, path)
 
 
@@ -332,14 +348,20 @@ def update(state, req):
     a = req.get("action")
     if a == "config":
         if "host" in req:
-            state["host"] = req["host"] or None
+            h = req["host"]
+            if h and (not isinstance(h, str) or len(h) > 253):
+                raise ValueError("Drucker-Adresse ungültig")
+            state["host"] = h or None
         if req.get("flush") is not None:
             f = float(req["flush"])
             if not 0.1 <= f <= 3:
                 raise ValueError("Spülmenge 0,1–3")
             state["flush"] = f
         if "purge_g" in req:
-            state["purge_g"] = float(req["purge_g"]) if req["purge_g"] else None
+            v = _num(req["purge_g"]) if req["purge_g"] else None
+            if req["purge_g"] and (v is None or not 0 <= v <= 100):   # wie validate_import
+                raise ValueError("Spülabfall 0–100 g")
+            state["purge_g"] = v
         if req.get("price_default") is not None:
             v = _num(req["price_default"])
             if v is None or not 0 < v <= 20000:
@@ -621,9 +643,14 @@ class Tracker:
             if not host or not self.lan.AVAILABLE:
                 return False
         link = self.lan.get_link(host)
-        if not link.reports:
+        # einmal unter der Sperre lesen: der Verbindungs-Thread leert reports beim Abbruch. Ohne info (nach dem
+        # Neuverbinden kommt oft erst tempature/ACE) sähe ein laufender Druck wie beendet aus → falscher Verlauf
+        with link.lock:
+            box_rep = link.reports.get("multiColorBox")
+            has_info = "info" in link.reports
+        if not has_info:
             return False
-        boxes = self.lan.ace_boxes({"multiColorBox": [link.reports["multiColorBox"]]} if "multiColorBox" in link.reports else {})
+        boxes = self.lan.ace_boxes({"multiColorBox": [box_rep]} if box_rep else {})
         info = link.data("info")
         with _lock:
             state = load(self.path)

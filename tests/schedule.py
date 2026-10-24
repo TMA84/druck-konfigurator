@@ -148,5 +148,85 @@ stopped = []
 sc.api_post({"action": "cancel"}, None, path, NOW + 60, on_cancel=lambda plan: stopped.append(plan["preheat"]["sent"]))
 check("Absage nach Vorwärmen: on_cancel (Heizung aus)", heats == [(True, 105)] and stopped == [True], (heats, stopped))
 
+sc.api_post({"action": "dismiss"}, None, path, NOW + 120)
+
+# Zwei ACE: Werkzeug-Nummern durchgehend (ACE 2, Slot 1 = Werkzeug 4), st["ace"] zählt je Einheit ab 0
+TWO = dict(FREE, ace=[{"id": 0, "slots": [{"index": 0, "type": "PLA", "present": True}, {"index": 1, "type": "PLA", "present": True}]},
+                      {"id": 1, "slots": [{"index": 0, "type": "PETG", "present": True}, {"index": 1, "type": "ASA", "present": True}]}])
+check("zwei ACE: Werkzeug 4 = ACE 2, Slot 1 (PETG)", sc.check_ready(TWO, [{"tool": 4, "type": "PETG"}]) is None, sc.check_ready(TWO, [{"tool": 4, "type": "PETG"}]))
+check("zwei ACE: Werkzeug 1 nicht mit ACE 2, Slot 2 verwechselt", "Slot 2: PLA eingelegt" in (sc.check_ready(TWO, [{"tool": 1, "type": "ASA"}]) or ""))
+check("zwei ACE: Werkzeug 5 = ASA", sc.check_ready(TWO, [{"tool": 5, "type": "ASA"}]) is None)
+check("Zuordnung Werkzeug 0 → Slot 6 (ASA)", sc.check_ready(TWO, [{"tool": 0, "type": "ASA"}], {"0": 5}) is None and
+      "Slot 1: PLA eingelegt" in sc.check_ready(TWO, [{"tool": 0, "type": "ASA"}]))
+got = []
+sc.api_post(dict(base, wants=[{"tool": 0, "type": "ASA"}], slots={"0": 5, "x": 1, "1": 99}), gfor, path, NOW)
+check("Zuordnung im Plan gespeichert (nur gültige)", sc.api_get(path)["plan"]["slots"] == {"0": 5}, sc.api_get(path)["plan"].get("slots"))
+sc.Runner(lambda: TWO, lambda plan: got.append(plan.get("slots")), dry, path=path).step(NOW + 3 * 3600 + 1)
+check("Start mit Zuordnung an start_fn", got == [{"0": 5}] and sc.api_get(path)["plan"]["state"] == "started", (got, sc.api_get(path)["plan"]))
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+
+# Druckerstand einmal nicht lesbar (None) zur Startzeit: warten bis GRACE_S, dann erst „failed“
+calls.clear(); heats.clear()
+sc.api_post(dict(base, preheat={"bed": 100, "minutes": 10}), gfor, path, NOW)
+st_now = [None]
+r = sc.Runner(lambda: st_now[0], start, dry, path=path, heat_fn=heat)
+r.step(NOW + 3 * 3600 - 590)
+pl = sc.api_get(path)["plan"]
+check("Vorwärmen ohne Stand: wartet mit Hinweis", pl["state"] == "wait" and "Warte" in (pl["note"] or "") and heats == [], pl)
+r.step(NOW + 3 * 3600 + 5)
+pl = sc.api_get(path)["plan"]
+check("Startzeit ohne Stand: wartet weiter", pl["state"] == "wait" and "Warte" in pl["note"] and calls == [], pl)
+st_now[0] = FREE
+r.step(NOW + 3 * 3600 + 60)
+check("Stand wieder da: gestartet", sc.api_get(path)["plan"]["state"] == "started" and calls[-1][0] == "start", (calls, sc.api_get(path)["plan"]))
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+sc.api_post(base, gfor, path, NOW)
+st_now[0] = None
+r.step(NOW + 3 * 3600 + 5)
+check("innerhalb der Frist nicht gescheitert", sc.api_get(path)["plan"]["state"] == "wait")
+r.step(NOW + 3 * 3600 + sc.GRACE_S + 1)
+pl = sc.api_get(path)["plan"]
+check("nach GRACE_S: failed mit Grund", pl["state"] == "failed" and "nicht erreichbar" in pl["note"], pl)
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+
+# Start läuft ohne Sperre: Seite und Home Assistant lesen währenddessen den Plan („starting“), Absagen geht nicht
+import threading  # noqa: E402
+sc.api_post(base, gfor, path, NOW)
+entered, release, seen = threading.Event(), threading.Event(), {}
+
+
+def slow(plan):
+    entered.set()
+    release.wait(5)
+
+
+r = sc.Runner(lambda: FREE, slow, dry, path=path)
+t = threading.Thread(target=r.step, args=(NOW + 3 * 3600 + 1,))
+t.start()
+entered.wait(5)
+done = threading.Event()
+threading.Thread(target=lambda: (seen.update(v=sc.api_get(path)), done.set())).start()
+check("während des Uploads: api_get blockiert nicht", done.wait(2) and seen["v"]["plan"]["state"] == "starting", seen)
+fails("während des Starts nicht absagbar", lambda: sc.api_post({"action": "cancel"}, None, path, NOW), "gerade gestartet")
+fails("während des Starts kein neuer Plan", lambda: sc.api_post(base, gfor, path, NOW), "schon ein Druck geplant")
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+check("während des Starts nicht entfernt", sc.api_get(path)["plan"] and sc.api_get(path)["plan"]["state"] == "starting")
+release.set(); t.join(5)
+check("danach gestartet", sc.api_get(path)["plan"]["state"] == "started")
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+# „starting“ nach einem Neustart des Servers: nicht noch einmal starten
+sc.api_post(base, gfor, path, NOW)
+stt = sc.load(path); stt["plan"]["state"] = "starting"; sc.save(stt, path)
+calls.clear()
+sc.Runner(lambda: FREE, start, dry, path=path).step(NOW + 3 * 3600 + 1)
+pl = sc.api_get(path)["plan"]
+check("abgebrochener Start nach Neustart: failed, kein zweiter Start", pl["state"] == "failed" and "unterbrochen" in pl["note"] and calls == [], pl)
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+
+# kaputte Datei: beiseitegelegt, nicht stumm überschrieben
+open(path, "w").write("{kaputt")
+check("kaputte Datei → leer, beiseitegelegt", sc.load(path)["plan"] is None and not os.path.exists(path)
+      and any(n.startswith("schedule.json.corrupt-") for n in os.listdir(d)), os.listdir(d))
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

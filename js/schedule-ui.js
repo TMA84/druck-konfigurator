@@ -62,7 +62,7 @@ function sendLaterState(p) {
   if (later) $('sendLaterInfo').textContent = at > now ? heatTxt + (dry ? t('Trocknen ab {d}, ', { d: schedWhen(at - dry.minutes * 60) }) : '') +
     t('Start {s}, fertig ≈ {e}.', { s: schedWhen(at), e: schedWhen(at + run) }) + ' ' + t('Vor dem Start prüft der Server: Drucker frei, Filament passt – sonst startet er nicht.') : '';
   return { ok: !why, why, now: !later, req: { action: 'create', job: sendCtx.slice.job, plate: p ? p.plate : 1, start_at: Math.round(at),
-    bed_clear: later ? $('sendBedOk').checked : true, wants, dry: later ? dry : null, preheat: heat,
+    bed_clear: later ? $('sendBedOk').checked : true, wants, slots: sendCtx.map || {}, dry: later ? dry : null, preheat: heat,
     name: sendCtx.name ? sendCtx.name.replace(/\.(stl|3mf|zip)$/i, '') : 'druck',
     options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } } };
 }

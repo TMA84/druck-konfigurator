@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -108,14 +109,29 @@ with tempfile.TemporaryDirectory() as d:
     back = spools.load(p)
     check("gespeichert und geladen", len(back["spools"]) == len(st["spools"]) and back["flush"] == 1.0)
     check("fehlende Datei → leerer Stand", spools.load(os.path.join(d, "fehlt.json"))["spools"] == [])
+    open(p, "w").write("{kaputt")
+    check("kaputte Datei → leer, beiseitegelegt", spools.load(p)["spools"] == [] and not os.path.exists(p)
+          and any(n.startswith("spools.json.corrupt-") for n in os.listdir(os.path.dirname(p))), os.listdir(os.path.dirname(p)))
+    check("kein .tmp liegen geblieben", spools.save(st, p) is None and not os.path.exists(p + ".tmp") and spools.load(p)["flush"] == 1.0)
+
+# Einstellungen: Spülabfall wie beim Import auf 0–100 g, Adresse nur Text bis 253 Zeichen
+for bad in ({"purge_g": 500}, {"purge_g": -1}, {"purge_g": float("nan")}, {"host": "x" * 300}, {"host": 42}):
+    try:
+        spools.update(spools.empty_state(), dict(bad, action="config")); check("Einstellung abgelehnt " + str(bad), False)
+    except ValueError:
+        check("Einstellung abgelehnt " + str(bad), True)
+cs = spools.empty_state()
+spools.update(cs, {"action": "config", "purge_g": 2.5, "host": "192.168.1.50"})
+check("Spülabfall 2,5 g und Adresse übernommen", cs["purge_g"] == 2.5 and cs["host"] == "192.168.1.50", cs)
 
 
 # Tracker mit nachgestelltem Drucker
 class FakeLink:
     def __init__(self):
-        self.reports = {"multiColorBox": {"data": {"multi_color_box": [{"id": 0, "loaded_slot": 0, "slots": [
-            {"index": 0, "sku": "SPM-6", "type": "ASA", "color": [1, 1, 1], "edit_status": 0, "status": 5}]}]}}}
+        self.lock = threading.Lock()
         self.info = {"project": {"filename": "t.gcode", "progress": 0, "supplies_usage": 500}}
+        self.reports = {"info": {"data": self.info}, "multiColorBox": {"data": {"multi_color_box": [{"id": 0, "loaded_slot": 0, "slots": [
+            {"index": 0, "sku": "SPM-6", "type": "ASA", "color": [1, 1, 1], "edit_status": 0, "status": 5}]}]}}}
 
     def data(self, kind):
         return self.info if kind == "info" else {}
@@ -149,6 +165,14 @@ with tempfile.TemporaryDirectory() as d:
     tr.step()
     got = spools.load(p)
     check("Tracker erkennt Spule und zählt", len(got["spools"]) == 1 and abs(got["spools"][0]["used_g"] - spools.mm_to_g(1500, "ASA")) < 1e-3, got["spools"])
+    # nach dem Neuverbinden: ACE schon da, info noch nicht – kein „Druck beendet“, kein Verlauf
+    hist = len(got["history"])
+    info_rep = lan.link.reports.pop("info")
+    real_info, lan.link.info = lan.link.info, {}
+    check("ohne info-Bericht: Tracker wartet", tr.step() is False and len(spools.load(p)["history"]) == hist
+          and spools.load(p)["track"] == got["track"], spools.load(p)["history"][hist:])
+    lan.link.info = real_info
+    lan.link.reports["info"] = info_rep
 
     # zweite ACE: deren Slots zählen als 5–8; der geladene Slot kommt aus der Einheit, die ihn meldet
     lan.link.reports["multiColorBox"]["data"]["multi_color_box"][0]["loaded_slot"] = -1
