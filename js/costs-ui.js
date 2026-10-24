@@ -86,7 +86,7 @@ function renderCostPanel() {
   if (project !== costProject) {
     costProject = project;
     if (!costState.busy) costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null };
-    else costState.stale = true;   // läuft noch für das alte Modell – Ergebnis gleich verwerfen
+    else { costState.stale = true; if (typeof exportStop === 'function') exportStop(); }   // läuft noch für das alte Modell – Ergebnis gleich verwerfen (3MF-Bau abbrechen)
     if (typeof clearSlicePreview === 'function') clearSlicePreview();
   }
   if (typeof refreshSlicePreview === 'function' && costState.slice) pvStale(costState.sig !== costSignature());
@@ -108,7 +108,7 @@ function renderCostPanel() {
   if (!costState.slice) {
     table.classList.add('hidden');
     badge.classList.add('hidden');
-    info.textContent = costState.busy ? t('Slicen mit OrcaSlicer …') : costState.error || (!project ? t('Zuerst ein Modell laden.') : !tpl ? t('Für diese Düse gibt es keine 3MF-Vorlage.')
+    info.textContent = costState.busy ? (costState.building ? t('Erstelle 3MF …') : t('Slicen mit OrcaSlicer …')) : costState.error || (!project ? t('Zuerst ein Modell laden.') : !tpl ? t('Für diese Düse gibt es keine 3MF-Vorlage.')
       : t('Slict das Projekt exakt mit OrcaSlicer (auf dem Server) und rechnet Filament, Spülabfall, Strom und Verschleiß.'));
     return;
   }
@@ -199,10 +199,16 @@ async function runCosts() {
     if (typeof sliceBar === 'function') sliceBar('error');
     renderCostPanel(); return;
   }
-  costState = { ...costState, busy: true, error: '' };
+  costState = { ...costState, busy: true, building: true, error: '' };
   renderCostPanel();
   try {
-    const sigs = sliceSigs(), sig = JSON.stringify(sigs), { bytes, plan, notes } = exportBytes(costDefaultSlot());
+    // 3MF bauen – große Modelle im Hintergrund (js/export-ui.js exportBytesAsync); null = neues Modell, Ergebnis verworfen
+    const sigs = sliceSigs(), sig = JSON.stringify(sigs);
+    if (typeof sliceBar === 'function') sliceBar('build');
+    const built = await exportBytesAsync(costDefaultSlot());
+    costState.building = false;
+    if (!built || costState.stale || project !== costProject) { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; if (typeof sliceBar === 'function') sliceBar(null); renderCostPanel(); return; }
+    const { bytes, plan, notes } = built;
     // Nur geänderte Platten neu slicen, wenn der letzte Stand noch auf dem Server liegt
     const prev = costState.slice && costState.slice.job ? costState.sigs : null, changed = changedPlates(prev, sigs);
     const partial = changed && changed.length < sigs.plates.length;
@@ -221,7 +227,7 @@ async function runCosts() {
     if (typeof refreshSlicePreview === 'function') setTimeout(() => refreshSlicePreview(true));
   } catch (e) {
     const stale = costState.stale;
-    costState = { ...costState, busy: false, slice: null, stale: false, error: stale ? '' : t('Nicht berechnet: {msg}', { msg: t(e.message) }), failedSig: stale ? null : costSignature() };
+    costState = { ...costState, busy: false, building: false, slice: null, stale: false, error: stale ? '' : t('Nicht berechnet: {msg}', { msg: t(e.message) }), failedSig: stale ? null : costSignature() };
     if (typeof sliceBar === 'function') sliceBar('error');
     if (typeof clearSlicePreview === 'function') clearSlicePreview(stale ? '' : t('Keine Vorschau – das Slicen ist fehlgeschlagen.'));
   }

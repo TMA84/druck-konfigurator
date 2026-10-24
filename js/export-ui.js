@@ -264,12 +264,49 @@ function openExportDialog(){
 }
 
 // Die 3MF genau wie beim Speichern – auch für das exakte Slicen der Kostenkalkulation
+function exportArgs(defaultSlot){
+  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),plan=exportPlan(defaultSlot);
+  return {plan,a:{tpl,r:plan.r,jobs:plan.jobs,slot:plan.slot,live:exportSlots(tpl),threemf:project.threemf||null,machine:exportMachine(tpl)}};
+}
+const towerNotes=notes=>(notes||[]).filter(n=>/Reinigungsturm|prime tower/i.test(n));
 function exportBytes(defaultSlot){
-  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),plan=exportPlan(defaultSlot),live=exportSlots(tpl);
-  const {bytes,notes}=project.threemf
-    ?build3mfFromProject(tpl,plan.r,plan.jobs,plan.slot,fflate,live,project.threemf,exportMachine(tpl))
-    :build3mf(tpl,plan.r,plan.jobs,plan.slot,fflate,live,exportMachine(tpl));
-  return {bytes,plan,tpl,notes:(notes||[]).filter(n=>/Reinigungsturm|prime tower/i.test(n))};
+  const {plan,a}=exportArgs(defaultSlot),{bytes,notes}=build3mfFor(a,fflate);
+  return {bytes,plan,tpl:a.tpl,notes:towerNotes(notes)};
+}
+/* Dasselbe im Hintergrund (js/export-worker.js) – große Modelle (ab EXPORT_WORKER_MIN Dreiecken, 3MF-Dateien nach Größe)
+   blockieren die Seite sonst sekundenlang. Kleine Modelle, file://, Tests ohne Worker und ein Worker, der nicht lädt oder
+   scheitert: direkt wie exportBytes (gleiches Ergebnis, tests/export-worker.js). Ein neuerer Auftrag beendet den
+   laufenden; der ältere bekommt null (verworfen). */
+let EXPORT_WORKER_MIN=50000,exportWorker=null,exportSeq=0;
+const exportWorkerOk=()=>typeof Worker!=='undefined'&&location.protocol!=='file:';
+function exportStop(){exportSeq++;if(exportWorker){const w=exportWorker;exportWorker=null;w.terminate();w.done(null)}}
+function exportWeight(a){
+  const seen=new Set();let n=0;
+  for(const j of a.jobs)if(j.geom&&!seen.has(j.geom)){seen.add(j.geom);n+=j.geom.pos.length/9}
+  if(a.threemf&&a.threemf.zip)for(const d of Object.values(a.threemf.zip))n+=d.length/50;   // ~50 Byte XML je Dreieck
+  return n;
+}
+async function exportBytesAsync(defaultSlot){
+  exportStop();
+  const seq=exportSeq,{plan,a}=exportArgs(defaultSlot);
+  let res=null;
+  if(exportWeight(a)>=EXPORT_WORKER_MIN&&exportWorkerOk())res=await export3mfInWorker(a);
+  if(seq!==exportSeq)return null;
+  if(!res)res=build3mfFor(a,fflate);   // Worker geht nicht: direkt (blockiert kurz, wie bisher)
+  return {bytes:res.bytes,plan,tpl:a.tpl,notes:towerNotes(res.notes)};
+}
+// {bytes, notes} aus dem Worker oder null (Worker geht nicht, Fehler, abgebrochen)
+function export3mfInWorker(a){
+  return new Promise(ok=>{
+    let w;try{w=new Worker('js/export-worker.js')}catch(e){ok(null);return}
+    const end=r=>{w.terminate();if(exportWorker===w)exportWorker=null;ok(r)};
+    w.done=ok;exportWorker=w;
+    w.onmessage=e=>{const d=e.data;if(d.error!=null){console.error('export-worker',d.error);end(null)}else end({bytes:d.bytes,notes:d.notes})};
+    w.onerror=e=>{e.preventDefault();console.error('export-worker',e.message||e);end(null)};
+    const i18n=I18N.lang==='de'?[]:[...document.querySelectorAll('script[src*="js/i18n/en-"]')].map(s=>s.src);
+    // Zahlenarrays werden kopiert (das Fenster braucht sie weiter); nicht kopierbar (DataCloneError) → direkt
+    try{w.postMessage({lang:I18N.lang,i18n,args:exportArgsPlain(a)})}catch(err){console.error('export-worker',err);end(null)}
+  });
 }
 async function save3mf(){
   // Anordnung nach Grundfläche läuft noch im Hintergrund (js/nest.js): erst fertig rechnen, dann exportieren

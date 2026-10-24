@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unreleased]
+
+### Verbessert
+- **Kosten bei großen Modellen ohne Einfrieren:** Die 3MF für das Slicen der Kostenkalkulation entsteht bei großen Modellen (ab etwa 50 000 Dreiecken, 3MF-Dateien nach Größe) im Hintergrund – vorher hing die Seite dabei mehrere Sekunden. Der Ladebalken zeigt solange „Erstelle 3MF …“. Wird ein neues Modell geladen, bricht der Bau ab. Die Datei ist dieselbe wie zuvor (Test `tests/export-worker.js`); geht der Hintergrund nicht, baut die Seite sie wie bisher selbst.
+
 ## [10.45.2] – 2026-10-24
 
 ### Behoben

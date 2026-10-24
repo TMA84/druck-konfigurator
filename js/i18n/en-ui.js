@@ -856,3 +856,7 @@ I18N.add({
  "Lese {name} … {p} %": "Reading {name} … {p} %",
  "Lese {n} Dateien … {p} %": "Reading {n} files … {p} %",
 });
+/* 3MF für die Kosten im Hintergrund bauen (js/export-ui.js exportBytesAsync, js/slicebar.js) */
+I18N.add({
+ "Erstelle 3MF …": "Building 3MF …",
+});
