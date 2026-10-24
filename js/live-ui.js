@@ -88,16 +88,18 @@ function lvRemaining(st) {
   if (!d || !job || !Array.isArray(d.layer_s) || !d.orca_s || !lv.at || d.layer_s.length !== d.layers.length) return null;
   const ls = d.layer_s, tot = ls.reduce((s, v) => s + v, 0);
   if (!(tot > 0)) return null;
-  const k = d.orca_s / tot, li = Math.min(ls.length - 1, Math.max(0, lv.at.li));
+  // gelernte Druckzeit (js/costs-ui.js timeK): Orcas Gesamtzeit vorab angepasst, das gemessene Tempo gleicht den Rest aus
+  const orcaS = d.orca_s * (typeof timeK === 'function' ? timeK() : 1);
+  const k = orcaS / tot, li = Math.min(ls.length - 1, Math.max(0, lv.at.li));
   let before = 0; for (let i = 0; i < li; i++) before += ls[i];
-  const done = k * (before + lv.at.frac * ls[li]), rest = Math.max(0, d.orca_s - done);
+  const done = k * (before + lv.at.frac * ls[li]), rest = Math.max(0, orcaS - done);
   const el = (+job.elapsed_min || 0) * 60;
   /* Vorbereitung vor der ersten Schicht (Bett vermessen, Aufheizen) rechnet Orca nicht mit – am S1 gemessen ~7 min
      (2026-10-01: 99,7 min echt, Orca 92,6 min). Das Tool merkt sich die Dauer je Druck (store.settings.prepS) und
      zählt sie getrennt: vorher kommt sie auf die Restzeit, danach nicht mehr ins Tempo. */
   const prepEst = +store.settings.prepS > 0 ? +store.settings.prepS : LV_PREP_DEFAULT_S;
   if (lv.prep.job !== job.name) lv.prep = { job: job.name, s: null };
-  if (!(+job.layer >= 1)) return { s: d.orca_s + Math.max(LV_PREP_MIN_S, prepEst - el), pace: 1, prep: true };
+  if (!(+job.layer >= 1)) return { s: orcaS + Math.max(LV_PREP_MIN_S, prepEst - el), pace: 1, prep: true };
   if (lv.prep.s == null) {
     // erste Schicht gerade begonnen: bis hierher war Vorbereitung (nur wenn der Druck von Anfang an zu sehen war)
     lv.prep.s = el > 0 && el < LV_PREP_MAX_S && done < 120 ? el : prepEst;

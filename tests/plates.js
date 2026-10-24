@@ -37,6 +37,9 @@ const q = { items: [{ plate: 2, time_s: 3600, state: 'printing', started: Date.n
 check('kurz nach dem Start: noch nicht fertig', K.queueTick(q, { printing: false }) === null && q.items[0].state === 'printing');
 check('druckt → gesehen', K.queueTick(q, { printing: true, job: { status: 'druckt', remaining_min: 30 } }) === null && q.items[0].seen);
 check('Restzeit: laufend + wartend', K.queueRemaining(q, { printing: true, job: { remaining_min: 30 } }) === 1800 + 1800);
+check('Restzeit mit Faktor: Druckerwert bleibt, wartende × 1,5', K.queueRemaining(q, { printing: true, job: { remaining_min: 30 } }, 1.5) === 1800 + 2700);
+const qp = { slice: { plates: [{ plate: 1, prep_s: 300 }] }, items: [{ plate: 1, time_s: 1800, state: 'wait' }] };
+check('Restzeit mit Faktor: Vorbereitung bleibt', K.queueRemaining(qp, null, 2) === 1500 * 2 + 300);
 const done = K.queueTick(q, { printing: false, job: null });
 check('fertig erkannt', done && done.plate === 2 && q.items[0].state === 'done');
 check('nächste Platte', K.queueNext(q).plate === 1);

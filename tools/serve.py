@@ -413,7 +413,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._api(spools.api_get)
         if url.path == "/api/queue":
             # auch beim Abrufen: rettet eine schon bestehende Warteschlange, solange ihr Auftrag noch da ist
-            return self._api(lambda: queue_pin(printqueue.api_get(st=printer_now()), prune=False))
+            return self._api(lambda: queue_pin(printqueue.api_get(st=printer_now(), factor=spools.time_factor_value()), prune=False))
         if url.path == "/api/schedule":
             return self._api(schedule.api_get)
         if url.path == "/api/prefs":
@@ -767,7 +767,7 @@ def _stem(name):
 
 def queue_post(req):
     """Warteschlange ändern; ihren Slice-Auftrag dauerhaft aufheben (slicer.pin_job), alte Kopien wegräumen."""
-    return queue_pin(printqueue.api_post(req, st=printer_now()), prune=True)
+    return queue_pin(printqueue.api_post(req, st=printer_now(), factor=spools.time_factor_value()), prune=True)
 
 
 def queue_pin(res, prune):
@@ -927,7 +927,7 @@ def main():
         schedule.Runner(printer_now, scheduled_start, scheduled_dry, heat_fn=scheduled_heat).start()   # geplanter Druck (tools/schedule.py)
         print("Geplanter Druck: " + schedule.data_file(), flush=True)
         try:
-            _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now()), spools.api_get,
+            _, note = ha_mqtt.start(printer_now, lambda: printqueue.api_get(st=printer_now(), factor=spools.time_factor_value()), spools.api_get,
                                     image_fn=progress_image.ProgressImages(printed_preview),
                                     control_fn=lambda action: anycubic_lan.command(printer_host() or "", "print", action, {}),
                                     plan_fn=lambda: schedule.api_get().get("plan"))

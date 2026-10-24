@@ -20,7 +20,11 @@ function histEstimate(req) {
   const slice = ctx && ctx.slice.job === req.job ? ctx.slice : typeof costState !== 'undefined' && costState.slice && costState.slice.job === req.job ? costState.slice : null;
   const p = slice && (slice.plates || []).find(x => +x.plate === +req.plate);
   if (!p) return null;
-  const est = { grams: (p.grams || []).map(g => Math.round((+g || 0) * 100) / 100), total_g: p.total_g, time_s: p.time_s, name: String(req.name || '').slice(0, 200) };
+  // time_s = reine Orca-Zeit, prep_s = Vorbereitung – daraus lernt der Server die Druckzeit (tools/spools.py time_factor).
+  // Platten der Warteschlange tragen die Vorbereitung schon in time_s (prep_s dabei).
+  const prep = p.prep_s != null ? Math.min(+p.prep_s || 0, p.time_s || 0) : null;
+  const est = { grams: (p.grams || []).map(g => Math.round((+g || 0) * 100) / 100), total_g: p.total_g, time_s: prep != null ? p.time_s - prep : p.time_s,
+    prep_s: prep != null ? prep : typeof prepS === 'function' ? prepS() : undefined, name: String(req.name || '').slice(0, 200) };
   try {
     const mats = (ctx && ctx.materials) || (typeof costState !== 'undefined' && costState.materials) || {};
     const live = typeof slotChoices === 'function' ? slotChoices() : [], slots = [];

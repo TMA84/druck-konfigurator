@@ -357,6 +357,8 @@ Im Schritt **③ Slicen & Kosten** unter **Kosten** steht der Preis des geladene
 
 Preise und Sätze stellst du unter **Preise & Sätze …** ein (auch **⚙ Einstellungen → Preise & Sätze …**): den **Preis je Filamenttyp** (PLA, PETG, ABS, ASA, TPU) und für alles andere, dazu Leistung, Strompreis, Verschleiß, Aufschlag und MwSt. Kostet ein einzelnes Filament mehr oder weniger als sein Typ, trägst du es unter „Abweichender Preis für einzelne Filamente“ ein. Slots ohne Filamentprofil – etwa Farben des Designers – rechnet das Tool mit dem Typ, den die ACE meldet. Änderst du dort etwas, rechnet das Tool sofort neu, ohne erneut zu slicen. Änderst du das Projekt (Filament, Slot, Lage …), steht beim Ergebnis **Veraltet** – dann neu berechnen.
 
+**Druckzeit:** Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung je Platte auf. Außerdem lernt es aus der [Druckhistorie](#druckhistorie--statistik), wie genau Orca bei dir schätzt: Es vergleicht bei den letzten bis zu 20 Drucken aus dem Tool die echte Dauer (ohne Vorbereitung) mit Orcas Zeit – nur fertige Drucke ohne übersprungene Objekte, ab 10 min – und nimmt den Median als Faktor (0,7–1,5). Ab 3 Drucken steht dann z. B. „Druckzeit ≈ 3 h 10 min (Orca 2 h 50 min + Vorbereitung, angepasst nach 12 Drucken: +8 %)“. Der Faktor gilt auch für die Zeiten je Platte, die Restzeit der Warteschlange, „fertig ≈“ beim geplanten Druck und die eigene Restzeit in der Werkbank; die Restzeit, die der Drucker selbst meldet, bleibt unverändert. Strom und Verschleiß rechnen weiter mit Orcas Zeit.
+
 Brauchen die Filamente zu unterschiedliche Temperaturen (z. B. PLA und ASA in einem Druck), slict Orca nicht; das Tool sagt das dann.
 
 **Ladebalken:** Nach einer Änderung zeigt ein Balken oben im Tab ③, dass neu geslict wird – erst „Änderung erkannt“, dann der Fortschritt (geschätzt nach der Dauer der letzten Läufe; OrcaSlicer selbst meldet keinen), zuletzt „Lade Vorschau“. Rechnet das Tool im Hintergrund, während du in einem anderen Tab bist, dreht sich am Reiter „③ Slicen & Kosten“ ein kleiner Kreisel.
@@ -437,6 +439,7 @@ Mit der Werksfirmware im LAN-Modus steuerst du den Kobra S1 im Tab **Drucker** �
 | **Achsen** | X/Y um 1, 10 oder 50 mm fahren, **Bett ↑ / Bett ↓** (beim Kobra S1 bewegt sich in Z das Bett: ↑ näher an die Düse), **⌂ XY** und **⌂ Z** referenzieren, Motoren aus. **Während eines Drucks gesperrt.** Nicht referenzierte Achsen fährt der Drucker nicht. |
 | **ACE-Verwaltung** | Slots mit Material, Farbe und RFID; **Laden**/**Zurück** je Slot (während eines Drucks gesperrt), **Automatisch nachfüllen**, **Trocknen** mit Temperatur und Dauer. |
 | **Drucker** | Modell, Firmware, IP, Zustand, Verbindung; **Rohdaten** zum Nachsehen. |
+| **Wartung** | Druckstunden seit dem letzten **Erledigt** für **Düse prüfen/wechseln** (Standard alle 200 h), **Achsen schmieren, Riemen prüfen** (300 h) und **Druckplatte gründlich reinigen** (50 h). Gezählt wird die Dauer aller Drucke der Druckhistorie (auch aus anderen Programmen) plus der laufende Druck. Das Intervall stellst du direkt in der Karte ein (1–10000 h); fällige Punkte werden rot, oben steht „fällig: …“. **Erledigt** setzt den Zähler auf 0 (mit Rückfrage). Der Stand liegt bei den Spulen auf dem Server und geht mit Export/Import mit. |
 
 Das Tool fragt den Stand alle paar Sekunden ab, solange der Tab offen ist. Der Server hält eine Verbindung zum Drucker dauerhaft – für die Filamentzählung und die Warteschlange, auch wenn keine Seite offen ist. Jeder Befehl wird auf dem Server geprüft (erlaubte Befehle, Wertebereiche, Sperren während des Drucks).
 
@@ -523,6 +526,10 @@ actions:
 **Druck pausieren / fortsetzen** (`button.druck_konfigurator_pause`, `…_resume`): nur, wenn du in den Add-on-Einstellungen **Steuern aus Home Assistant** einschaltest (Standard aus) – damit steuert Home Assistant den Drucker. Abbrechen geht nie über Home Assistant; ohne laufenden Druck lehnt der Drucker den Befehl ab.
 
 **Filament knapp** (`binary_sensor.druck_konfigurator_filament_low`): an, wenn eine Spule unter der Warnschwelle liegt oder die wartenden Platten der Warteschlange mehr brauchen als im Slot ist (Grund im Attribut `filament_note`) – gut für eine Benachrichtigung, bevor die nächste Platte startet.
+
+**Wartung fällig** (`binary_sensor.druck_konfigurator_maintenance_due`): an, wenn ein Punkt des [Wartungszählers](#drucker-werkbank-tab-drucker) sein Intervall erreicht hat; was fällig ist, steht im Attribut `maintenance_note` (z. B. „Düse prüfen/wechseln: 212 h von 200 h“). Aus geht er nach **Erledigt** in der Werkbank.
+
+**Warteschlange Restzeit** (`sensor.druck_konfigurator_queue_remaining_min`) rechnet die wartenden Platten mit der gelernten Druckzeit (siehe [Kostenkalkulation](#kostenkalkulation)), den laufenden Druck mit der Restzeit des Druckers.
 
 **Kamera „3D-Fortschritt“** (`camera.druck_konfigurator_progress`): ein Bild des laufenden Drucks – schräg von oben, gedruckte Schichten in den Farben der ACE-Slots, die aktuelle hell, dazu der Umriss des ganzen Modells. Neu bei jeder Schicht, nur für Drucke aus dem Tool. Es braucht keine Anmeldung am Add-on (anders als die eingebettete Seite) – geht also auch in der Handy-App und als Bild in Benachrichtigungen, z. B.:
 

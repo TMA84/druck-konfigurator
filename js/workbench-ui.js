@@ -152,7 +152,8 @@ function wbRender() {
     const jt = wbJobTitle(job.name), pct = Math.max(0, Math.min(100, safeInt(job.progress)));
     // Restzeit: eigene Schätzung aus Orca und der aktuellen Schicht (js/live-ui.js lvRemaining), sonst die des Druckers
     const own = !job.paused && typeof lvRemaining === 'function' ? lvRemaining(st) : null, remMin = own ? Math.round(own.s / 60) : job.remaining_min;
-    const remTip = own ? t('Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}', { m: wbMin(job.remaining_min) }) : t('Laut Drucker');
+    const remTip = own ? t('Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}', { m: wbMin(job.remaining_min) }) +
+      (typeof timeFactor === 'function' && timeFactor() ? ' · ' + t('Orca {note}', { note: timeFactorNote() }) : '') : t('Laut Drucker');
     $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') +
       '<div class="wb-jobtitle" title="' + esc(job.name) + '">' + esc(jt.title) + '</div>' + (jt.sub ? '<div class="wb-jobsub">' + esc(jt.sub) + '</div>' : '') +
       '<div class="wb-bigpct"><b>' + pct + ' %</b><span>' + (job.paused ? t('pausiert') : esc(t(job.status || ''))) + '</span></div>' +
@@ -344,6 +345,46 @@ $('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); wb.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (wb.player) wbCamStop(true); return; }
   if (wb.camOn && !wb.camUserOff && document.body.dataset.tab === 'printer' && (typeof lv === 'undefined' || lv.mode === 'cam')) { wb.camRetries = 0; wbCamStart(true); }
+});
+
+/* Wartung: Druckstunden seit dem letzten „Erledigt“ je Punkt (tools/spools.py maintenance_view, kommt mit GET api/spools –
+   js/spools-ui.js ruft wbMaintRender nach jedem Laden). Intervall änderbar; fällig → rot und Hinweis (auch an Home Assistant). */
+function wbMaintRender() {
+  const m = typeof spoolData !== 'undefined' && spoolData && spoolData.maintenance, card = $('wbMaintCard');
+  card.classList.toggle('hidden', !(m && m.items && m.items.length));
+  if (!m || !m.items) return;
+  $('wbMaintSum').textContent = m.due.length ? t('fällig: {list}', { list: m.due.map(n => t(n)).join(', ') }) : t('nichts fällig');
+  $('wbMaintSum').classList.toggle('bad', !!m.due.length);
+  const list = $('wbMaint');
+  if (list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // nicht beim Tippen neu zeichnen
+  list.innerHTML = m.items.map(it => {
+    const pct = Math.max(0, Math.min(100, it.hours / it.interval_h * 100)), key = esc(it.key);
+    const last = it.done_at ? t('zuletzt erledigt {d}', { d: new Date(it.done_at * 1000).toLocaleDateString(LOCALE()) }) : t('noch nie als erledigt markiert');
+    return '<li class="' + (it.due ? 'due' : '') + '"><div class="wb-maint-name"><b>' + esc(t(it.name)) + '</b><small>' + esc(last) + '</small></div>' +
+      '<span class="wb-maint-h">' + (it.due ? '<b>' + t('fällig') + '</b> · ' : '') + t('{h} h von', { h: de(it.hours, 0) }) +
+        ' <input type="number" min="1" max="10000" step="10" value="' + Math.round(it.interval_h) + '" data-wb-maint-iv="' + key + '" aria-label="' + esc(t('Intervall in Druckstunden')) + '"> h</span>' +
+      '<i class="wb-heatbar"><i style="width:' + pct.toFixed(0) + '%"></i></i>' +
+      '<button class="btn sec" type="button" data-wb-maint-done="' + key + '">' + t('Erledigt') + '</button></li>';
+  }).join('');
+}
+async function wbMaintPost(body, ok) {
+  try { await spoolPost(Object.assign({ action: 'maintenance' }, body)); if (ok) toast(ok); }
+  catch (e) { toast(t('Nicht gespeichert: {msg}', { msg: e.message })); }
+  wbMaintRender();
+}
+$('wbMaint').addEventListener('click', e => {
+  const b = e.target.closest('[data-wb-maint-done]'); if (!b) return;
+  const it = spoolData.maintenance.items.find(x => x.key === b.dataset.wbMaintDone); if (!it) return;
+  if (!confirm(t('„{name}“ als erledigt markieren? Der Zähler beginnt wieder bei 0 h.', { name: t(it.name) }))) return;
+  b.disabled = true;
+  wbMaintPost({ item: it.key, done: true }, t('Wartung erledigt – Zähler zurückgesetzt'));
+});
+$('wbMaint').addEventListener('change', e => {
+  const inp = e.target.closest('[data-wb-maint-iv]'); if (!inp) return;
+  const v = +inp.value;
+  if (!(v >= 1 && v <= 10000)) { toast(t('Wartungsintervall 1–10000 h')); wbMaintRender(); return; }
+  inp.blur();
+  wbMaintPost({ item: inp.dataset.wbMaintIv, interval_h: v }, t('Intervall gespeichert'));
 });
 
 if (document.body.dataset.tab === 'printer') wbPoll();

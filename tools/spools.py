@@ -20,13 +20,24 @@ Stand (export_state), POST {action: import, data, mode: merge|replace} spielt ih
   merge:   Spulen zuordnen – zuerst über die id, sonst über gleiche sku/Typ/Farbe (bevorzugt im selben Slot, sonst eine
            Spule im Regal, jede höchstens einmal). Bei einem Paar gewinnt der Eintrag mit dem späteren last_seen (id und
            Slot bleiben die dieses Servers, der die ACE gerade sieht). Unbekannte Spulen kommen ins Regal (slot None).
-           Letzte Drucke werden vereinigt. host, flush, purge_g, low_g und track bleiben die dieses Servers.
+           Letzte Drucke werden vereinigt. host, flush, purge_g, low_g, track und maintenance bleiben die dieses Servers.
 
 Druckhistorie (history, höchstens HISTORY Einträge): je Druck {job, start, end, duration_s, used: {spool_id: g}, grams_total,
 types: {Typ: g}, cost_eur, changes, estimate?}. cost_eur = Σ Gramm × €/kg der Spule (price_per_kg, sonst price_default).
 Plan (Schätzung aus dem Tool): Startet die Seite einen Druck, schickt sie {action: plan, job_name, plate, estimate}. Der Server
 merkt ihn sich in plans (Schlüssel = Dateiname ohne Pfad/Endung, höchstens MAX_PLANS) und hängt ihn beim Druckende als
 estimate an den Eintrag, wenn der Auftragsname des Druckers passt. stats() fasst den laufenden Monat zusammen (Home Assistant).
+result: „finished“ oder „aborted“, wenn der Drucker das Ende meldet (fehlt, wenn der Auftrag einfach verschwand).
+
+Druckzeit lernen (time_factor): Orca schätzt die Druckzeit am S1 meist etwas zu kurz. Faktor = Median von
+(echte Dauer − Vorbereitung) ÷ Orca-Zeit über die letzten TIME_N passenden Drucke (nicht abgebrochen, nichts
+übersprungen, Orca ≥ 10 min, Verhältnis plausibel 0,4–2,5), begrenzt auf TIME_LO–TIME_HI, erst ab TIME_MIN Drucken.
+Vorbereitung (Bett vermessen, Aufheizen) rechnet Orca nicht mit – sie kommt aus der Schätzung (prep_s, gemessen von der
+Seite), sonst TIME_PREP_S. Die Seite rechnet damit: Orca × Faktor + Vorbereitung. Ein Faktor für alle Drucke (ein Drucker).
+
+Wartung (maintenance): Druckstunden seit dem letzten „erledigt“ je Punkt (MAINT_ITEMS, Intervall änderbar).
+Stunden = Σ Dauer der Drucke, die nach dem Zurücksetzen endeten (nur der Teil danach), plus der laufende Druck.
+{items: {key: {interval_h, done_at, done_hours}}}; done_hours = Druckstunden beim letzten „erledigt“ (zur Info).
 
 Daten: JSON-Datei $SPOOL_FILE oder $DATA_DIR/spools.json (Standard ~/.druck-konfigurator/spools.json, im Container /data).
 Der Server fragt den Drucker dafür dauerhaft ab (Tracker), sobald die Seite ihm die Adresse genannt hat.
@@ -52,6 +63,13 @@ VIEW_HISTORY = 50          # so viele letzte Drucke bekommt die Seite mit GET /a
 MAX_PLANS = 50
 PRICE_DEFAULT = 25.0
 POLL_S = 5
+TIME_N, TIME_MIN, TIME_LO, TIME_HI = 20, 3, 0.7, 1.5
+TIME_PREP_S = 420           # wie js/costs-ui.js prepS (am S1 gemessen ~7 min), wenn die Schätzung keine prep_s hat
+TIME_MIN_EST_S = 600        # kurze Drucke: Vorbereitung und Zufall überwiegen
+TIME_RATIO = (0.4, 2.5)     # außerhalb: unplausibel (z. B. früh abgebrochen ohne gemeldeten Status)
+# key → (Name, Standard-Intervall in Druckstunden). Kobra S1: Messingdüse, Stahlstangen (CoreXY), PEI-Platte
+MAINT_ITEMS = {"nozzle": ("Düse prüfen/wechseln", 200), "axes": ("Achsen schmieren, Riemen prüfen", 300), "plate": ("Druckplatte gründlich reinigen", 50)}
+MAINT_MAX_H = 10000
 _lock = threading.RLock()
 
 
@@ -125,7 +143,8 @@ def view(state):
     spools = [dict(sp, remaining_g=remaining(sp)) for sp in state["spools"]]
     return {"spools": spools, "host": state.get("host"), "flush": state.get("flush"), "purge_g": state.get("purge_g"), "low_g": state.get("low_g", LOW_G_DEFAULT),
             "price_default": price_default(state), "history": state.get("history", [])[-VIEW_HISTORY:], "history_total": len(state.get("history", [])),
-            "stats": stats(state), "track": state.get("track") or {}, "file": data_file()}
+            "stats": stats(state), "track": state.get("track") or {}, "file": data_file(),
+            "time_factor": time_factor(state.get("history", [])), "maintenance": maintenance_view(state)}
 
 
 def price_default(state):
@@ -151,8 +170,8 @@ def find_plan(state, job):
     return next((k for k in sorted(plans, key=lambda k: -(plans[k].get("at") or 0)) if k and (stem.endswith(k) or k.endswith(stem))), None)
 
 
-def finish_entry(state, t, now):
-    """Eintrag für die Druckhistorie aus dem Zähler t (Druck zu Ende)."""
+def finish_entry(state, t, now, result=None):
+    """Eintrag für die Druckhistorie aus dem Zähler t (Druck zu Ende). result: finished | aborted | None (unbekannt)."""
     by_id = {sp["id"]: sp for sp in state["spools"]}
     dflt = price_default(state)
     used = {k: round(g, 2) for k, g in (t.get("used") or {}).items()}
@@ -166,12 +185,141 @@ def finish_entry(state, t, now):
     start = t.get("start")
     e = {"job": t["job"], "start": start, "end": now, "duration_s": round(now - start) if isinstance(start, (int, float)) else None,
          "used": used, "grams_total": round(sum(used.values()), 2), "types": types, "cost_eur": round(cost, 3), "changes": t.get("changes", 0)}
+    if result:
+        e["result"] = result
     if t.get("skipped"):
         e["skipped"] = list(t["skipped"])      # übersprungene Objekte – die Schätzung enthält sie noch
     key = find_plan(state, t["job"])
     if key:
         e["estimate"] = state["plans"].pop(key)
     return e
+
+
+def end_result(project):
+    """finished | aborted aus dem gemeldeten Ende. state hat Vorrang: der S1 meldet „stoped“ auch mit print_status 2."""
+    s = str(project.get("state") or "").lower()
+    if s in ("stoped", "stopped", "canceled", "cancelled", "failed"):
+        return "aborted"
+    if s in ("finished", "complete", "completed"):
+        return "finished"
+    return {2: "finished", 3: "aborted"}.get(project.get("print_status"))
+
+
+def time_factor(history):
+    """Gelernter Faktor echte Druckzeit ÷ Orca (Regeln oben). {factor (None = zu wenig Daten), samples, raw, clamped, min}."""
+    ratios = []
+    for h in reversed(history or []):
+        if not isinstance(h, dict) or h.get("result") == "aborted" or h.get("skipped"):
+            continue
+        est = h.get("estimate") if isinstance(h.get("estimate"), dict) else {}
+        orca, dur = _num(est.get("time_s")), _num(h.get("duration_s"))
+        if orca is None or dur is None or orca < TIME_MIN_EST_S:
+            continue
+        prep = _num(est.get("prep_s"))
+        r = (dur - (TIME_PREP_S if prep is None else prep)) / orca
+        if not TIME_RATIO[0] <= r <= TIME_RATIO[1]:
+            continue
+        ratios.append(r)
+        if len(ratios) >= TIME_N:
+            break
+    if len(ratios) < TIME_MIN:
+        return {"factor": None, "samples": len(ratios), "min": TIME_MIN}
+    ratios.sort()
+    n = len(ratios)
+    med = ratios[n // 2] if n % 2 else (ratios[n // 2 - 1] + ratios[n // 2]) / 2
+    f = min(TIME_HI, max(TIME_LO, med))
+    return {"factor": round(f, 3), "samples": n, "raw": round(med, 3), "clamped": f != med, "min": TIME_MIN}
+
+
+def time_factor_value(path=None):
+    """Nur die Zahl (1.0 ohne genug Daten) – für die Warteschlange (tools/printqueue.py) in serve.py."""
+    with _lock:
+        return time_factor(load(path).get("history", [])).get("factor") or 1.0
+
+
+def print_hours_since(state, since, now=None):
+    """Druckstunden ab Zeitpunkt since (None = alle): Drucke der Historie, nur der Teil nach since, plus laufender Druck."""
+    now = now or time.time()
+    since = since or 0
+    s = 0.0
+    for h in state.get("history", []):
+        end, dur = _num(h.get("end")), _num(h.get("duration_s"))
+        if end is None or dur is None or end <= since:
+            continue
+        s += max(0.0, min(dur, end - since))
+    t = state.get("track") or {}
+    start = _num(t.get("start"))
+    if t.get("job") and not t.get("done") and start is not None:
+        s += max(0.0, now - max(start, since))
+    return s / 3600
+
+
+def _maint(state):
+    """Stand der Wartung, fehlende Punkte mit Standardwerten ergänzt (ohne zu speichern)."""
+    m = state.get("maintenance") if isinstance(state.get("maintenance"), dict) else {}
+    items = m.get("items") if isinstance(m.get("items"), dict) else {}
+    out = {}
+    for k, (_name, dflt) in MAINT_ITEMS.items():
+        it = items.get(k) if isinstance(items.get(k), dict) else {}
+        iv = _num(it.get("interval_h"))
+        out[k] = {"interval_h": iv if iv is not None and 1 <= iv <= MAINT_MAX_H else float(dflt), "done_at": _num(it.get("done_at")),
+                  "done_hours": _num(it.get("done_hours"))}
+    return out
+
+
+def maintenance_view(state, now=None):
+    """Für Seite und Home Assistant: {items: [{key, name, interval_h, hours, left_h, due, done_at, done_hours}], due: [Name …]}."""
+    items = []
+    for k, it in _maint(state).items():
+        h = print_hours_since(state, it["done_at"], now)
+        items.append(dict(it, key=k, name=MAINT_ITEMS[k][0], default_h=MAINT_ITEMS[k][1], hours=round(h, 1),
+                          left_h=round(it["interval_h"] - h, 1), due=h >= it["interval_h"]))
+    return {"items": items, "due": [i["name"] for i in items if i["due"]]}
+
+
+def maintenance_update(state, req, now=None):
+    """{action: maintenance, item, interval_h?, done?} – Intervall ändern (1–10000 h) und/oder „erledigt“."""
+    key = req.get("item")
+    if not isinstance(key, str) or key not in MAINT_ITEMS:
+        raise ValueError("Wartung: unbekannter Punkt")
+    if req.get("done") is not None and not isinstance(req["done"], bool):
+        raise ValueError("Wartung: „done“ muss wahr/falsch sein")
+    if "interval_h" not in req and not req.get("done"):
+        raise ValueError("Wartung: nichts zu ändern")
+    m = _maint(state)
+    it = m[key]
+    if "interval_h" in req:
+        v = _num(req["interval_h"])
+        if v is None or not 1 <= v <= MAINT_MAX_H:
+            raise ValueError("Wartungsintervall 1–%d h" % MAINT_MAX_H)
+        it["interval_h"] = round(v, 1)
+    if req.get("done"):
+        now = now or time.time()
+        it["done_hours"] = round(print_hours_since(state, it["done_at"], now), 2)
+        it["done_at"] = now
+    state["maintenance"] = {"items": m}
+    return "erledigt" if req.get("done") else "gespeichert"
+
+
+def _clean_maintenance(d):
+    """Wartung aus einer Importdatei prüfen."""
+    if not isinstance(d, dict) or not isinstance(d.get("items", {}), dict):
+        raise ValueError("„maintenance“ ungültig")
+    out = {}
+    for k, it in d.get("items", {}).items():
+        if k not in MAINT_ITEMS:
+            continue                       # Punkt einer anderen Version: weglassen
+        if not isinstance(it, dict):
+            raise ValueError("Wartung „%s“ ungültig" % k)
+        e = {}
+        for f, lo, hi in (("interval_h", 1, MAINT_MAX_H), ("done_at", 0, 1e11), ("done_hours", 0, 1e6)):
+            if it.get(f) is not None:
+                v = _num(it[f])
+                if v is None or not lo <= v <= hi:
+                    raise ValueError("Wartung „%s“: „%s“ ungültig" % (k, f))
+                e[f] = v
+        out[k] = e
+    return {"items": out}
 
 
 def _month(ts):
@@ -250,7 +398,7 @@ def track(state, project, loaded_slot, now=None, skipped=None):
     ended = bool(project) and (project.get("print_status") in (2, 3) or str(project.get("state") or "").lower() in ENDED_STATES)
     if ended:
         if t.get("job") and not t.get("done"):
-            state.setdefault("history", []).append(finish_entry(state, t, now))
+            state.setdefault("history", []).append(finish_entry(state, t, now, end_result(project)))
             state["history"] = state["history"][-HISTORY:]
             state["track"] = {"job": t["job"], "done": True}
             return True
@@ -312,7 +460,7 @@ def _clean_estimate(d, where="Schätzung"):
     if not isinstance(g, list) or len(g) > 64 or any(_num(x) is None or not 0 <= x <= 1e6 for x in g):
         raise ValueError(where + ": „grams“ ungültig")
     e = {"grams": [round(float(x), 2) for x in g]}
-    for k, hi in (("total_g", 1e6), ("time_s", 1e8), ("cost_eur", 1e6), ("cost_total_eur", 1e6), ("at", 1e11)):
+    for k, hi in (("total_g", 1e6), ("time_s", 1e8), ("prep_s", 7200), ("cost_eur", 1e6), ("cost_total_eur", 1e6), ("at", 1e11)):
         if d.get(k) is not None:
             v = _num(d[k])
             if v is None or not 0 <= v <= hi:
@@ -379,6 +527,8 @@ def update(state, req):
         return import_history(state, req.get("history"), req.get("idmap"))
     if a == "plan":
         return add_plan(state, req)
+    if a == "maintenance":
+        return maintenance_update(state, req)
     if a == "add":
         s = {"type": str(req.get("type") or "PLA").upper(), "colour": str(req.get("colour") or "#FFFFFF"), "sku": "", "rfid": False}
         sp = new_spool(s, None, time.time(), check=False)   # von Hand angelegt: Füllgewicht gibt der Nutzer gleich ein
@@ -517,6 +667,15 @@ def _clean_history(lst):
             e["types"] = {k: _num(v) for k, v in types.items()}
         if h.get("estimate") is not None:
             e["estimate"] = _clean_estimate(h["estimate"], "Druck %d: Schätzung" % n)
+        if h.get("result") is not None:
+            if h["result"] not in ("finished", "aborted"):
+                raise ValueError("Druck %d: „result“ ungültig" % n)
+            e["result"] = h["result"]
+        if h.get("skipped"):
+            sk = h["skipped"]
+            if not isinstance(sk, list) or len(sk) > 1000 or any(isinstance(x, bool) or not isinstance(x, int) for x in sk):
+                raise ValueError("Druck %d: „skipped“ ungültig" % n)
+            e["skipped"] = list(sk)
         out.append(e)
     return out[-HISTORY:]
 
@@ -542,6 +701,8 @@ def validate_import(data):
                 raise ValueError("Slot %d ist doppelt belegt" % (sp["slot"] + 1))
             slots.add(sp["slot"])
     out = {"spools": spools, "history": _clean_history(data.get("history", []))}
+    if data.get("maintenance") is not None:
+        out["maintenance"] = _clean_maintenance(data["maintenance"])
     for k, lo, hi in (("flush", 0.1, 3), ("purge_g", 0, 100), ("low_g", 0, 5000), ("price_default", 0.01, 20000)):
         if data.get(k) is not None:
             v = _num(data[k])
@@ -563,6 +724,8 @@ def import_state(state, data, mode):
         state["purge_g"] = src.get("purge_g")
         state["low_g"] = src.get("low_g", LOW_G_DEFAULT)
         state["price_default"] = src.get("price_default", PRICE_DEFAULT)
+        if "maintenance" in src:
+            state["maintenance"] = src["maintenance"]
         return {"note": "Spulen ersetzt", "imported": {"mode": mode, "total": len(src["spools"]), "added": len(src["spools"]), "updated": 0,
                                                        "idmap": {sp["id"]: sp["id"] for sp in src["spools"]}}}
     own = state["spools"]
@@ -619,7 +782,7 @@ def export_state(state, now=None):
     """Ganzer Stand zum Herunterladen: (Dateiname, JSON-Bytes)."""
     now = now or time.time()
     out = {"format": EXPORT_FORMAT, "version": 1, "exported": round(now)}
-    out.update({k: state.get(k) for k in ("flush", "purge_g", "low_g", "price_default", "spools", "history")})
+    out.update({k: state.get(k) for k in ("flush", "purge_g", "low_g", "price_default", "spools", "history", "maintenance")})
     out["host"] = state.get("host")
     name = "spools-" + time.strftime("%Y-%m-%d", time.localtime(now)) + ".json"
     return name, json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode()
