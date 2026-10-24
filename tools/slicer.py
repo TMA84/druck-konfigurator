@@ -6,6 +6,7 @@ Es wird immer nur ein Auftrag gleichzeitig geslict; weitere warten.
 Neu slicen nur geänderter Platten: slice_3mf(data, plates=[2, 3], count=4, reuse=<job>) slict Platte 2 und 3
 einzeln (--slice N) und übernimmt die übrigen G-Codes aus dem früheren Auftrag.
 """
+import contextlib
 import json
 import os
 import re
@@ -115,15 +116,38 @@ def _keep_failure(data, log):
         pass
 
 
-def _new_job_dir():
-    os.makedirs(JOBS_DIR, exist_ok=True)
-    old = sorted((os.path.join(JOBS_DIR, d) for d in os.listdir(JOBS_DIR) if JOB_ID.match(d)), key=os.path.getmtime)
-    for d in old[:max(0, len(old) - KEEP_JOBS + 1)]:
-        shutil.rmtree(d, ignore_errors=True)
-    job = os.urandom(8).hex()
-    path = os.path.join(JOBS_DIR, job)
-    os.mkdir(path)
-    return job, path
+_jobs_lock = threading.Lock()   # Aufräumen der Aufträge (Slicen und G-Code-Import gleichzeitig)
+_protected = {}                 # Auftrag → Anzahl laufender Übernahmen (reuse): nicht wegräumen
+
+
+def _new_job_dir(protect=()):
+    """Neuer Auftragsordner; die ältesten weg (außer protect und gerade übernommenen Aufträgen)."""
+    with _jobs_lock:
+        os.makedirs(JOBS_DIR, exist_ok=True)
+        skip = set(protect) | set(_protected)
+        old = sorted((os.path.join(JOBS_DIR, d) for d in os.listdir(JOBS_DIR) if JOB_ID.match(d) and d not in skip), key=os.path.getmtime)
+        for d in old[:max(0, len(old) - KEEP_JOBS + 1)]:
+            shutil.rmtree(d, ignore_errors=True)
+        job = os.urandom(8).hex()
+        path = os.path.join(JOBS_DIR, job)
+        os.mkdir(path)
+        return job, path
+
+
+@contextlib.contextmanager
+def _protect(job):
+    """Solange ein Auftrag übernommen wird (reuse), räumt ihn kein anderes Slicen/Import weg (sonst FileNotFoundError)."""
+    with _jobs_lock:
+        if job:
+            _protected[job] = _protected.get(job, 0) + 1
+    try:
+        yield
+    finally:
+        with _jobs_lock:
+            if job and _protected.get(job, 0) > 1:
+                _protected[job] -= 1
+            elif job:
+                _protected.pop(job, None)
 
 
 def _link_or_copy(src, dst):
@@ -257,6 +281,12 @@ def slice_3mf(data, plates=None, count=None, reuse=None):
     orca = find_orca()
     if not orca:
         raise SliceError("OrcaSlicer ist auf dem Server nicht installiert (im Container enthalten; lokal ORCA_PATH setzen)", "no_slicer")
+    reuse = str(reuse) if reuse and JOB_ID.match(str(reuse)) else None
+    with _protect(reuse):
+        return _slice(orca, data, plates, count, reuse)
+
+
+def _slice(orca, data, plates, count, reuse):
     todo, keep = None, {}
     if plates is not None and count:
         todo = sorted({int(n) for n in plates if 1 <= int(n) <= int(count)})
@@ -288,7 +318,7 @@ def slice_3mf(data, plates=None, count=None, reuse=None):
                 msg = ("Die Filamente brauchen zu unterschiedliche Düsentemperaturen (z. B. PLA zusammen mit ASA/ABS) – "
                        "Orca slict so nicht. Für mehrfarbige Teile Filamente derselben Art in die Slots legen.")
             raise SliceError("OrcaSlicer konnte nicht slicen: " + msg, "failed")
-        job, job_dir = _new_job_dir()
+        job, job_dir = _new_job_dir(protect=[reuse] if keep else ())
         plates_out = []
         for name in made:
             dest = os.path.join(job_dir, name)

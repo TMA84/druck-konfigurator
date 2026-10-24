@@ -29,21 +29,27 @@ Aufruf: python tools/serve.py [PORT]
   übernimmt ihn, und die Filamentverwaltung zählt gleich ab dem Start mit.
   MQTT_HOST=<Broker> (dazu MQTT_PORT, MQTT_USER, MQTT_PASSWORD …): Stand für Home Assistant (tools/ha_mqtt.py).
   KONFIGURATOR_PIN=<4–32 Zeichen>: Zugriffsschutz für den direkten Zugriff (NAS, Add-on-Port) – siehe „Zugriffsschutz“.
+  KONFIGURATOR_ALLOWED_HOSTS=<Name,Name>: ohne PIN beantwortet der Server nur Anfragen an IP-Adressen, localhost, Namen
+  ohne Punkt und Namen auf .local/.lan/.home.arpa/.internal/.fritz.box (Schutz gegen DNS-Rebinding fremder Webseiten).
+  Andere Namen (z. B. drucker.example.de im Heimnetz) hier eintragen, mit Komma getrennt.
 """
 import functools
 import gzip
 import hmac
 import html
+import ipaddress
 import http.cookies
 import http.server
 import json
 import os
+import posixpath
 import re
 import secrets
 import shutil
 import sys
 import threading
 import time
+import traceback
 import urllib.parse
 import urllib.request
 
@@ -91,6 +97,11 @@ _gzip_cache = {}
 VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/printing/preview", "/api/printing/objects", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
 QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
+# Nur diese Dateien der Seite ausliefern (sonst 404) – nicht .git, tools/, Datenordner, Verzeichnislisten
+STATIC_DIRS = ("js/", "css/", "vendor/", "img/", "docs/", "templates/", "ha/")
+STATIC_FILES = {"", "index.html", "tests/ui-smoke.js"}   # ui-smoke.js: Bedientest (tools/headless.js smoke)
+# Große Uploads (3MF/G-Code bis 200 MB) liegen ganz im Speicher: höchstens zwei gleichzeitig annehmen
+UPLOAD_SLOTS = threading.BoundedSemaphore(2)
 
 
 def file_version(rel):
@@ -115,6 +126,8 @@ def index_html():
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    timeout = 60   # Sekunden je Lesen/Schreiben: hängende Verbindungen belegen sonst für immer einen Thread
+
     def end_headers(self):
         if not getattr(self, "_cache_set", False):
             self.send_header("Cache-Control", "no-store")
@@ -169,11 +182,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(body)
         return True
 
+    def list_directory(self, path):
+        self.send_error(404)   # keine Verzeichnislisten
+        return None
+
     def log_message(self, fmt, *args):
         # Adressen der Drucker sind unkritisch, Abfragen aber häufig – nur Fehler und API-Aufrufe loggen
-        if self.command in ("GET", "HEAD") and args and str(args[1]) in ("200", "304") and self.path.split("?")[0] in QUIET_GET:
+        # (path/command fehlen bei kaputter Anfragezeile, args bei log_error)
+        path, code = getattr(self, "path", "") or "", str(args[1]) if len(args) > 1 else ""
+        if getattr(self, "command", None) in ("GET", "HEAD") and code in ("200", "304") and path.split("?")[0] in QUIET_GET:
             return   # Abfragen im Takt (Seite alle paar Sekunden, Watchdog von Home Assistant) – nur Fehler protokollieren
-        if self.path.startswith("/api/") or (args and str(args[1])[:1] in "45"):
+        if path.startswith("/api/") or code[:1] in ("4", "5") or not code:
             super().log_message(fmt, *args)
 
     def _json(self, code, obj):
@@ -186,13 +205,62 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _api(self, fn):
         try:
-            self._json(200, fn())
+            res = fn()
         except (anycubic_lan.LanError, slicer.SliceError) as e:
-            self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
+            return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
         except (printqueue.QueueError, schedule.ScheduleError, prefs.PrefsError) as e:
-            self._json(409, {"error": str(e), "kind": "bad_request"})
-        except (ValueError, KeyError) as e:
-            self._json(400, {"error": "Ungültige Anfrage: " + str(e), "kind": "bad_request"})
+            return self._json(409, {"error": str(e), "kind": "bad_request"})
+        except (ValueError, KeyError, TypeError) as e:
+            return self._json(400, {"error": "Ungültige Anfrage: " + str(e), "kind": "bad_request"})
+        except Exception as e:   # sonst bekäme der Browser gar keine Antwort
+            traceback.print_exc()
+            return self._json(500, {"error": "Interner Fehler: " + (str(e) or type(e).__name__), "kind": "internal"})
+        self._json(200, res)
+
+    def _reject(self, code, error):
+        """Fehler vor dem Lesen des Inhalts: Verbindung danach schließen (der ungelesene Rest wäre sonst die nächste Anfrage)."""
+        self.close_connection = True
+        self._json(code, {"error": error, "kind": "bad_request"})
+
+    def _length(self, limit):
+        """Content-Length prüfen: Zahl ≥ 0 und höchstens limit, sonst 400/413 (dann None)."""
+        raw = (self.headers.get("Content-Length") or "0").strip()
+        if not re.fullmatch(r"[0-9]{1,15}", raw):   # auch negativ: rfile.read(-1) liest bis zum Verbindungsende, an allen Grenzen vorbei
+            self._reject(400, "Ungültige Content-Length")
+            return None
+        if int(raw) > limit:
+            self._reject(413, "Anfrage zu groß (höchstens %d MB)" % (limit // (1024 * 1024)) if limit >= 1024 * 1024 else "Anfrage zu groß")
+            return None
+        return int(raw)
+
+    def _body(self, length):
+        """JSON-Inhalt der Anfrage – nur ein Objekt ({…}), sonst ValueError (→ 400)."""
+        req = json.loads(self.rfile.read(length) or b"{}")
+        if not isinstance(req, dict):
+            raise ValueError("JSON-Objekt erwartet")
+        return req
+
+    def _host_gate(self):
+        """Ohne PIN nur Anfragen an Adressen im Heimnetz (Schutz gegen DNS-Rebinding) – True, wenn schon beantwortet."""
+        if auth_pin() or is_ingress(self.client_address[0], self.headers) or host_allowed(self.headers.get("Host")):
+            return False
+        if urllib.parse.urlparse(self.path).path == "/api/health" and self.command in ("GET", "HEAD"):
+            return False   # Healthcheck bleibt offen (ohne Drucker-Adresse, siehe do_GET)
+        body = ("Unbekannter Servername – ohne PIN nur über IP-Adresse oder Heimnetz-Namen erreichbar "
+                "(weitere Namen: KONFIGURATOR_ALLOWED_HOSTS)\n").encode()
+        self.close_connection = True
+        self.send_response(403)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        return True
+
+    def _cross_site(self):
+        """Vom Browser einer fremden Seite ausgelöst (<img>, Link)? Nur mit Sec-Fetch-Site erkennbar."""
+        site = self.headers.get("Sec-Fetch-Site")
+        return site is not None and site not in ("same-origin", "none")
 
     # ---------- Zugriffsschutz (KONFIGURATOR_PIN), Hilfsfunktionen unten bei „Zugriffsschutz“ ----------
     def _auth_ok(self):
@@ -268,8 +336,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     def _login_post(self):
-        length = int(self.headers.get("Content-Length") or 0)
-        form = urllib.parse.parse_qs(self.rfile.read(min(length, 4096)).decode("utf-8", "replace")) if length > 0 else {}
+        length = self._length(4096)
+        if length is None:
+            return
+        form = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8", "replace")) if length > 0 else {}
         nxt, ip = form.get("next", [""])[0], self.client_address[0]
         if login_blocked(ip):
             return self._login_page(nxt, "Zu viele Versuche – bitte 5 Minuten warten. / Too many attempts, wait 5 minutes.", 429)
@@ -285,26 +355,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self):
-        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
+        if self._host_gate() or self._auth_gate() or self._viewer_gate():   # Servername, PIN, nur ansehen
             return
         url = urllib.parse.urlparse(self.path)
+        if not url.path.startswith("/api/") and not static_allowed(url.path):
+            return self.send_error(404)
         if not url.path.startswith("/api/") and os.environ.get("KONFIGURATOR_CACHE", "1") != "0" and self._static(url):
             return
         super().do_HEAD()
 
     def do_GET(self):
-        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
+        if self._host_gate() or self._auth_gate() or self._viewer_gate():   # Servername, PIN, nur ansehen
             return
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/health":
             # ohne Anmeldung (Healthcheck, HA-Watchdog) keine Drucker-Adresse
-            printer = preset_printer() if self._auth_ok() else None
+            printer = preset_printer() if self._auth_ok() and (auth_pin() or host_allowed(self.headers.get("Host"))) else None
             return self._json(200, {"ok": True, "lan": anycubic_lan.AVAILABLE, "slicer": slicer.version(), "printer": printer})
         if url.path == "/api/anycubic/status":
             q = urllib.parse.parse_qs(url.query)
             host, pos = q.get("host", [""])[0], q.get("pos", [""])[0] == "1"
             if self._viewer():   # nur ansehen: eingestellter Drucker, keine zusätzlichen Abfragen
                 host, pos = printer_host() or host, False
+            elif self._cross_site():   # von einer fremden Seite ausgelöst: keine Verbindung zu beliebigen Adressen
+                if not printer_host():
+                    return self._json(403, {"error": "Nur von der eigenen Seite", "kind": "forbidden"})
+                host, pos = printer_host(), False
             return self._api(lambda: anycubic_lan.status(host, pos=pos))
         if url.path == "/api/printing/preview":
             # Schichtvorschau des laufenden Drucks (nur für Drucke, die das Tool gestartet hat) – Live-Ansicht in ④
@@ -337,6 +413,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
         if url.path == "/api/anycubic/camera":
+            if self._cross_site():   # startet die Kamera am Drucker – nur von der eigenen Seite
+                return self._json(403, {"error": "Kamera nur von der eigenen Seite", "kind": "forbidden"})
             return self._camera(urllib.parse.parse_qs(url.query).get("host", [""])[0])
         m = re.match(r"^/api/slice/([0-9a-f]{16})/plate_(\d+)\.(preview|gcode)$", url.path)
         if m:
@@ -349,6 +427,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                               "plate_%s.gcode" % m.group(2) if m.group(3) == "gcode" else None)
         if url.path.startswith("/api/"):
             return self._json(404, {"error": "unbekannt", "kind": "not_found"})
+        if not static_allowed(url.path):
+            return self.send_error(404)
         if os.environ.get("KONFIGURATOR_CACHE", "1") != "0" and self._static(url):
             return None
         return super().do_GET()
@@ -392,76 +472,58 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile, 1024 * 1024)
 
     def do_POST(self):
-        if self._auth_gate() or self._viewer_gate():   # Zugriffsschutz (KONFIGURATOR_PIN), nur ansehen
+        if self._host_gate() or self._auth_gate() or self._viewer_gate():   # Servername, PIN, nur ansehen
             return
         path = urllib.parse.urlparse(self.path).path
-        length = int(self.headers.get("Content-Length") or 0)
         ctype = self.headers.get("Content-Type", "").split(";")[0].strip()
-        if path == "/api/slice":
+        if path in ("/api/slice", "/api/gcode"):
             # application/octet-stream ist kein „einfacher“ Typ: fremde Webseiten bräuchten eine CORS-Freigabe
             if ctype != "application/octet-stream":
-                return self._json(415, {"error": "3MF als application/octet-stream erwartet", "kind": "bad_request"})
-            if length > slicer.MAX_BYTES:
-                return self._json(413, {"error": "3MF zu groß (höchstens 200 MB)", "kind": "bad_request"})
-            # ?plates=2,3&count=4&reuse=<job>: nur geänderte Platten neu slicen, die übrigen übernehmen
-            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
-            count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
-            reuse = q.get("reuse", [""])[0] or None
-            return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
-        if path == "/api/gcode":
-            # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
-            if ctype != "application/octet-stream":
-                return self._json(415, {"error": "G-Code als application/octet-stream erwartet", "kind": "bad_request"})
-            if length > slicer.MAX_BYTES:
-                return self._json(413, {"error": "G-Code zu groß (höchstens 200 MB)", "kind": "bad_request"})
-            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            name = q.get("name", [""])[0][:120]
-
-            def take():
-                res = slicer.import_gcode(self.rfile.read(length), name)
-                gcode = slicer.job_file(res["job"], 1, "gcode")
-                res["facts"] = {k: v for k, v in anycubic_lan.gcode_facts(gcode).items() if k != "size"}
-                return res
-            return self._api(take)
+                return self._reject(415, ("3MF" if path == "/api/slice" else "G-Code") + " als application/octet-stream erwartet")
+            length = self._length(slicer.MAX_BYTES)
+            if length is None:
+                return None
+            if not UPLOAD_SLOTS.acquire(blocking=False):   # sonst bis zu 200 MB je wartender Anfrage im Speicher
+                self.close_connection = True
+                return self._json(503, {"error": "Der Server verarbeitet gerade schon zwei Dateien – bitte gleich noch einmal versuchen",
+                                        "kind": "busy"})
+            try:
+                return self._upload(path, length)
+            finally:
+                UPLOAD_SLOTS.release()
+        limit = MAX_SPOOL_BODY if path == "/api/spools" else MAX_BODY
+        if path not in ("/api/spools", "/api/queue", "/api/prefs", "/api/schedule", "/api/anycubic/print", "/api/anycubic/command"):
+            self.close_connection = True
+            return self._json(404, {"error": "unbekannt", "kind": "not_found"})
+        # Nur Aufrufe der eigenen Seite (application/json ist kein „einfacher“ Typ – einfacher Schutz gegen fremde Webseiten)
+        if ctype != "application/json":
+            return self._reject(415, "JSON erwartet")
+        length = self._length(limit)
+        if length is None:
+            return None
         if path == "/api/spools":
-            if ctype != "application/json" or length > MAX_SPOOL_BODY:
-                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-
             def change():
-                req = json.loads(self.rfile.read(length) or b"{}")
+                req = self._body(length)
                 if req.get("action") == "config" and req.get("host"):
                     req["host"] = anycubic_lan.check_host(req["host"])   # nur private Adressen
                 return spools.api_post(req)
             return self._api(change)
         if path == "/api/queue":
-            if ctype != "application/json" or length > MAX_BODY:
-                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-            return self._api(lambda: queue_post(json.loads(self.rfile.read(length) or b"{}")))
+            return self._api(lambda: queue_post(self._body(length)))
         if path == "/api/prefs":
             # eigene Standardwerte für alle Browser (tools/prefs.py)
-            if ctype != "application/json" or length > MAX_BODY:
-                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-            body = json.loads(self.rfile.read(length) or b"{}")
-            return self._api(lambda: prefs.api_post(body))
+            return self._api(lambda: prefs.api_post(self._body(length)))
         if path == "/api/schedule":
             # Druck planen / absagen (tools/schedule.py); der G-Code wird mit Vorschaubild in den Datenordner kopiert
-            if ctype != "application/json" or length > MAX_BODY:
-                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-            req = json.loads(self.rfile.read(length) or b"{}")
-
             def gcode_for(job, plate):
                 gcode = slicer.job_file(job, plate, "gcode")
                 if gcode:
                     with_thumbnail(job, plate, gcode)
                 return gcode, slicer.job_file(job, plate, "preview") if gcode else None
-            return self._api(lambda: schedule.api_post(req, gcode_for, on_cancel=scheduled_cancel))
+            return self._api(lambda: schedule.api_post(self._body(length), gcode_for, on_cancel=scheduled_cancel))
         if path == "/api/anycubic/print":
-            if ctype != "application/json" or length > MAX_BODY:
-                return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
-
             def send():
-                req = json.loads(self.rfile.read(length) or b"{}")
+                req = self._body(length)
                 gcode = slicer.job_file(str(req.get("job", "")), str(req.get("plate", "")), "gcode")
                 if not gcode:
                     raise slicer.SliceError("Slice-Auftrag nicht (mehr) vorhanden – bitte neu berechnen", "bad_request")
@@ -475,33 +537,47 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     remember_print(res["filename"], str(req.get("job", "")), int(req["plate"]))
                 return res
             return self._api(send)
-        if path != "/api/anycubic/command":
-            return self._json(404, {"error": "unbekannt", "kind": "not_found"})
-        if length > MAX_BODY:
-            return self._json(413, {"error": "Anfrage zu groß", "kind": "bad_request"})
-        # Nur Aufrufe der eigenen Seite (einfacher Schutz gegen fremde Webseiten im selben Netz)
-        if ctype != "application/json":
-            return self._json(415, {"error": "JSON erwartet", "kind": "bad_request"})
 
-        def run():
-            req = json.loads(self.rfile.read(length) or b"{}")
+        def run():   # /api/anycubic/command
+            req = self._body(length)
             return anycubic_lan.command(req["host"], req["type"], req["action"], req.get("data"))
         return self._api(run)
+
+    def _upload(self, path, length):
+        if path == "/api/slice":
+            # ?plates=2,3&count=4&reuse=<job>: nur geänderte Platten neu slicen, die übrigen übernehmen
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
+            count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
+            reuse = q.get("reuse", [""])[0] or None
+            return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
+        # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
+        name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name", [""])[0][:120]
+
+        def take():
+            res = slicer.import_gcode(self.rfile.read(length), name)
+            gcode = slicer.job_file(res["job"], 1, "gcode")
+            res["facts"] = {k: v for k, v in anycubic_lan.gcode_facts(gcode).items() if k != "size"}
+            return res
+        return self._api(take)
 
 
 # ---------- Zugriffsschutz (KONFIGURATOR_PIN) ----------
 # Ohne KONFIGURATOR_PIN ist alles offen wie bisher. Mit PIN braucht jede Anfrage eine Sitzung (Cookie, 30 Tage, nur im
 # Speicher – nach einem Neustart neu anmelden). Ausgenommen: GET /api/health (Docker-Healthcheck, HA-Watchdog), die
 # Anmeldeseite /login und der Home-Assistant-Ingress (Supervisor-Proxy 172.30.32.2 UND Kopfzeile X-Ingress-Path –
-# die Kopfzeile allein kann jeder setzen). Höchstens 5 falsche PINs je Adresse in 5 Minuten, danach 429.
+# die Kopfzeile allein kann jeder setzen). Höchstens 5 falsche PINs je Adresse in 5 Minuten, danach 429 – und
+# höchstens 20 von allen Adressen zusammen (sonst probiert jemand mit vielen Adressen durch).
 SESSION_COOKIE = "dk_session"
 SESSION_SECONDS = 30 * 24 * 3600
 SESSION_MAX = 1000
 INGRESS_PROXY = "172.30.32.2"
 LOGIN_MAX_FAILS, LOGIN_WINDOW = 5, 300
+LOGIN_MAX_FAILS_ALL = 20
 LOGIN_HTML = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "login.html"), encoding="utf-8").read()
 _sessions = {}   # Token → Ablaufzeit
 _fails = {}      # Client-Adresse → Zeitpunkte falscher Versuche
+_fails_all = []  # Zeitpunkte falscher Versuche aller Adressen
 _auth_lock = threading.Lock()
 
 
@@ -545,13 +621,16 @@ def _recent_fails(ip, now):
 
 
 def login_blocked(ip):
+    now = time.time()
     with _auth_lock:
-        return len(_recent_fails(ip, time.time())) >= LOGIN_MAX_FAILS
+        _fails_all[:] = [t for t in _fails_all if now - t < LOGIN_WINDOW]
+        return len(_recent_fails(ip, now)) >= LOGIN_MAX_FAILS or len(_fails_all) >= LOGIN_MAX_FAILS_ALL
 
 
 def login_failed(ip):
     now = time.time()
     with _auth_lock:
+        _fails_all[:] = [t for t in _fails_all if now - t < LOGIN_WINDOW] + [now]
         _fails[ip] = _recent_fails(ip, now) + [now]
         for k in [k for k in _fails if not _recent_fails(k, now)]:
             del _fails[k]
@@ -560,6 +639,41 @@ def login_failed(ip):
 def login_reset(ip):
     with _auth_lock:
         _fails.pop(ip, None)
+
+
+LOCAL_SUFFIXES = (".local", ".lan", ".home.arpa", ".internal", ".fritz.box")
+
+
+def host_allowed(host):
+    """Servername aus der Host-Kopfzeile: IP-Adresse, localhost, Name ohne Punkt, Heimnetz-Endung oder
+    KONFIGURATOR_ALLOWED_HOSTS. Ohne Kopfzeile (HTTP/1.0, Healthcheck) erlaubt – Browser schicken sie immer."""
+    h = str(host or "").strip().lower()
+    if not h:
+        return True
+    if h.startswith("["):
+        h = h[1:h.find("]")] if "]" in h else h[1:]
+    elif h.count(":") == 1:
+        h = h.split(":")[0]
+    h = h.rstrip(".")
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        pass
+    extra = {x.strip().lower().rstrip(".") for x in (os.environ.get("KONFIGURATOR_ALLOWED_HOSTS") or "").split(",") if x.strip()}
+    return (bool(h) and ("." not in h or h == "localhost" or h.endswith(".localhost") or h.endswith(LOCAL_SUFFIXES))) or h in extra
+
+
+def static_allowed(path):
+    """Nur Dateien, die die Seite lädt (STATIC_DIRS/STATIC_FILES) – nicht .git, tools/, Tests, Datenordner."""
+    p = urllib.parse.unquote(str(path or ""))
+    if "\\" in p or "\0" in p:
+        return False
+    p = posixpath.normpath("/" + p).lstrip("/")
+    p = "" if p == "." else p
+    if any(part.startswith(".") for part in p.split("/") if part):
+        return False
+    return p in STATIC_FILES or (p.startswith(STATIC_DIRS) and not p.endswith("/"))
 
 
 def safe_next(nxt):
@@ -682,14 +796,18 @@ def remember_print(filename, job, plate, gcode_path=None, preview_path=None):
 
 
 def printed_preview(name):
-    """Pfad der gespeicherten Vorschau zum Auftragsnamen des Druckers (genau oder als Endung) oder None."""
+    """Pfad der gespeicherten Vorschau zum Auftragsnamen des Druckers oder None. Genau, sonst als Endung ab einem „_“
+    (der Drucker bzw. ein Umbenennen beim Hochladen kann vorne etwas anhängen/abschneiden) – nur wenn genau eine passt:
+    „Halter_Platte1“ darf nie die Vorschau von „Wandhalter_Platte1“ bekommen (falsche Objekte zum Überspringen)."""
     stem = re.sub(r"[^\w.\-]+", "_", _stem(name))
     d = _printed_dir()
     if not stem or not os.path.isdir(d):
         return None
     files = [f[:-len(".preview")] for f in os.listdir(d) if f.endswith(".preview")]
-    hit = next((f for f in files if f == stem), None) or next((f for f in files if stem.endswith(f) or f.endswith(stem)), None)
-    return os.path.join(d, hit + ".preview") if hit else None
+    if stem in files:
+        return os.path.join(d, stem + ".preview")
+    hits = [f for f in files if stem.endswith("_" + f) or f.endswith("_" + stem)]
+    return os.path.join(d, hits[0] + ".preview") if len(hits) == 1 else None
 
 
 def preset_printer():

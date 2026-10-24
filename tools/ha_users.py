@@ -20,6 +20,7 @@ TIMEOUT_S = 8
 SUPERVISOR = ("supervisor", 80)
 WS_PATH = "/core/websocket"
 _lock = threading.Lock()
+_fetch_lock = threading.Lock()   # höchstens eine Abfrage bei Home Assistant gleichzeitig
 _cache = {"at": 0, "ok": False, "admins": set(), "users": set()}
 
 
@@ -99,21 +100,33 @@ def _fetch_users():
         sock.close()
 
 
+def _needs_fetch(c, user_id, now):
+    stale = now - c["at"] > (CACHE_S if c["ok"] else ERROR_RETRY_S)
+    return stale or (c["ok"] and user_id not in c["users"] and now - c["at"] > ERROR_RETRY_S)   # neuer Benutzer
+
+
 def is_admin(user_id):
     """True/False für die Benutzer-ID aus X-Remote-User-Id; ohne ID oder ohne Antwort von Home Assistant False."""
     if not user_id:
         return False
     with _lock:
         c = dict(_cache)
-    now = time.time()
-    stale = now - c["at"] > (CACHE_S if c["ok"] else ERROR_RETRY_S)
-    if stale or (c["ok"] and user_id not in c["users"] and now - c["at"] > ERROR_RETRY_S):   # neuer Benutzer
-        try:
-            users = _fetch_users()
-            c = {"at": now, "ok": True, "admins": {u for u, a in users.items() if a}, "users": set(users)}
-        except (OSError, ValueError, KeyError, IndexError) as e:
-            print("Benutzerrechte aus Home Assistant nicht lesbar: %s – Panel nur zum Ansehen" % e, flush=True)
-            c = {"at": now, "ok": False, "admins": set(), "users": set()}
-        with _lock:
-            _cache.update(c)
+    if _needs_fetch(c, user_id, time.time()):
+        # nur eine Abfrage gleichzeitig; die anderen nehmen solange den alten Stand (beim allerersten Mal: warten)
+        if _fetch_lock.acquire(blocking=not c["at"]):
+            try:
+                with _lock:
+                    c = dict(_cache)
+                now = time.time()
+                if _needs_fetch(c, user_id, now):   # inzwischen von einer anderen Anfrage geholt?
+                    try:
+                        users = _fetch_users()
+                        c = {"at": now, "ok": True, "admins": {u for u, a in users.items() if a}, "users": set(users)}
+                    except (OSError, ValueError, KeyError, IndexError) as e:
+                        print("Benutzerrechte aus Home Assistant nicht lesbar: %s – Panel nur zum Ansehen" % e, flush=True)
+                        c = {"at": now, "ok": False, "admins": set(), "users": set()}
+                    with _lock:
+                        _cache.update(c)
+            finally:
+                _fetch_lock.release()
     return user_id in c["admins"]
