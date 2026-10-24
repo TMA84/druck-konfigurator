@@ -56,7 +56,7 @@ function lvResize() {
   const el = $('wbLiveStage'), w = el.clientWidth, h = el.clientHeight;
   if (!w || !h) return;
   lv.renderer.setSize(w, h, false); lv.camera.aspect = w / h; lv.camera.updateProjectionMatrix();
-  lvRefit(); lvRender();
+  lvRefit(); lvRender(); lvKick();   // wieder sichtbar (auch eingebettet ohne Tabwechsel): Schleifen weiter
 }
 /* Geänderte Farben (Bahn-Bereich lo…hi) bis zum nächsten Zeichnen sammeln: three.js überträgt nur einen Bereich je Bild –
    setzt man ihn zweimal, bevor gezeichnet wird, geht der erste verloren (die Bahnen blieben schwarz). */
@@ -79,12 +79,30 @@ function lvRange(end) {
 }
 function lvDraw() {
   if (!lv.renderer) return;
+  if (lv.raf) { cancelAnimationFrame(lv.raf); lv.raf = 0; }   // schon gezeichnet: vorgemerktes Bild entfällt
   lv.renderer.render(lv.scene, lv.camera);
   lv.dirty = null;
 }
 function lvRender() {
   if (lv.raf || !lv.renderer) return;
   lv.raf = requestAnimationFrame(() => { lv.raf = 0; lvDraw(); });
+}
+/* Grafikspeicher freigeben (Neuaufbau, lvHeadInit): Geometrien, Materialien und Texturen eines Teilbaums – außer den geteilten,
+   die über alle Aufbauten bleiben (lvPulleyKit, Grundtexturen von Riemen/Luft/Fluss, Kopfschlauch-Fluss lv.filFlow) */
+const LV_SHARED = new WeakSet();
+function lvDisposeMat(m, seen) {
+  if (!m || seen.has(m) || LV_SHARED.has(m)) return;
+  seen.add(m);
+  for (const k of ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap']) { const t = m[k]; if (t && !seen.has(t) && !LV_SHARED.has(t)) { seen.add(t); t.dispose(); } }
+  m.dispose();
+}
+function lvDispose(obj, extra) {
+  const seen = new Set();
+  if (obj) obj.traverse(o => {
+    if (o.geometry && !seen.has(o.geometry) && !LV_SHARED.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) lvDisposeMat(m, seen);
+  });
+  for (const m of extra || []) lvDisposeMat(m, seen);
 }
 
 function lvBuild() {
@@ -135,7 +153,8 @@ function lvBuild() {
   lv.scene.add(lv.mesh, lv.ghost);
   if (lv.grid) { lv.scene.remove(lv.grid); lv.grid.geometry.dispose(); lv.grid.material.dispose(); }
   const size = Math.max(bx1 - bx0, by1 - by0, 20), span = Math.ceil(size * 1.4 / 10) * 10;
-  lv.grid = new THREE.GridHelper(span, span / 10, 0xffffff, 0xffffff);   // Farbe setzt lvTheme lv.grid.rotation.x = Math.PI / 2; lv.grid.position.z = 0.01; lv.scene.add(lv.grid);
+  lv.grid = new THREE.GridHelper(span, span / 10, 0xffffff, 0xffffff);   // Farbe setzt lvTheme
+  lv.grid.rotation.x = Math.PI / 2; lv.grid.position.z = 0.01; lv.scene.add(lv.grid);
   const top = d.bbox[5] || 1;
   // Bett und Mechanik möglichst im Bild – bei kleinen Teilen höchstens 2,2 × Modellgröße, sonst wäre das Teil winzig
   // mindestens ~230 mm Bildausschnitt: sonst füllt der Druckkopf (≈ 56 × 48 × 70 mm) bei kleinen Teilen das Bild
@@ -177,7 +196,13 @@ function lvBed() {
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 function lvHeadInit() {
-  for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG', 'zArms']) if (lv[k]) { lv.scene.remove(lv[k]); lv[k] = null; }
+  // ACE-Flussmaterialien hängen nicht immer an einem Teil (lvAceColours tauscht sie) – eigens freigeben
+  const loose = (lv.aceSpools || []).flatMap(sp => [sp.flow, sp.flowS, sp.line]);
+  for (const k of ['head', 'gantry', 'bed', 'frameFixed', 'mechG', 'zArms']) if (lv[k]) { lv.scene.remove(lv[k]); lvDispose(lv[k]); lv[k] = null; }
+  lvDispose(null, loose);
+  if (lv.swap) { for (const d of lv.swap.drops) { lv.scene.remove(d.m); lvDispose(d.m); } lv.swap = null; }
+  lv.aceSpools = null; lv.aceUnitsFx = null; lv.aceLast = null; lv.tube = lv.fil = lv.filGlow = null; lv.display = null; lv.mechBuilt = null;
+  lv.aceG = lv.enclosureG = lv.encLight = lv.statusLine = null; lv.filTool = null;   // neues Schlauchmaterial: Filamentfarbe neu setzen (lvFilamentAt)
   lv.motorCaps = []; lv.zScrews = []; lv.zDrive = null;
   /* Druckkopf und Mechanik (2026-10-07, vorher Glaskästen): beleuchtete Teile, leicht durchscheinend, damit das Teil
      sichtbar bleibt. Graphit-Gehäuse (der Petrol-Streifen verdeckte das Teil – entfernt), Lüfterring vorn, Alu-Heizblock, Messingdüse; X-Traverse als
@@ -395,7 +420,7 @@ function lvBeltTexture() {
   if (lvBeltTex) return lvBeltTex;
   const c = document.createElement('canvas'); c.width = 32; c.height = 8;
   const g = c.getContext('2d'); g.fillStyle = '#16191b'; g.fillRect(0, 0, 32, 8); g.fillStyle = '#4a5156'; g.fillRect(0, 0, 12, 8);
-  lvBeltTex = new THREE.CanvasTexture(c); lvBeltTex.wrapS = THREE.RepeatWrapping;
+  lvBeltTex = new THREE.CanvasTexture(c); lvBeltTex.wrapS = THREE.RepeatWrapping; LV_SHARED.add(lvBeltTex);
   return lvBeltTex;
 }
 /* Umlenkrolle und Motorritzel (2026-10-08): Achse y (wie CylinderGeometry), gedreht wird um y.
@@ -424,6 +449,7 @@ function lvPulleyKit() {
     mflange: new THREE.CylinderGeometry(M + 1.6, M + 1.6, 0.9, 28), hub: new THREE.CylinderGeometry(M * 0.85, M * 0.85, 5, 24),
     screw: new THREE.CylinderGeometry(0.9, 0.9, 1.4, 8), shaft: new THREE.CylinderGeometry(1.25, 1.25, h + 7, 12)
   };
+  for (const v of Object.values(lvPulleyParts)) LV_SHARED.add(v);
   return lvPulleyParts;
 }
 function lvIdler() {
@@ -788,7 +814,7 @@ function lvFlowMat(len) {
     const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
     gr.addColorStop(0, '#000'); gr.addColorStop(0.35, '#000'); gr.addColorStop(0.82, '#8a8a8a'); gr.addColorStop(0.9, '#fff'); gr.addColorStop(1, '#000');
     g.fillStyle = gr; g.fillRect(0, 0, 256, 4);
-    lvFlowTexBase = new THREE.CanvasTexture(cv);
+    lvFlowTexBase = new THREE.CanvasTexture(cv); LV_SHARED.add(lvFlowTexBase);
   }
   const tex = lvFlowTexBase.clone(); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(Math.max(1, len / LV_FLOW_MM), 1); tex.needsUpdate = true;
   return new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, emissive: 0xffffff, emissiveIntensity: 1.6, emissiveMap: tex });
@@ -796,9 +822,16 @@ function lvFlowMat(len) {
 function lvGlowMat(flow) {
   return new THREE.MeshBasicMaterial({ color: 0xffffff, map: flow.emissiveMap, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
 }
+// 3D-Ansicht zu sehen? (Ansicht „3D“, Tab ④ offen oder eingebettet ?ansicht=3d, Seite im Vordergrund) – sonst stehen Kopf- und Effekt-Schleife
+function lvOnScreen() { const el = $('wbLiveStage'); return lv.mode === 'live' && !document.hidden && !!el && el.clientWidth > 0; }
+// beide Schleifen wieder anstoßen (Tab wieder offen, Ansicht wieder sichtbar/größer, Seite wieder im Vordergrund)
+function lvKick() {
+  if (lv.hs && lv.head && lv.head.visible && !lv.anim && lvOnScreen()) lv.anim = requestAnimationFrame(lvHeadTick);
+  lvAceAnimate();
+}
 function lvAceAnimate() {
   if (lv.aceAnim) return;
-  const busy = () => lv.mode === 'live' && !document.hidden && (lvFxBusy() || lv.aceSpools && lv.aceG && lv.aceG.visible)
+  const busy = () => lvOnScreen() && (lvFxBusy() || lv.aceSpools && lv.aceG && lv.aceG.visible)
     && ((lv.aceSpools || []).some(sp => sp.active) || (lv.aceUnitsFx || []).some(fx => fx.dry) || lvFxBusy());   // nur wenn sich etwas tut (Akku am Handy)
   if (!busy()) return;
   let last = 0;
@@ -826,7 +859,7 @@ function lvAceAnimate() {
   };
   lv.aceAnim = requestAnimationFrame(tick);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) lvAceAnimate(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lvKick(); });
 
 /* Farbwechsel (lv.swap aus lvAceColours): 0–2,5 s läuft das alte Filament rückwärts zur ACE (Spule spult auf),
    2,5–5 s das neue schnell vor, ab 3,5 s fallen Tropfen der Spülmenge (alte → neue Farbe) unter der Düse heraus */
@@ -957,7 +990,8 @@ function lvAirSprite() {
   const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
-  return (lvAirTex = new THREE.CanvasTexture(c));
+  LV_SHARED.add(lvAirTex = new THREE.CanvasTexture(c));
+  return lvAirTex;
 }
 function lvAirStream(parent, from, dir, len, spread, key, size) {
   const pos = new Float32Array(LV_AIR_N * 3), col = new Float32Array(LV_AIR_N * 3), g = new THREE.BufferGeometry();
@@ -1004,7 +1038,7 @@ function lvFansInit(md, g) {
   const duct = new THREE.Mesh(new THREE.BoxGeometry(26, 70, 102), dark); duct.position.set(fx1 - 30, cy, zAux - 45); side.add(duct);
   const wheel = new THREE.Mesh(new THREE.CircleGeometry(38, 32), new THREE.MeshStandardMaterial({ color: 0x0c0e10, roughness: 0.8 })); wheel.rotation.y = -Math.PI / 2; wheel.position.set(fx1 - 40.5, cy, zAux - 155); side.add(wheel);
   { const ro = lvRotor(36, 11), hold = new THREE.Group(); hold.rotation.y = -Math.PI / 2; hold.position.set(fx1 - 41.5, cy, zAux - 155); hold.add(ro); side.add(hold); lv.rotors.push({ obj: ro, key: 'aux_fan_speed_pct' }); }
-  const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 26, cy, zAux);   // nah an der Wand: außerhalb des Kopfwegs side.add(slot);   // flache Düse
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(34, 92, 12), dark); slot.position.set(fx1 - 26, cy, zAux); side.add(slot);   // flache Düse, nah an der Wand: außerhalb des Kopfwegs
   const mouth = new THREE.Mesh(new THREE.PlaneGeometry(6, 84),   // nach der Drehung um y: 6 mm hoch, 84 mm breit (waagerechter Schlitz)
     new THREE.MeshBasicMaterial({ color: 0x050607 })); mouth.rotation.y = -Math.PI / 2; mouth.position.set(fx1 - 43.2, cy, zAux); side.add(mouth);
   lv.gantry.add(side);
@@ -1060,7 +1094,11 @@ function lvChainCurve(a, h, xmin) {
   return new THREE.CubicBezierCurve3(new THREE.Vector3(a.x, a.y, z), new THREE.Vector3(lx, a.y, z),
     new THREE.Vector3(lx, h.y, z), new THREE.Vector3(h.x, h.y, z));
 }
-function lvMechUpdate(p) {
+/* Schlauch, Filament und Leuchtschein zum Kopf (drei TubeGeometry) nicht in jedem Bild neu bauen: höchstens 10×/s, solange der
+   Kopf fährt (≥ 1 mm seit dem letzten Bau), sonst einmal nach, wenn er steht; bei Sprüngen und Umschaltern (force) sofort */
+const LV_MECH_MS = 100, LV_MECH_MM = 1, LV_MECH_JUMP = 30;
+const lvV = { q: new THREE.Vector3(), T: new THREE.Vector3(), up: new THREE.Vector3(0, 0, 1), side: new THREE.Vector3(), sd: new THREE.Vector3() };
+function lvMechUpdate(p, force) {
   if (!lv.mechG) return;
   lv.mechG.visible = lv.head.visible;
   // Z-Spindeln drehen mit der Höhe (rotation.y = um die eigene Achse, wie die Rollen)
@@ -1075,19 +1113,27 @@ function lvMechUpdate(p) {
   }
   // Anker in Weltkoordinaten: CoreXY am Rahmen (fährt in Z mit der Traverse), Bettschubser am oberen Querholm (fährt in Y)
   const A = lv.mechAnchor, a = A.fixed ? { x: A.x, y: A.y + p.y, z: A.z } : { x: A.x, y: A.y, z: p.z + LV_GANTRY_Z + A.z };
-  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 14 }, c = lvChainCurve(a, top, A.xmin), q = new THREE.Vector3();
+  const top = { x: p.x, y: p.y + 4, z: p.z + LV_HEAD.h + 14 }, c = lvChainCurve(a, top, A.xmin), q = lvV.q;
   lv.chain.forEach((l, k) => {
     const t = (k + 0.5) / LV_CHAIN_LINKS; c.getPoint(t, l.position); c.getTangent(t, q);
     l.lookAt(l.position.x + q.x, l.position.y + q.y, l.position.z + q.z);
   });
   /* Schlauch hängt außen (im Bogen links) an der Kette – fester seitlicher Abstand, Seite bleibt über den ganzen Bogen gleich,
      kann sie nicht kreuzen; am Kopf taucht er von oben hinein, das Filament läuft weiter senkrecht bis zur Düsenspitze */
-  const pts = [], T = new THREE.Vector3(), up = new THREE.Vector3(0, 0, 1), side = new THREE.Vector3(0, 1, 0);
+  const now = performance.now(), B = lv.mechBuilt, key = lvAceFlowing() + '|' + !!(lv.aceG && lv.aceG.visible);
+  const dist = B ? Math.hypot(p.x - B.x, p.y - B.y, p.z - B.z) : Infinity;
+  if (!force && B && B.key === key && dist < LV_MECH_JUMP && (dist < 0.01 || now - B.t < (dist < LV_MECH_MM ? 3 : 1) * LV_MECH_MS)) {
+    // kommt keine weitere Bewegung (Schleife steht), den letzten Stand trotzdem nachziehen
+    if (dist >= 0.01 && !lv.mechLate) lv.mechLate = setTimeout(() => { lv.mechLate = 0; if (lv.head && lv.head.visible) { lvMechUpdate(lv.head.position, true); lvRender(); } }, 3 * LV_MECH_MS);
+    return;
+  }
+  lv.mechBuilt = { x: p.x, y: p.y, z: p.z, t: now, key };
+  const pts = [], { T, up, side, sd } = lvV; side.set(0, 1, 0);
   for (let k = 0; k <= 36; k++) {
     const t = k / 36 * 0.92, P = c.getPoint(t); c.getTangent(t, T);
-    const sd = new THREE.Vector3().crossVectors(T, up);
+    sd.crossVectors(T, up);
     if (sd.lengthSq() > 1e-4) { sd.normalize(); if (sd.dot(side) < 0) sd.negate(); side.copy(sd); }
-    pts.push(P.add(side.clone().multiplyScalar(9)));
+    pts.push(P.addScaledVector(side, 9));
   }
   if (lv.hubTop && lv.aceG && lv.aceG.visible && !A.fixed) {
     /* mit ACE: Schlauch beginnt oben an der Zusammenführung, steigt senkrecht, biegt im 90°-Bogen nach vorn, geht waagerecht durch die
@@ -1117,7 +1163,7 @@ function lvMechUpdate(p) {
   // fließendes Filament bis in den Kopf (wie in den ACE-Schläuchen, lvAceAnimate), nur solange ein Slot aktiv druckt
   if (lv.filGlow) { lv.mechG.remove(lv.filGlow); lv.filGlow.geometry.dispose(); lv.filGlow = null; }
   if (lvAceFlowing()) {
-    if (!lv.filFlow) { lv.filFlow = lvFlowMat(300); lv.filGlowM = lvGlowMat(lv.filFlow); }
+    if (!lv.filFlow) { lv.filFlow = lvFlowMat(300); lv.filGlowM = lvGlowMat(lv.filFlow); for (const v of [lv.filFlow, lv.filGlowM, lv.filFlow.emissiveMap]) LV_SHARED.add(v); }
     lv.filFlow.emissiveMap.repeat.x = Math.max(1, cf.getLength() / LV_FLOW_MM);
     lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3);
     lv.filGlow = new THREE.Mesh(new THREE.TubeGeometry(cf, 80, 2.0, 8), lv.filGlowM); lv.filGlow.renderOrder = 4; lv.mechG.add(lv.filGlow);
@@ -1354,7 +1400,8 @@ function lvHeadPos(h, now) {
 function lvHeadTick(now) {
   lv.anim = 0;
   const h = lv.hs;
-  if (!h || !lv.head || !lv.head.visible || lv.mode !== 'live' || document.hidden) { lv.lastTick = 0; return; }
+  if (!h || !lv.head || !lv.head.visible || !lvOnScreen()) { lv.lastTick = 0; return; }
+  if (lv.lastTick && now - lv.lastTick < 30) { lv.anim = requestAnimationFrame(lvHeadTick); return; }   // ~30 Bilder/s wie lvAceAnimate
   const p = lvHeadPos(h, now);
   if (p) {
     // Glätten: gezeigte Stelle folgt dem Ziel mit kurzer Verzögerung; sehr weite Wege (Schichtwechsel, Start) direkt
@@ -1369,7 +1416,6 @@ function lvHeadTick(now) {
   lv.lastTick = now;
   if (h.snapped || !h.real || now - h.t0 < h.dur + 1000) lv.anim = requestAnimationFrame(lvHeadTick);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && lv.hs && !lv.anim) lv.anim = requestAnimationFrame(lvHeadTick); });
 
 // Bis Schicht cur (0-basiert): fertig = Filamentfarbe, aktuell = orange; danach die kommenden Schichten je nach Wahl
 /* Farben bis Schicht cur: frühere Schichten in Filamentfarbe. Aktuelle Schicht ohne Kopfposition (done = null) ganz orange;
@@ -1560,6 +1606,6 @@ $('wbLiveGhost').value = lvGhostMode();
 $('wbLiveGhost').addEventListener('change', e => { store.settings.liveGhost = e.currentTarget.value; persist(); lvGhostApply(); });
 for (const [id, key, grp] of [['wbLiveEnc', 'liveEnclosure', 'enclosureG'], ['wbLiveAce', 'liveAce', 'aceG']]) {
   $(id).checked = store.settings[key] !== false;
-  $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; if (lv.head && lv.head.visible) lvMechUpdate(lv.head.position); lvRefit(); lvRender(); } });
+  $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; if (lv.head && lv.head.visible) lvMechUpdate(lv.head.position, true); lvRefit(); lvRender(); } });
 }
 liveMode(!EMBED_3D && store.settings.wbView === 'cam' ? 'cam' : 'live');

@@ -37,6 +37,7 @@ const Viewer = (() => {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .08;
     controls.addEventListener('start', () => { userMoved = true; });
+    controls.addEventListener('change', invalidate);
 
     axes = new THREE.AxesHelper(1);
     scene.add(axes);
@@ -50,7 +51,17 @@ const Viewer = (() => {
     initBrush();
     new ResizeObserver(resize).observe(stage);
     resize();
-    (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+    invalidate();
+  }
+  /* Zeichnen nur bei Bedarf (vorher jedes Bild, auch im Leerlauf): Kamera bewegt (controls 'change'), Szene geändert (jede
+     öffentliche Funktion, siehe unten), Größe geändert. Danach weiter, solange die Dämpfung nachläuft (controls.update() → true). */
+  let raf = 0, extra = 0;
+  function invalidate() { extra = 2; if (!raf && renderer) raf = requestAnimationFrame(frame); }
+  function frame() {
+    raf = 0;
+    const moving = controls.update();
+    renderer.render(scene, camera);
+    if (!raf && (moving || extra-- > 0)) raf = requestAnimationFrame(frame);
   }
 
   function resize() {
@@ -60,6 +71,7 @@ const Viewer = (() => {
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     if (!userMoved && lastFit) fit();   // Fenster/Handy gedreht: neu einpassen, solange niemand die Ansicht bewegt hat
+    invalidate();
   }
 
   function setBedGrid(size) {
@@ -161,7 +173,9 @@ const Viewer = (() => {
   }
   function setPaint(p) { paint = p && p.length ? p : null; colorize(lastTh); }
 
-  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; extras.concat(overlays, paintLayer ? [paintLayer] : []).forEach(m => { m.material.wireframe = on; }); }
+  function setWireframe(on) { wireframeOn = on; if (mesh) mesh.material.wireframe = on; layers().forEach(m => { m.material.wireframe = on; }); }
+  // alle Zusatzschichten über dem Teil (Beschriftung, Farbschichten, Bemalung und Pinselstrich); die Füllvorschau nur für den Schnitt
+  const layers = () => extras.concat(overlays, Object.values(paintLayers).filter(Boolean));
 
   /* Zusatznetze zum Teil (z. B. Beschriftung): list = [{pos (geom-Koordinaten wie geom.pos), color (0xRRGGBB), opacity?}].
      Werden bei show()/clear() entfernt. */
@@ -248,39 +262,55 @@ const Viewer = (() => {
      setBrush({cursor: 'circle'|'sphere'|'height'|'none', radius, onStroke(phase, hit, ev)}) oder null.
      Linke Maustaste bzw. ein Finger auf dem Teil malt (phase 'start' → 'move' … → 'end'), daneben dreht die Ansicht wie
      sonst; mit zwei Fingern wird der Strich beendet und gezoomt. hit = {tri, point (geom-Koordinaten), normal, dir}. */
-  const brush = { opts: null, active: false, cursor: null, hoverQueued: false, lastEv: null };
+  const brush = { opts: null, active: false, cursor: null, kind: null, queued: false, lastEv: null, rc: new THREE.Raycaster(), ndc: new THREE.Vector2(), up: new THREE.Vector3() };
   function brushRay(ev) {
-    const rect = renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
-    const rc = new THREE.Raycaster();
-    rc.setFromCamera(ndc, camera);
+    const rect = renderer.domElement.getBoundingClientRect(), rc = brush.rc;
+    brush.ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    rc.setFromCamera(brush.ndc, camera);
     const hit = mesh && rc.intersectObject(mesh).find(h => !clip.on || clip.plane.distanceToPoint(h.point) >= 0);
     if (!hit) return null;
     const d = rc.ray.direction;
     return { tri: hit.faceIndex, point: [hit.point.x + offset[0], hit.point.y + offset[1], hit.point.z + offset[2]], normal: [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z], dir: [d.x, d.y, d.z] };
   }
+  // Pinselzeiger: ein Netz je Form (Einheitsgröße), bei jeder Bewegung nur verschoben und skaliert statt neu gebaut
   function brushCursor(hit) {
-    if (brush.cursor) { scene.remove(brush.cursor); brush.cursor.geometry.dispose(); brush.cursor.material.dispose(); brush.cursor = null; }
     const o = brush.opts;
     if (o && o.onHover && !brush.active) o.onHover(hit);
-    if (!o || !hit || o.cursor === 'none') return;
-    const r = Math.max(0.05, o.radius || 1), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
-    let m;
-    if (o.cursor === 'sphere') m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), mat);
-    else if (o.cursor === 'height') {
-      const s = Math.max(geomRef ? Math.max(geomRef.x, geomRef.y) : maxDim, 10) * 1.3;
-      m = new THREE.Mesh(new THREE.BoxGeometry(s, s, Math.max(0.05, 2 * r)), mat); mat.opacity = 0.18;
-      m.position.set(0, 0, hit.point[2] - offset[2]); scene.add(m); brush.cursor = m; return;
-    } else {
-      m = new THREE.Mesh(new THREE.RingGeometry(r * 0.9, r, 40), mat); mat.opacity = 0.8; mat.color.set(MARKER_COLOR);
-      m.lookAt(new THREE.Vector3(...hit.normal));
+    const kind = o && hit && o.cursor !== 'none' ? (o.cursor === 'sphere' || o.cursor === 'height' ? o.cursor : 'circle') : null;
+    if (brush.cursor && brush.kind !== kind) { scene.remove(brush.cursor); brush.cursor.geometry.dispose(); brush.cursor.material.dispose(); brush.cursor = null; }
+    brush.kind = kind;
+    invalidate();
+    if (!kind) return;
+    let m = brush.cursor;
+    if (!m) {
+      const mat = new THREE.MeshBasicMaterial({ color: kind === 'circle' ? MARKER_COLOR : 0xffffff, transparent: true, opacity: kind === 'sphere' ? 0.35 : kind === 'height' ? 0.18 : 0.8, depthWrite: false, side: THREE.DoubleSide });
+      m = brush.cursor = new THREE.Mesh(kind === 'sphere' ? new THREE.SphereGeometry(1, 24, 16) : kind === 'height' ? new THREE.BoxGeometry(1, 1, 1) : new THREE.RingGeometry(0.9, 1, 40), mat);
+      m.raycast = () => {};
+      scene.add(m);
     }
+    const r = Math.max(0.05, o.radius || 1);
+    if (kind === 'height') {
+      const s = Math.max(geomRef ? Math.max(geomRef.x, geomRef.y) : maxDim, 10) * 1.3;
+      m.scale.set(s, s, Math.max(0.05, 2 * r)); m.position.set(0, 0, hit.point[2] - offset[2]); return;
+    }
+    m.scale.setScalar(r);
     m.position.set(hit.point[0] - offset[0] + hit.normal[0] * 0.02, hit.point[1] - offset[1] + hit.normal[1] * 0.02, hit.point[2] - offset[2] + hit.normal[2] * 0.02);
-    scene.add(m); brush.cursor = m;
+    if (kind === 'circle') m.lookAt(brush.up.set(hit.normal[0], hit.normal[1], hit.normal[2]).add(m.position));
   }
   function brushEnd(ev) {
     if (!brush.active) return;
+    if (brush.queued) brushMove();   // letzte Bewegung vor dem Loslassen noch malen
     brush.active = false; controls.enabled = true;
     if (brush.opts) brush.opts.onStroke('end', null, ev);
+  }
+  function brushMove() {
+    if (!brush.queued) return;
+    brush.queued = false;
+    const e = brush.lastEv;
+    if (!brush.opts || !e) return;
+    const hit = brushRay(e);
+    if (brush.active && hit) brush.opts.onStroke('move', hit, e);
+    brushCursor(hit);
   }
   function setBrush(opts) {
     if (!opts) brushEnd();
@@ -305,13 +335,13 @@ const Viewer = (() => {
     const touchGuard = e => { if (!brush.active) return; if (e.touches && e.touches.length > 1) { brushEnd(e); return; } e.stopPropagation(); };
     stage.addEventListener('touchstart', touchGuard, true);
     stage.addEventListener('touchmove', touchGuard, true);
+    // Bewegungen je Bild zusammenfassen: ein Strahl pro Bild (Strich und Zeiger); der Strich verbindet die Treffer (ptDab)
     el.addEventListener('pointermove', e => {
       if (!brush.opts) return;
       brush.lastEv = e;
-      if (brush.active) { const hit = brushRay(e); if (hit) brush.opts.onStroke('move', hit, e); brushCursor(hit); return; }
-      if (brush.hoverQueued || e.pointerType === 'touch') return;
-      brush.hoverQueued = true;
-      requestAnimationFrame(() => { brush.hoverQueued = false; if (brush.opts && !brush.active && brush.lastEv) brushCursor(brushRay(brush.lastEv)); });
+      if (brush.queued || (!brush.active && e.pointerType === 'touch')) return;
+      brush.queued = true;
+      requestAnimationFrame(brushMove);
     });
     el.addEventListener('pointerup', e => brushEnd(e));
     el.addEventListener('pointercancel', e => brushEnd(e));
@@ -325,7 +355,7 @@ const Viewer = (() => {
     if (!renderer) return;
     clip.helper.visible = on;
     if (mesh) mesh.material.clippingPlanes = on ? [clip.plane] : [];
-    extras.concat(overlays, paintLayer ? [paintLayer] : []).forEach(m => { m.material.clippingPlanes = on ? [clip.plane] : []; });
+    layers().concat(preview ? [preview] : []).forEach(m => { m.material.clippingPlanes = on ? [clip.plane] : []; });
   }
   function setClipAxis(axis) {
     clip.axis = axis;
@@ -392,9 +422,12 @@ const Viewer = (() => {
       if (!hit) return;
       // zweites Argument: getroffener Punkt in geom-Koordinaten (für die Beschriftung)
       if (pick.on) { const cb = pick.onPick; setPick(false); if (cb) cb(hit.faceIndex, [hit.point.x + offset[0], hit.point.y + offset[1], hit.point.z + offset[2]]); return; }
-      addMeasurePoint(hit.point.clone());
+      addMeasurePoint(hit.point.clone()); invalidate();
     });
   }
 
-  return { available, init, show, fit, clear, setOverlay, setPaintLayer, setPreview, triColor, setBrush, setBrushRadius, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
+  // jede Funktion von außen kann die Szene ändern → danach neu zeichnen
+  const api = { available, init, show, fit, clear, setOverlay, setPaintLayer, setPreview, triColor, setBrush, setBrushRadius, setVolume, colorize, setPaint, setWireframe, setAxes, setClip, setClipAxis, setClipFraction, setMeasure, setPick, setExtras };
+  for (const k of Object.keys(api)) if (k !== 'available' && k !== 'triColor') { const f = api[k]; api[k] = function () { const r = f.apply(this, arguments); invalidate(); return r; }; }
+  return api;
 })();
