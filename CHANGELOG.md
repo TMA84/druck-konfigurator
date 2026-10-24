@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.45.1] – 2026-10-24
+
+### Intern
+- `js/live-ui.js` (3D-Druckeransicht) und `js/export3mf.js` (3MF-Export) in kleinere Dateien aufgeteilt (`live-scene/-mech/-ace/-fx/-head.js`, `export3mf-settings/-mesh/-pack/-relayout.js`) – nur verschoben, keine Änderung im Verhalten.
+
 ## [10.45.0] – 2026-10-24
 
 ### Neu
