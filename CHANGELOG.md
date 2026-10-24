@@ -2,6 +2,37 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.44.0] – 2026-10-24
+
+Ergebnis eines Code-Reviews (Sicherheit, Fehlerbehandlung, Performance).
+
+### Behoben – Drucken
+- **Kurzer WLAN-Aussetzer:** Nach dem Neuverbinden wartet die Druckwerkstatt auf den echten Druckstatus. Vorher galt ein laufender Druck kurz als beendet: Platte „fertig“, falscher Eintrag in der Historie, Meldung „fertig“ an Home Assistant.
+- **Kein doppelter Druckstart:** Während ein Druck hochgeladen wird, lässt sich der Dialog nicht schließen und kein zweiter Start auslösen; der Server lehnt einen gleichzeitigen zweiten Start ab. Eine alte Ablehnung des Druckers wird beim nächsten Start nicht mehr als neue gewertet.
+- **Geplanter Druck:** Mit zwei ACE werden Slots 5–8 richtig erkannt. Ein einzelner Verbindungsaussetzer zur Startzeit lässt den Plan nicht mehr scheitern (bis 5 min Nachfrist). Während des Hochladens zeigt der Plan „startet“, und Seite und Absagen hängen nicht mehr.
+- **Spulen, Warteschlange, Zeitplan:** Dateien werden sicher geschrieben; eine beschädigte Datei wird als `.corrupt-…` aufgehoben statt still überschrieben.
+- Pause/Fortsetzen/Stopp bleiben gesperrt, solange ein Befehl läuft. Die Werkbank fragt weiter ab, auch wenn bei einer Meldung etwas schiefgeht.
+
+### Behoben – Konfigurator
+- Export und Kosten mit bemalter 3MF plus hinzugefügtem Teil brachen mit einem Fehler ab.
+- Import: ungültige Dreiecke (NaN, falsche Indizes) werden entfernt und gemeldet; zu große oder beschädigte Dateien und ZIP-Bomben geben eine verständliche Meldung. Zwei schnell nacheinander geladene Dateien überschreiben sich nicht mehr.
+- Importierte Profile werden geprüft; Werte aus Profilen und vom Drucker landen nur noch maskiert in der Seite.
+- Farbanteile bemalter Dreiecke beim Import wie beim Bemalen gewichtet.
+
+### Sicherheit – Server
+- Nur noch die Dateien der Seite werden ausgeliefert (kein `/.git/`, keine Verzeichnislisten).
+- Ohne PIN nur bekannte Servernamen (IP, `localhost`, Namen ohne Punkt, `.local`, `.lan`, `.fritz.box`, `.home.arpa`, `.internal`); weitere über `KONFIGURATOR_ALLOWED_HOSTS`. Schützt vor fremden Webseiten, die per DNS-Rebinding Befehle schicken.
+- Ungültige Anfragegrößen, Zeitlimit für Verbindungen, höchstens zwei Uploads gleichzeitig, Fehler immer als verständliche Antwort, globale Sperre gegen PIN-Raten.
+- Kamera und Status lassen sich nicht mehr von fremden Seiten auslösen.
+- Schichtvorschau und Objekte überspringen nehmen bei ähnlichen Namen (z. B. Halter/Wandhalter) nicht mehr den falschen Druck.
+
+### Schneller
+- 3D-Druckeransicht und Modell-Ansicht zeichnen nur noch, wenn sich etwas bewegt, und gar nicht, wenn sie nicht zu sehen sind. Der Schlauch wird seltener neu gebaut; der Grafikspeicher wächst bei Druckstart/-ende nicht mehr.
+- Kamera stoppt, wenn das Fenster im Hintergrund ist.
+- Teilanalyse wird zwischengespeichert, Pinsel beim Bemalen flüssiger, großer STL-Import schneller.
+- Dashboard-Karte startet nach einem Fehler nicht mehr ständig neu.
+- Raster und flache Düse in der 3D-Ansicht wieder sichtbar.
+
 ## [10.43.0] – 2026-10-18
 
 ### Neu
