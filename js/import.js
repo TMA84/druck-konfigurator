@@ -82,6 +82,7 @@ function splitBodyGroups(pos) {
   const parent = new Int32Array(n).map((_, i) => i);
   const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
   const first = weldFirst(pos, n);
+  progressAt(0.5);
   if (first) for (let t = 0; t < n; t++) for (let v = 0; v < 3; v++) {
     const other = first[t * 3 + v];
     if (other !== t) { const a = find(t), b = find(other); if (a !== b) parent[a] = b; }
@@ -237,6 +238,7 @@ function parse3MF(fileName, zip, zipLib) {
   const models = new Map();
   const model = p => { if (!models.has(p)) { const xml = text(p); if (xml === null) throw Error(t('{file} fehlt', { file: p })); models.set(p, parseModelXML(xml)); } return models.get(p); };
   const root = model(rootPath);
+  progressAt(0.5);
   const settings = parseModelSettings(text('Metadata/model_settings.config'));
   const plateOf = new Map();
   settings.plates.forEach(pl => pl.instances.forEach(x => plateOf.set(x.id + '#' + x.instance, pl.id)));
@@ -281,7 +283,8 @@ function parse3MF(fileName, zip, zipLib) {
   // (neben dem Bett abgelegt). Sie mitzunehmen schob beim Mitten des Designer-Layouts das echte Teil vom Bett
   // (2026-10-02, Bambu-3MF „KOBRA-3-S1-REDONDO…“: Orca brach ab, keine Objekte auf der Platte).
   const hasPlates = settings.plates.some(pl => pl.instances.length);
-  root.items.forEach(item => {
+  root.items.forEach((item, ii) => {
+    progressAt(0.5 + 0.5 * ii / root.items.length);
     const obj = root.objects.get(item.objectid);
     if (!obj || (obj.type && obj.type !== 'model')) return;
     const inst0 = seen.get(item.objectid) || 0;
@@ -354,10 +357,10 @@ function stlToMm(pos, fileName, notes) {
   return out;
 }
 function stlParts(fileName, bytes, notes = []) {
-  const raw = readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  const raw = progressSub(0, 0.3, () => readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)));
   if (raw.dropped) notes.push(badTrisNote(fileName, raw.dropped));
   const pos = stlToMm(raw, fileName, notes);
-  const groups = splitBodyGroups(pos);
+  const groups = progressSub(0.3, 1, () => splitBodyGroups(pos));
   const base = fileName.replace(/^.*[\\/]/, '');
   // Sehr kleine STL: vielleicht in Zoll gespeichert – nicht eindeutig, deshalb nur ein Angebot in der Seite (inchHint)
   const inch = !pos.unitFixed && stlMaxSize(pos) <= STL_INCH_MAX_MM && stlMaxSize(pos) * 25.4 <= 1000;
@@ -373,8 +376,10 @@ function objParts(fileName, bytes, notes = []) {
   let cur = null, hasO = /^o\s/m.test(text), badObj = 0;
   const open = name => { cur = { name, tris: [] }; groups.push(cur); };
   const idx = (s, n) => { const i = parseInt(s, 10); return i < 0 ? n + i : i - 1; };
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
+  const lines = text.split(/\r?\n/);
+  for (let li = 0; li < lines.length; li++) {
+    if (!(li & 262143)) progressAt(0.6 * li / lines.length);
+    const line = lines[li].trim();
     if (!line || line[0] === '#') continue;
     const sp = line.split(/\s+/), k = sp[0];
     if (k === 'v') v.push(+sp[1], +sp[2], +sp[3]);
@@ -398,7 +403,7 @@ function objParts(fileName, bytes, notes = []) {
   let o = 0; for (const g of used) { all.set(g.tris, o); o += g.tris.length; }
   const mm = stlToMm(all, fileName, notes), f = mm === all ? 1 : 1000;   // Meter: alle Gruppen gleich umrechnen
   if (used.length === 1) {
-    const groupsB = splitBodyGroups(mm);
+    const groupsB = progressSub(0.6, 1, () => splitBodyGroups(mm));
     return groupsB.map((g, i) => ({ name: groupsB.length > 1 ? base + ' · Teil ' + (i + 1) : (used[0].name || base), pos: g.pos,
       ...(g.bodies.length > 1 ? { bodies: g.bodies.map((count, j) => ({ name: 'Körper ' + (j + 1), count })) } : {}) }));
   }
@@ -428,18 +433,23 @@ function importModels(entries, zipLib) {
   if (!files.length) throw Error(notes.join(' ') || t('keine Modelldatei'));
 
   const parts = [];
-  let threemf = null;
+  let threemf = null, done = 0;
+  // Fortschritt (nur im Hintergrund, js/stl.js progressSub): Anteil je Datei nach Größe
+  const sizeAll = files.reduce((a, f) => a + ((f.bytes && f.bytes.length) || 0), 0) || 1;
   for (const f of files) {
     if (f.bytes && f.bytes.length > IMPORT_MAX_BYTES) throw tooBig(f.name);
+    const from = done / sizeAll; done += (f.bytes && f.bytes.length) || 0;
     // zu wenig Speicher / Netz zu groß für ein Array (RangeError) → verständliche Meldung statt „Invalid array length“
-    try {
-      if (/\.3mf$/i.test(f.name)) {
-        const r = parse3MF(f.name, safeUnzip(f.name, f.bytes, zipLib), zipLib);
-        parts.push(...r.parts); notes.push(...r.notes);
-        if (files.length === 1) threemf = r.threemf;
-      } else if (/\.obj$/i.test(f.name)) parts.push(...objParts(f.name, f.bytes, notes));
-      else parts.push(...stlParts(f.name, f.bytes, notes));
-    } catch (err) { if (err instanceof RangeError) throw tooBig(f.name); throw err; }
+    progressSub(from, done / sizeAll, () => {
+      try {
+        if (/\.3mf$/i.test(f.name)) {
+          const r = parse3MF(f.name, safeUnzip(f.name, f.bytes, zipLib), zipLib);
+          parts.push(...r.parts); notes.push(...r.notes);
+          if (files.length === 1) threemf = r.threemf;
+        } else if (/\.obj$/i.test(f.name)) parts.push(...objParts(f.name, f.bytes, notes));
+        else parts.push(...stlParts(f.name, f.bytes, notes));
+      } catch (err) { if (err instanceof RangeError) throw tooBig(f.name); throw err; }
+    });
   }
   if (files.length > 1 && tmf.length) notes.push(t('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.'));
   const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : t('{n} Teile', { n: parts.length });

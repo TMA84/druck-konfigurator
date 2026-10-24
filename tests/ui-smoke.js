@@ -768,6 +768,51 @@ async function runSmoke(opts={}){
     ok(typeof t==='function'&&I18N.dict['Datei']==='File','englisches Wörterbuch geladen');
   }
 
+  /* 13c) Großes Modell im Hintergrund lesen (js/import-worker.js): gleiches Ergebnis wie direkt gelesen, Fortschritt in %,
+     neuere Datei bricht das Lesen ab */
+  { const W0=window.Worker;let made=0;
+    window.Worker=class extends W0{constructor(u,o){super(u,o);if(/import-worker/.test(u))made++}};
+    // zwei getrennte Ringe (je 2·200·200 Dreiecke, ≈ 8 MB) → zwei Teile
+    const torus=(cx,N)=>{const P=(i,j)=>{const u=2*Math.PI*(i%N)/N,v=2*Math.PI*(j%N)/N;return [(30+10*Math.cos(v))*Math.cos(u)+cx,(30+10*Math.cos(v))*Math.sin(u)+60,10*Math.sin(v)+10]},out=[];
+      for(let i=0;i<N;i++)for(let j=0;j<N;j++){const a=P(i,j),b=P(i+1,j),c=P(i+1,j+1),d=P(i,j+1);out.push([a,b,c],[a,c,d])}return out};
+    const tris=[...torus(50,200),...torus(150,200)],buf=new ArrayBuffer(84+tris.length*50),dv=new DataView(buf);dv.setUint32(80,tris.length,true);
+    tris.forEach((tr,i)=>{let o=84+i*50+12;for(const p of tr)for(const c of p){dv.setFloat32(o,c,true);o+=4}});
+    const big=new File([buf],'gross.stl');
+    const sig=()=>project?project.parts.map(p=>[p.name,p.geom.n,p.geom.vol,p.geom.total,p.geom.bedArea,p.geom.x,p.geom.y,p.geom.z,p.geom.hidden.reduce((s,v)=>s+v,0),p.geom.pos===p.origPos,p.bodies?p.bodies.length:0].join('|')).join(' / '):'';
+    const loaded=async before=>{for(let i=0;i<300&&!(project&&project!==before&&!/%/.test($('fileinfo').textContent));i++)await wait(100)};
+    // Hintergrund: Fortschritt sichtbar, Fenster reagiert (längste Pause zwischen zwei Zeitgebern)
+    const seen=new Set();let gap=0,lastT=performance.now(),run=true;
+    (async()=>{while(run){await wait(20);const n=performance.now();gap=Math.max(gap,n-lastT);lastT=n;const m=/(\d+) %/.exec($('fileinfo').textContent);if(m)seen.add(+m[1])}})();
+    let before=project;await dropFile(big);await loaded(before);run=false;
+    const viaWorker=sig(),tw=project.parts.reduce((s,p)=>s+p.geom.n,0);
+    ok(made===1&&tw===tris.length&&project.parts.length===2,'großes Modell im Hintergrund gelesen ('+made+' Worker, '+tw+' Dreiecke, '+project.parts.length+' Teile)');
+    ok(seen.size>=2,'Fortschritt beim Lesen angezeigt ('+[...seen].sort((a,b)=>a-b).join(', ')+' %; längste Pause '+Math.round(gap)+' ms)');
+    // direkt gelesen (wie bisher): exakt dieselben Teile und Analysewerte
+    const min0=IMPORT_WORKER_MIN;IMPORT_WORKER_MIN=Infinity;
+    before=project;await dropFile(big);await loaded(before);
+    ok(made===1&&sig()===viaWorker,'direkt gelesen: gleiches Ergebnis wie im Hintergrund');
+    IMPORT_WORKER_MIN=min0;
+    // neuere Datei während des Lesens: die ältere verfällt, ihr Worker endet
+    await dropFile(big);for(let i=0;i<100&&made<2;i++)await wait(20);
+    before=project;await dropFile(stlFile('klein.stl',[[0,0,0,20,20,20]]));await loaded(before);await wait(1500);
+    ok(made===2&&project.name==='klein.stl'&&importWorker===null,'neuere Datei bricht das Lesen im Hintergrund ab ('+project.name+')');
+    // Nahtstelle direkt: bemalte 3MF (Platten, Einstellungen) und STL mit zwei Körpern – Worker und importModels liefern dasselbe
+    { const v='<vertex x="0" y="0" z="0"/><vertex x="10" y="0" z="0"/><vertex x="0" y="10" z="0"/><vertex x="10" y="10" z="0"/><vertex x="0" y="0" z="5"/>';
+      const tr='<triangle v1="0" v2="1" v3="2" paint_color="8"/><triangle v1="1" v2="3" v3="2" paint_color="2C"/><triangle v1="0" v2="1" v3="4" paint_supports="4"/>';
+      const model='<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources><object id="1" type="model"><mesh><vertices>'+v+'</vertices><triangles>'+tr+'</triangles></mesh></object></resources><build><item objectid="1"/></build></model>';
+      const zip=fflate.zipSync({'3D/3dmodel.model':fflate.strToU8(model),'_rels/.rels':fflate.strToU8('<Relationships><Relationship Target="/3D/3dmodel.model" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
+        'Metadata/project_settings.config':fflate.strToU8('{"layer_height":"0.2"}'),'Metadata/model_settings.config':fflate.strToU8('<config><object id="1"><metadata key="name" value="Bemalt"/><metadata key="extruder" value="2"/></object><plate><metadata key="plater_id" value="1"/><model_instance><metadata key="object_id" value="1"/><metadata key="instance_id" value="0"/></model_instance></plate></config>')});
+      const boxes=new Uint8Array(await stlFile('zwei.stl',[[0,0,0,10,10,10],[30,0,0,40,10,10]]).arrayBuffer());
+      const plain=x=>JSON.stringify(x,(k,val)=>ArrayBuffer.isView(val)?[val.constructor.name,...val]:val instanceof Set?['Set',...val]:val instanceof Map?['Map',...val]:typeof val==='number'&&!isFinite(val)?String(val):val);
+      for(const [name,bytes] of [['bemalt.3mf',zip],['zwei.stl',boxes]]){
+        const direct=importModels([{name,bytes:bytes.slice()}],fflate),geoms=direct.parts.map(p=>makeGeom(p.name,p.pos));
+        const w=await importInWorker([{name,bytes:bytes.slice()}],()=>{});
+        const wg=w?w.parts.map(p=>{const g=p.geom;delete p.geom;return g}):[];
+        ok(w&&plain(w)===plain(direct)&&plain(wg)===plain(geoms)&&wg.every((g,i)=>g.pos===w.parts[i].pos),'Worker = direkt gelesen: '+name+' ('+(w?w.parts.length:0)+' Teile)');
+      }
+    }
+    window.Worker=W0; }
+
   /* 14) Modell entfernen */
   menuClick('clear');ok(!$('modelCard').classList.contains('loaded')&&$('export3mf').disabled,'Modell entfernen setzt alles zurück');
 
