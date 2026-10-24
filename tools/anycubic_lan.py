@@ -824,6 +824,18 @@ def _light_off_after_cam(link):
             return
 
 
+CAM_PROBE_S = 1.5   # so lange auf die ersten Bytes eines schon laufenden Streams warten
+
+
+def _stream_running(url):
+    """Sendet die Kamera schon (anderer Zuschauer, Neuladen kurz zuvor)? Dann braucht es kein startCapture."""
+    try:
+        with urllib.request.urlopen(url, timeout=CAM_PROBE_S) as r:
+            return r.read(3) == b"FLV"
+    except (OSError, ValueError):
+        return False
+
+
 def camera_url(host):
     """Kamera-Adresse (HTTP-FLV, Port 18088) – nur auf dem Drucker selbst; startet die Übertragung."""
     link = _ready(host)
@@ -834,6 +846,10 @@ def camera_url(host):
     if u.hostname != host and u.hostname != (link.data("info").get("ip")):
         raise LanError("Kamera-Adresse zeigt nicht auf den Drucker", "forbidden")
     check_host(u.hostname)
+    # Jedes startCapture schaltet am Kobra S1 das Licht ein (gemessen 2026-10-24: 0,3 s danach light/control status 1) –
+    # läuft der Stream noch (die Firmware hält ihn nach dem letzten Zuschauer eine Weile), ohne Befehl anschließen
+    if _stream_running(url):
+        return url
     try:
         link.request("video", "startCapture", {}, timeout=8)
     except LanError:

@@ -394,6 +394,16 @@ lan._light_off_after_cam(link); time.sleep(0.5)
 lan.LIGHT_CAM_DELAYS_S = delays
 check("nach dem Kamerastart sofort wieder aus", broker.light["status"] == 0, broker.light)
 link.light_off = None
+# Läuft der Stream schon, kein startCapture (schaltet das Licht ein); sonst schon
+caps = []
+req, run = link.request, lan._stream_running
+link.request = lambda kind, action, *a, **k: caps.append((kind, action))
+lan._stream_running = lambda url: True
+check("Kamera läuft schon: kein startCapture", lan.camera_url("127.0.0.1") == "http://127.0.0.1:18088/flv" and caps == [], caps)
+lan._stream_running = lambda url: False
+check("Kamera aus: startCapture", lan.camera_url("127.0.0.1") == "http://127.0.0.1:18088/flv" and caps == [("video", "startCapture")], caps)
+link.request, lan._stream_running = req, run
+check("Stream-Probe: nichts unter der Adresse → nicht laufend", lan._stream_running("http://127.0.0.1:9/flv") is False)
 lan.POLL_S = 5
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})
 lan.command("127.0.0.1", "axis", "move", {"axis": 3, "move_type": 2})

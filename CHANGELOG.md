@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.46.1] – 2026-10-24
+
+### Behoben
+- **Licht ging beim Öffnen der Kamera wieder an** (Issue #1, Ursache jetzt gefunden): Der Kobra S1 schaltet das Licht bei jedem Kamera-Startbefehl selbst ein (gemessen: 0,3 s danach). Läuft die Kamera schon – sie sendet nach dem letzten Zuschauer noch eine Weile weiter –, schließt sich die Druckwerkstatt jetzt ohne Startbefehl an. Neu laden, ein zweites Gerät oder die Dashboard-Karte lassen das Licht damit aus; nur beim ersten Kamerastart schaltet die Druckwerkstatt es wie bisher gleich wieder aus.
+
 ## [10.46.0] – 2026-10-24
 
 ### Neu
