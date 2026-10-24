@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.45.0] – 2026-10-24
+
+### Neu
+- **„Später starten“ und „Bett vorwärmen“ für fertigen G-Code:** Auch eigener G-Code lässt sich planen. Die Betttemperatur fürs Vorwärmen kommt aus dem G-Code (ohne Angabe kein Vorwärmen); die Zuordnung Werkzeug → ACE-Slot gilt auch beim geplanten Start und wird vor dem Start geprüft. Die Werkbank zeigt den Dateinamen.
+- **Großes Modell laden ohne Einfrieren:** Große Dateien (ab etwa 4 MB) werden im Hintergrund gelesen, mit Fortschritt „Lese … 45 %“ in der Modellkarte; die Seite bleibt bedienbar. Eine neue Datei bricht das Lesen der vorigen ab.
+- **Home-Assistant-Add-on:** Option „Weitere Servernamen“ für den direkten Port ohne PIN (z. B. hinter einem Reverse-Proxy).
+
+### Verbessert
+- **Uploads gehen direkt auf die Platte:** Beim Slicen und beim G-Code-Import liegt die Datei nicht mehr ganz im Speicher (50 MB G-Code: Spitze 57 MB → 5 MB) – wichtig auf dem Raspberry Pi. Unvollständig übertragene Dateien werden abgelehnt statt halb übernommen.
+- **Automatische Code-Prüfung (ESLint, Ruff)** bei jedem Push; ein Fehler hält das Release an. Der Anordnen-Test läuft jetzt auch auf GitHub (vorher nur mit lokalen Dateien).
+
 ## [10.44.2] – 2026-10-24
 
 ### Behoben
