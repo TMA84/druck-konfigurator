@@ -191,7 +191,6 @@ function partColours(p){
   const st=(project.threemf&&project.threemf.settings)||{},dcol=d=>{const c=(st.filament_colour||[])[d];return /^#[0-9a-f]{6}$/i.test(c||'')?c:null};
   const own=p.slot??(typeof defaultSlot==='function'?defaultSlot():0),map=(project.threemf&&project.threemf.designMap)||{},out=[],lc=lowColours(p);
   const lowTxt=t('in den ersten Schichten – von unten sichtbar');
-  const base0=out.length;
   (p.bodies||[]).forEach((b,j)=>out.push({kind:'body',key:j,slot:b.slot??null,eff:b.slot??own,label:t(b.name),sub:lc.bodies[j]&&b.count<p.geom.n/2?lowTxt:''}));
   /* Bemalung je Dreieck: je Farbe des Designers eine Zeile mit Slot (Klick → Slot wählen, gilt projektweit wie bei
      Modifikatoren und oben unter „Filamente“) und Anteil der Oberfläche – vorher nur Farbpunkte mit Verweis nach oben,

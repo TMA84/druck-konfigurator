@@ -6,6 +6,7 @@
 target-version = "py312"
 include = ["tools/**/*.py", "tests/**/*.py"]
 line-length = 200
+extend-exclude = [".claude"]
 
 [lint]
 select = ["E9", "F", "B"]

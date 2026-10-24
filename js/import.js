@@ -370,7 +370,7 @@ function stlParts(fileName, bytes, notes = []) {
    ohne Gruppen wie bei STL: getrennte Körper als Teile. Achsen wie in OrcaSlicer unverändert (Z oben), Meter → mm wie STL. */
 function objParts(fileName, bytes, notes = []) {
   const text = new TextDecoder().decode(bytes), v = [], groups = [];
-  let cur = null, by = null, hasO = /^o\s/m.test(text), badObj = 0;
+  let cur = null, hasO = /^o\s/m.test(text), badObj = 0;
   const open = name => { cur = { name, tris: [] }; groups.push(cur); };
   const idx = (s, n) => { const i = parseInt(s, 10); return i < 0 ? n + i : i - 1; };
   for (const raw of text.split(/\r?\n/)) {

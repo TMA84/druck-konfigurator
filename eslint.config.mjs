@@ -102,7 +102,7 @@ const RULES = {
 const node = { ...globals.node };
 
 export default [
-  { ignores: ['vendor/**', 'docs/**', 'node_modules/**', 'js/orca-printers/**'] },
+  { ignores: ['vendor/**', 'docs/**', 'node_modules/**', 'js/orca-printers/**', '.claude/**'] },
   { linterOptions: { reportUnusedDisableDirectives: 'error' } },
 
   // Seitendateien: jede Datei mit den Namen der übrigen als Globals (siehe oben)
