@@ -29,28 +29,44 @@ function wbCamAuto() {
   wb.camRetries = 0; wbCamStart(false);
 }
 
+/* Eine Abfrage zur Zeit zählt: wb.pollSeq – überholt eine neuere (Tab geöffnet, Verbinden, Befehl, Zeitgeber) eine ältere,
+   verwirft die ältere ihre Antwort (sonst gewänne ein alter Stand, und wbEvents meldete „fertig“ zweimal). Ein Fehler in
+   einem der Module danach (Warteschlange, 3D-Fortschritt, Plan …) hält die Abfrage nicht mehr an: finally plant neu. */
+const wbSafe = (name, fn) => { try { fn(); } catch (e) { console.error('wbPoll/' + name, e); } };
 async function wbPoll() {
   clearTimeout(wb.timer);
   if (document.body.dataset.tab !== 'printer') return;
-  const host = wbHost();
-  if (!host || !(await lanServerAvailable())) { wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : ''); return; }
-  // pos=1: Kopfposition auch während des Drucks, solange die 3D-Ansicht offen ist (js/live-ui.js)
-  const pos = typeof livePosWanted === 'function' && livePosWanted() ? '&pos=1' : '';
-  const prev = wb.st, n0 = wb.cmdN || 0;
-  let st = null, err = '';
-  try { st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); }
-  catch (e) { err = t(e.message); }
-  /* Stand von vor oder während eines Befehls verwerfen – er setzte z. B. den Lichtschalter zurück, obwohl der Drucker schon
-     umgeschaltet hatte (2026-10-09). wbCmd holt danach selbst frisch (finally → wbPoll). */
-  if (wb.cmdBusy || (wb.cmdN || 0) !== n0) return;
-  if (err) wb.err = err; else { wb.st = st; wb.err = ''; }
-  if (!wb.err) wbEvents(prev, wb.st);
-  wbRender();
-  if (!wb.err && typeof onQueueStatus === 'function') onQueueStatus(wb.st);
-  if (!wb.err && typeof liveUpdate === 'function') liveUpdate(wb.st);   // 3D-Fortschritt (js/live-ui.js)
-  wbCamAuto();   // Warteschlange (js/queue-ui.js)
-  if (typeof schedPoll === 'function') schedPoll();   // geplanter Druck (js/schedule-ui.js)
-  wb.timer = setTimeout(wbPoll, WB_POLL_MS);
+  const seq = wb.pollSeq = (wb.pollSeq || 0) + 1;
+  let again = true;
+  try {
+    const host = wbHost();
+    if (!host || !(await lanServerAvailable())) {
+      again = false;
+      if (seq === wb.pollSeq) wbRenderNoLink(host ? t('Der Server kann den LAN-Modus nicht (im Container enthalten; lokal: pip install -r requirements.txt).') : '');
+      return;
+    }
+    // pos=1: Kopfposition auch während des Drucks, solange die 3D-Ansicht offen ist (js/live-ui.js)
+    const pos = typeof livePosWanted === 'function' && livePosWanted() ? '&pos=1' : '';
+    const n0 = wb.cmdN || 0;
+    let st = null, err = '';
+    try { st = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host) + pos); }
+    catch (e) { err = t(e.message); }
+    if (seq !== wb.pollSeq) { again = false; return; }   // eine neuere Abfrage läuft – sie plant auch neu
+    /* Stand von vor oder während eines Befehls verwerfen – er setzte z. B. den Lichtschalter zurück, obwohl der Drucker schon
+       umgeschaltet hatte (2026-10-09). wbCmd holt danach selbst frisch (finally → wbPoll). */
+    if (wb.cmdBusy || (wb.cmdN || 0) !== n0) { again = false; return; }
+    const prev = wb.st;
+    if (err) wb.err = err; else { wb.st = st; wb.err = ''; }
+    if (!wb.err) wbSafe('events', () => wbEvents(prev, wb.st));
+    wbSafe('render', wbRender);
+    if (!wb.err && typeof onQueueStatus === 'function') wbSafe('queue', () => onQueueStatus(wb.st));   // Warteschlange (js/queue-ui.js)
+    if (!wb.err && typeof liveUpdate === 'function') wbSafe('live', () => liveUpdate(wb.st));   // 3D-Fortschritt (js/live-ui.js)
+    wbSafe('camera', wbCamAuto);
+    if (typeof schedPoll === 'function') wbSafe('schedule', schedPoll);   // geplanter Druck (js/schedule-ui.js)
+  } catch (e) { console.error('wbPoll', e); }
+  finally {
+    if (again && seq === wb.pollSeq && document.body.dataset.tab === 'printer') { clearTimeout(wb.timer); wb.timer = setTimeout(wbPoll, WB_POLL_MS); }
+  }
 }
 
 /* Druck pausiert (mit Grund), fertig oder abgebrochen: Meldung in der Seite und – wenn erlaubt – als Benachrichtigung
@@ -133,7 +149,7 @@ function wbRender() {
 
   // Druckauftrag
   if (job) {
-    const jt = wbJobTitle(job.name), pct = job.progress ?? 0;
+    const jt = wbJobTitle(job.name), pct = Math.max(0, Math.min(100, safeInt(job.progress)));
     // Restzeit: eigene Schätzung aus Orca und der aktuellen Schicht (js/live-ui.js lvRemaining), sonst die des Druckers
     const own = !job.paused && typeof lvRemaining === 'function' ? lvRemaining(st) : null, remMin = own ? Math.round(own.s / 60) : job.remaining_min;
     const remTip = own ? t('Aus der Orca-Schätzung und der aktuellen Schicht; der Drucker meldet {m}', { m: wbMin(job.remaining_min) }) : t('Laut Drucker');
@@ -142,7 +158,7 @@ function wbRender() {
       '<div class="wb-bigpct"><b>' + pct + ' %</b><span>' + (job.paused ? t('pausiert') : esc(t(job.status || ''))) + '</span></div>' +
       (job.paused ? '<p class="note warn wb-pause"><b>' + t('Pausiert') + ':</b> ' + esc(t(st.pause_reason || 'am Drucker pausiert – Grund nicht gemeldet')) + '</p>' : '') +
       '<div class="wb-progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%"></i></div>' +
-      '<dl class="wb-jobinfo"><div><dt>' + t('Schicht') + '</dt><dd>' + (job.layer ?? '–') + ' / ' + (job.layers ?? '–') + '</dd></div>' +
+      '<dl class="wb-jobinfo"><div><dt>' + t('Schicht') + '</dt><dd>' + (job.layer != null ? safeInt(job.layer) : '–') + ' / ' + (job.layers != null ? safeInt(job.layers) : '–') + '</dd></div>' +
       '<div title="' + esc(remTip) + '"><dt>' + t('Fertig um') + '</dt><dd>' + (remMin != null && !job.paused ? wbClock(remMin) : '–') + '</dd></div>' +
       '<div title="' + esc(remTip) + '"><dt>' + t('Verbleibend') + '</dt><dd>' + wbMin(remMin) + (own && job.remaining_min != null ? '<small class="wb-printer-rem">' + esc(t('Drucker: {m}', { m: wbMin(job.remaining_min) })) + '</small>' : '') + '</dd></div><div><dt>' + t('Gedruckt') + '</dt><dd>' + wbMin(job.elapsed_min) + '</dd></div>' +
       (job.filament_mm ? '<div><dt>' + t('Filament bisher') + '</dt><dd>' + de(job.filament_mm / 1000, 1) + ' m</dd></div>' : '') + '</dl>';
@@ -154,12 +170,14 @@ function wbRender() {
         (plan.start_at > Date.now() / 1000 ? ' (' + esc(t('in {t}', { t: duration(plan.start_at - Date.now() / 1000) })) + ')' : '') + '<br><small>' + esc(plan.name) + ' · ' + esc(t('Platte {n}', { n: plan.plate })) + '</small>';
     $('wbJob').innerHTML = (wb.err ? '<p class="note bad">' + esc(wb.err) + '</p>' : '') + '<p class="wb-idle">' + msg + '</p>';
   }
-  $('wbPause').disabled = !job || job.paused; $('wbResume').disabled = !job || !job.paused; $('wbStop').disabled = !job;
+  // während eines Befehls (wbCmd) gesperrt lassen – ein anderes wbRender (Plan, ACE-Reiter) gäbe sie sonst frei
+  const busy = !!wb.cmdBusy;
+  $('wbPause').disabled = !job || job.paused || busy; $('wbResume').disabled = !job || !job.paused || busy; $('wbStop').disabled = !job || busy;
   $('wbPause').classList.toggle('hidden', !job || job.paused); $('wbResume').classList.toggle('hidden', !(job && job.paused)); $('wbStop').classList.toggle('hidden', !job);
   $('wbGcode').classList.toggle('hidden', !!job);   // fertigen G-Code senden (js/gcode-ui.js), nur ohne laufenden Druck
   if (typeof skRender === 'function') skRender(st);   // Objekte überspringen (js/skip-ui.js)
   const badge = $('printerBadge');
-  badge.textContent = job ? (job.progress ?? 0) + ' %' : ''; badge.classList.toggle('hidden', !job);
+  badge.textContent = job ? safeInt(job.progress) + ' %' : ''; badge.classList.toggle('hidden', !job);
 
   // Temperaturen, Lüfter
   const tp = st.temps || {};
@@ -183,11 +201,11 @@ function wbRender() {
   $('wbAceTabs').classList.toggle('hidden', boxes.length < 2);
   $('wbAceTabs').innerHTML = boxes.length < 2 ? '' : boxes.map((x, i) => '<button type="button" data-wb-box="' + i + '" aria-pressed="' + (i === bi) + '">ACE ' + (i + 1) +
     (x.drying && x.drying.status ? ' <small>' + t('trocknet') + '</small>' : '') + '</button>').join('');
-  $('wbAceSlots').innerHTML = box ? box.slots.map(s => { const g = base + s.index; return '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
-      '<div class="wb-swatch" style="' + (s.present ? 'background:' + esc(s.colour || '#dddddd') : '') + '"><span>' + (g + 1) + '</span></div>' +
+  $('wbAceSlots').innerHTML = box ? box.slots.map(s => { const si = safeInt(s.index), g = base + si; return '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
+      '<div class="wb-swatch" style="' + (s.present ? 'background:' + safeColour(s.colour, '#dddddd') : '') + '"><span>' + (g + 1) + '</span></div>' +
       '<div class="wb-slotinfo"><b>' + (s.present ? esc(s.type) : t('leer')) + '</b><small>' + (s.present ? (s.loaded ? t('im Drucker') : s.rfid ? 'RFID' : t('von Hand')) : '–') + '</small>' +
         (s.present && typeof spoolTileHTML === 'function' ? spoolTileHTML(g) : '') + '</div>' +
-      (s.present ? '<div class="wb-feed"><button type="button" data-wb-feed="' + s.index + ',1"' + (printing ? ' disabled' : '') + ' title="' + t('Filament bis zur Düse laden') + '">' + t('Laden') + '</button><button type="button" data-wb-feed="' + s.index + ',2"' + (printing ? ' disabled' : '') + ' title="' + t('Filament zurückziehen') + '">' + t('Zurück') + '</button></div>' : '') + '</li>'; }).join('')
+      (s.present ? '<div class="wb-feed"><button type="button" data-wb-feed="' + si + ',1"' + (printing ? ' disabled' : '') + ' title="' + t('Filament bis zur Düse laden') + '">' + t('Laden') + '</button><button type="button" data-wb-feed="' + si + ',2"' + (printing ? ' disabled' : '') + ' title="' + t('Filament zurückziehen') + '">' + t('Zurück') + '</button></div>' : '') + '</li>'; }).join('')
     : '<li class="empty" style="grid-column:1/-1;padding:10px">' + (st.has_ace === 0 ? t('Keine ACE angeschlossen.') : t('Keine ACE-Daten.')) + '</li>';
   $('wbAutoFeed').disabled = !box; if (box && document.activeElement !== $('wbAutoFeed')) $('wbAutoFeed').checked = box.auto_feed === 1;
   const dry = box && box.drying || {};
@@ -321,7 +339,11 @@ function wbCamStart(reconnect) {
   }, 1000);
 }
 $('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); wb.camUserOff = true; return; } wb.camUserOff = false; wb.camRetries = 0; wbCamStart(false); });
-// Fenster/Tab wieder vorn: frisch verbinden (im Hintergrund drosselt der Browser, danach käme ein altes Bild)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && wb.camOn && wb.player) { wb.camRetries = 0; wbCamStart(true); } });
+/* Fenster/Tab im Hintergrund: Kamera anhalten (sonst liefe der Strom vom Drucker über den Server weiter, ohne dass ihn
+   jemand sieht); wb.camOn bleibt – wieder vorn: frisch verbinden (im Hintergrund drosselt der Browser, danach käme ein altes Bild) */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (wb.player) wbCamStop(true); return; }
+  if (wb.camOn && !wb.camUserOff && document.body.dataset.tab === 'printer' && (typeof lv === 'undefined' || lv.mode === 'cam')) { wb.camRetries = 0; wbCamStart(true); }
+});
 
 if (document.body.dataset.tab === 'printer') wbPoll();

@@ -11,6 +11,23 @@ const TOUCH_MM = 0.05;      // Körper mit weniger Abstand gelten als ein Teil
 const MIN_BODY_TRIS = 4;    // kleinere Splitter sind kein eigenständiges Teil
 const UNIT_MM = { micron: 0.001, millimeter: 1, centimeter: 10, inch: 25.4, foot: 304.8, meter: 1000 };
 const MODEL_EXT = /\.(stl|obj|3mf)$/i;
+// Grenzen gegen zu große oder präparierte Dateien (ZIP-Bombe): je Datei bzw. entpackt je ZIP/3MF zusammen, Einträge je ZIP
+const IMPORT_MAX_BYTES = 500 * 1024 * 1024, IMPORT_MAX_ENTRIES = 50000;
+const badTrisNote = (file, n) => t('{file}: {n} ungültige Dreiecke entfernt.', { file: String(file).replace(/^.*[\\/]/, ''), n });
+const tooBig = file => Error(t('{file}: Datei zu groß oder beschädigt.', { file: String(file).replace(/^.*[\\/]/, '') }));
+// ZIP/3MF entpacken mit Grenze für die entpackte Größe (Angabe im ZIP-Verzeichnis; fflate entpackt nie mehr als angegeben);
+// keep(name): nur diese Einträge entpacken. Kaputte Daten und zu große Dateien → „Datei zu groß oder beschädigt“
+function safeUnzip(fileName, bytes, zipLib, keep) {
+  let total = 0, n = 0;
+  try {
+    return zipLib.unzipSync(bytes, { filter: f => {
+      if (keep && !keep(f.name)) return false;
+      total += +f.originalSize || 0;
+      if (++n > IMPORT_MAX_ENTRIES || total > IMPORT_MAX_BYTES) throw new RangeError('zip too large');
+      return true;
+    } });
+  } catch (e) { throw tooBig(fileName); }
+}
 
 /* ---------- STL in Körper zerlegen ---------- */
 function bboxOf(pos, tris) {
@@ -124,6 +141,7 @@ function splitBodyGroups(pos) {
 const splitBodies = pos => splitBodyGroups(pos).map(g => g.pos);
 
 /* ---------- 3MF lesen ---------- */
+const PAINT_HEX = /^[0-9A-Fa-f]+$/;
 const attrsOf = tag => { const o = {}; tag.replace(/([\w:]+)="([^"]*)"/g, (_, k, v) => { o[k] = v; }); return o; };
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
 // unit = Einheit der Datei in mm; gilt auch für den Verschiebungsanteil
@@ -144,6 +162,7 @@ function mulTransform(a, b) {
 }
 
 function parseModelXML(text) {
+  let bad = 0;
   const unit = UNIT_MM[(/<(?:\w+:)?model\b[^>]*\bunit="([^"]+)"/.exec(text) || [])[1] || 'millimeter'] || 1;
   const objects = new Map();
   for (const m of text.matchAll(blockRe('object'))) {
@@ -159,15 +178,23 @@ function parseModelXML(text) {
       const ps = [], pstates = new Set(), canPaint = typeof paintMain === 'function', pc = {};
       // gemalte Stützen und Naht des Designers (paint_supports, paint_seam): Index → Code
       let sc = null, zc = null;
+      // Dreiecke mit Eckpunkt außerhalb der Liste oder ungültigen Koordinaten weglassen (drop: Index in der Datei, für den Export)
+      const nv = vs.length / 3, okV = i => Number.isInteger(i) && i >= 0 && i < nv && Number.isFinite(vs[3 * i]) && Number.isFinite(vs[3 * i + 1]) && Number.isFinite(vs[3 * i + 2]);
+      let ti = -1, drop = null;
       for (const t of meshXml[2].matchAll(tagRe('triangle'))) {
-        const ta = attrsOf(t[1]); ts.push(+ta.v1, +ta.v2, +ta.v3);
-        if (ta.paint_supports) (sc = sc || {})[ts.length / 3 - 1] = ta.paint_supports;
-        if (ta.paint_seam) (zc = zc || {})[ts.length / 3 - 1] = ta.paint_seam;
-        if (ta.paint_color) { painted = true; if (canPaint) { ps[ts.length / 3 - 1] = paintMain(ta.paint_color); if (ta.paint_color.length > 2) paintStates(ta.paint_color).forEach(s => pstates.add(s));
+        ti++;
+        const ta = attrsOf(t[1]), a = +ta.v1, b = +ta.v2, c = +ta.v3;
+        if (!okV(a) || !okV(b) || !okV(c)) { (drop = drop || []).push(ti); continue; }
+        ts.push(a, b, c);
+        // Codes sind Hex-Ziffern (Bambu/Orca); alles andere verwerfen – sie werden beim Export wieder ins XML geschrieben
+        if (ta.paint_supports && PAINT_HEX.test(ta.paint_supports)) (sc = sc || {})[ts.length / 3 - 1] = ta.paint_supports;
+        if (ta.paint_seam && PAINT_HEX.test(ta.paint_seam)) (zc = zc || {})[ts.length / 3 - 1] = ta.paint_seam;
+        if (ta.paint_color && PAINT_HEX.test(ta.paint_color)) { painted = true; if (canPaint) { ps[ts.length / 3 - 1] = paintMain(ta.paint_color); if (ta.paint_color.length > 2) paintStates(ta.paint_color).forEach(s => pstates.add(s));
           if (parseInt(ta.paint_color[ta.paint_color.length - 1], 16) & 3) pc[ts.length / 3 - 1] = ta.paint_color; } }
       }
       if (painted && canPaint) for (let i = 0; i < ts.length / 3; i++) { ps[i] = ps[i] || 0; pstates.add(ps[i]); }
-      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted, sc, zc, ...(painted && canPaint ? { ps: Uint8Array.from(ps), pstates, pc } : {}) };
+      obj.mesh = { v: Float64Array.from(vs), t: Uint32Array.from(ts), painted, sc, zc, ...(drop ? { drop } : {}), ...(painted && canPaint ? { ps: Uint8Array.from(ps), pstates, pc } : {}) };
+      if (drop) bad += drop.length;
     }
     for (const c of body.matchAll(tagRe('component'))) {
       const ca = attrsOf(c[1]);
@@ -179,7 +206,7 @@ function parseModelXML(text) {
     const a = attrsOf(m[1]);
     return { objectid: a.objectid, transform: parseTransform(a.transform, unit), printable: a.printable !== '0' };
   });
-  return { objects, items };
+  return { objects, items, bad };
 }
 
 // model_settings.config: Name, Slot (extruder), Teiletyp je Bauteil und die Platten
@@ -225,7 +252,7 @@ function parse3MF(fileName, zip, zipLib) {
     if (obj.mesh) {
       const { v, t } = obj.mesh;
       // Herkunft der Dreiecke (Datei, Objekt, erster Index im Teil): eigene Bemalung wird beim Export dorthin geschrieben
-      (flags.src = flags.src || []).push({ path, id, start: out.length / 9, count: t.length / 3 });
+      (flags.src = flags.src || []).push({ path, id, start: out.length / 9, count: t.length / 3, ...(obj.mesh.drop ? { drop: obj.mesh.drop } : {}) });
       if (obj.mesh.pc) for (const [i, code] of Object.entries(obj.mesh.pc)) (flags.pc = flags.pc || {})[out.length / 9 + +i] = code;
       if (obj.mesh.sc) for (const [i, code] of Object.entries(obj.mesh.sc)) (flags.sc = flags.sc || {})[out.length / 9 + +i] = code;
       if (obj.mesh.zc) for (const [i, code] of Object.entries(obj.mesh.zc)) (flags.zc = flags.zc || {})[out.length / 9 + +i] = code;
@@ -295,6 +322,8 @@ function parse3MF(fileName, zip, zipLib) {
       ...(flags.sc ? { supCodes: flags.sc } : {}), ...(flags.zc ? { seamCodes: flags.zc } : {})
     });
   });
+  const badTris = [...models.values()].reduce((s, m) => s + (m.bad || 0), 0);
+  if (badTris) notes.push(badTrisNote(fileName, badTris));
   if (!parts.length) throw Error(t('keine druckbaren Objekte in {file}', { file: fileName }));
   if (skipped) notes.push(t('{n} Modifier/Hilfskörper ausgelassen (werden nicht gedruckt).', { n: skipped }));
   if (offPlate) notes.push(t('{n} Objekt(e) im Projekt auf „nicht drucken“ oder neben den Platten – weggelassen, wie in Bambu Studio/OrcaSlicer.', { n: offPlate }));
@@ -325,7 +354,9 @@ function stlToMm(pos, fileName, notes) {
   return out;
 }
 function stlParts(fileName, bytes, notes = []) {
-  const pos = stlToMm(readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), fileName, notes);
+  const raw = readSTL(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  if (raw.dropped) notes.push(badTrisNote(fileName, raw.dropped));
+  const pos = stlToMm(raw, fileName, notes);
   const groups = splitBodyGroups(pos);
   const base = fileName.replace(/^.*[\\/]/, '');
   // Sehr kleine STL: vielleicht in Zoll gespeichert – nicht eindeutig, deshalb nur ein Angebot in der Seite (inchHint)
@@ -339,7 +370,7 @@ function stlParts(fileName, bytes, notes = []) {
    ohne Gruppen wie bei STL: getrennte Körper als Teile. Achsen wie in OrcaSlicer unverändert (Z oben), Meter → mm wie STL. */
 function objParts(fileName, bytes, notes = []) {
   const text = new TextDecoder().decode(bytes), v = [], groups = [];
-  let cur = null, by = null, hasO = /^o\s/m.test(text);
+  let cur = null, by = null, hasO = /^o\s/m.test(text), badObj = 0;
   const open = name => { cur = { name, tris: [] }; groups.push(cur); };
   const idx = (s, n) => { const i = parseInt(s, 10); return i < 0 ? n + i : i - 1; };
   for (const raw of text.split(/\r?\n/)) {
@@ -352,9 +383,15 @@ function objParts(fileName, bytes, notes = []) {
       if (!cur) open('');
       const n = v.length / 3, ids = sp.slice(1).map(x => idx(x.split('/')[0], n));
       if (ids.some(i => !(i >= 0 && i < n))) throw Error(t('{file}: Fläche verweist auf einen Punkt, den es nicht gibt.', { file: fileName }));
-      for (let j = 1; j + 1 < ids.length; j++) for (const i of [ids[0], ids[j], ids[j + 1]]) cur.tris.push(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+      const okV = i => Number.isFinite(v[3 * i]) && Number.isFinite(v[3 * i + 1]) && Number.isFinite(v[3 * i + 2]);
+      for (let j = 1; j + 1 < ids.length; j++) {
+        const tri = [ids[0], ids[j], ids[j + 1]];
+        if (!tri.every(okV)) { badObj++; continue; }   // Punkt mit ungültigen Koordinaten (z. B. „v 1 nan 2“)
+        for (const i of tri) cur.tris.push(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+      }
     }
   }
+  if (badObj) notes.push(badTrisNote(fileName, badObj));
   const used = groups.filter(g => g.tris.length);
   if (!used.length) throw Error(t('{file}: keine Flächen in der OBJ.', { file: fileName }));
   const base = fileName.replace(/^.*[\\/]/, ''), all = new Float32Array(used.reduce((a, g) => a + g.tris.length, 0));
@@ -373,8 +410,9 @@ function importModels(entries, zipLib) {
   const notes = [];
   let files = [];
   for (const e of entries) {
+    if (e.bytes && e.bytes.length > IMPORT_MAX_BYTES) throw tooBig(e.name);
     if (/\.zip$/i.test(e.name)) {
-      const zip = zipLib.unzipSync(e.bytes);
+      const zip = safeUnzip(e.name, e.bytes, zipLib, k => MODEL_EXT.test(k));
       const inner = Object.keys(zip).filter(k => MODEL_EXT.test(k) && !/(^|\/)(__MACOSX|\.)/.test(k) && zip[k].length);
       if (!inner.length) notes.push(t('{file}: keine STL/OBJ/3MF darin.', { file: e.name }));
       files.push(...inner.map(k => ({ name: k.replace(/^.*\//, ''), bytes: zip[k], from: e.name })));
@@ -392,12 +430,16 @@ function importModels(entries, zipLib) {
   const parts = [];
   let threemf = null;
   for (const f of files) {
-    if (/\.3mf$/i.test(f.name)) {
-      const r = parse3MF(f.name, zipLib.unzipSync(f.bytes), zipLib);
-      parts.push(...r.parts); notes.push(...r.notes);
-      if (files.length === 1) threemf = r.threemf;
-    } else if (/\.obj$/i.test(f.name)) parts.push(...objParts(f.name, f.bytes, notes));
-    else parts.push(...stlParts(f.name, f.bytes, notes));
+    if (f.bytes && f.bytes.length > IMPORT_MAX_BYTES) throw tooBig(f.name);
+    // zu wenig Speicher / Netz zu groß für ein Array (RangeError) → verständliche Meldung statt „Invalid array length“
+    try {
+      if (/\.3mf$/i.test(f.name)) {
+        const r = parse3MF(f.name, safeUnzip(f.name, f.bytes, zipLib), zipLib);
+        parts.push(...r.parts); notes.push(...r.notes);
+        if (files.length === 1) threemf = r.threemf;
+      } else if (/\.obj$/i.test(f.name)) parts.push(...objParts(f.name, f.bytes, notes));
+      else parts.push(...stlParts(f.name, f.bytes, notes));
+    } catch (err) { if (err instanceof RangeError) throw tooBig(f.name); throw err; }
   }
   if (files.length > 1 && tmf.length) notes.push(t('Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.'));
   const name = entries.length === 1 ? entries[0].name.replace(/^.*[\\/]/, '') : t('{n} Teile', { n: parts.length });

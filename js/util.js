@@ -22,5 +22,9 @@ const LOCALE=()=>I18N.lang==='de'?'de-DE':'en-GB';
 // Stellenzahl – toLocaleString baute bei jedem Aufruf einen neuen (≈ ⅔ der Rechenzeit eines update(), gemessen 2026-09-29)
 const DE_FMT=new Map();
 function de(v,d){const k=LOCALE()+'|'+d;let f=DE_FMT.get(k);if(!f){f=new Intl.NumberFormat(LOCALE(),{minimumFractionDigits:d,maximumFractionDigits:d});DE_FMT.set(k,f)}return f.format(Number(v))}
+// Farbe aus Drucker/Server/Datei für style-Attribute: nur #rrggbb, sonst der Ersatz (kein CSS aus fremden Daten)
+const safeColour=(c,fb='#888888')=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c)?c:fb;
+// Zahl aus Drucker/Server für die Anzeige: gerundet, ungültig = 0
+const safeInt=v=>Math.round(+v||0);
 const nkey=d=>String(Number(d));
 const num=v=>{if(v===null||v===undefined)return NaN;const n=parseFloat(String(v).trim().replace(',','.'));return n};

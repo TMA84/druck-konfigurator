@@ -35,7 +35,7 @@ const hexToRgb01 = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2
   return l < 0.18 ? c.map(v => v + (0.3 - l)) : c; };
 function toolColour(t) {
   const s = typeof slotChoices === 'function' ? slotChoices()[t] : null;
-  return s && /^#[0-9a-f]{6}$/i.test(s.colour) ? s.colour : BODY_PALETTE[t % BODY_PALETTE.length];
+  return safeColour(s && s.colour, BODY_PALETTE[t % BODY_PALETTE.length]);
 }
 const pvKey = i => $('pvColour').value === 'tool' ? 'k' + pv.data.a[2 * i + 1] : 't' + pv.data.a[2 * i];
 
@@ -151,27 +151,33 @@ function pvLegend() {
   }).join('');
 }
 
+// pv.loadSeq: schneller Plattenwechsel – nur die zuletzt angeforderte Platte wird gezeigt
 async function pvLoad(plate) {
+  const seq = pv.loadSeq = (pv.loadSeq || 0) + 1, job = pv.job;
   $('pvStatus').textContent = t('Lade Vorschau von Platte {n} …', { n: plate }); $('pvStatus').classList.remove('hidden');
   $('pvDownload').href = 'api/slice/' + pv.job + '/plate_' + plate + '.gcode';
   $('pvDownload').download = (project ? project.name.replace(/\.(stl|3mf|zip)$/i, '').replace(/[^\w.-]+/g, '_') : t('druck')) + t('_Platte') + plate + '.gcode';
   const p = pv.plates.find(x => x.plate === plate);
   $('pvStats').textContent = p ? t('Druckzeit {time} · {g} g · {n} Farbwechsel · G-Code {mb} MB', { time: duration(p.time_s), g: de(p.total_g, 1), n: p.changes, mb: de(p.gcode_mb || 0, 1) }) : '';
   try {
-    const res = await fetch('api/slice/' + pv.job + '/plate_' + plate + '.preview');
+    const res = await fetch('api/slice/' + job + '/plate_' + plate + '.preview');
+    if (seq !== pv.loadSeq || job !== pv.job) return;
     if (!res.ok) throw Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
-    pv.data = parsePreview(await res.arrayBuffer());
+    const buf = await res.arrayBuffer();
+    if (seq !== pv.loadSeq || job !== pv.job) return;
+    pv.data = parsePreview(buf);
     pv.hidden = new Set();
     $('pvLayer').max = Math.max(0, pv.data.layers.length - 1); $('pvLayer').value = $('pvLayer').max;
     pvBuild();
     $('pvStatus').classList.add('hidden');
     if (typeof sliceBar === 'function' && sb.phase === 'preview') sliceBar('done');
-  } catch (e) { $('pvStatus').textContent = t('Vorschau nicht verfügbar: {msg}', { msg: t(e.message) }); if (typeof sliceBar === 'function' && sb.phase === 'preview') sliceBar('done'); }
+  } catch (e) { if (seq !== pv.loadSeq || job !== pv.job) return; $('pvStatus').textContent = t('Vorschau nicht verfügbar: {msg}', { msg: t(e.message) }); if (typeof sliceBar === 'function' && sb.phase === 'preview') sliceBar('done'); }
 }
 
 // Zum aktuellen Slice-Auftrag laden (nur wenn der Tab sichtbar ist und der Auftrag neu ist)
 // Vorschau leeren (neues Modell, Slicen fehlgeschlagen): nichts Altes mehr zeigen
 function clearSlicePreview(text) {
+  pv.loadSeq = (pv.loadSeq || 0) + 1;   // eine noch laufende pvLoad zeigt nichts Altes mehr
   if (pv.mesh) { pv.scene.remove(pv.mesh); pv.mesh.geometry.dispose(); pv.mesh.material.dispose(); pv.mesh = null; }
   pv.job = null; pv.data = null; pv.plates = [];
   $('pvPlate').innerHTML = ''; $('pvLegend').innerHTML = ''; $('pvStats').textContent = ''; $('pvDownload').removeAttribute('href');

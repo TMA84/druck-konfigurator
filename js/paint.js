@@ -20,7 +20,7 @@ function paintNodes(str) {
   while (pos > 0) node();      // üblich: genau ein Baum je Dreieck
   return out;
 }
-// Überwiegendes Filament eines Dreiecks (Flächenanteil: jedes Kind ≈ gleicher Teil seines Elternteils)
+// Überwiegendes Filament eines Dreiecks (Flächenanteile der Kinder wie Orca, PAINT_SHARE – gleich paintTreeMain)
 function paintMain(str) {
   if (!str) return 0;
   if (str.length === 1) { const c = parseInt(str, 16); return (c & 3) ? paintMainTree(str) : c >> 2; }
@@ -36,7 +36,8 @@ function paintMainTree(str) {
     const n = nodes[i++];
     if (!n) return;
     if (!n.split) { w.set(n.state, (w.get(n.state) || 0) + share); return; }
-    for (let k = 0; k <= n.split; k++) walk(share / (n.split + 1));
+    // Flächenanteile wie paintTreeMain (PAINT_SHARE); gelesen wird c[split] … c[0] (paintTree)
+    for (let k = 0; k <= n.split; k++) walk(share * PAINT_SHARE[n.split][n.split - k]);
   };
   while (i < nodes.length) walk(1);
   let best = 0, bw = -1;

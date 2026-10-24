@@ -171,6 +171,46 @@ check('G-Code als Modell: Hinweis auf „G-Code drucken“', /G-Code drucken/.te
   check('normales Teil (50 mm): kein Zoll-Angebot', !imp([{ name: 'n.stl', bytes: stlBytes(box(0, 0, 0, 50, 20, 10)) }]).parts[0].inchHint);
   check('in Meter umgerechnet: kein Zoll-Angebot', !m.parts[0].inchHint); }
 
+/* ---------- Kaputte Dateien (Befund der Prüfung 2026-10-24) ---------- */
+{ const u8 = x => fflate.strToU8(x), tooBig = /Datei zu groß oder beschädigt/;
+  const err = f => { try { f(); return ''; } catch (e) { return e.message; } };
+  // STL mit NaN/unendlich: Dreiecke weg, Hinweis, Rest bleibt
+  const tris = boxTris(0, 0, 0, 10, 10, 10); tris[3] = [[NaN, 0, 0], [1, 0, 0], [0, 1, 0]]; tris[5] = [[0, 0, 0], [Infinity, 0, 0], [0, 1, 0]];
+  let k = imp([{ name: 'nan.stl', bytes: stlBytes(tris) }]);
+  check('STL mit NaN: 2 Dreiecke entfernt', k.parts.length === 1 && k.parts[0].pos.length === 10 * 9 && k.parts[0].pos.every(Number.isFinite), k.parts[0] && k.parts[0].pos.length / 9);
+  check('STL mit NaN: Hinweis', k.notes.some(n => /nan\.stl: 2 ungültige Dreiecke entfernt/.test(n)), k.notes.join('|'));
+  const ascii = 'solid x\n' + boxTris(0, 0, 0, 5, 5, 5).map((t, i) => ' facet normal 0 0 0\n  outer loop\n' + t.map(v => '   vertex ' + (i === 0 ? ['1e999', v[1], v[2]] : v).join(' ') + '\n').join('') + '  endloop\n endfacet\n').join('') + 'endsolid x\n';
+  k = imp([{ name: 'a.stl', bytes: u8(ascii) }]);
+  check('ASCII-STL mit 1e999: Dreieck entfernt', k.parts[0].pos.length === 11 * 9 && k.notes.some(n => /1 ungültige Dreiecke/.test(n)), k.parts[0].pos.length / 9);
+  check('STL nur ungültig: Fehler', /Keine gültigen Dreiecke/.test(err(() => imp([{ name: 'n.stl', bytes: stlBytes([[[NaN, 0, 0], [1, 0, 0], [0, 1, 0]]]) }]))));
+  // OBJ mit NaN-Punkt
+  const obj = 'v 0 0 0\nv 10 0 0\nv 0 10 0\nv 0 0 10\nv nan 1 1\nf 1 3 2\nf 1 2 4\nf 1 4 3\nf 2 3 4\nf 1 2 5\n';
+  k = imp([{ name: 't.obj', bytes: u8(obj) }]);
+  check('OBJ mit NaN: Fläche entfernt', k.parts.length === 1 && k.parts[0].pos.length === 4 * 9 && k.parts[0].pos.every(Number.isFinite), k.parts[0] && k.parts[0].pos.length / 9);
+  check('OBJ mit NaN: Hinweis', k.notes.some(n => /t\.obj: 1 ungültige Dreiecke entfernt/.test(n)), k.notes.join('|'));
+  // 3MF: Index außerhalb der Punktliste und kaputte Koordinate → Dreieck weg, Stützen-Code bleibt am richtigen Dreieck
+  const verts = [[0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10]].map(v => '<vertex x="' + v[0] + '" y="' + v[1] + '" z="' + v[2] + '"/>').join('') + '<vertex x="abc" y="0" z="0"/>';
+  const trisX = '<triangle v1="0" v2="2" v3="1"/><triangle v1="0" v2="1" v3="99"/><triangle v1="0" v2="1" v3="3"/><triangle v1="0" v2="4" v3="1"/>' +
+    '<triangle v1="0" v2="3" v3="2" paint_supports="4"/><triangle v1="1" v2="2" v3="3" paint_seam="&quot;/&gt;&lt;x"/><triangle v1="1" v2="2" v3="3" paint_supports="-1"/>';
+  const tmf = fflate.zipSync({ '3D/3dmodel.model': u8('<?xml version="1.0"?><model unit="millimeter"><resources><object id="1" type="model"><mesh><vertices>' + verts + '</vertices><triangles>' + trisX + '</triangles></mesh></object></resources><build><item objectid="1"/></build></model>') });
+  k = imp([{ name: 'kaputt.3mf', bytes: tmf }]);
+  check('3MF: 2 ungültige Dreiecke entfernt', k.parts.length === 1 && k.parts[0].pos.length === 5 * 9 && k.parts[0].pos.every(Number.isFinite), k.parts[0] && k.parts[0].pos.length / 9);
+  check('3MF: Hinweis', k.notes.some(n => /kaputt\.3mf: 2 ungültige Dreiecke entfernt/.test(n)), k.notes.join('|'));
+  const p0 = k.parts[0];
+  check('3MF: Stützen-Code am richtigen Dreieck (Index nach dem Entfernen)', p0.supCodes && p0.supCodes[2] === '4' && Object.keys(p0.supCodes).length === 1, JSON.stringify(p0.supCodes));
+  check('3MF: Naht-/Stützen-Code ohne Hex-Ziffern verworfen', !p0.seamCodes, JSON.stringify(p0.seamCodes));
+  check('3MF: weggelassene Dreiecke für den Export gemerkt', p0.paintSrc && JSON.stringify(p0.paintSrc[0].drop) === '[1,3]', JSON.stringify(p0.paintSrc));
+  // kaputte ZIP/3MF und 3MF ohne Modell
+  check('kaputte ZIP: verständliche Meldung', tooBig.test(err(() => imp([{ name: 'x.zip', bytes: new Uint8Array([80, 75, 3, 4, 1, 2, 3, 4, 5]) }]))), err(() => imp([{ name: 'x.zip', bytes: new Uint8Array([80, 75, 3, 4, 1, 2, 3]) }])));
+  const broken = fflate.zipSync({ '3D/3dmodel.model': u8('<model>' + 'x'.repeat(2000) + '</model>') }); broken[45] ^= 0xff; broken[60] ^= 0xff;
+  check('kaputte 3MF: verständliche Meldung', tooBig.test(err(() => imp([{ name: 'y.3mf', bytes: broken }]))), err(() => imp([{ name: 'y.3mf', bytes: broken }])));
+  check('3MF ohne .model: Meldung', /kein 3D-Modell/.test(err(() => imp([{ name: 'leer.3mf', bytes: fflate.zipSync({ 'Metadata/x.txt': u8('hallo') }) }]))));
+  // entpackt zu groß (Angabe im ZIP-Verzeichnis): wird nicht entpackt
+  const big = fflate.zipSync({ 'a.stl': stlBytes(boxTris(0, 0, 0, 1, 1, 1)) }), dv = new DataView(big.buffer, big.byteOffset, big.byteLength);
+  for (let i = big.length - 22; i >= 0; i--) if (dv.getUint32(i, true) === 0x02014b50) { dv.setUint32(i + 24, 0xF0000000, true); break; }   // Zentralverzeichnis: originalSize
+  check('ZIP über der Grenze: Meldung', tooBig.test(err(() => imp([{ name: 'bombe.zip', bytes: big }]))), err(() => imp([{ name: 'bombe.zip', bytes: big }])));
+}
+
 const mw = process.env.MW3MF;
 if (mw && fs.existsSync(mw)) {
   const t0 = Date.now();

@@ -178,6 +178,9 @@ I18N.add({
   "keine Modelldatei": "no model file",
   "Mehrere 3MF: nur die Geometrie wird übernommen, nicht Platten und Einstellungen.": "Several 3MFs: only the geometry is used, not plates and settings.",
   "Keine gültigen Dreiecke gefunden": "No valid triangles found",
+  "{file}: {n} ungültige Dreiecke entfernt.": "{file}: {n} invalid triangles removed.",
+  "{file}: Datei zu groß oder beschädigt.": "{file}: file too large or damaged.",
+  "Datei zu groß oder beschädigt": "File too large or damaged",
   "Eigenes Profil.": "Your own profile.",
   "Anderer {vendor}": "Other {vendor}"
 });

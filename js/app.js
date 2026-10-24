@@ -17,13 +17,21 @@ $('clear').addEventListener('click',()=>{input.value='';project=null;if(typeof s
 const readBytes=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(new Uint8Array(r.result));r.onerror=()=>fail(r.error||Error(t('Lesefehler')));r.readAsArrayBuffer(file)});
 
 // Eine oder mehrere Dateien (STL, OBJ, 3MF, ZIP) → Projekt mit Teileliste
+// loadSeq: wird eine neue Datei gewählt, solange eine ältere noch gelesen wird, gewinnt die neue (die ältere verfällt)
+let loadSeq=0;
 async function loadFiles(files){
+  const seq=++loadSeq;
   // fertiger G-Code ist kein Modell: gleich „G-Code drucken“ (js/gcode-ui.js)
   if(files.length===1&&/\.(gcode|gco|g)$/i.test(files[0].name)&&typeof gcodeOpenFile==='function'){addMode=false;return gcodeOpenFile(files[0])}
   $('fileinfo').textContent=files.length===1?t('Lese {name} …',{name:files[0].name}):t('Lese {n} Dateien …',{n:files.length});
   try{
+    // zu große Datei gar nicht erst in den Speicher lesen (Grenze wie js/import.js)
+    const big=files.find(f=>f.size>IMPORT_MAX_BYTES);
+    if(big)throw tooBig(big.name);
     const entries=await Promise.all(files.map(async f=>({name:f.name,bytes:await readBytes(f)})));
+    if(seq!==loadSeq)return;
     const imp=importModels(entries,fflate);
+    if(seq!==loadSeq)return;
     if(addMode&&project){addMode=false;return addParts(imp)}
     addMode=false;
     showProject({name:imp.name,parts:partsFromImport(imp),threemf:imp.threemf,notes:imp.notes});
@@ -33,8 +41,11 @@ async function loadFiles(files){
     if(typeof adoptSlotMaterialFor==='function'&&adoptSlotMaterialFor(project.parts)&&!moved)update();
     if(moved){update();toast(t('{n} Farben des Designers auf ähnliche Slots gelegt – unter „Farben des Designers“ anpassen',{n:moved}))}
   }catch(e){
+    if(seq!==loadSeq)return;
     addMode=false;
-    $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg:t(e.message)});
+    // zu wenig Speicher (RangeError: Array/Puffer zu groß) → verständliche Meldung
+    const msg=e instanceof RangeError?t('Datei zu groß oder beschädigt'):t(e.message);
+    $('fileinfo').textContent=t('Modell konnte nicht gelesen werden: {msg}. Bitte die Datei prüfen oder erneut exportieren.',{msg});
   }
 }
 // slot: 0-basiert oder null (= Slot aus dem Export-Dialog); 3MF-Teile behalten den Slot des Designers

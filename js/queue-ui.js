@@ -49,11 +49,22 @@ function queueServerData(r) {
   renderQueue();
 }
 
+// qSrv.seq: überholt eine neuere Abfrage eine ältere, verwirft die ältere ihre Antwort (kein alter Stand, kein Doppel-Zeitgeber)
 async function queueSync() {
   clearTimeout(qSrv.timer);
-  try { const r = await fetch('api/queue'); if (r.ok) queueServerData(await r.json()); } catch (e) { /* nächster Versuch */ }
-  const q = queue();
-  qSrv.timer = setTimeout(queueSync, !q ? QUEUE_SRV_MS.idle : q.items.some(i => i.state === 'printing') ? QUEUE_SRV_MS.printing : QUEUE_SRV_MS.active);
+  const seq = qSrv.seq = (qSrv.seq || 0) + 1;
+  try {
+    const r = await fetch('api/queue');
+    if (seq !== qSrv.seq) return;
+    if (r.ok) { const d = await r.json(); if (seq === qSrv.seq) queueServerData(d); }
+  } catch (e) { console.error('queueSync', e); /* nächster Versuch */ }
+  finally {
+    if (seq === qSrv.seq) {
+      let q = null; try { q = queue(); } catch (e) { /* wie leer */ }
+      clearTimeout(qSrv.timer);
+      qSrv.timer = setTimeout(queueSync, !q ? QUEUE_SRV_MS.idle : q.items.some(i => i.state === 'printing') ? QUEUE_SRV_MS.printing : QUEUE_SRV_MS.active);
+    }
+  }
 }
 
 // Warteschlange aus dem Browser (ältere Version) einmalig auf den Server übernehmen
@@ -162,7 +173,7 @@ function renderQueue() {
     : last ? '<b>' + t(last.aborted ? 'Platte {n} abgebrochen' : 'Platte {n} fertig – Bett abräumen.', { n: last.plate }) + '</b>' + (next ? ' ' + t('Danach:') + ' <button class="btn" type="button" data-q-print="' + next.plate + '"' + (free ? '' : ' disabled') + '>' + t('Platte {n} drucken …', { n: next.plate }) + '</button>' : '') : '';
   $('queueList').innerHTML = q.items.map((it, n) => {
     const need = plateNeeds(q.slice.plates.find(p => p.plate === it.plate) || { plate: it.plate }, q.materials, ace, slotMatchesKind);
-    const prog = it.state === 'printing' && st && st.job && st.job.progress != null ? ' · ' + st.job.progress + ' %' : '';
+    const prog = it.state === 'printing' && st && st.job && st.job.progress != null ? ' · ' + safeInt(st.job.progress) + ' %' : '';
     const act = it.state === 'wait' ? '<button class="btn sec" type="button" data-q-print="' + it.plate + '"' + (free && !cur ? '' : ' disabled title="' + t('Erst wenn der Drucker frei ist') + '"') + '>' + t('Drucken …') + '</button><button class="linkbtn" type="button" data-q-skip="' + it.plate + '">' + t('Überspringen') + '</button>'
       : it.state === 'printing' ? '' : '<button class="linkbtn" type="button" data-q-again="' + it.plate + '">' + t('Nochmal') + '</button>';
     return '<li class="q-' + it.state + '"><span class="q-n">' + (n + 1) + '</span><span class="q-main"><b>' + t('Platte {n}', { n: it.plate }) + '</b><small>' + duration(it.time_s) + ' · ' + de(it.total_g, 1) + ' g</small>' +

@@ -9,7 +9,7 @@ const fflate = require('../vendor/fflate.min.js');
 
 const ROOT = path.join(__dirname, '..');
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'export3mf', 'import'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'paint', 'export3mf', 'import'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({importModels, makeGeom, compute, getMat, store, exportTemplate, build3mfFromProject})', ctx);
 
@@ -82,6 +82,50 @@ check('Fehlende Objekt-Einstellungen → Hinweis', t.res.notes.some(n => /keine 
   check('Bauteil Sockel bekommt Slot 2', /key="extruder" value="2"/.test(part(1)), part(1));
   check('Bauteil Spitze: eigener Slot entfernt (gilt Objekt-Slot)', !/key="extruder"/.test(part(2)) && /key="name" value="Spitze"/.test(part(2)), part(2));
   check('Objekt-Slot bleibt 1', /<object id="3">\s*<metadata key="name" value="Turm"\/>\s*<metadata key="extruder" value="1"\/>/.test(t.ms), t.ms.slice(0, 200));
+}
+
+// 5) Befund der Prüfung: bemalte 3MF (paint_color je Dreieck) + hinzugefügtes, bemaltes Teil → Neuanordnung (relayout3mf)
+//    darf nicht an der fehlenden designMap scheitern (ReferenceError dmap); die Bemalung des neuen Teils landet im Netz
+{ const painted = cubeXml(1, 20).replace(/<triangle ([^/]*)\/>/g, (all, a) => '<triangle ' + a + ' paint_color="8"/>');
+  const zip = fflate.zipSync({
+    '3D/3dmodel.model': u8('<?xml version="1.0"?><model unit="millimeter" xmlns:p="x"><resources>' + painted + '</resources><build><item objectid="1" transform="1 0 0 0 1 0 0 0 1 128 128 0"/></build></model>'),
+    'Metadata/model_settings.config': u8('<?xml version="1.0"?><config><object id="1"><metadata key="name" value="Bemalt"/><metadata key="extruder" value="1"/><part id="1" subtype="normal_part"></part></object>' +
+      '<plate><metadata key="plater_id" value="1"/><model_instance><metadata key="object_id" value="1"/><metadata key="instance_id" value="0"/></model_instance></plate></config>')
+  });
+  const imp = K.importModels([{ name: 'b.3mf', bytes: zip }], fflate);
+  check('bemalte 3MF: Bemalung erkannt', imp.parts[0].paintState && imp.parts[0].paintSlots.includes(2), imp.parts[0].paintSlots);
+  imp.threemf.designMap = { 1: 2 }; // Filament 2 des Designers → eigener Slot 3
+  const base = { printer: 'kobra_s1', nozD: '0.4', nozM: 'steel_hardened', material: 'pla_hs', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const g0 = K.makeGeom(imp.parts[0].name, imp.parts[0].pos), g1 = K.makeGeom('extra.stl', imp.parts[0].pos.slice());
+  const r = K.compute(base, g0, { getMat: K.getMat, settings: K.store.settings });
+  const p0 = imp.parts[0], jobs = [
+    { geom: g0, slot: 0, part: { objectId: p0.objectId, instance: 0, plate: 1, paintState: p0.paintState, paintSlots: p0.paintSlots }, r },
+    { geom: g1, slot: 0, part: { extra: true, objectId: null, instance: 0, plate: 1, paintState: Uint8Array.from(p0.paintState), paintSlots: [2] }, holes: [], r }];
+  let res = null, err = null;
+  try { res = K.build3mfFromProject(K.exportTemplate('kobra_s1', '0.4'), r, jobs, 0, fflate, null, imp.threemf); } catch (e) { err = e; }
+  check('bemalte 3MF + eigenes Teil: Export ohne Fehler', res && !err, err && String(err));
+  if (res) {
+    const root = fflate.strFromU8(fflate.unzipSync(res.bytes)['3D/3dmodel.model']);
+    const objs = root.match(/<object id="\d+"[^>]*>[\s\S]*?<\/object>/g) || [];
+    check('neues Teil bemalt, umgelegt auf Slot 3 (Code 0C)', objs.slice(1).some(o => /paint_color="0C"/.test(o)), objs.map(o => (o.match(/paint_color="\w+"/) || [''])[0]));
+  }
+}
+
+// 6) Beim Import weggelassenes (ungültiges) Dreieck: eigene Bemalung landet trotzdem am richtigen Dreieck der Datei
+{ const bad = cubeXml(1, 20).replace('<triangle v1="0" v2="3" v3="2"/>', '<triangle v1="0" v2="3" v3="99"/>');
+  const zip = fflate.zipSync({
+    '3D/3dmodel.model': u8('<?xml version="1.0"?><model unit="millimeter" xmlns:p="x"><resources>' + bad + '</resources><build><item objectid="1" transform="1 0 0 0 1 0 0 0 1 128 128 0"/></build></model>'),
+    'Metadata/model_settings.config': u8('<?xml version="1.0"?><config><object id="1"><metadata key="name" value="Loch"/><metadata key="extruder" value="1"/><part id="1" subtype="normal_part"></part></object></config>')
+  });
+  const imp = K.importModels([{ name: 'l.3mf', bytes: zip }], fflate), p0 = imp.parts[0];
+  check('ungültiges Dreieck beim Import weggelassen', p0.pos.length === 11 * 9 && JSON.stringify(p0.paintSrc[0].drop) === '[1]', p0.pos.length / 9);
+  const base = { printer: 'kobra_s1', nozD: '0.4', nozM: 'steel_hardened', material: 'pla_hs', object: 'general', goal: 'balanced', load: 'medium', support: 'auto', supportLevel: 'balanced', thresh: '45' };
+  const g = K.makeGeom(p0.name, p0.pos), r = K.compute(base, g, { getMat: K.getMat, settings: K.store.settings });
+  // Teil-Dreieck 1 = Dreieck 2 der Datei (Dreieck 1 fehlt im Teil)
+  const part = { objectId: p0.objectId, instance: 0, plate: 1, paintSrc: p0.paintSrc, paintUser: { codes: { 1: '8' }, slots: [1] } };
+  const res = K.build3mfFromProject(K.exportTemplate('kobra_s1', '0.4'), r, [{ geom: g, slot: 0, part, r }], 0, fflate, null, imp.threemf);
+  const tris = fflate.strFromU8(fflate.unzipSync(res.bytes)['3D/3dmodel.model']).match(/<triangle\b[^>]*>/g) || [];
+  check('eigene Bemalung am Dreieck 2 der Datei, nicht am weggelassenen', tris.length === 12 && /paint_color="8"/.test(tris[2]) && !/paint_color/.test(tris[1]) && tris.filter(x => /paint_color/.test(x)).length === 1, tris.slice(0, 4).join(' '));
 }
 
 console.log(pass + '/' + (pass + fail) + ' bestanden');

@@ -1007,8 +1007,9 @@ const PLATE_FILE_KEYS = /[ \t]*<metadata key="(thumbnail_file|thumbnail_no_light
    Objekte (Netz direkt im Hauptmodell, ein Bauteil je Körper, dazu Loch-Modifikatoren) anhängen.
    Kopien eines 3MF-Objekts werden weitere Instanzen desselben Objekts (Orca: gleiche Bauteile, Modifikatoren, Bemalung
    und Objekt-Einstellungen, eigene Lage) – so bleibt die Datei klein und jede Änderung am Objekt gilt für alle Kopien.
-   zipFiles: alle Dateien der 3MF (für freie Ids). Ergebnis {model, ms, objectChanges}. */
-function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, zipLib) {
+   zipFiles: alle Dateien der 3MF (für freie Ids); dmap = designMap (Filament des Designers → eigener Slot, für die Bemalung
+   hinzugefügter Teile). Ergebnis {model, ms, objectChanges}. */
+function relayout3mf(model, ms, items, lay, settings, partSlot, nFil, zipFiles, zipLib, dmap = {}) {
   // freie Ids oberhalb aller vorhandenen (Objekte und Bauteile, auch in 3D/Objects/*)
   let maxId = 0;
   for (const [name, data] of Object.entries(zipFiles)) if (/\.model$/i.test(name)) {
@@ -1192,7 +1193,7 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
     if (threemf.designMap && Object.keys(threemf.designMap).length) ms = patchModifierExtruders(ms, esc, threemf.designMap, nFil);
   }
   if (relayout) {
-    const rl = relayout3mf(zipLib.strFromU8(out[rootPath]), ms, items, lay, settings, partSlot, nFil, out, zipLib);
+    const rl = relayout3mf(zipLib.strFromU8(out[rootPath]), ms, items, lay, settings, partSlot, nFil, out, zipLib, dmap);
     out[rootPath] = zipLib.strToU8(rl.model); ms = rl.ms; objectChanges.push(...rl.objectChanges);
     if (out['Metadata/filament_sequence.json']) out['Metadata/filament_sequence.json'] = zipLib.strToU8(JSON.stringify(Object.fromEntries(Array.from({ length: lay.count }, (_, pi) => ['plate_' + (pi + 1), { nozzle_sequence: [], optimal_assignment: [], sequence: [] }]))));
   }
@@ -1227,7 +1228,7 @@ function writeUserPaint(out, items, zipLib, nFil) {
     done.add(String(p.objectId));
     for (const s of p.paintSrc) {
       const f = byFile.get(s.path) || byFile.set(s.path, new Map()).get(s.path);
-      if (!f.has(String(s.id))) f.set(String(s.id), { start: s.start, layers });
+      if (!f.has(String(s.id))) f.set(String(s.id), { start: s.start, layers, drop: s.drop ? new Set(s.drop) : null });
     }
   }
   for (const [path, objs] of byFile) {
@@ -1237,8 +1238,10 @@ function writeUserPaint(out, items, zipLib, nFil) {
     out[name] = zipLib.strToU8(txt.replace(/<((?:\w+:)?object)\b([^>]*)>([\s\S]*?)<\/\1>/g, (all, tag, attrs, body) => {
       const e = objs.get((/\bid="([^"]+)"/.exec(attrs) || [])[1]);
       if (!e) return all;
-      let i = 0;
+      // beim Import weggelassene (ungültige) Dreiecke zählen nicht mit (js/import.js parseModelXML: drop)
+      let i = 0, k = -1;
       return '<' + tag + attrs + '>' + body.replace(/<((?:\w+:)?triangle)\b([^>]*?)\s*(\/?)>/g, (tri, ttag, tattrs, close) => {
+        if (e.drop && e.drop.has(++k)) return tri;
         const g = e.start + i++;
         let a = tattrs, changed = false;
         for (const L of e.layers) {

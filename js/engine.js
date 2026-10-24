@@ -36,7 +36,7 @@ function helpFor(label,kind){
   if(kind==='tpu'&&['Düse','Lüfter','Rückzug','Maximale Volumengeschwindigkeit','Außenwand','Innere Wand','Füllung','Travel','Beschleunigung'].includes(key))extra=' '+t('TPU reagiert deutlich empfindlicher auf hohe Geschwindigkeit als PLA.');
   return explanations[key]+extra;
 }
-function rowHTML(r,kind){const h=helpFor(r[0],kind);return '<div class="setting'+(r[3]?' ov':'')+'"><b>'+esc(t(r[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</b><span class="value">'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</span></div>'}
+function rowHTML(r,kind){const h=helpFor(r[0],kind);return '<div class="setting'+(r[3]?' ov':'')+'"><b>'+esc(t(r[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</b><span class="value">'+esc(r[1])+(r[2]?'<small>'+esc(r[2])+'</small>':'')+'</span></div>'}
 
 function orcaFilamentInherits(printerId,kindUpper){
   return (ORCA_FILAMENT_BASE[printerId]||{})[kindUpper]||ORCA_SYSTEM_FILAMENT[kindUpper]||'Generic PLA @System';
@@ -270,7 +270,7 @@ function compute(I,geom,ctx){
     const own=c.every(k=>!userSet(k));   // nur aus deinen Standardwerten
     return [row[0],row[1],[t(own?'dein Standard – Werk {v}':'angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]};
   const rows=[
-    mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',esc(t(m.bedNote))]),
+    mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',t(m.bedNote)]),
     mark(['layer','first_layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(firstLayer,2)+' mm']),
     mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill','sp_travel'],['Füllung / Travel',sp_fill+' / '+sp_travel+' mm/s',nFill]),
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
@@ -320,12 +320,12 @@ function compute(I,geom,ctx){
   }
   const dryNeed=tpu||m.kind==='petg'||m.abrasive;
   ordered.push(['Material / Filament',[
-    ['Profilname',esc(m.name)],['Düse',nozzle+' °C',t('erste und weitere Schichten')],['Herstellerbereich',esc(m.range)||t('Angabe auf der Rolle')],
-    ['Heizbett',m.bed+' °C',esc(t(m.bedNote))],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
+    ['Profilname',m.name],['Düse',nozzle+' °C',t('erste und weitere Schichten')],['Herstellerbereich',m.range||t('Angabe auf der Rolle')],
+    ['Heizbett',m.bed+' °C',t(m.bedNote)],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
     mark(['max_vol'],['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s']),mark(['flow'],['Durchflussverhältnis',de(m.flow,2)])]
-    .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),esc(t(m.dry))]])]);
+    .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),t(m.dry)]])]);
   {const xo=typeof extraOverrides==='function'?extraOverrides(ov):{};const xk=Object.keys(xo);
-   if(xk.length)ordered.push(['Weitere Orca-Einstellungen',xk.map(k=>[ORCA_EXTRA_BY_KEY[k][1],esc(extraLabel(k,xo[k])),t(userSet('x:'+k)?'angepasst':'dein Standard'),true])])}
+   if(xk.length)ordered.push(['Weitere Orca-Einstellungen',xk.map(k=>[ORCA_EXTRA_BY_KEY[k][1],extraLabel(k,xo[k]),t(userSet('x:'+k)?'angepasst':'dein Standard'),true])])}
   ordered.push(['Sonstiges',[['Düsendurchmesser',nozLabel],mark(['brim','brim_gap','brim_kind','brim_inner','brim_inner_kind'],['Brim',brimTxt+(brim!=='Nicht nötig'||brimInner?' · '+t('Abstand {g} mm',{g:de(brimGap,2)}):''),brimNoteX||brimNote]),mark(['zhop'],['Z-Hop',de(m.zhop,1)+' mm']),['Erste Schicht beobachten',t('Ja')]]]);
   // Für diesen Auftrag angepasste Werte auch in der Slicer-Reihenfolge markieren (wie in der Übersicht)
   const ORDER_KEYS={'Schichthöhe':['layer'],'Wandlinien':['w'],'Obere Schichten':['t'],'Untere Schichten':['b'],'Fülldichte':['inf'],'Füllmuster':['pattern'],
