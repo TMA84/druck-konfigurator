@@ -48,7 +48,7 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 docker compose up -d --build
 ```
 
-Danach im Browser `http://<IP-des-NAS>:8765/` öffnen. Das Image enthält OrcaSlicer für die Kostenkalkulation (rund 1,5 GB, x86_64 und ARM). Der Container braucht nur ausgehende Verbindungen zum Drucker (Ports 18910 und 9883 im LAN-Modus); das normale Docker-Netz reicht. Die Seite hat keine Anmeldung – nur im Heimnetz betreiben, nicht ins Internet freigeben. Eigene Filamentwerte speichert weiterhin jeder Browser für sich.
+Danach im Browser `http://<IP-des-NAS>:8765/` öffnen. Das Image enthält OrcaSlicer für die Kostenkalkulation (rund 1,5 GB, x86_64 und ARM). Der Container braucht nur ausgehende Verbindungen zum Drucker (Ports 18910 und 9883 im LAN-Modus); das normale Docker-Netz reicht. Die Seite hat keine Anmeldung – nur im Heimnetz betreiben, nicht ins Internet freigeben. Ohne PIN (`KONFIGURATOR_PIN`) antwortet der Server nur, wenn er über eine IP-Adresse, `localhost`, einen Namen ohne Punkt oder einen Heimnetz-Namen (`.local`, `.lan`, `.home.arpa`, `.internal`, `.fritz.box`) aufgerufen wird – andere Namen in `KONFIGURATOR_ALLOWED_HOSTS` eintragen (mit Komma getrennt, z. B. `drucker.example.de`). Eigene Filamentwerte speichert weiterhin jeder Browser für sich.
 
 **Als Home-Assistant-Add-on:** In Home Assistant unter **Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories** `https://github.com/TMA84/ha-addons` hinzufügen, dann **Druckwerkstatt** installieren. Das Tool erscheint in der Seitenleiste (Ingress, mit der HA-Anmeldung); optional zusätzlich direkt auf Port 8765. Spulen und Verbrauch der Filamentverwaltung liegen im Add-on unter `/data`.
 
@@ -101,6 +101,7 @@ node tests/filaments.js       # Filamente der Hersteller: Werte stimmig, Farbcod
 node tests/paint-orca.js      # Bemalen gegen Orca: Farbe, Stützen (erzwingen/verhindern), Naht im G-Code
 node tests/designer-3mf.js    # Makerworld-Aufbau: Bemalung (auch eigene), Modifikator, Drehen/Größe, Text am Objekt (mit Orca-CLI)
 python tests/auth.py          # PIN-Schutz
+python tests/http_limits.py   # Server-Härtung: Anfragegrößen, JSON-Fehler, nur Dateien der Seite, Servername
 node tools/headless.js smoke  # Bedientest im Chrome ohne Fenster (Server muss laufen)
 node tests/verify-3mf.js      # Export gegen die OrcaSlicer-CLI (dauert einige Minuten)
 node tests/verify-orca-printers.js  # 3MF für beliebige Drucker gegen die OrcaSlicer-CLI (dauert lang)

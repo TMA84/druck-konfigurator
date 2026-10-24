@@ -68,6 +68,28 @@ n = len([f for f in os.listdir(os.path.join(tmp, "data", "printed")) if f.endswi
 check("es bleiben höchstens %d Vorschauen" % serve.PRINTED_KEEP, n == serve.PRINTED_KEEP, n)
 check("ohne Slice-Auftrag kein Fehler", serve.remember_print("x.gcode", "ffffffffffffffff", 1) is None)
 
+# ähnliche Namen: „Halter_Platte1“ darf nie die Vorschau (und Objekte zum Überspringen) von „Wandhalter_Platte1“ bekommen
+pdir = os.path.join(tmp, "data", "printed")
+for f in os.listdir(pdir):
+    os.remove(os.path.join(pdir, f))
+open(os.path.join(tmp, "jobs", job, "plate_1.preview"), "wb").write(b"GCPV2 Wandhalter")
+serve.remember_print("Wandhalter_Platte1.gcode", job, 1)
+check("ähnlicher Name → keine fremde Vorschau", serve.printed_preview("Halter_Platte1") is None, serve.printed_preview("Halter_Platte1"))
+check("Teil des Namens ohne „_“-Grenze → keine", serve.printed_preview("halter_Platte1.gcode") is None)
+open(os.path.join(tmp, "jobs", job, "plate_1.preview"), "wb").write(b"GCPV2 Halter")
+serve.remember_print("Halter_Platte1.gcode", job, 1)
+p = serve.printed_preview("Halter_Platte1")
+check("genauer Name gewinnt", p and open(p, "rb").read() == b"GCPV2 Halter", p)
+p = serve.printed_preview("Wandhalter_Platte1")
+check("anderer Auftrag behält seine Vorschau", p and open(p, "rb").read() == b"GCPV2 Wandhalter", p)
+# Endung ab „_“: der Name auf dem Drucker hat vorne etwas mehr/weniger – nur wenn genau eine Vorschau passt
+p = serve.printed_preview("123_Wandhalter_Platte1")
+check("Endung ab „_“ (eindeutig) gefunden", p and open(p, "rb").read() == b"GCPV2 Wandhalter", p)
+serve.remember_print("Box_Halter_Platte1.gcode", job, 1)
+p = serve.printed_preview("X_Halter_Platte1")
+check("Endung ab „_“ eindeutig (vorne mehr)", p and open(p, "rb").read() == b"GCPV2 Halter", p)
+check("Endung mehrdeutig → keine", serve.printed_preview("Platte1") is None)
+
 shutil.rmtree(tmp, ignore_errors=True)
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)
