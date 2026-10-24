@@ -66,7 +66,7 @@ function skPreviewLayer(L) {
 }
 function skDrawLines(skipped) {
   if (typeof lv === 'undefined' || !lv.scene || !lv.data || !sk.objects) return;
-  // Bahnen übersprungener Objekte ab der Schicht des Überspringens dunkel, der Kopf lässt sie aus (js/live-ui.js)
+  // Bahnen übersprungener Objekte ab der Schicht des Überspringens dunkel, der Kopf lässt sie aus (js/live-head.js lvSkipSet)
   if (typeof lvSkipSet === 'function') {
     const at = (sk.st && sk.st.job && sk.st.job.skipped_at) || {}, cur = lv.shown >= 0 ? lv.shown : 0;
     lvSkipSet(sk.objects.filter(o => skipped.has(o.id) && o.polygon && o.polygon.length > 2)

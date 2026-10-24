@@ -175,7 +175,7 @@ function paintLayerCode(part, i, layer, dmap) {
   const d = part[PAINT_LAYERS[layer].designer];
   return (d && d[i]) || '';
 }
-// Stützen erzwungen (irgendwo Zustand 1)? – dann braucht das Objekt enable_support (js/export3mf.js supportPaintOverrides)
+// Stützen erzwungen (irgendwo Zustand 1)? – dann braucht das Objekt enable_support (js/export3mf-settings.js supportPaintOverrides)
 function paintHasEnforcers(part) {
   const all = { ...(part.supCodes || {}), ...(paintUserCodes(part, 'support') || {}) };
   for (const k in all) { const c = all[k]; if (c && c !== '0' && paintStates(c).includes(1)) return true; }

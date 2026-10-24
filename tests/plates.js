@@ -1,9 +1,9 @@
 'use strict';
 /* Prüft js/plates.js (geänderte Platten, Filamentbedarf, Reihenfolge, Warteschlange) und die Plattenzuordnung
-   je Teil in js/export3mf.js (arrangeByPlate). Aufruf: node tests/plates.js */
+   je Teil in js/export3mf-pack.js (arrangeByPlate). Aufruf: node tests/plates.js */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ctx = vm.createContext({ console, TextDecoder, Date });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'nest', 'export3mf', 'plates'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'nest', 'export3mf-settings', 'export3mf-mesh', 'export3mf-pack', 'export3mf-relayout', 'export3mf', 'plates'])
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({placeTransform, footprint, changedPlates, plateNeeds, orderPlates, queueTick, queueNext, queueRemaining, arrangeParts, arrangeByPlate, exportTemplate, buildVolume, volumeExcess, patchModifierExtruders})', ctx);
 let pass = 0, fail = 0;

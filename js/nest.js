@@ -1,5 +1,5 @@
 'use strict';
-/* Teile nach ihrer echten Grundfläche aufs Bett legen (2026-10-08). Das Rechteck-Verfahren (js/export3mf.js packGroup)
+/* Teile nach ihrer echten Grundfläche aufs Bett legen (2026-10-08). Das Rechteck-Verfahren (js/export3mf-pack.js packGroup)
    rechnet mit dem Hüllrechteck – dünne Rahmen, Winkel und Dreiecke (Rack-Teile: 18–28 % des Rechtecks belegt) bekamen
    so je eine eigene Platte, obwohl zwei ineinander gedreht passen. Hier: Grundfläche als Raster (NEST_RES mm, Projektion
    aller Dreiecke von oben), je Teil 0/90/180/270° (spart 45° eine Platte mehr, auch in 45°-Schritten), Abstand = Raster-

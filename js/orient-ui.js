@@ -6,7 +6,7 @@ const orientCache = new WeakMap();   // Teil → {th, res}
 let orientJob = 0;                   // verhindert, dass eine alte Berechnung eine neue überschreibt
 
 const selectedPart = () => project && project.parts[project.selected];
-/* Drehen geht jetzt auch bei Makerworld-3MF: die Drehung steht dann in der Transformation des Objekts (js/export3mf.js
+/* Drehen geht jetzt auch bei Makerworld-3MF: die Drehung steht dann in der Transformation des Objekts (js/export3mf-relayout.js
    partItemTransform), Modifikatoren und Bemalung drehen mit. Ohne Zutun bleibt die Lage des Designers. */
 const orientable = () => !!project;
 // Vorschlag (Auflageflächen durchprobieren) nur bis zu dieser Netzgröße – darüber würde die Seite spürbar hängen

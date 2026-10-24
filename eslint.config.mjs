@@ -130,7 +130,7 @@ export default [
       sourceType: 'script',
       globals: { ...globals.worker, ...DECLS['js/nest.js'] },
     },
-    // lexLess usw. stehen für nest.js bereit (im Fenster kommen sie aus export3mf.js)
+    // lexLess usw. stehen für nest.js bereit (im Fenster kommen sie aus export3mf-pack.js)
     rules: { ...RULES, 'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', vars: 'local' }] },
   },
 

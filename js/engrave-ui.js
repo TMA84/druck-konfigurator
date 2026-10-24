@@ -2,7 +2,7 @@
 /* Beschriftung (① Modell, Abschnitt „Beschriftung“): Text erhaben (eigener Slot, andere Farbe) oder vertieft auf eine
    Fläche des gewählten Teils. Standard-Fläche = Oberseite (js/engrave.js topFace); „Fläche wählen …“ wie „Fläche aufs
    Bett“ (Viewer.setPick). Das Formular ist ein Entwurf mit Vorschau; „Text hinzufügen“ legt ihn in part.texts ab
-   (für alle Platzierungen/Kopien des Teils), Export in js/export3mf.js (textVolumes).
+   (für alle Platzierungen/Kopien des Teils), Export in js/export3mf-mesh.js (textVolumes).
    Nur für STL-Teile und in eine 3MF hinzugefügte Teile (part.extra) – Objekte des Designers noch nicht. */
 
 const TEXT_FIELDS = ['txText', 'txHeight', 'txDepth', 'txStroke', 'txRot', 'txMode', 'txSlot'];
@@ -11,7 +11,7 @@ const txState = { part: null, geom: null, anchor: null, picked: false, editing: 
 const topFaceCache = new WeakMap();   // geom → Oberseite (Anker mit Fläche)
 
 const txPart = () => project && project.parts[project.selected];
-// seit 10.6.2 auch auf Objekten des Designers (js/export3mf.js designerTexts: weiteres Bauteil im Objekt)
+// seit 10.6.2 auch auf Objekten des Designers (js/export3mf-relayout.js designerTexts: weiteres Bauteil im Objekt)
 const txUsable = p => !!p;
 function txTop(geom) {
   if (!topFaceCache.has(geom)) topFaceCache.set(geom, topFace(geom));

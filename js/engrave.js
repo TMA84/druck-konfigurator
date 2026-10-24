@@ -4,7 +4,7 @@
    Schrift: Hershey Simplex (js/font-hershey.js, Strichschrift). Jeder Strichabschnitt wird zu einer Kapsel (Rechteck mit
    runden Enden, Breite = Strichstärke) und senkrecht zur Fläche extrudiert. Die Kapseln überlappen sich; Orca vereinigt
    überlappende Hüllen eines Bauteils beim Slicen (per CLI geprüft), eine eigene Boolesche Operation ist nicht nötig.
-   Export (js/export3mf.js textVolumes): erhaben = weiteres Orca-Bauteil (normal_part) mit eigenem Slot, vertieft =
+   Export (js/export3mf-mesh.js textVolumes): erhaben = weiteres Orca-Bauteil (normal_part) mit eigenem Slot, vertieft =
    negative_part (Orca zieht es beim Slicen vom Teil ab).
    part.texts = [{id, text, height, depth, stroke, mode:'raised'|'engraved', slot, rot, anchor:{p, n, u}}]
    anchor in Koordinaten von part.origPos (vor der Drehung part.R) – so bleibt der Text beim Drehen des Teils an seiner

@@ -3,7 +3,7 @@
    (Objekt, Körper, Farb-Modifikator wie ein Schriftzug), lässt sich auf einen anderen ACE-Slot legen – z. B. auf
    einen Slot mit Filament derselben Art, damit PLA und ASA/ABS nicht auf einer Platte landen.
    Objekt und Körper: part.slot / body.slot werden umgestellt. Modifikatoren: project.threemf.designMap
-   {Slot des Designers: eigener Slot} (js/export3mf.js patchModifierExtruders). Bemalung je Dreieck bleibt.
+   {Slot des Designers: eigener Slot} (js/export3mf-relayout.js patchModifierExtruders). Bemalung je Dreieck bleibt.
    Dazu die Prüfung, ob eine Platte Filamente mit zu unterschiedlicher Düsentemperatur mischt. */
 
 // PLA/TPU drucken um 200–220 °C, PETG/ABS/ASA um 240–260 °C – Orca lehnt Mischungen der beiden Gruppen ab

@@ -3,7 +3,7 @@
    die 3MF-Werte (plannedChanges) übernehmen ihn; ohne Anpassung bleibt alles wie vorher. */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ctx = vm.createContext({ console, TextDecoder });
-for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'export3mf'])
+for (const f of ['util', 'data', 'stl', 'store', 'engine', 'orca-templates', 'brim-ears', 'export3mf-settings', 'export3mf-mesh', 'export3mf-pack', 'export3mf-relayout', 'export3mf'])
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const K = vm.runInContext('({compute, getMat, store, plannedChanges, supportChanges, orcaInfillPattern})', ctx);
 let pass = 0, fail = 0;
