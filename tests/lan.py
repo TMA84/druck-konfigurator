@@ -459,6 +459,12 @@ gtmp.close()
 g5 = tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False)
 g5.write("; filament used [g] = 0, 0, 0, 0, 2.0\n; filament_type = PLA;PLA;PLA;PLA;PLA\n; printer_model = Anycubic Kobra S1\n")
 g5.close()
+# Betttemperatur fürs Vorwärmen (geplanter eigener G-Code): erstes M140/M190 mit S > 0
+gb = tempfile.NamedTemporaryFile("w", suffix=".gcode", delete=False)
+gb.write("; M140 S999 im Kommentar zählt nicht\nM140 S0\nM190 S100 ; ABS\nM140 S90\n; filament used [g] = 2.0\n")
+gb.close()
+check("G-Code: Betttemperatur der ersten Schicht", lan.gcode_facts(gb.name)["bed"] == 100 and lan.gcode_facts(g5.name)["bed"] is None,
+      (lan.gcode_facts(gb.name), lan.gcode_facts(g5.name)))
 n_up = len(uploads)
 try:
     lan.print_gcode("127.0.0.1", g5.name, "slot5.gcode"); check("Slot 5 ohne zweite ACE abgelehnt (vor dem Hochladen)", False)

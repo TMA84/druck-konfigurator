@@ -12,14 +12,15 @@ let sendFootStd = '';
    neu geöffnet), eine ältere darf kein „Drucker bereit“ mehr anzeigen. */
 let sendBusy = false, sendReq = 0, sendRun = 0;
 // Was gedruckt wird: letzter Slice-Stand oder der einer Warteschlange (js/queue-ui.js) mit Rückmeldung beim Start
-// own: fertiger G-Code („G-Code drucken …“, js/gcode-ui.js) – Werkzeug → Slot frei wählbar (map), Material aus dem G-Code
+// own: fertiger G-Code („G-Code drucken …“, js/gcode-ui.js) – Werkzeug → Slot frei wählbar (map), Material aus dem G-Code,
+// bed: Betttemperatur der ersten Schicht aus dem G-Code (fürs Vorwärmen)
 let sendCtx = { slice: null, materials: null, name: '', onStarted: null, own: false, map: {} };
 
 async function openSendDialog(plate, opts) {
   if (sendBusy) { if (!$('sendDlg').open) $('sendDlg').showModal(); return; }
   const o = opts || {};
   sendCtx = { slice: o.slice || (costState && costState.slice), materials: o.materials || costState.materials, name: o.name || (project ? project.name : ''), onStarted: o.onStarted || null,
-    own: !!o.own, map: o.map || {}, colours: o.colours || [] };
+    own: !!o.own, map: o.map || {}, colours: o.colours || [], bed: o.bed || 0 };
   const s = sendCtx.slice;
   if (!s || !s.job) { toast(t('Zuerst „Kosten berechnen“ – dabei wird geslict')); return; }
   const host = printerHost(SEND_PRINTER);
@@ -119,7 +120,7 @@ async function sendAdopt() {
 }
 $('sendDlg').addEventListener('click', e => {
   if (e.target.closest('[data-send-adopt]')) { sendAdopt(); return; }
-  if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted, own: sendCtx.own, map: sendCtx.map, colours: sendCtx.colours });
+  if (e.target.closest('[data-send-refresh]')) openSendDialog(+$('sendPlate').value, { slice: sendCtx.slice, materials: sendCtx.materials, name: sendCtx.name, onStarted: sendCtx.onStarted, own: sendCtx.own, map: sendCtx.map, colours: sendCtx.colours, bed: sendCtx.bed });
 });
 $('sendGo').addEventListener('click', async () => {
   // Benachrichtigung bei Pause/Fertig (js/workbench-ui.js wbEvents) – fragen, solange ein Klick die Erlaubnis trägt

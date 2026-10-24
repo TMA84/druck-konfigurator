@@ -223,6 +223,34 @@ pl = sc.api_get(path)["plan"]
 check("abgebrochener Start nach Neustart: failed, kein zweiter Start", pl["state"] == "failed" and "unterbrochen" in pl["note"] and calls == [], pl)
 sc.api_post({"action": "dismiss"}, None, path, NOW)
 
+# eigener G-Code („G-Code drucken“): own im Plan, Zuordnung Werkzeug → Slot, Start mit own und Slots
+fails("own kein bool", lambda: sc.api_post(dict(base, own="ja"), gfor, path, NOW), "own")
+check("ohne own: own = False", sc.api_post(base, gfor, path, NOW)["plan"]["own"] is False)
+sc.api_post({"action": "cancel"}, None, path, NOW); sc.api_post({"action": "dismiss"}, None, path, NOW)
+got = []
+v = sc.api_post(dict(base, own=True, name="teil", wants=[{"tool": 0, "type": "PETG"}, {"tool": 1, "type": "PLA"}],
+                     slots={"0": 1, "1": 0}, preheat={"bed": 80, "minutes": 10}), gfor, path, NOW)
+check("eigener G-Code: own und Zuordnung im Plan", v["plan"]["own"] is True and v["plan"]["slots"] == {"0": 1, "1": 0}
+      and v["plan"]["preheat"]["bed"] == 80, v["plan"])
+check("eigener G-Code: Zuordnung vor dem Start geprüft (T0 → Slot 2 PETG)", sc.check_ready(FREE, v["plan"]["wants"], v["plan"]["slots"]) is None)
+check("ohne Zuordnung passte es nicht", "Slot 1: PLA eingelegt" in (sc.check_ready(FREE, v["plan"]["wants"]) or ""))
+check("zugeordneter Slot fehlt am Drucker → nicht starten", "gibt es am Drucker nicht" in (sc.check_ready(FREE, [], {"0": 9}) or ""))
+sc.Runner(lambda: FREE, lambda plan: got.append((plan.get("own"), plan.get("slots"))), dry, path=path, heat_fn=lambda on, bed: None).step(NOW + 3 * 3600 + 1)
+check("Start mit own und Zuordnung an start_fn", got == [(True, {"0": 1, "1": 0})] and sc.api_get(path)["plan"]["state"] == "started", (got, sc.api_get(path)["plan"]))
+# serve.scheduled_start: Dateiname auf dem Drucker ohne „_Platte1“, Slots an print_gcode (Drucker nachgestellt)
+os.environ.setdefault("SPOOL_FILE", os.path.join(d, "data", "spools.json"))
+os.environ.setdefault("SLICE_JOBS_DIR", os.path.join(d, "jobs"))
+import serve  # noqa: E402
+sent = []
+serve.printer_host = lambda: "192.168.0.99"
+serve.anycubic_lan.print_gcode = lambda host, gc, name, opts, slots: sent.append((name, slots)) or {"filename": name}
+plan = dict(sc.load(path)["plan"])
+serve.scheduled_start(plan)
+serve.scheduled_start(dict(plan, own=False))
+check("geplanter Start: eigener G-Code ohne „_Platte1“, sonst mit; Zuordnung an print_gcode",
+      sent == [("teil.gcode", {"0": 1, "1": 0}), ("teil_Platte1.gcode", {"0": 1, "1": 0})], sent)
+sc.api_post({"action": "dismiss"}, None, path, NOW)
+
 # kaputte Datei: beiseitegelegt, nicht stumm überschrieben
 open(path, "w").write("{kaputt")
 check("kaputte Datei → leer, beiseitegelegt", sc.load(path)["plan"] is None and not os.path.exists(path)

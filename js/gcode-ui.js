@@ -14,7 +14,7 @@ async function gcodeOpenFile(file) {
     const f = r.facts || {}, kinds = (f.types || []).map(x => ({ kind: kindOfType(x), name: x }));
     if (!r.plates || !r.plates.length || !(r.plates[0].grams || []).some(g => g > 0))
       toast(t('Im G-Code fehlt die Filament-Statistik von OrcaSlicer – Werkzeuge und Druckzeit unbekannt'));
-    openSendDialog(1, { slice: { job: r.job, plates: r.plates }, materials: kinds, name: file.name, own: true, colours: f.colours || [] });
+    openSendDialog(1, { slice: { job: r.job, plates: r.plates }, materials: kinds, name: file.name, own: true, colours: f.colours || [], bed: f.bed || 0 });
   } catch (e) { toast(t('G-Code nicht übernommen: {msg}', { msg: t(e.message) })); }
 }
 $('gcodeFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; gcodeOpenFile(f); });

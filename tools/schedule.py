@@ -12,7 +12,7 @@ der Server die Bettheizung wieder aus (heat_fn(False)).
 Der G-Code wird beim Planen in den Datenordner kopiert (Slice-Aufträge im Zwischenspeicher werden aufgeräumt).
 
 Stand: $DATA_DIR/schedule.json (bzw. $SCHEDULE_FILE), Dateien in $DATA_DIR/scheduled/<id>/.
-{plan: {id, name, file, start_at, created, plate, wants:[{tool, type}], slots: {Werkzeug: ACE-Slot}, options,
+{plan: {id, name, file, start_at, created, plate, own, wants:[{tool, type}], slots: {Werkzeug: ACE-Slot}, options,
         dry: {temp, minutes, start_at, sent}|null, state: wait|drying|heating|starting|started|failed|cancelled, note, done_at}|null, seq}
 """
 import json
@@ -108,7 +108,8 @@ def view(state, now=None):
 
 
 def create(state, req, gcode_src, preview_src=None, path=None, now=None):
-    """req: {name, start_at (Unix-Sekunden), plate, wants:[{tool,type}], options, bed_clear: True, dry: {temp, minutes}|None}."""
+    """req: {name, start_at (Unix-Sekunden), plate, wants:[{tool,type}], slots, own, options, bed_clear: True, dry: {temp, minutes}|None}.
+    own: fertiger G-Code („G-Code drucken“) – Dateiname auf dem Drucker ohne „_Platte1“."""
     now = now or time.time()
     p = state.get("plan")
     if p and p["state"] in BUSY:
@@ -141,6 +142,9 @@ def create(state, req, gcode_src, preview_src=None, path=None, now=None):
     for k, v in (req.get("slots") or {}).items() if isinstance(req.get("slots"), dict) else ():
         if str(k).isdigit() and int(k) < 32 and isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 16:
             smap[str(int(k))] = v
+    own = req.get("own", False)
+    if not isinstance(own, bool):
+        raise ScheduleError("Ungültiger Wert: own")
     opts = {k: 1 if (req.get("options") or {}).get(k) else 0 for k in ("auto_leveling", "flow_calibration", "timelapse")}
     pid = uuid.uuid4().hex[:12]
     d = os.path.join(files_dir(path), pid)
@@ -152,7 +156,7 @@ def create(state, req, gcode_src, preview_src=None, path=None, now=None):
     if preview_src and os.path.isfile(preview_src):
         shutil.copyfile(preview_src, os.path.join(d, "plate.preview"))
     name = "".join(c if c.isalnum() or c in "._-" else "_" for c in str(req.get("name") or "druck"))[:80]
-    state["plan"] = {"id": pid, "name": name, "file": d, "plate": int(req.get("plate") or 1), "start_at": start, "created": now,
+    state["plan"] = {"id": pid, "name": name, "file": d, "plate": int(req.get("plate") or 1), "own": own, "start_at": start, "created": now,
                      "wants": wants, "slots": smap, "options": opts, "dry": dry, "preheat": heat, "state": "wait", "note": None, "done_at": None}
     state["seq"] = state.get("seq", 0) + 1
     return state["plan"]
@@ -181,6 +185,11 @@ def check_ready(st, wants, slots_map=None):
     # Werkzeug-Nummern sind durchgehend (ACE 2 = 4–7), st["ace"] zählt je Einheit ab 0 – also wie print_gcode umrechnen
     slots = anycubic_lan.all_slots(st.get("ace") or [])
     smap = {int(k): v for k, v in (slots_map or {}).items() if str(k).isdigit()}
+    # wie print_gcode: zugeordnete Slots muss es am Drucker geben
+    have_idx = {x.get("index") for x in slots}
+    missing = sorted({v + 1 for v in smap.values() if isinstance(v, int) and slots and v not in have_idx})
+    if missing:
+        return "Slot %s gibt es am Drucker nicht" % ", ".join(map(str, missing))
     for w in wants:
         n = smap.get(w["tool"], w["tool"])
         s = next((x for x in slots if x.get("index") == n), None)

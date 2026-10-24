@@ -730,6 +730,18 @@ async function runSmoke(opts={}){
         ok(h.preheat&&h.preheat.bed===105&&h.preheat.minutes===10&&h.bed_clear===true&&!h.dry&&Math.abs(h.start_at-(t0+620))<5,'Vorwärmen sofort: Plan mit Start in 10 min, ohne Trocknen');
         sendInfo={...sendInfo,state:'busy'};sched.v=null;sendLaterReset();await wait(100);$('sendHeat').checked=true;$('sendHeat').dispatchEvent(new Event('input'));
         ok($('sendGo').disabled&&/nicht frei/.test($('sendHeatInfo').textContent),'Vorwärmen sofort: Drucker beschäftigt → gesperrt');
+        // eigener G-Code („G-Code drucken“): Später starten und Vorwärmen (Bett aus dem G-Code), Plan mit own und Zuordnung
+        posts.length=0;sched.v=null;sendInfo={...sendInfo,state:'free',printing:false};
+        sendCtx={slice:{job:'x',plates:[{plate:1,grams:[0,0,22.4],time_s:600}]},materials:[null,null,{kind:'asa',name:'ASA'}],name:'teil.gcode',onStarted:null,own:true,map:{2:0},colours:[],bed:100};
+        sendLaterReset();await wait(100);
+        ok(!$('sendLaterBox').classList.contains('hidden')&&!$('sendHeat').closest('label').classList.contains('hidden')&&$('sendHeat').checked&&$('sendHeatBed').value==='100','Eigener G-Code: „Später starten“ und „Bett vorwärmen“ sichtbar, Bett 100 °C aus dem G-Code (ASA angehakt)');
+        $('sendLater').checked=true;$('sendLater').dispatchEvent(new Event('input'));$('sendAt').value=at.getFullYear()+'-'+String(at.getMonth()+1).padStart(2,'0')+'-'+String(at.getDate()).padStart(2,'0')+'T'+String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0');
+        $('sendBedOk').checked=true;$('sendBedOk').dispatchEvent(new Event('input'));$('sendGo').click();await wait(300);
+        { const o=posts[0]||{};ok(o.own===true&&JSON.stringify(o.slots)==='{"2":0}'&&o.name==='teil'&&JSON.stringify(o.wants)==='[{"tool":2,"type":"ASA"}]'&&o.preheat&&o.preheat.bed===100,'Eigener G-Code geplant: own, Zuordnung Werkzeug → Slot, Name ohne .gcode, Vorwärmen ('+JSON.stringify(o)+')'); }
+        sched.v={plan:{id:'x',name:'teil',plate:1,own:true,state:'wait',start_at:Math.round(at.getTime()/1000),note:null}};schedRender();
+        ok(/teil\.gcode/.test($('schedSum').textContent)&&!/Platte/.test($('schedSum').textContent),'Werkbank: geplanter eigener G-Code unter seinem Dateinamen, ohne Platte');
+        sched.v=null;sendCtx={...sendCtx,bed:0};sendLaterReset();await wait(100);
+        ok(!$('sendLaterBox').classList.contains('hidden')&&$('sendHeat').closest('label').classList.contains('hidden')&&!$('sendHeat').checked,'Eigener G-Code ohne Betttemperatur: „Später starten“ ja, „Bett vorwärmen“ nicht');
         sched.v=null;schedRender();window.fetch=of;if($('sendDlg').open)$('sendDlg').close(); }
       // Slice-Stand nicht mehr auf dem Server (z. B. nach einem Add-on-Neustart): einmal neu slicen, dann mit neuem Auftrag starten
       { const ol=window.lanApi,orc=window.runCosts,calls=[],cs0=costState;const sc0={job:'aaaaaaaaaaaaaaaa',plates:[{plate:1,grams:[5],total_g:5,time_s:60,changes:0}]};costState={...costState,slice:sc0,materials:{}};
