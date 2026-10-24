@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.44.2] – 2026-10-24
+
+### Behoben
+- **„Druck fertig“ nach jedem Neustart der App:** Das Druck-Ereignis in Home Assistant ging beim Neustart kurz auf „nicht verfügbar“ und zurück; die Beispiel-Automation („trigger: state“) meldete dadurch das letzte Ereignis – meist „fertig“ – erneut. Das Ereignis bleibt jetzt beim Neustart verfügbar. Im Handbuch hat die Beispiel-Automation zusätzlich `not_from`/`not_to: [unavailable, unknown]` – bitte in der eigenen Automation ergänzen, das schützt auch beim Neustart von Home Assistant.
+
 ## [10.44.1] – 2026-10-24
 
 ### Geändert

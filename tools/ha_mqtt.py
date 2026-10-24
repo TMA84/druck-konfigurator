@@ -304,8 +304,10 @@ class Publisher:
             if key in ("printer_state", "queue_state", "month_prints", "filament_low", "schedule_state"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
+        # Ohne availability: sonst geht das Ereignis bei jedem Neustart der App auf „nicht verfügbar“ und zurück –
+        # Automationen mit „trigger: state“ sehen das als Zustandswechsel und melden das letzte Ereignis (meist „fertig“) erneut.
         out["%s/event/%s/print_event/config" % (prefix, base)] = dict(
-            common, name="Druck-Ereignis", unique_id=base + "_print_event", default_entity_id="event." + base + "_print_event",
+            {k: v for k, v in common.items() if not k.startswith(("availability", "payload_"))}, name="Druck-Ereignis", unique_id=base + "_print_event", default_entity_id="event." + base + "_print_event",
             state_topic=self.t_event, event_types=EVENT_TYPES, icon="mdi:printer-3d-nozzle-alert")
         if self.image_fn:
             out["%s/camera/%s/progress/config" % (prefix, base)] = dict(

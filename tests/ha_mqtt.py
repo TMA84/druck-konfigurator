@@ -251,6 +251,7 @@ uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/co
 check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1 + 1 + 2, sorted(set(uids)))   # + Druck-Ereignis, Licht, ACE 1 Temperatur/Trocknen
 evc = json.loads(disc("event", "print_event")[1])
 check("Druck-Ereignis (MQTT-Event)", evc["state_topic"] == "dk_test/event" and evc["event_types"] == ["pausiert", "fortgesetzt", "fertig", "abgebrochen"], evc)
+check("Druck-Ereignis ohne availability (Neustart löst keine Automation aus)", not any(k.startswith(("availability", "payload_")) for k in evc) and evc["device"], evc)
 mc = json.loads(disc("sensor", "month_cost_eur")[1])
 check("Kosten diesen Monat: monetary EUR", mc["device_class"] == "monetary" and mc["unit_of_measurement"] == "EUR" and mc["state_class"] == "total"
       and mc["value_template"] == "{{ value_json.month_cost_eur }}", mc)
