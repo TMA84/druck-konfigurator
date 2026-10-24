@@ -34,6 +34,43 @@ for bad in (b"", b"kein zip", b"PK" + b"x" * 10):
     except slicer.SliceError as e:
         check("ungültige Datei abgelehnt (" + e.kind + ")", e.kind in ("bad_request", "failed", "no_slicer"), e)
 
+# Upload als Datei (serve.py schreibt in Stücken in slicer.upload_file): verknüpft, nicht ganz gelesen; die Datei
+# gehört weiter dem Aufrufer
+def upload(data):
+    fd, path = slicer.upload_file()
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+    return path
+
+
+def leftovers():
+    return [n for n in os.listdir(slicer.JOBS_DIR) if n.startswith((slicer.UPLOAD_PREFIX, slicer.WORK_PREFIX))]
+
+
+src = upload(b"; G-Code\nG1 X1 Y1 E1\n" * 1000)
+r = slicer.import_gcode(src, "datei.gcode")
+dest = slicer.job_file(r["job"], 1, "gcode")
+check("G-Code aus Datei übernommen", dest and os.path.getsize(dest) == os.path.getsize(src) and r["name"] == "datei.gcode", r)
+check("Upload-Datei bleibt beim Aufrufer", os.path.isfile(src))
+os.unlink(src)
+check("Auftrag behält den G-Code ohne Upload-Datei", os.path.isfile(dest))
+for bad in (b"kein gcode", b""):
+    src = upload(bad)
+    try:
+        slicer.import_gcode(src)
+        check("ungültiger G-Code aus Datei abgelehnt", False)
+    except slicer.SliceError as e:
+        check("ungültiger G-Code aus Datei abgelehnt", e.kind == "bad_request", e)
+    os.unlink(src)
+src = upload(b"kein zip")
+try:
+    slicer.slice_3mf(src)
+    check("ungültige 3MF aus Datei abgelehnt", False)
+except slicer.SliceError as e:
+    check("ungültige 3MF aus Datei abgelehnt", e.kind == "bad_request", e)
+os.unlink(src)
+check("keine Upload-Dateien übrig (bytes)", not leftovers(), leftovers())
+
 # 2) Echtes Slicen
 if slicer.find_orca():
     try:
@@ -78,6 +115,13 @@ if slicer.find_orca():
         check("an: weniger Stützen als aus", n_on < n_off, (n_on, n_off))
         gone = slicer.slice_3mf(two, plates=[2], count=2, reuse="0" * 16)
         check("fehlender Auftrag: alles geslict", gone["sliced"] == 2, gone["plates"])
+        # aus einer Upload-Datei (wie serve.py): gleiches Ergebnis, Datei bleibt beim Aufrufer, kein Arbeitsordner übrig
+        src = upload(data)
+        from_file = slicer.slice_3mf(src)
+        check("3MF aus Datei geslict", from_file["total"]["total_g"] == r["total"]["total_g"], from_file["total"])
+        check("3MF-Upload-Datei bleibt beim Aufrufer", os.path.isfile(src))
+        os.unlink(src)
+        check("kein Arbeitsordner/Upload übrig", not leftovers(), leftovers())
     else:
         print("Hinweis: kein Test-3MF (node fehlt) – echtes Slicen übersprungen")
 else:

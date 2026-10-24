@@ -161,6 +161,21 @@ os.environ["KONFIGURATOR_PIN"] = "4711"
 check("mit PIN: Servername egal (Anmeldung nötig)", req("GET", "/api/queue", headers={"Host": "boese.example"})[0] == 401)
 os.environ.pop("KONFIGURATOR_PIN")
 
+def slots_free():
+    got = [serve.UPLOAD_SLOTS.acquire(blocking=False) for _ in range(2)]
+    for g in got:
+        if g:
+            serve.UPLOAD_SLOTS.release()
+    return all(got)
+
+
+def settle(cond, wait=5):
+    end = time.time() + wait
+    while not cond() and time.time() < end:
+        time.sleep(0.05)
+    return cond()
+
+
 # 5) Upload-Plätze: höchstens zwei große Dateien gleichzeitig
 serve.UPLOAD_SLOTS.acquire()
 serve.UPLOAD_SLOTS.acquire()
@@ -171,9 +186,7 @@ check("Upload belegt → 503 sofort", st == 503 and j(data).get("kind") == "busy
 st, _, data = req("POST", "/api/gcode?name=t.gcode", b"; G-Code\nG1 X1 Y1 E1\n", {"Content-Type": "application/octet-stream"})
 check("G-Code danach angenommen", st == 200 and j(data).get("job"), (st, data[:200]))
 st, _, data = req("POST", "/api/gcode", b"kein gcode", {"Content-Type": "application/octet-stream"})
-check("Upload-Platz nach Fehler frei", st == 400 and serve.UPLOAD_SLOTS.acquire(blocking=False) and serve.UPLOAD_SLOTS.acquire(blocking=False), st)
-serve.UPLOAD_SLOTS.release()
-serve.UPLOAD_SLOTS.release()
+check("Upload-Platz nach Fehler frei", st == 400 and settle(slots_free), st)   # die Antwort kommt vor dem Freigeben
 
 # 6) Kamera und Stand von fremden Seiten
 st, _, data = req("GET", "/api/anycubic/camera?host=192.168.1.9", headers={"Sec-Fetch-Site": "cross-site"})
@@ -262,6 +275,65 @@ for t in ts:
     t.join()
 check("erste Abfrage: alle warten auf das Ergebnis", len(fetches) == 1 and res == [True] * 5, (len(fetches), res))
 ha_users._fetch_users = orig_fetch
+
+# 11) Uploads landen in Stücken in einer Datei: kurzer Inhalt, Abbruch, Aufräumen, Speicher
+def leftovers():
+    d = slicer.JOBS_DIR
+    return [n for n in os.listdir(d) if n.startswith(".upload-")] if os.path.isdir(d) else []
+
+
+for path in ("/api/gcode?name=x", "/api/slice"):
+    s = socket.create_connection(("127.0.0.1", PORT), timeout=10)
+    s.sendall(("POST %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/octet-stream\r\nContent-Length: 100000\r\n"
+               "Connection: close\r\n\r\n" % path).encode() + b"; G-Code\nG1 X1\n")
+    s.shutdown(socket.SHUT_WR)   # weniger als Content-Length, dann Ende
+    data = b""
+    while True:
+        chunk = s.recv(65536)
+        if not chunk:
+            break
+        data += chunk
+    s.close()
+    head, _, rest = data.partition(b"\r\n\r\n")
+    st = int(head.split(b" ")[1]) if head.startswith(b"HTTP/") else 0
+    check("kurzer Inhalt → 400 (%s)" % path, st == 400 and j(rest).get("kind") == "bad_request", (st, rest[:200]))
+    check("kurzer Inhalt: keine Upload-Datei übrig (%s)" % path, settle(lambda: not leftovers()), leftovers())
+    # Verbindung mitten im Upload weg
+    s = socket.create_connection(("127.0.0.1", PORT), timeout=10)
+    s.sendall(("POST %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/octet-stream\r\nContent-Length: 5000000\r\n"
+               "\r\n" % path).encode() + b"PK" + b"x" * 2000000)
+    time.sleep(0.2)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, b"\x01\x00\x00\x00\x00\x00\x00\x00")   # RST statt FIN
+    s.close()
+    check("Abbruch: Upload-Datei weg, Plätze frei (%s)" % path, settle(lambda: not leftovers() and slots_free()), (leftovers(), slots_free()))
+before = len(os.listdir(slicer.JOBS_DIR))
+st, _, data = req("POST", "/api/gcode", b"kein gcode", {"Content-Type": "application/octet-stream"})
+check("ungültiger G-Code: kein Auftrag, keine Upload-Datei", st == 400 and settle(lambda: not leftovers()) and len(os.listdir(slicer.JOBS_DIR)) == before, (st, leftovers()))
+
+# großer G-Code: Speicher des Servers wächst nicht mit der Größe (vorher: ganze Datei im Speicher)
+import tracemalloc  # noqa: E402
+BIG = 50 * 1024 * 1024
+line = b"G1 X10.123 Y20.456 E0.789\n"
+block = line * (1024 * 1024 // len(line)) + b";" * (1024 * 1024 % len(line))
+tracemalloc.start()
+c = http.client.HTTPConnection("127.0.0.1", PORT, timeout=60)
+c.putrequest("POST", "/api/gcode?name=gross.gcode")
+c.putheader("Content-Type", "application/octet-stream")
+c.putheader("Content-Length", str(BIG))
+c.endheaders()
+for _ in range(BIG // len(block)):
+    c.send(block)
+r = c.getresponse()
+data = r.read()
+c.close()
+peak = tracemalloc.get_traced_memory()[1]
+tracemalloc.stop()
+res = j(data)
+print("50 MB G-Code: Speicher-Spitze %.1f MB" % (peak / 1e6))
+check("großer G-Code angenommen", r.status == 200 and res.get("plates", [{}])[0].get("gcode_mb") == round(BIG / 1e6, 1), (r.status, data[:200]))
+check("großer G-Code: Datei vollständig", os.path.getsize(slicer.job_file(res.get("job"), 1, "gcode") or os.devnull) == BIG)
+check("großer G-Code: Speicher-Spitze unter 10 MB", peak < 10 * 1024 * 1024, peak)
+check("großer G-Code: keine Upload-Datei übrig", settle(lambda: not leftovers()), leftovers())
 
 check("Verbindungs-Zeitlimit gesetzt", 0 < (serve.Handler.timeout or 0) <= 120, serve.Handler.timeout)
 

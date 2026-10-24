@@ -100,8 +100,14 @@ GZIP_CACHE_MAX = 32 * 1024 * 1024
 # Nur diese Dateien der Seite ausliefern (sonst 404) – nicht .git, tools/, Datenordner, Verzeichnislisten
 STATIC_DIRS = ("js/", "css/", "vendor/", "img/", "docs/", "templates/", "ha/")
 STATIC_FILES = {"", "index.html", "tests/ui-smoke.js"}   # ui-smoke.js: Bedientest (tools/headless.js smoke)
-# Große Uploads (3MF/G-Code bis 200 MB) liegen ganz im Speicher: höchstens zwei gleichzeitig annehmen
+# Große Uploads (3MF/G-Code bis 200 MB): höchstens zwei gleichzeitig annehmen. Sie kommen in Stücken von UPLOAD_CHUNK in
+# eine Datei im Auftragsordner (slicer.upload_file), nicht in den Speicher (Raspberry Pi mit dem Add-on)
 UPLOAD_SLOTS = threading.BoundedSemaphore(2)
+UPLOAD_CHUNK = 1024 * 1024
+
+
+class ClientGone(Exception):
+    """Verbindung beim Hochladen abgebrochen oder Zeitlimit: keine Antwort mehr möglich."""
 
 
 def file_version(rel):
@@ -208,6 +214,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             res = fn()
         except (anycubic_lan.LanError, slicer.SliceError) as e:
             return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
+        except ClientGone:
+            raise
         except (printqueue.QueueError, schedule.ScheduleError, prefs.PrefsError) as e:
             return self._json(409, {"error": str(e), "kind": "bad_request"})
         except (ValueError, KeyError, TypeError) as e:
@@ -543,23 +551,59 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return anycubic_lan.command(req["host"], req["type"], req["action"], req.get("data"))
         return self._api(run)
 
-    def _upload(self, path, length):
-        if path == "/api/slice":
-            # ?plates=2,3&count=4&reuse=<job>: nur geänderte Platten neu slicen, die übrigen übernehmen
-            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
-            count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
-            reuse = q.get("reuse", [""])[0] or None
-            return self._api(lambda: slicer.slice_3mf(self.rfile.read(length), plates, count, reuse))
-        # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
-        name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name", [""])[0][:120]
+    def _receive(self, fd, length):
+        """Inhalt in Stücken in die Datei fd schreiben. Weniger als Content-Length → SliceError (400),
+        Verbindung abgebrochen → ClientGone."""
+        left = length
+        with os.fdopen(fd, "wb") as f:
+            while left:
+                try:
+                    chunk = self.rfile.read(min(left, UPLOAD_CHUNK))
+                except OSError as e:   # Verbindung zurückgesetzt, Zeitlimit
+                    raise ClientGone() from e
+                if not chunk:
+                    break
+                f.write(chunk)
+                left -= len(chunk)
+        if left:
+            self.close_connection = True
+            raise slicer.SliceError("Datei unvollständig übertragen (%d von %d Bytes) – bitte noch einmal versuchen"
+                                    % (length - left, length), "bad_request")
 
-        def take():
-            res = slicer.import_gcode(self.rfile.read(length), name)
-            gcode = slicer.job_file(res["job"], 1, "gcode")
-            res["facts"] = {k: v for k, v in anycubic_lan.gcode_facts(gcode).items() if k != "size"}
-            return res
-        return self._api(take)
+    def _upload(self, path, length):
+        files = []
+
+        def receive():
+            fd, tmp = slicer.upload_file()
+            files.append(tmp)
+            self._receive(fd, length)
+            return tmp
+        try:
+            if path == "/api/slice":
+                # ?plates=2,3&count=4&reuse=<job>: nur geänderte Platten neu slicen, die übrigen übernehmen
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
+                count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
+                reuse = q.get("reuse", [""])[0] or None
+                return self._api(lambda: slicer.slice_3mf(receive(), plates, count, reuse))
+            # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
+            name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name", [""])[0][:120]
+
+            def take():
+                res = slicer.import_gcode(receive(), name)
+                gcode = slicer.job_file(res["job"], 1, "gcode")
+                res["facts"] = {k: v for k, v in anycubic_lan.gcode_facts(gcode).items() if k != "size"}
+                return res
+            return self._api(take)
+        except ClientGone:
+            self.close_connection = True
+            return None
+        finally:
+            for tmp in files:   # der Auftrag hat seine eigene Verknüpfung bzw. Kopie
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
 
 
 # ---------- Zugriffsschutz (KONFIGURATOR_PIN) ----------

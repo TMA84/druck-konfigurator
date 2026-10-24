@@ -3,6 +3,8 @@
 Orca wird gesucht in: $ORCA_PATH, /opt/orca/AppRun (Container), macOS-App, Windows-Standardpfad, PATH.
 Im Container läuft Orca ohne Bildschirm (geprüft 2026-09-28 mit 2.4.2 auf aarch64).
 Es wird immer nur ein Auftrag gleichzeitig geslict; weitere warten.
+Uploads (3MF, G-Code) kommen als Datei (upload_file, im Auftragsordner – gleiches Dateisystem, also verknüpfen statt
+kopieren); slice_3mf und import_gcode nehmen einen Pfad oder bytes und lesen die Datei nie ganz in den Speicher.
 Neu slicen nur geänderter Platten: slice_3mf(data, plates=[2, 3], count=4, reuse=<job>) slict Platte 2 und 3
 einzeln (--slice N) und übernimmt die übrigen G-Codes aus dem früheren Auftrag.
 """
@@ -14,6 +16,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 
 CANDIDATES = [
     os.environ.get("ORCA_PATH", ""),
@@ -35,6 +38,9 @@ JOBS_DIR = os.environ.get("SLICE_JOBS_DIR") or (os.path.join(os.environ["DATA_DI
 JOB_ID = re.compile(r"^[0-9a-f]{16}$")
 TIMEOUT_S = 900
 TAIL_BYTES = 2 * 1024 * 1024   # Statistik und Einstellungen stehen am Ende des G-Codes
+UPLOAD_PREFIX = ".upload-"     # Upload-Dateien und Arbeitsordner („.slice-“) im Auftragsordner: keine Auftrags-Id,
+WORK_PREFIX = ".slice-"        # bleiben beim Aufräumen der Aufträge stehen; nach einem Absturz nach STALE_S weg
+STALE_S = 24 * 3600
 _lock = threading.Lock()
 _version = {}
 
@@ -104,12 +110,11 @@ def _failure_reason(result, log):
     return " · ".join(dict.fromkeys(lines[-3:])) or "unbekannter Fehler (siehe Orca-Protokoll)"
 
 
-def _keep_failure(data, log):
+def _keep_failure(src, log):
     """Letzten fehlgeschlagenen Auftrag zur Fehlersuche aufheben (überschreibt den vorigen)."""
     d = os.environ.get("SLICE_DEBUG_DIR", tempfile.gettempdir())
     try:
-        with open(os.path.join(d, "druck-konfigurator-slice-fehler.3mf"), "wb") as f:
-            f.write(data)
+        shutil.copyfile(src, os.path.join(d, "druck-konfigurator-slice-fehler.3mf"))   # in Stücken, nicht ganz im Speicher
         with open(os.path.join(d, "druck-konfigurator-slice-fehler.log"), "w") as f:
             f.write(log)
     except OSError:
@@ -125,13 +130,55 @@ def _new_job_dir(protect=()):
     with _jobs_lock:
         os.makedirs(JOBS_DIR, exist_ok=True)
         skip = set(protect) | set(_protected)
-        old = sorted((os.path.join(JOBS_DIR, d) for d in os.listdir(JOBS_DIR) if JOB_ID.match(d) and d not in skip), key=os.path.getmtime)
+        names = os.listdir(JOBS_DIR)
+        old = sorted((os.path.join(JOBS_DIR, d) for d in names if JOB_ID.match(d) and d not in skip), key=os.path.getmtime)
+        _remove_stale(names)
         for d in old[:max(0, len(old) - KEEP_JOBS + 1)]:
             shutil.rmtree(d, ignore_errors=True)
         job = os.urandom(8).hex()
         path = os.path.join(JOBS_DIR, job)
         os.mkdir(path)
         return job, path
+
+
+def _remove_stale(names):
+    """Upload-Dateien und Arbeitsordner, die ein Absturz liegen ließ (älter als STALE_S)."""
+    for d in names:
+        if d.startswith((UPLOAD_PREFIX, WORK_PREFIX)):
+            p = os.path.join(JOBS_DIR, d)
+            try:
+                if os.path.getmtime(p) < time.time() - STALE_S:
+                    shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) else os.unlink(p)
+            except OSError:
+                pass
+
+
+def upload_file():
+    """Neue leere Datei für einen Upload → (fd, Pfad). Im Auftragsordner, damit sie ohne Kopie (os.link) zum Auftrag
+    bzw. Arbeitsordner kommt. Wegräumen muss der Aufrufer."""
+    os.makedirs(JOBS_DIR, exist_ok=True)
+    return tempfile.mkstemp(prefix=UPLOAD_PREFIX, dir=JOBS_DIR)
+
+
+@contextlib.contextmanager
+def _source(data):
+    """Pfad (bleibt, wie er ist) oder bytes (vorübergehend in eine Upload-Datei) → Pfad."""
+    if not isinstance(data, (bytes, bytearray)):
+        yield os.fspath(data)
+        return
+    fd, path = upload_file()
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        yield path
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+
+
+def _head(path, n):
+    with open(path, "rb") as f:
+        return f.read(n)
 
 
 @contextlib.contextmanager
@@ -237,16 +284,18 @@ def job_file(job, plate, ext):
 
 def import_gcode(data, name=""):
     """Fertigen G-Code (2026-10-18, „G-Code drucken“) als Auftrag mit einer Platte ablegen – danach wie geslict:
-    Vorschau (job_file … preview), Drucken über /api/anycubic/print, 3D-Fortschritt. Rückgabe wie slice_3mf (eine Platte)."""
-    if not data or len(data) > MAX_BYTES:
-        raise SliceError("G-Code fehlt oder ist zu groß (höchstens 200 MB)", "bad_request")
-    head = data[:4096].decode("utf-8", "replace")
-    if not re.search(r"^\s*(;|G[0-9]|M[0-9]|T[0-9])", head, re.M):
-        raise SliceError("Das sieht nicht nach G-Code aus", "bad_request")
-    job, path = _new_job_dir()
-    dest = os.path.join(path, "plate_1.gcode")
-    with open(dest, "wb") as f:
-        f.write(data)
+    Vorschau (job_file … preview), Drucken über /api/anycubic/print, 3D-Fortschritt. Rückgabe wie slice_3mf (eine Platte).
+    data: Pfad (z. B. upload_file; wird verknüpft, der Aufrufer räumt ihn weg) oder bytes."""
+    with _source(data) as src:
+        size = os.path.getsize(src)
+        if not size or size > MAX_BYTES:
+            raise SliceError("G-Code fehlt oder ist zu groß (höchstens 200 MB)", "bad_request")
+        head = _head(src, 4096).decode("utf-8", "replace")
+        if not re.search(r"^\s*(;|G[0-9]|M[0-9]|T[0-9])", head, re.M):
+            raise SliceError("Das sieht nicht nach G-Code aus", "bad_request")
+        job, path = _new_job_dir()
+        dest = os.path.join(path, "plate_1.gcode")
+        _link_or_copy(src, dest)   # gleiches Dateisystem: keine Kopie
     return {"job": job, "name": name, "plates": [{"plate": 1, "reused": False, **_plate_stats(dest)}]}
 
 
@@ -274,30 +323,34 @@ def _run(orca, src, out, tmp, index):
 
 
 def slice_3mf(data, plates=None, count=None, reuse=None):
-    """plates/count/reuse: nur diese Platten (1-basiert) neu slicen, die übrigen der count Platten aus reuse
+    """data: Pfad der 3MF (z. B. upload_file; wird verknüpft, der Aufrufer räumt sie weg) oder bytes.
+    plates/count/reuse: nur diese Platten (1-basiert) neu slicen, die übrigen der count Platten aus reuse
     übernehmen. Fehlt dort etwas, wird alles geslict. Ergebnis je Platte mit "reused": True/False."""
-    if not data or len(data) > MAX_BYTES or not data.startswith(b"PK"):
-        raise SliceError("Keine gültige 3MF-Datei (höchstens 200 MB)", "bad_request")
-    orca = find_orca()
-    if not orca:
-        raise SliceError("OrcaSlicer ist auf dem Server nicht installiert (im Container enthalten; lokal ORCA_PATH setzen)", "no_slicer")
-    reuse = str(reuse) if reuse and JOB_ID.match(str(reuse)) else None
-    with _protect(reuse):
-        return _slice(orca, data, plates, count, reuse)
+    with _source(data) as upload:
+        size = os.path.getsize(upload)
+        if not size or size > MAX_BYTES or _head(upload, 2) != b"PK":
+            raise SliceError("Keine gültige 3MF-Datei (höchstens 200 MB)", "bad_request")
+        orca = find_orca()
+        if not orca:
+            raise SliceError("OrcaSlicer ist auf dem Server nicht installiert (im Container enthalten; lokal ORCA_PATH setzen)", "no_slicer")
+        reuse = str(reuse) if reuse and JOB_ID.match(str(reuse)) else None
+        with _protect(reuse):
+            return _slice(orca, upload, plates, count, reuse)
 
 
-def _slice(orca, data, plates, count, reuse):
+def _slice(orca, upload, plates, count, reuse):
     todo, keep = None, {}
     if plates is not None and count:
         todo = sorted({int(n) for n in plates if 1 <= int(n) <= int(count)})
         keep = _reusable(reuse, [n for n in range(1, int(count) + 1) if n not in todo]) or {}
         if len(keep) + len(todo) != int(count) or not (todo or keep):
             todo, keep = None, {}
-    with _lock, tempfile.TemporaryDirectory(prefix="slice-") as tmp:
+    os.makedirs(JOBS_DIR, exist_ok=True)
+    # Arbeitsordner im Auftragsordner: 3MF hinein und G-Codes heraus ohne Kopie (gleiches Dateisystem)
+    with _lock, tempfile.TemporaryDirectory(prefix=WORK_PREFIX, dir=JOBS_DIR) as tmp:
         src, out = os.path.join(tmp, "projekt.3mf"), os.path.join(tmp, "out")
         os.mkdir(out)
-        with open(src, "wb") as f:
-            f.write(data)
+        _link_or_copy(upload, src)
         proc, result = None, {}
         for index in (todo if todo is not None else [0]):
             proc = _run(orca, src, out, tmp, index)
@@ -312,7 +365,7 @@ def _slice(orca, data, plates, count, reuse):
         missing = todo is not None and len(made) != len(todo)
         if (todo is None and not made) or missing:
             log = ((proc.stdout or "") + "\n" + (proc.stderr or "")) if proc else ""
-            _keep_failure(data, log)
+            _keep_failure(src, log)
             msg = _failure_reason(result, log)
             if "temperatures are incompatible" in msg:
                 msg = ("Die Filamente brauchen zu unterschiedliche Düsentemperaturen (z. B. PLA zusammen mit ASA/ABS) – "
