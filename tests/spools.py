@@ -404,5 +404,96 @@ try:
     spools.update(st, {"action": "replace", "id": old["id"]}); check("archivierte Spule: Fehler", False)
 except ValueError:
     check("archivierte Spule (nicht in der ACE): Fehler", True)
+
+# Ende des Drucks: fertig / abgebrochen in der Historie
+check("Ende: finished", spools.end_result({"state": "finished", "print_status": 2}) == "finished")
+check("Ende: „stoped“ mit print_status 2 = abgebrochen", spools.end_result({"state": "stoped", "print_status": 2}) == "aborted")
+check("Ende: nur print_status 3 = abgebrochen", spools.end_result({"print_status": 3}) == "aborted")
+check("Ende: unbekannt", spools.end_result({"state": "busy"}) is None)
+check("Historie: Abbruch steht als result drin", fin["history"][1].get("result") == "aborted" and fin["history"][0].get("result") == "finished", fin["history"])
+
+
+# Druckzeit lernen
+def hist(orca, real, **kw):
+    return dict({"job": "x", "start": 0, "end": real, "duration_s": real, "estimate": {"grams": [], "time_s": orca, "prep_s": 300}}, **kw)
+
+
+tf = spools.time_factor
+check("Faktor: ohne Daten keiner", tf([]) == {"factor": None, "samples": 0, "min": 3})
+check("Faktor: zwei Drucke reichen nicht", tf([hist(3600, 4260)] * 2)["factor"] is None)
+r = tf([hist(3600, 300 + 3600 * 1.1)] * 3)
+check("Faktor: drei Drucke, Vorbereitung abgezogen → 1,1", r["factor"] == 1.1 and r["samples"] == 3 and not r["clamped"], r)
+r = tf([hist(3600, 300 + 3600 * x) for x in (1.05, 1.1, 1.15, 2.4, 0.45)])
+check("Faktor: Median, Ausreißer zählen nicht voll", r["factor"] == 1.1, r)
+r = tf([hist(3600, 300 + 3600 * x) for x in (1.1, 1.1, 1.1, 9, 0.1)])
+check("Faktor: unplausible Verhältnisse fallen weg", r["samples"] == 3 and r["factor"] == 1.1, r)
+r = tf([hist(3600, 300 + 3600 * 2.0)] * 4)
+check("Faktor: begrenzt auf 1,5", r["factor"] == 1.5 and r["clamped"] and r["raw"] == 2.0, r)
+r = tf([hist(3600, 300 + 3600 * 0.5)] * 4)
+check("Faktor: begrenzt auf 0,7", r["factor"] == 0.7 and r["clamped"], r)
+r = tf([hist(3600, 4000, result="aborted")] * 5 + [hist(3600, 4000, skipped=[1])] * 5 + [hist(300, 600)] * 5 +
+       [{"job": "y", "duration_s": 4000}] * 5 + [dict(hist(3600, 4000), duration_s=None)] * 5)
+check("Faktor: abgebrochen, übersprungen, kurz, ohne Schätzung/Dauer zählen nicht", r["samples"] == 0, r)
+old = [dict(hist(3600, 420 + 3600), estimate={"grams": [], "time_s": 3600})] * 3
+check("Faktor: ältere Schätzung ohne prep_s → 7 min Vorbereitung", tf(old)["factor"] == 1.0, tf(old))
+r = tf([hist(3600, 300 + 3600 * 1.4)] * 30 + [hist(3600, 300 + 3600 * 1.0)] * 20)
+check("Faktor: nur die letzten 20 Drucke", r["factor"] == 1.0 and r["samples"] == 20, r)
+check("Faktor in GET /api/spools", "time_factor" in spools.view({**spools.empty_state(), "history": [hist(3600, 4260)] * 3}))
+st = spools.empty_state()
+spools.add_plan(st, {"job_name": "a.gcode", "estimate": {"grams": [1], "time_s": 3600, "prep_s": 400}})
+check("Plan: prep_s bleibt", st["plans"]["a"]["prep_s"] == 400)
+try:
+    spools.add_plan(st, {"job_name": "a.gcode", "estimate": {"grams": [1], "time_s": 3600, "prep_s": 99999}}); check("Plan: prep_s zu groß", False)
+except ValueError:
+    check("Plan: prep_s zu groß → Fehler", True)
+
+# Wartung
+st = spools.empty_state()
+st["history"] = [{"job": "a", "start": 0, "end": 36000, "duration_s": 36000}, {"job": "b", "start": 40000, "end": 47200, "duration_s": 7200}]
+mv = spools.maintenance_view(st, now=50000)
+nz = next(i for i in mv["items"] if i["key"] == "nozzle")
+check("Wartung: Standard 200 h Düse, 12 h gedruckt", nz["interval_h"] == 200 and nz["hours"] == 12.0 and not nz["due"] and nz["left_h"] == 188, nz)
+check("Wartung: drei Punkte, nichts fällig", len(mv["items"]) == 3 and mv["due"] == [], mv)
+st["track"] = {"job": "c", "start": 46800 + 3600, "mm": 0, "used": {}}
+check("Wartung: laufender Druck zählt mit", spools.maintenance_view(st, now=50400 + 3600)["items"][0]["hours"] == 13.0)
+st["track"] = {}
+spools.update(st, {"action": "maintenance", "item": "plate", "interval_h": 10})
+pl = next(i for i in spools.maintenance_view(st, now=50000)["items"] if i["key"] == "plate")
+check("Wartung: Intervall 10 h → fällig", pl["interval_h"] == 10 and pl["due"] and spools.maintenance_view(st, now=50000)["due"] == [pl["name"]], pl)
+spools.maintenance_update(st, {"item": "plate", "done": True}, now=43600)
+pl = next(i for i in spools.maintenance_view(st, now=50000)["items"] if i["key"] == "plate")
+check("Wartung: erledigt mitten im Druck – nur der Teil danach zählt", pl["hours"] == 1.0 and not pl["due"] and pl["done_at"] == 43600 and pl["done_hours"] == 12.0, pl)   # done_hours: was bis dahin in der Historie stand
+for bad in ({"item": "plate", "interval_h": 0}, {"item": "plate", "interval_h": 20000}, {"item": "plate", "interval_h": "5"},
+            {"item": "plate", "interval_h": float("nan")}, {"item": "plate", "interval_h": True}, {"item": "kaffee", "done": True},
+            {"item": ["plate"], "done": True}, {"item": "plate"}, {"item": "plate", "done": "ja"}):
+    try:
+        spools.update(st, dict(bad, action="maintenance")); check("Wartung ungültig: " + repr(bad), False)
+    except ValueError:
+        check("Wartung ungültig abgelehnt", True)
+check("Wartung: nach Fehlern unverändert", spools._maint(st)["plate"]["interval_h"] == 10)
+st["maintenance"] = {"items": {"nozzle": "kaputt", "plate": {"interval_h": -3}}}
+check("Wartung: kaputter Stand → Standardwerte", spools._maint(st)["nozzle"]["interval_h"] == 200 and spools._maint(st)["plate"]["interval_h"] == 50)
+# Export/Import
+st = spools.empty_state()
+spools.update(st, {"action": "maintenance", "item": "nozzle", "interval_h": 150, "done": True})
+name, body = spools.export_state(st)
+import json  # noqa: E402
+data = json.loads(body)
+st2 = spools.empty_state()
+spools.import_state(st2, data, "replace")
+check("Wartung: Export/Import (ersetzen)", spools._maint(st2)["nozzle"]["interval_h"] == 150 and spools._maint(st2)["nozzle"]["done_at"])
+st3 = spools.empty_state()
+spools.import_state(st3, data, "merge")
+check("Wartung: Zusammenführen behält die eigene", spools._maint(st3)["nozzle"]["interval_h"] == 200)
+try:
+    spools.validate_import(dict(data, maintenance={"items": {"nozzle": {"interval_h": -1}}})); check("Import: Wartung ungültig", False)
+except ValueError:
+    check("Import: ungültige Wartung abgelehnt", True)
+h = spools._clean_history([{"job": "a", "result": "finished", "skipped": [2]}])
+check("Import: result und skipped bleiben", h[0]["result"] == "finished" and h[0]["skipped"] == [2], h)
+try:
+    spools._clean_history([{"job": "a", "result": "kaputt"}]); check("Import: result ungültig", False)
+except ValueError:
+    check("Import: result ungültig abgelehnt", True)
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

@@ -52,9 +52,16 @@ function queueTick(q, st) {
   return cur;
 }
 const queueNext = q => q.items.find(i => i.state === 'wait') || null;
-// Restzeit: laufender Druck laut Drucker, dazu alle wartenden Platten laut Orca
-function queueRemaining(q, st) {
+// Dauer einer Platte der Warteschlange: time_s = Orca + Vorbereitung (prep_s der Platte); der gelernte Faktor k gilt nur
+// für Orcas Teil (wie tools/printqueue.py item_s). Ältere Warteschlangen ohne prep_s: ganz mal k.
+function queueItemS(q, it, k) {
+  const f = k > 0 ? k : 1, ts = it.time_s || 0, p = ((q.slice && q.slice.plates) || []).find(x => x.plate === it.plate);
+  const prep = Math.min(ts, (p && +p.prep_s) || 0);
+  return (ts - prep) * f + prep;
+}
+// Restzeit: laufender Druck laut Drucker (sonst eigene Schätzung), dazu alle wartenden Platten
+function queueRemaining(q, st, k) {
   const cur = q.items.find(i => i.state === 'printing');
-  const now = cur ? (st && st.job && st.job.remaining_min != null ? st.job.remaining_min * 60 : cur.time_s || 0) : 0;
-  return now + q.items.filter(i => i.state === 'wait').reduce((s, i) => s + (i.time_s || 0), 0);
+  const now = cur ? (st && st.job && st.job.remaining_min != null ? st.job.remaining_min * 60 : queueItemS(q, cur, k)) : 0;
+  return now + q.items.filter(i => i.state === 'wait').reduce((s, i) => s + queueItemS(q, i, k), 0);
 }

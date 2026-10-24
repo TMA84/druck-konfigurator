@@ -133,8 +133,10 @@ function renderCostPanel() {
   table.querySelector('tbody').innerHTML = html;
   table.classList.remove('hidden');
   info.innerHTML = (fresh ? '' : costState.busy || (costAuto() && costSignature() !== costState.failedSig) ? t('<b>Wird neu berechnet …</b>') + ' ' : t('<b>Veraltet</b> – das Projekt hat sich geändert, bitte neu berechnen.') + ' ') +
-    t('Druckzeit ≈ {time} · {g} g', { time: duration(tot.time_s + prepS() * costState.slice.plates.length), g: de(tot.total_g, 1) }) +
-      '<span class="muted small" title="' + esc(t('Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung ({p}) je Platte auf.', { p: duration(prepS()) })) + '"> (' + esc(t('Orca {time} + Vorbereitung', { time: duration(tot.time_s) })) + ')</span>' + (costState.slice.plates.length > 1 ? ' · ' + t('{n} Platten', { n: costState.slice.plates.length }) : '') +
+    t('Druckzeit ≈ {time} · {g} g', { time: duration(tot.time_s * timeK() + prepS() * costState.slice.plates.length), g: de(tot.total_g, 1) }) +
+      '<span class="muted small" title="' + esc(t('Orca rechnet Bett vermessen und Aufheizen nicht mit – das Tool schlägt die gemessene Vorbereitung ({p}) je Platte auf.', { p: duration(prepS()) }) +
+        (timeFactor() ? ' ' + t('Orcas Zeit ist an die echte Dauer der letzten Drucke angepasst (Faktor {f}).', { f: de(timeK(), 2) }) : '')) + '"> (' +
+      esc(t('Orca {time} + Vorbereitung', { time: duration(tot.time_s) }) + (timeFactor() ? ', ' + timeFactorNote() : '')) + ')</span>' + (costState.slice.plates.length > 1 ? ' · ' + t('{n} Platten', { n: costState.slice.plates.length }) : '') +
     (costState.slice.sliced != null && costState.slice.sliced < costState.slice.plates.length ? ' · ' + t('neu geslict: {n} von {total}', { n: costState.slice.sliced, total: costState.slice.plates.length }) : '') +
     (costState.slice.orca ? ' <span class="muted">(OrcaSlicer ' + esc(costState.slice.orca) + ')</span>' : '') +
     ((costState.notes || []).length ? '<br>' + costState.notes.map(esc).join('<br>') : '');
@@ -164,7 +166,7 @@ function renderPlateCosts(slots, live) {
   const purge = costPurge(), cfg = costCfg();
   $('plateCosts').querySelector('tbody').innerHTML = s.plates.map(p => {
     const c = computeCosts({ total: p }, slots, purge, cfg);
-    return '<tr data-pv-plate="' + p.plate + '" title="' + t('In der Vorschau zeigen') + '"><td>' + p.plate + (p.reused ? '<small>' + t('unverändert') + '</small>' : '') + '</td><td>' + duration(p.time_s + prepS()) + (p.changes ? '<small>' + t('{n} Wechsel', { n: p.changes }) + '</small>' : '') + '</td><td>' + de(p.total_g, 1) + ' g</td><td>' + eur(c.total) + '</td></tr>';
+    return '<tr data-pv-plate="' + p.plate + '" title="' + t('In der Vorschau zeigen') + '"><td>' + p.plate + (p.reused ? '<small>' + t('unverändert') + '</small>' : '') + '</td><td>' + duration(plateEstS(p)) + (p.changes ? '<small>' + t('{n} Wechsel', { n: p.changes }) + '</small>' : '') + '</td><td>' + de(p.total_g, 1) + ' g</td><td>' + eur(c.total) + '</td></tr>';
   }).join('');
   const o = orderPlates(s.plates, costState.materials, live.length ? live : null, slotMatchesKind);
   const miss = o.list.filter(n => n.missing.length);
@@ -184,6 +186,14 @@ $('plateCosts').addEventListener('click', e => {
 /* Vorbereitung je Platte (Bett vermessen, Aufheizen): rechnet Orca nicht mit; gemessen beim letzten Druck (js/live-ui.js,
    store.settings.prepS), sonst ~7 min wie am S1 gemessen. Kommt auf die angezeigten Druckzeiten und in die Warteschlange. */
 const prepS = () => +store.settings.prepS > 0 ? +store.settings.prepS : 420;
+/* Gelernte Druckzeit (tools/spools.py time_factor, über GET api/spools): Median echte Dauer ÷ Orca der letzten Drucke,
+   0,7–1,5, erst ab 3 Drucken. Gilt nur für Orcas Teil; die Restzeit, die der Drucker meldet, bleibt unangetastet. */
+const timeFactor = () => { const f = typeof spoolData !== 'undefined' && spoolData && spoolData.time_factor; return f && f.factor > 0 ? f : null; };
+const timeK = () => { const f = timeFactor(); return f ? f.factor : 1; };
+// Geschätzte Dauer einer Platte: Orca × Faktor + Vorbereitung. p.prep_s: in time_s schon enthalten (Platten der Warteschlange)
+const plateEstS = p => { const prep = p.prep_s != null ? Math.min(+p.prep_s || 0, p.time_s || 0) : null; return prep != null ? ((p.time_s || 0) - prep) * timeK() + prep : (p.time_s || 0) * timeK() + prepS(); };
+// „angepasst nach 12 Drucken: +8 %“ – leer ohne Faktor
+const timeFactorNote = () => { const f = timeFactor(); return f ? t('angepasst nach {n} Drucken: {pct} %', { n: f.samples, pct: (f.factor >= 1 ? '+' : '−') + de(Math.abs(f.factor - 1) * 100, 0) }) : ''; };
 async function runCosts() {
   if (!project || costState.busy) return;
   if (typeof nestBusy === 'function' && nestBusy()) await nestIdle();   // Anordnung im Hintergrund abwarten (js/nest.js)

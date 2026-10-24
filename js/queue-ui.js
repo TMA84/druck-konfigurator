@@ -87,7 +87,8 @@ async function startQueue() {
   const o = orderPlates(s.plates, costState.materials, live.length ? live : null, slotMatchesKind);
   const materials = Object.fromEntries(Object.entries(costState.materials || {}).map(([k, m]) => [k, m ? { kind: m.kind, name: m.name } : null]));
   const name = project ? project.name : 'Druck';
-  const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s + prepS(), changes: p.changes }));
+  // time_s mit Vorbereitung (prep_s getrennt, damit der gelernte Faktor nur Orcas Teil trifft und der Plan Orcas Zeit kennt)
+  const plates = s.plates.map(p => ({ plate: p.plate, grams: p.grams, total_g: p.total_g, time_s: p.time_s + prepS(), prep_s: prepS(), changes: p.changes }));
   if (qSrv.mode === 'server') {
     // Rückmeldung, solange der Server anlegt (2026-10-08: bei vielen großen Platten dauerte das ohne jedes Zeichen)
     const btn = $('queueStart'), label = btn.textContent;
@@ -164,7 +165,7 @@ function renderQueue() {
   if (!q) return;
   const st = queueSt, cur = q.items.find(i => i.state === 'printing'), next = queueNext(q);
   const free = st && !st.printing, done = q.items.filter(i => i.state === 'done').length;
-  const rest = st || !qSrv.srv ? queueRemaining(q, st) : qSrv.srv.remaining_s || 0;
+  const rest = st || !qSrv.srv ? queueRemaining(q, st, timeK()) : qSrv.srv.remaining_s || 0;
   $('queueT').textContent = t('Warteschlange · {name}', { name: q.name.replace(/\.(stl|3mf|zip)$/i, '') });
   $('queueSum').textContent = t('{done} von {total} fertig', { done, total: q.items.length }) + (rest > 0 ? ' · ' + t('noch ≈ {time} Druckzeit (ohne Pausen zum Abräumen)', { time: duration(rest) }) : '');
   const ace = st && st.ace && st.ace.length ? aceSlots(st) : null;
@@ -179,7 +180,7 @@ function renderQueue() {
     const prog = it.state === 'printing' && st && st.job && st.job.progress != null ? ' · ' + safeInt(st.job.progress) + ' %' : '';
     const act = it.state === 'wait' ? '<button class="btn sec" type="button" data-q-print="' + it.plate + '"' + (free && !cur ? '' : ' disabled title="' + t('Erst wenn der Drucker frei ist') + '"') + '>' + t('Drucken …') + '</button><button class="linkbtn" type="button" data-q-skip="' + it.plate + '">' + t('Überspringen') + '</button>'
       : it.state === 'printing' ? '' : '<button class="linkbtn" type="button" data-q-again="' + it.plate + '">' + t('Nochmal') + '</button>';
-    return '<li class="q-' + it.state + '"><span class="q-n">' + (n + 1) + '</span><span class="q-main"><b>' + t('Platte {n}', { n: it.plate }) + '</b><small>' + duration(it.time_s) + ' · ' + de(it.total_g, 1) + ' g</small>' +
+    return '<li class="q-' + it.state + '"><span class="q-n">' + (n + 1) + '</span><span class="q-main"><b>' + t('Platte {n}', { n: it.plate }) + '</b><small>' + duration(queueItemS(q, it, timeK())) + ' · ' + de(it.total_g, 1) + ' g</small>' +
       (need.missing.length && it.state === 'wait' ? '<small class="warn">' + need.missing.map(m => m.have ? t('Slot {n}: {want} einlegen (jetzt {have})', { n: m.slot + 1, want: esc(m.want), have: esc(m.have) }) : t('Slot {n}: {want} einlegen', { n: m.slot + 1, want: esc(m.want) })).join(' · ') + '</small>' : '') + '</span>' +
       '<span class="wb-pill q-state">' + t(QUEUE_STATE[it.state]) + prog + '</span><span class="q-act">' + act + '</span></li>';
   }).join('');

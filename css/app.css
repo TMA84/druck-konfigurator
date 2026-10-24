@@ -732,6 +732,24 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-pad button:hover:not(:disabled), .wb-z button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .wb-pad button:disabled, .wb-z button:disabled, .wb-card .btn:disabled { opacity: .4; cursor: not-allowed; }
 
+/* Wartung: je Punkt Name, Stunden/Intervall, Balken, „Erledigt“ */
+.wb-maintcard { grid-column: 1 / -1; }
+.wb-maintcard.hidden { display: none; }
+.wb-maintcard > p { margin: 0; }
+#wbMaintSum.bad { color: #c0392b; font-weight: 600; }
+.wb-maint { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.wb-maint li { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--rule-strong); border-radius: var(--r-s); background: var(--paper); }
+.wb-maint li.due { border-color: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
+.wb-maint-name { display: grid; gap: 1px; }
+.wb-maint-name small { color: var(--ink-3); font-size: 11px; }
+.wb-maint-h { font-size: 13px; font-variant-numeric: tabular-nums; }
+.wb-maint-h input { width: 70px; padding: 3px 6px; font-size: 13px; }
+.wb-maint li.due .wb-maint-h b { color: #c0392b; }
+.wb-maint .wb-heatbar { margin: 0; }
+.wb-maint .wb-heatbar > i { background: var(--accent); }
+.wb-maint li.due .wb-heatbar > i { background: #c0392b; }
+.wb-maint .btn { justify-self: start; }
+
 @media (max-width: 1250px) {
   .wb-job, .wb-cam { grid-column: 1 / -1; }
   .wb-heat, .wb-acecard { grid-column: span 6; }

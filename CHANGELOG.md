@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [Unreleased]
+
+### Neu
+- **Druckzeit lernt aus der Druckhistorie:** Das Tool vergleicht Orcas Schätzung mit der echten Dauer der letzten Drucke (bis 20, nur fertige, ohne übersprungene Objekte; Vorbereitung herausgerechnet) und passt seine Schätzungen an – Median, begrenzt auf 0,7–1,5, ab 3 Drucken. Gilt für die Druckzeit in ③ (mit Orcas Wert daneben: „Orca 2 h 50 min + Vorbereitung, angepasst nach 12 Drucken: +8 %“), die Platten, die Restzeit der Warteschlange (auch in Home Assistant), „fertig ≈“ beim geplanten Druck und die eigene Restzeit in ④. Die Restzeit, die der Drucker meldet, bleibt unverändert. Die Historie merkt sich dafür, ob ein Druck fertig wurde oder abgebrochen.
+- **Wartungszähler in der Werkbank:** Druckstunden seit dem letzten „Erledigt“ für Düse (alle 200 h), Achsen schmieren/Riemen prüfen (300 h) und Druckplatte gründlich reinigen (50 h), Intervalle änderbar. Fällige Punkte stehen rot in der Karte **Wartung**. Home Assistant: neuer binary_sensor **Wartung fällig** (`maintenance_due`, Liste im Attribut `maintenance_note`). Wartung geht mit Export/Import der Spulen mit.
+
 ## [10.45.2] – 2026-10-24
 
 ### Behoben

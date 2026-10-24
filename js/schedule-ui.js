@@ -61,7 +61,7 @@ function sendLaterState(p) {
   const wantType = m => m && (ORCA_KIND[m.kind] || (sendCtx.own && typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''));
   const wants = (p ? p.grams : []).map((g, tool) => g > 0 && sendCtx.materials && wantType(sendCtx.materials[tool])
     ? { tool, type: wantType(sendCtx.materials[tool]) } : null).filter(Boolean);
-  const run = p ? p.time_s + (typeof prepS === 'function' ? prepS() : 0) : 0;
+  const run = p ? (typeof plateEstS === 'function' ? plateEstS(p) : p.time_s) : 0;   // mit gelernter Druckzeit (js/costs-ui.js)
   const heatTxt = heat ? (later ? t('Vorwärmen ab {d}, ', { d: schedWhen(at - heat.minutes * 60) }) : t('Bett jetzt auf {c} °C, nach {m} min Druckstart. ', { c: heat.bed, m: heat.minutes })) : '';
   $('sendHeatInfo').textContent = later ? '' : heatTxt;
   if (later) $('sendLaterInfo').textContent = at > now ? heatTxt + (dry ? t('Trocknen ab {d}, ', { d: schedWhen(at - dry.minutes * 60) }) : '') +

@@ -207,6 +207,15 @@ check("Geplanter Druck fehlgeschlagen: kein Start, Grund", p3["schedule_start"] 
 check("Kein Plan: keiner", ha_mqtt.payload(None, None)["schedule_state"] == "keiner")
 p_ = ha_mqtt.payload(None, qv, spool_view=sv)
 check("Stand: filament_low ON mit Text", p_["filament_low"] == "ON" and "Slot 1" in p_["filament_note"], p_.get("filament_note"))
+# Wartung fällig (tools/spools.py maintenance_view)
+mv = {"maintenance": {"items": [{"key": "nozzle", "name": "Düse prüfen/wechseln", "hours": 212.4, "interval_h": 200, "due": True},
+                                {"key": "plate", "name": "Druckplatte gründlich reinigen", "hours": 10, "interval_h": 50, "due": False}]}}
+check("Wartung: fälliger Punkt als Text", ha_mqtt.maintenance_check(mv) == ["Düse prüfen/wechseln: 212 h von 200 h"], ha_mqtt.maintenance_check(mv))
+p_ = ha_mqtt.payload(None, None, spool_view=mv)
+check("Stand: maintenance_due ON mit Text", p_["maintenance_due"] == "ON" and p_["maintenance_note"].startswith("Düse"), p_.get("maintenance_note"))
+p_ = ha_mqtt.payload(None, None, spool_view={"maintenance": {"items": [dict(mv["maintenance"]["items"][1])]}})
+check("Stand: nichts fällig → OFF", p_["maintenance_due"] == "OFF" and p_["maintenance_note"] is None)
+check("Stand: ohne Filamentverwaltung OFF", ha_mqtt.payload(None, None)["maintenance_due"] == "OFF")
 
 # ---------- gegen den Broker ----------
 broker = Broker()
@@ -248,7 +257,10 @@ s1 = json.loads(disc("sensor", "slot1_remaining")[1])
 check("Slot-Sensor", s1["state_topic"] == "dk_test/slot/1" and s1["json_attributes_topic"] == "dk_test/slot/1" and s1["unit_of_measurement"] == "g"
       and s1["device_class"] == "weight" and s1["name"] == "Slot 1 Filament", s1)
 uids = [json.loads(p[1])["unique_id"] for p in broker.pubs if p[0].endswith("/config")]
-check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1 + 1 + 2, sorted(set(uids)))   # + Druck-Ereignis, Licht, ACE 1 Temperatur/Trocknen
+check("unique_ids eindeutig je Entität", len(set(uids)) == len(keys) + 4 + 4 + 1 + 1 + 2 + 1, sorted(set(uids)))   # + Druck-Ereignis, Licht, ACE 1 Temperatur/Trocknen, Wartung
+w = json.loads(disc("binary_sensor", "maintenance_due")[1])
+check("Wartung fällig: binary_sensor problem mit Attributen", w["device_class"] == "problem" and w["json_attributes_topic"] == "dk_test/state"
+      and w["value_template"] == "{{ value_json.maintenance_due }}", w)
 evc = json.loads(disc("event", "print_event")[1])
 check("Druck-Ereignis (MQTT-Event)", evc["state_topic"] == "dk_test/event" and evc["event_types"] == ["pausiert", "fortgesetzt", "fertig", "abgebrochen"], evc)
 check("Druck-Ereignis ohne availability (Neustart löst keine Automation aus)", not any(k.startswith(("availability", "payload_")) for k in evc) and evc["device"], evc)

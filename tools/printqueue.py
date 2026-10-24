@@ -9,6 +9,8 @@ hat (direkt nach dem Start ist er oft noch „frei“; nach 10 min ohne Meldung 
 druckt oder „fertig“ meldet. „abgebrochen“ stellt sie wieder auf „wartet“ (aborted). Gestartet wird nie automatisch:
 die nächste Platte startet die Seite nach Klick (api/anycubic/print) und meldet das mit {action: started}.
 
+Restzeit: Platten mit Orca-Zeit × gelerntem Faktor (tools/spools.py time_factor, von serve.py übergeben) plus Vorbereitung.
+
 Stand: {version, seq, queue: {name, created, slice:{job, plates}, materials, items:[{plate, time_s, total_g, state,
 seen, started, aborted, finished}], lastDone} | None, bed_clear, event: {seq, kind: done|aborted, plate, time, next,
 name, cleared} | None, events: [...]}. Zeiten in Sekunden (Unix). Nach der letzten Platte wird die Warteschlange
@@ -88,14 +90,25 @@ def next_item(q):
     return next((i for i in q["items"] if i["state"] == "wait"), None) if q else None
 
 
-def remaining_s(q, st):
-    """Laufender Druck laut Drucker (sonst Orca), dazu alle wartenden Platten laut Orca – wie queueRemaining."""
+def item_s(q, it, factor=None):
+    """Geschätzte Dauer einer Platte: time_s = Orca + Vorbereitung (prep_s der Platte); der gelernte Faktor
+    (tools/spools.py time_factor) gilt nur für Orcas Teil. Ältere Warteschlangen ohne prep_s: ganz mal Faktor."""
+    f = factor if isinstance(factor, (int, float)) and factor > 0 else 1.0
+    t = it.get("time_s") or 0
+    p = next((x for x in ((q.get("slice") or {}).get("plates") or []) if x.get("plate") == it.get("plate")), None)
+    prep = min(t, (p or {}).get("prep_s") or 0)
+    return (t - prep) * f + prep
+
+
+def remaining_s(q, st, factor=None):
+    """Laufender Druck laut Drucker (sonst eigene Schätzung), dazu alle wartenden Platten – wie queueRemaining.
+    factor: gelernter Faktor für Orcas Zeit; die Restzeit, die der Drucker meldet, bleibt unverändert."""
     if not q:
         return 0
     cur = current(q)
     job = (st or {}).get("job") or {}
-    now = (job["remaining_min"] * 60 if isinstance(job.get("remaining_min"), (int, float)) else cur.get("time_s") or 0) if cur else 0
-    return int(now + sum(i.get("time_s") or 0 for i in q["items"] if i["state"] == "wait"))
+    now = (job["remaining_min"] * 60 if isinstance(job.get("remaining_min"), (int, float)) else item_s(q, cur, factor)) if cur else 0
+    return int(now + sum(item_s(q, i, factor) for i in q["items"] if i["state"] == "wait"))
 
 
 def tick(state, st, now=None):
@@ -168,7 +181,7 @@ def _create(req, now):
             raise QueueError("Ungültiger Wert: grams")
         clean.append({"plate": _plate_no(p.get("plate")), "grams": [_num(g or 0, "grams") for g in grams],
                       "total_g": _num(p.get("total_g") or 0, "total_g"), "time_s": _num(p.get("time_s") or 0, "time_s"),
-                      "changes": _num(p.get("changes") or 0, "changes")})
+                      "changes": _num(p.get("changes") or 0, "changes"), "prep_s": _num(p.get("prep_s") or 0, "prep_s", 0, 7200)})
     by_no = {p["plate"]: p for p in clean}
     if len(by_no) != len(clean):
         raise QueueError("Platte doppelt")
@@ -249,7 +262,7 @@ def update(state, req, now=None):
     return "wartet wieder"
 
 
-def summary(state, st=None):
+def summary(state, st=None, factor=None):
     """Kurzfassung für Home Assistant: Text, Restzeit, Platten fertig/gesamt."""
     q = state.get("queue")
     if not q:
@@ -266,7 +279,7 @@ def summary(state, st=None):
         text = "Platte %d wartet" % nxt["plate"]
     else:
         text = "alle Platten gedruckt"
-    return {"active": True, "text": text, "remaining_s": remaining_s(q, st), "done": done, "total": total,
+    return {"active": True, "text": text, "remaining_s": remaining_s(q, st, factor), "done": done, "total": total,
             "current": cur["plate"] if cur else None, "next": nxt["plate"] if nxt else None, "bed_clear": bool(state.get("bed_clear"))}
 
 
@@ -277,10 +290,10 @@ def printer_view(st):
     return {k: st.get(k) for k in ("model", "state", "printing", "job", "ace", "connected", "time")}
 
 
-def view(state, st=None):
+def view(state, st=None, factor=None):
     return {"queue": state.get("queue"), "seq": state.get("seq") or 0, "event": state.get("event"), "events": state.get("events") or [],
-            "bed_clear": bool(state.get("bed_clear")), "remaining_s": remaining_s(state.get("queue"), st),
-            "summary": summary(state, st), "printer": printer_view(st), "server": True}
+            "bed_clear": bool(state.get("bed_clear")), "remaining_s": remaining_s(state.get("queue"), st, factor),
+            "summary": summary(state, st, factor), "printer": printer_view(st), "server": True, "time_factor": factor}
 
 
 # ---------- Beobachter: fragt den Drucker ab (gemeinsam für Warteschlange und Home Assistant) ----------
@@ -344,14 +357,14 @@ class Watcher:
             time.sleep(POLL_S if not self.last_error else 15)
 
 
-def api_get(path=None, st=None):
+def api_get(path=None, st=None, factor=None):
     with _lock:
-        return view(load(path), st)
+        return view(load(path), st, factor)
 
 
-def api_post(req, path=None, st=None):
+def api_post(req, path=None, st=None, factor=None):
     with _lock:
         state = load(path)
         msg = update(state, req)
         save(state, path)
-        return dict(view(state, st), note=msg)
+        return dict(view(state, st, factor), note=msg)

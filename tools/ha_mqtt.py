@@ -7,7 +7,8 @@ Einstellungen über Umgebungsvariablen (im Add-on setzt run.sh sie aus dem MQTT-
 Themen (base = MQTT_BASE_TOPIC):
   <base>/availability     online | offline (Last Will, retained)
   <base>/state            JSON mit allen Werten (siehe payload()), alle 15 s und bei Änderung – auch Filament, Kosten und
-                          Anzahl der Drucke im laufenden Monat (aus der Druckhistorie, tools/spools.py stats)
+                          Anzahl der Drucke im laufenden Monat (aus der Druckhistorie, tools/spools.py stats) und
+                          fällige Wartung (maintenance_due, Text in maintenance_note)
   <base>/slot/<n>         JSON je ACE-Slot (1 …): remaining_g, name, type, colour, net_g, brand
   <base>/progress_image   PNG des Druckfortschritts (MQTT-Kamera „3D-Fortschritt“, retained; tools/progress_image.py) –
                           bei jeder neuen Schicht, nur für Drucke aus dem Tool
@@ -66,6 +67,8 @@ ENTITIES = [
     ("bed_clear", "binary_sensor", "Bett abräumen", None, None, None, "mdi:printer-3d-nozzle-alert"),
     # Spule unter der Warnschwelle oder die wartenden Platten der Warteschlange brauchen mehr, als im Slot ist
     ("filament_low", "binary_sensor", "Filament knapp", None, "problem", None, "mdi:printer-3d-nozzle-alert"),
+    # Wartungszähler (tools/spools.py maintenance_view): ein Punkt hat sein Intervall in Druckstunden erreicht
+    ("maintenance_due", "binary_sensor", "Wartung fällig", None, "problem", None, "mdi:wrench-clock"),
     # geplanter Druck (tools/schedule.py)
     ("schedule_start", "sensor", "Geplanter Start", None, "timestamp", None, "mdi:calendar-clock"),
     ("schedule_state", "sensor", "Geplanter Druck", None, None, None, "mdi:calendar-check"),
@@ -198,6 +201,14 @@ def filament_check(queue, spool_view):
     return out
 
 
+def maintenance_check(spool_view):
+    """Fällige Wartung als Text je Punkt (aus spools.view()["maintenance"]); ohne Filamentverwaltung leer."""
+    m = (spool_view or {}).get("maintenance") if isinstance(spool_view, dict) else None
+    items = (m or {}).get("items") if isinstance(m, dict) else None
+    return ["%s: %d h von %d h" % (i.get("name"), int(i.get("hours") or 0), int(i.get("interval_h") or 0))
+            for i in items or [] if isinstance(i, dict) and i.get("due")]
+
+
 SCHEDULE_STATE = {"wait": "geplant", "drying": "trocknet", "heating": "heizt vor", "starting": "startet", "started": "gestartet", "failed": "nicht gestartet", "cancelled": "abgesagt"}
 
 
@@ -216,6 +227,7 @@ def payload(st, queue, now=None, spool_view=None, plan=None):
             "queue_state": sm.get("text") or "keine", "queue_remaining_min": round((sm.get("remaining_s") or 0) / 60),
             "plates": "%d/%d" % (sm.get("done") or 0, sm.get("total") or 0), "plates_done": sm.get("done") or 0,
             "filament_low": "ON" if filament_check(queue, spool_view) else "OFF", "filament_note": "; ".join(filament_check(queue, spool_view)) or None,
+            "maintenance_due": "ON" if maintenance_check(spool_view) else "OFF", "maintenance_note": "; ".join(maintenance_check(spool_view)) or None,
             "schedule_start": datetime.datetime.fromtimestamp(int(plan["start_at"]), datetime.timezone.utc).isoformat(timespec="seconds")
             if plan and plan.get("state") in ("wait", "drying", "heating") else None,
             "schedule_state": SCHEDULE_STATE.get((plan or {}).get("state"), "keiner"), "schedule_note": (plan or {}).get("note"),
@@ -301,7 +313,7 @@ class Publisher:
                 c["icon"] = icon
             if comp == "binary_sensor":
                 c.update(payload_on="ON", payload_off="OFF")
-            if key in ("printer_state", "queue_state", "month_prints", "filament_low", "schedule_state"):
+            if key in ("printer_state", "queue_state", "month_prints", "filament_low", "maintenance_due", "schedule_state"):
                 c["json_attributes_topic"] = self.t_state
             out["%s/%s/%s/%s/config" % (prefix, comp, base, key)] = c
         # Ohne availability: sonst geht das Ereignis bei jedem Neustart der App auf „nicht verfügbar“ und zurück –

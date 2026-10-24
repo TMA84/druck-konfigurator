@@ -112,6 +112,7 @@ function renderSpoolBits() {
   if (typeof renderSidePanels === 'function' && typeof lastResult !== 'undefined' && lastResult) renderSidePanels();
   if (typeof renderCostPanel === 'function' && typeof lastResult !== 'undefined' && lastResult) renderCostPanel();
   renderSpoolCheck();
+  if (typeof wbMaintRender === 'function') wbMaintRender();   // Wartung in der Werkbank (js/workbench-ui.js)
   // nicht neu zeichnen, während jemand im Dialog tippt
   const typing = $('spoolBody').contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if ($('spoolDlg').open && !typing) renderSpoolDialog();
