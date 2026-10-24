@@ -479,7 +479,7 @@ Ist das MQTT-Add-on (Mosquitto) installiert, meldet das Tool automatisch Sensore
 | Filament, Kosten und Drucke diesen Monat | aus der Druckhistorie |
 | Slot 1–4 Restmenge | errechnete Restmenge der Spule in g (mit Name, Typ, Farbe) |
 
-**Druck-Ereignis** (`event.druck_konfigurator_print_event`): feuert bei **pausiert** (mit Grund), **fortgesetzt**, **fertig** und **abgebrochen** – Attribute `druck`, `grund`, `fortschritt`. Gemeldet wird vom Server, auch wenn keine Seite offen ist. Handy-Benachrichtigung für jede Pause und jede fertige Platte (`not_from`/`not_to` verhindern, dass ein Neustart von Home Assistant oder der App das letzte Ereignis noch einmal meldet):
+**Druck-Ereignis** (`event.druck_konfigurator_print_event`): feuert bei **pausiert** (mit Grund), **fortgesetzt**, **fertig** und **abgebrochen** – Attribute `druck`, `grund`, `fortschritt`. Gemeldet wird vom Server, auch wenn keine Seite offen ist. Handy-Benachrichtigung für jede Pause und jede fertige Platte (`not_from`/`not_to` und die Zeitbedingung verhindern, dass ein Neustart oder Update von Home Assistant oder der App das letzte Ereignis noch einmal meldet – Home Assistant stellt den letzten Stand wieder her, der Zeitstempel bleibt aber der alte):
 
 ```yaml
 triggers:
@@ -487,6 +487,9 @@ triggers:
     entity_id: event.druck_konfigurator_print_event
     not_from: [unavailable, unknown]
     not_to: [unavailable, unknown]
+conditions:
+  - condition: template
+    value_template: "{{ (now() - as_datetime(trigger.to_state.state)).total_seconds() < 120 }}"
 actions:
   - action: notify.mobile_app_mein_handy
     data:

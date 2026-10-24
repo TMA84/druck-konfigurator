@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.45.2] – 2026-10-24
+
+### Behoben
+- Home Assistant meldete nach einem Update der App erneut „Druck fertig“: Das Druck-Ereignis trug Modell und Firmware des Druckers im Gerät, die erst mit der ersten Druckerantwort kommen. Die geänderte Konfiguration baute die Entität neu auf, der wiederhergestellte letzte Stand löste die Automation aus. Das Ereignis verweist jetzt nur noch über die Kennung aufs Gerät und bleibt immer gleich. Das Automationsbeispiel im Handbuch prüft zusätzlich, ob das Ereignis frisch ist (unter 2 Minuten).
+
 ## [10.45.1] – 2026-10-24
 
 ### Intern
