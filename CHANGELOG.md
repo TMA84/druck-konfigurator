@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.44.1] – 2026-10-24
+
+### Geändert
+- **Warteschlange nach der letzten Platte geleert:** Ist die letzte Platte fertig und die Meldung raus (Seite/Browser-Benachrichtigung „Das war die letzte Platte“; „fertig“ an Home Assistant kommt wie bisher aus dem Druckerstand), wird die Warteschlange automatisch geleert – kein „alle Platten gedruckt“ mehr, das von Hand beendet werden muss. „Bett abräumen“ in Home Assistant bleibt an, bis der Drucker wieder druckt.
+
 ## [10.44.0] – 2026-10-24
 
 Ergebnis eines Code-Reviews (Sicherheit, Fehlerbehandlung, Performance).

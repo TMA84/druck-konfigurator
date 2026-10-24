@@ -44,7 +44,7 @@ function queueServerData(r) {
   if (ev && ev.seq > seen) {
     store.settings.queueSeen = ev.seq; persist();
     // nur, was noch gilt: Bett noch nicht abgeräumt (bzw. abgebrochen) und nicht zu alt
-    if (Date.now() / 1000 - (ev.time || 0) < QUEUE_EVENT_MAX_AGE_S && r.queue && (r.bed_clear || ev.kind === 'aborted')) notifyDone({ plate: ev.plate, aborted: ev.kind === 'aborted' }, r.queue);
+    if (Date.now() / 1000 - (ev.time || 0) < QUEUE_EVENT_MAX_AGE_S && (r.queue || ev.cleared) && (r.bed_clear || ev.kind === 'aborted')) notifyDone({ plate: ev.plate, aborted: ev.kind === 'aborted' }, r.queue);
   } else if (!ev && r.seq > seen) { store.settings.queueSeen = r.seq; persist(); }
   renderQueue();
 }
@@ -122,7 +122,7 @@ function queuePrint(plate) {
 }
 
 function notifyDone(it, q) {
-  const next = queueNext(q);
+  const next = q ? queueNext(q) : null;   // ohne q: letzte Platte, der Server hat die Warteschlange schon geleert
   const title = t(it.aborted ? 'Platte {n} abgebrochen' : 'Platte {n} fertig', { n: it.plate });
   const body = it.aborted ? t('Sie steht wieder in der Warteschlange.') : next ? t('Bett abräumen – dann Platte {n} starten.', { n: next.plate }) : t('Bett abräumen. Das war die letzte Platte.');
   toast(title + ': ' + body);
@@ -138,7 +138,10 @@ function onQueueStatus(st) {
   const q = queue(); if (!q) return;
   const cur = q.items.find(i => i.state === 'printing'), seen = cur && cur.seen;
   const done = queueTick(q, st);
-  if (done) { q.lastDone = done.plate; saveQueue(q); notifyDone(done, q); }
+  if (done) {
+    q.lastDone = done.plate; notifyDone(done, q);
+    saveQueue(!done.aborted && !queueNext(q) ? null : q);   // letzte Platte fertig: Warteschlange leeren (wie der Server)
+  }
   else if (cur && cur.seen !== seen) saveQueue(q);
   renderQueue();
 }

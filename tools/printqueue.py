@@ -11,7 +11,8 @@ die nächste Platte startet die Seite nach Klick (api/anycubic/print) und meldet
 
 Stand: {version, seq, queue: {name, created, slice:{job, plates}, materials, items:[{plate, time_s, total_g, state,
 seen, started, aborted, finished}], lastDone} | None, bed_clear, event: {seq, kind: done|aborted, plate, time, next,
-name} | None, events: [...]}. Zeiten in Sekunden (Unix).
+name, cleared} | None, events: [...]}. Zeiten in Sekunden (Unix). Nach der letzten Platte wird die Warteschlange
+geleert (event.cleared); bed_clear bleibt gesetzt, bis eine neue Platte startet.
 """
 import json
 import os
@@ -102,6 +103,9 @@ def tick(state, st, now=None):
     now = now or time.time()
     q = state.get("queue")
     cur = current(q)
+    if not q and st and st.get("printing") and state.get("bed_clear"):
+        state["bed_clear"] = False   # Warteschlange schon geleert: der nächste Druck (egal woher) heißt „Bett ist frei“
+        return {"kind": "bed", "plate": None}
     if not cur or not st:
         return None
     status = (st.get("job") or {}).get("status")
@@ -124,6 +128,11 @@ def tick(state, st, now=None):
     state["events"] = (state.get("events") or [])[-(EVENTS - 1):] + [ev]
     if not aborted:
         state["bed_clear"] = True
+        if not nxt:
+            # Letzte Platte fertig: Warteschlange leeren. Das Ereignis (Seite) und „Bett abräumen“ (Home Assistant)
+            # bleiben stehen; „fertig“ an Home Assistant kommt unabhängig davon aus dem Druckerstand (ha_mqtt.print_events).
+            state["queue"] = None
+            ev["cleared"] = True
     return ev
 
 
@@ -314,7 +323,7 @@ class Watcher:
             ev = tick(state, st)
             if ev:
                 save(state, self.path)
-        if ev and ev["kind"] != "seen":
+        if ev and ev["kind"] in ("done", "aborted"):
             print("Warteschlange: Platte %s %s" % (ev["plate"], "fertig – Bett abräumen" if ev["kind"] == "done" else "abgebrochen"), flush=True)
         for fn in self.listeners:
             try:

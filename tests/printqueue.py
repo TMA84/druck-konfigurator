@@ -103,8 +103,16 @@ pq.update(s, {"action": "started", "plate": 3}, now=7000)
 check("vor 10 min nicht", pq.tick(s, FREE, now=7000 + 599) is None)
 ev = pq.tick(s, FREE, now=7000 + 601)
 check("nach 10 min ohne Meldung fertig", ev and ev["kind"] == "done" and it3["aborted"] is False)
-check("alle gedruckt", pq.summary(s)["text"] == "alle Platten gedruckt" or pq.summary(s)["text"].startswith("Platte 3 fertig"), pq.summary(s))
+check("letzte Platte fertig → Warteschlange geleert", ev.get("cleared") is True and ev["next"] is None and s["queue"] is None, ev)
+check("geleert: Bett abräumen bleibt (Home Assistant)", s["bed_clear"] is True and pq.view(s)["bed_clear"] is True and pq.summary(s)["text"] == "keine")
+check("geleert: Ereignis bleibt für die Seite", s["event"] is ev and ev["name"] == q["name"])
+check("geleert: kein weiteres Ereignis", pq.tick(s, FREE, now=7000 + 700) is None)
 check("Ereignisliste", [e["seq"] for e in s["events"]] == [1, 2, 3, 4])
+check("geleert: Bett abräumen aus, sobald wieder gedruckt wird", pq.tick(s, PRINTING, now=7750)["kind"] == "bed" and s["bed_clear"] is False)
+check("geleert: danach nichts mehr", pq.tick(s, PRINTING, now=7760) is None)
+s["bed_clear"] = True
+check("neue Warteschlange danach möglich", pq.update(s, dict(CREATE), now=7800) == "angelegt" and s["bed_clear"] is False)
+q = s["queue"]
 
 # Überspringen / Nochmal / Start einer anderen, während eine noch als „druckt“ gilt
 pq.update(s, {"action": "again", "plate": 2})
