@@ -7,11 +7,16 @@
 const SEND_PRINTER = 'kobra_s1';
 let sendInfo = null; // Stand des Druckers beim Öffnen
 let sendFootStd = '';
+/* Senden läuft (Hochladen/Planen): Dialog bleibt offen (Esc gesperrt), „Jetzt drucken“ gesperrt – auch nach erneutem
+   Öffnen, sonst ginge derselbe Druck zweimal raus. sendReq: nur die Antwort der letzten Abfrage zählt (Erneut abfragen,
+   neu geöffnet), eine ältere darf kein „Drucker bereit“ mehr anzeigen. */
+let sendBusy = false, sendReq = 0, sendRun = 0;
 // Was gedruckt wird: letzter Slice-Stand oder der einer Warteschlange (js/queue-ui.js) mit Rückmeldung beim Start
 // own: fertiger G-Code („G-Code drucken …“, js/gcode-ui.js) – Werkzeug → Slot frei wählbar (map), Material aus dem G-Code
 let sendCtx = { slice: null, materials: null, name: '', onStarted: null, own: false, map: {} };
 
 async function openSendDialog(plate, opts) {
+  if (sendBusy) { if (!$('sendDlg').open) $('sendDlg').showModal(); return; }
   const o = opts || {};
   sendCtx = { slice: o.slice || (costState && costState.slice), materials: o.materials || costState.materials, name: o.name || (project ? project.name : ''), onStarted: o.onStarted || null,
     own: !!o.own, map: o.map || {}, colours: o.colours || [] };
@@ -29,13 +34,22 @@ async function openSendDialog(plate, opts) {
   $('sendFoot').innerHTML = sendCtx.own ? esc(t('Das Tool lädt diesen G-Code unverändert auf den Drucker und startet ihn – Temperaturen und Material wie im G-Code. Bett frei? Richtige Druckplatte? Passt das Filament in den gewählten Slots?')) : sendFootStd;
   $('sendState').textContent = t('Frage den Drucker ab …'); $('sendState').className = 'note';
   $('sendMap').innerHTML = ''; $('sendGo').disabled = true;
-  $('sendDlg').showModal();
-  try { sendInfo = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); }
-  catch (e) { sendInfo = null; $('sendState').textContent = t('Drucker nicht erreichbar: {msg}', { msg: t(e.message) }); $('sendState').className = 'note bad'; return; }
+  sendInfo = null;
+  const req = ++sendReq;
+  if (!$('sendDlg').open) $('sendDlg').showModal();
+  let info = null;
+  try { info = await lanApi('api/anycubic/status?host=' + encodeURIComponent(host)); }
+  catch (e) {
+    if (req !== sendReq) return;
+    sendInfo = null; $('sendState').textContent = t('Drucker nicht erreichbar: {msg}', { msg: t(e.message) }); $('sendState').className = 'note bad'; return;
+  }
+  if (req !== sendReq || sendBusy) return;
+  sendInfo = info;
   renderSendDialog();
 }
 
 function renderSendDialog() {
+  if (sendBusy) { $('sendGo').disabled = true; return; }
   const s = sendCtx.slice, plate = +$('sendPlate').value, p = s.plates.find(x => x.plate === plate), st = sendInfo;
   const free = st && !st.printing && (st.state === 'free' || !st.state);
   // „busy“ ohne Auftrag: meist wartet nach einem Abbruch ein Dialog am Display (Kobra S1, Firmware 2.7) – das Tool schickt dafür nichts
@@ -58,7 +72,7 @@ function renderSendDialog() {
     const want = mat ? (ORCA_KIND[mat.kind] || mat.name) : '', have = ace && ace.present ? ace.type : '';
     const bad = !have || (mat && !slotMatchesKind(have, mat.kind));
     if (bad) warn++;
-    const sw = c => '<span class="pslot" style="display:inline-block;width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,.35);vertical-align:middle;background:' + esc(c || '#dddddd') + '"></span> ';
+    const sw = c => '<span class="pslot" style="display:inline-block;width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,.35);vertical-align:middle;background:' + safeColour(c, '#dddddd') + '"></span> ';
     // eigener G-Code: Slot wählbar (Auswahl mit Material und Farbe je Slot), Farbe aus dem G-Code daneben
     const pick = sendCtx.own && slots.length ? '<select data-send-tool="' + tool + '" aria-label="' + esc(t('Slot für Werkzeug {n}', { n: 'T' + tool })) + '">' +
       slots.map((s, i) => '<option value="' + i + '"' + (i === to ? ' selected' : '') + '>Slot ' + (i + 1) + ': ' + esc(s.present ? s.type || '?' : t('leer')) + '</option>').join('') + '</select> ' : 'Slot ' + (to + 1) + ': ';
@@ -112,15 +126,21 @@ $('sendGo').addEventListener('click', async () => {
   try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); } catch (e) { /* egal */ }
   let later = null;
   try { later = typeof sendLaterState === 'function' ? sendLaterState(sendCtx.slice.plates.find(x => x.plate === +$('sendPlate').value)) : null; } catch (e) { console.error(e); }
-  if (later) { if (later.ok) sendSchedule(later); return; }
+  if (sendBusy) return;
+  if (later) { if (later.ok) { sendBusy = true; try { await sendSchedule(later); } finally { sendBusy = false; } } return; }
   const plate = +$('sendPlate').value, host = printerHost(SEND_PRINTER), btn = $('sendGo');
+  sendBusy = true; sendReq++;   // eine noch laufende Abfrage des Dialogs verwerfen
+  const run = ++sendRun;   // finally gibt nur frei, wenn kein neuer Versuch (nach dem Neu-Slicen) übernommen hat
   btn.disabled = true; btn.textContent = t('Lade hoch …');
   try {
-    const r = await lanApi('api/anycubic/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      host, job: sendCtx.slice.job, plate, name: sendCtx.name ? sendCtx.name.replace(/\.(stl|obj|3mf|zip|gcode|gco|g)$/i, '') : 'druck',
+    const req = { host, job: sendCtx.slice.job, plate, name: sendCtx.name ? sendCtx.name.replace(/\.(stl|obj|3mf|zip|gcode|gco|g)$/i, '') : 'druck',
       ...(sendCtx.own ? { own: true, slots: sendCtx.map } : {}),
-      options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } }) });
+      options: { auto_leveling: $('sendLevel').checked ? 1 : 0, flow_calibration: $('sendFlow').checked ? 1 : 0, timelapse: $('sendLapse').checked ? 1 : 0 } };
+    const r = await lanApi('api/anycubic/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+    sendBusy = false;
     $('sendDlg').close();
+    // Druck läuft: Verlauf (js/history-ui.js) und andere Module hören auf „print-started“
+    try { document.dispatchEvent(new CustomEvent('print-started', { detail: { req, res: r } })); } catch (e) { console.error(e); }
     if (sendCtx.onStarted) sendCtx.onStarted(plate);
     toast(r.job ? t('Druck gestartet: {name}', { name: r.job.name }) : (r.note ? t(r.note) : t('Gesendet')));
     setTab('printer');
@@ -131,13 +151,17 @@ $('sendGo').addEventListener('click', async () => {
       btn.textContent = t('Slicen …');
       costState.sig = null;
       await runCosts();
-      if (costState.slice && costState.slice.job && !costState.error) { sendCtx.slice = costState.slice; sendCtx.resliced = true; btn.disabled = false; $('sendGo').click(); return; }
+      if (costState.slice && costState.slice.job && !costState.error) { sendCtx.slice = costState.slice; sendCtx.resliced = true; sendBusy = false; btn.disabled = false; $('sendGo').click(); return; }
     }
+    sendBusy = false;
     $('sendState').textContent = t('Nicht gestartet: {msg}', { msg: t(e.message) }) + (sendCtx.onStarted && /nicht \(mehr\) vorhanden/.test(e.message) ? ' ' + t('Bitte die Warteschlange neu anlegen.') : '');
     $('sendState').className = 'note bad';
     btn.disabled = false; btn.textContent = t('Erneut versuchen');
-  }
+  } finally { if (run === sendRun) sendBusy = false; }
 });
 $('sendOpen').addEventListener('click', () => openSendDialog());
 $('pvSend').addEventListener('click', () => openSendDialog(+$('pvPlate').value));
-$('sendDlg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+$('sendDlg').addEventListener('click', e => { if (e.target === e.currentTarget && !sendBusy) e.currentTarget.close(); });
+// Esc während des Hochladens: Dialog bleibt offen (sonst wirkte der Druck abgebrochen, und ein zweiter Klick schickte ihn erneut)
+$('sendDlg').addEventListener('cancel', e => { if (sendBusy) e.preventDefault(); });
+$('sendDlg').addEventListener('click', e => { if (sendBusy && e.target.closest('[data-close]')) e.stopPropagation(); });   // „Abbrechen“ ebenso (js/app.js schließt über document)

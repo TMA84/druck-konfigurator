@@ -16,8 +16,20 @@ function readSTL(buf){
     while((m=re.exec(text)))arr.push(+m[1],+m[2],+m[3]);
     arr.length-=arr.length%9; pos=new Float32Array(arr);
   }
+  pos=dropBadTris(pos);
   if(!pos.length)throw Error(t('Keine gültigen Dreiecke gefunden'));
   return pos;
+}
+/* Dreiecke mit ungültigen Koordinaten (NaN, unendlich – kaputte oder abgeschnittene Datei) weglassen; sie zerstörten
+   Hüllquader, Ausrichtung und Export. Ergebnis: dasselbe Array, wenn alles gültig ist, sonst ein neues mit .dropped = Anzahl. */
+function dropBadTris(pos){
+  const n=pos.length/9|0;let bad=0;
+  for(let i=0;i<n*9;i++)if(!Number.isFinite(pos[i])){bad=1;break}
+  if(!bad)return pos;
+  const out=new Float32Array(n*9);let k=0;bad=0;
+  for(let i=0;i<n;i++){const o=i*9;let ok=true;for(let j=0;j<9;j++)if(!Number.isFinite(pos[o+j])){ok=false;break}
+    if(ok){out.set(pos.subarray(o,o+9),k);k+=9}else bad++}
+  const res=out.slice(0,k);res.dropped=bad;return res;
 }
 function parseSTL(name,buf){return makeGeom(name,readSTL(buf))}
 

@@ -9,19 +9,31 @@
      slug: d761c650_druck_konfigurator   # optional */
 const DW_SLUG = 'd761c650_druck_konfigurator';
 const DW_KEEPALIVE_MS = 60000;
+const DW_RETRY_MS = 30000;
 
 class DruckwerkstattCard extends HTMLElement {
   setConfig(config) {
     this._config = Object.assign({ slug: DW_SLUG, aspect_ratio: '56%' }, config || {});
     if (this._frame) this._layout();
   }
+  /* Home Assistant setzt hass bei jeder Zustandsänderung (oft mehrmals je Sekunde): nach einem Fehlschlag erst wieder
+     nach _retryAt starten, sonst ginge eine Flut von Anfragen an den Supervisor */
   set hass(hass) {
     this._hass = hass;
     if (!this._frame) this._build();
-    if (!this._started && this.isConnected) this._start();
+    if (this._canStart()) this._start();
   }
-  connectedCallback() { if (this._hass && !this._started) this._start(); }
-  disconnectedCallback() { clearInterval(this._timer); this._started = false; }
+  connectedCallback() {
+    if (this._box && this._ro) this._ro.observe(this._box);
+    if (this._hass && this._canStart()) this._start();
+  }
+  disconnectedCallback() {
+    clearInterval(this._timer); this._timer = 0; clearTimeout(this._retry); this._retry = 0;
+    if (this._ro) this._ro.disconnect();
+    this._run = (this._run || 0) + 1;   // laufendes _start verwerfen
+    this._started = false;
+  }
+  _canStart() { return !this._started && this.isConnected && Date.now() >= (this._retryAt || 0); }
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 6, rows: 6, min_rows: 3 }; }
   static getStubConfig() { return { aspect_ratio: '56%' }; }
@@ -36,7 +48,8 @@ class DruckwerkstattCard extends HTMLElement {
     this._layout();
     // iOS übernimmt eine spätere Größenänderung der Kachel nicht in die eingebettete Seite – feste Pixelgröße setzen
     // und die Seite (gleicher Ursprung) neu messen lassen
-    new ResizeObserver(() => this._fit()).observe(this._box);
+    this._ro = new ResizeObserver(() => this._fit());
+    this._ro.observe(this._box);
   }
   _fit() {
     const w = this._box.clientWidth, h = this._box.clientHeight;
@@ -75,25 +88,32 @@ class DruckwerkstattCard extends HTMLElement {
   }
   async _start() {
     this._started = true;
-    clearInterval(this._timer);
+    clearInterval(this._timer); clearTimeout(this._retry); this._retry = 0;
+    const run = this._run = (this._run || 0) + 1, gone = () => run !== this._run || !this.isConnected;
     try {
       const info = await this._ws('/addons/' + this._config.slug + '/info');
+      if (gone()) return;
       if (!info.ingress_url) throw Error('Das Add-on hat keinen Ingress');
       await this._session();
+      if (gone()) return;
+      this._retryAt = 0;
       const src = info.ingress_url + '?ansicht=3d';
       if (this._frame.getAttribute('src') !== src) { this._frame.onload = () => this._fit(); this._frame.setAttribute('src', src); }
       this._msg.style.display = 'none';
       this._timer = setInterval(() => this._keep(), DW_KEEPALIVE_MS);
     } catch (e) {
+      if (gone()) return;
       this._started = false;
+      this._retryAt = Date.now() + DW_RETRY_MS;
       this._msg.style.display = '';
       this._msg.textContent = 'Druckwerkstatt nicht erreichbar: ' + ((e && (e.message || e.code)) || e) + ' – nächster Versuch in 30 s';
-      setTimeout(() => { if (this.isConnected && !this._started) this._start(); }, 30000);
+      this._retry = setTimeout(() => { this._retry = 0; if (this._canStart()) this._start(); }, DW_RETRY_MS);
     }
   }
   async _keep() {
+    if (!this.isConnected) return;
     try { await this._ws('/ingress/validate_session', 'post', { session: this._sid }); }
-    catch (e) { try { await this._session(); } catch (e2) { /* nächste Minute */ } }
+    catch (e) { if (!this.isConnected) return; try { await this._session(); } catch (e2) { /* nächste Minute */ } }
   }
 }
 if (!customElements.get('druckwerkstatt-card')) customElements.define('druckwerkstatt-card', DruckwerkstattCard);

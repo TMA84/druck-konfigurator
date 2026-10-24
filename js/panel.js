@@ -72,7 +72,7 @@ function themeCards(r){
   const xv=extraValues(r),set=r.extraOv||{};
   for(const f of (typeof ORCA_EXTRA==='undefined'?[]:ORCA_EXTRA)){const k=f[0];if(!(k in xv))continue;
     if(/^(support_|tree_support)/.test(k)&&!r.supOn&&!(k in set))continue;   // Stützen-Details nur, wenn gestützt wird
-    add(EXTRA_THEME[f[2]]||'Sonstiges',[f[1],esc(extraLabel(k,xv[k])),'',k in set],'x:'+k)}
+    add(EXTRA_THEME[f[2]]||'Sonstiges',[f[1],extraLabel(k,xv[k]),'',k in set],'x:'+k)}
   return VALUE_THEMES.filter(th=>by[th].length).map(th=>{const n=by[th].filter(([x])=>x[3]).length;
     return '<section class="spec-group th-card"><h3 class="spec-title">'+esc(t(th))+(n?' <span class="ov-count">'+t('{n} angepasst',{n})+'</span>':'')+
       (project?' <button type="button" class="linkbtn small spec-edit" data-ov-group="'+esc(t(th))+'">'+esc(t('✎ anpassen'))+'</button>':'')+'</h3>'+
@@ -82,19 +82,19 @@ function themeCards(r){
 function valueRow(x,key){
   const h=helpFor(x[0],getMat($('material').value).kind);
   return '<div class="vl-row'+(x[3]?' ov':'')+'"'+(key?' data-ovk="'+esc(key)+'"':'')+'><span class="vl-k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
-    '<span class="vl-v">'+x[1]+'</span>'+(x[2]?'<span class="vl-n">'+x[2]+'</span>':'')+'</div>';
+    '<span class="vl-v">'+esc(x[1])+'</span>'+(x[2]?'<span class="vl-n">'+esc(x[2])+'</span>':'')+'</div>';
 }
 // Kennzahlen oben: die wichtigsten Werte auf einen Blick (anklickbar wie die Zeilen)
 const KEY_STRIP=[['Düse','nozzle'],['Heizbett','bed'],['Schichthöhe','layer'],['Wandlinien','w'],['Fülldichte','inf'],['Stützstrukturen','support'],['Brim','brim']];
 function keyStrip(r){
   const rows=Object.fromEntries(r.ordered.flatMap(g=>g[1]).map(x=>[x[0],x]));
   return '<div class="key-strip">'+KEY_STRIP.filter(([l])=>rows[l]).map(([l,k])=>{const x=rows[l];
-    return '<div class="ks'+(x[3]?' ov':'')+'" data-ovk="'+k+'"><span class="ks-k">'+esc(t(l==='Stützstrukturen'?'Stützen':l))+'</span><span class="ks-v">'+String(x[1]).split(' · ')[0]+'</span></div>'}).join('')+'</div>';
+    return '<div class="ks'+(x[3]?' ov':'')+'" data-ovk="'+esc(k)+'"><span class="ks-k">'+esc(t(l==='Stützstrukturen'?'Stützen':l))+'</span><span class="ks-v">'+esc(String(x[1]).split(' · ')[0])+'</span></div>'}).join('')+'</div>';
 }
 function specCell(x,key){
   const h=helpFor(x[0],getMat($('material').value).kind);
   return '<div class="spec-cell'+(KEY_ROWS.includes(x[0])||x[0]==='Schichthöhe'?' key':'')+(x[3]?' ov':'')+'"'+(key?' data-ovk="'+esc(key)+'"':'')+'><span class="k">'+esc(t(x[0]))+(h?'<span class="help" title="'+esc(h)+'">?</span>':'')+'</span>'+
-    '<span class="v">'+x[1]+'</span>'+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</div>';
+    '<span class="v">'+esc(x[1])+'</span>'+(x[2]?'<span class="n">'+esc(x[2])+'</span>':'')+'</div>';
 }
 
 $('hintsFold').addEventListener('toggle',e=>{if(e.isTrusted)$('hintsFold').dataset.touched='1'});
@@ -329,6 +329,36 @@ $('settingsBtn').addEventListener('click',()=>{
 });
 
 /* Export / Import */
+// Profil aus einer Importdatei: nur Felder der eingebauten Profile, Zahlen als Zahl (ungültige fallen weg), Texte als Text;
+// ohne gültige Düsentemperaturen kein Profil (null). Schutz vor Code/Markup in Zahlenfeldern, die als HTML angezeigt werden.
+const PROFILE_DROP=new Set(['id','builtin','overridden','status','src','__proto__','constructor','prototype']);
+function sanitizeProfile(p){
+  if(!p||typeof p!=='object'||Array.isArray(p))return null;
+  const ref=Object.assign({},P({}),...BUILTIN),out={};
+  for(const k of Object.keys(p)){
+    if(PROFILE_DROP.has(k)||!(k in ref))continue;
+    const v=p[k],r=ref[k];
+    if(Array.isArray(r)){if(!Array.isArray(v))continue;const a=v.map(Number);if(a.length&&a.every(Number.isFinite))out[k]=a}
+    else if(typeof r==='number'||(k==='pa'&&r===null)){if(v===null&&k==='pa'){out[k]=null;continue}const n=Number(v);if(v!==''&&v!=null&&Number.isFinite(n))out[k]=n}
+    else if(typeof r==='boolean')out[k]=!!v;
+    else if(v!=null&&typeof v!=='object')out[k]=String(v);
+  }
+  if(!out.name||!out.nozzle)return null;
+  if(!KIND_TEMPLATE[out.kind])out.kind='pla';
+  if(out.refMat&&!NOZZLE_MATERIALS[out.refMat])delete out.refMat;
+  if(safeColour(p.colour,'')) out.colour=p.colour;   // Farbe aus der Spule (js/spools-ui.js spoolCreateProfile)
+  return out;
+}
+// Programmweite Einstellungen aus einer Importdatei: nur bekannte Schlüssel (schon gesetzt oder Standard), gleicher Typ
+function importSettings(s){
+  if(!s||typeof s!=='object'||Array.isArray(s))return;
+  for(const k of Object.keys(s)){
+    if(PROFILE_DROP.has(k)||!Object.prototype.hasOwnProperty.call(store.settings,k))continue;
+    const v=s[k],cur=store.settings[k];
+    if(typeof cur==='number'){const n=Number(v);if(v!==''&&v!=null&&Number.isFinite(n))store.settings[k]=n}
+    else if(cur===null||typeof cur===typeof v&&Array.isArray(cur)===Array.isArray(v))store.settings[k]=v;
+  }
+}
 $('exportBtn').addEventListener('click',()=>{
   const data={format:'druck-konfigurator',version:4,exported:new Date().toISOString(),profiles:store.profiles,settings:store.settings,last:store.last};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -343,16 +373,18 @@ $('importFile').addEventListener('change',()=>{
     try{
       const d=JSON.parse(r.result);
       if(!d||(d.format!=='druck-konfigurator'&&d.format!=='kobra-s1-konfigurator')||typeof d.profiles!=='object')throw Error(t('Keine Profildatei dieses Programms'));
-      const ids=Object.keys(d.profiles).filter(id=>{const p=d.profiles[id];return p&&typeof p==='object'&&p.name&&Array.isArray(p.nozzle)});
+      const clean={};Object.keys(d.profiles).forEach(id=>{if(!/^[\w.-]{1,64}$/.test(id)||PROFILE_DROP.has(id))return;const p=sanitizeProfile(d.profiles[id]);if(p)clean[id]=p});
+      const ids=Object.keys(clean);
       const hasLast=d.last&&typeof d.last==='object'&&Object.keys(d.last).length>0;
       if(!ids.length&&!hasLast)throw Error(t('Die Datei enthält weder eigene Profile noch eine gespeicherte Auswahl'));
       const parts=[];
       if(ids.length){const clash=ids.filter(id=>store.profiles[id]).length;parts.push(clash?t('{n} Profil(e) ({c} werden überschrieben)',{n:ids.length,c:clash}):t('{n} Profil(e)',{n:ids.length}))}
       if(hasLast)parts.push(t('die zuletzt gespeicherte Auswahl (Drucker, Filament, Düse, Objekt, Ziel)'));
       if(!confirm(t('Importieren: {list}?',{list:parts.join(' '+t('und')+' ')})))return;
-      if(ids.length)ids.forEach(id=>{store.profiles[id]=Object.assign({},P({}),d.profiles[id])});
-      if(hasLast)Object.assign(store.last,d.last);
-      if(d.settings&&confirm(t('Auch die Düsen-Umrechnung aus der Datei übernehmen?')))Object.assign(store.settings,d.settings);
+      if(ids.length)ids.forEach(id=>{store.profiles[id]=Object.assign({},P({}),clean[id])});
+      if(hasLast)Object.keys(d.last).forEach(k=>{const v=d.last[k];if(PROFILE_DROP.has(k)||v==null)return;
+        if(typeof v!=='object')store.last[k]=v;else if(k==='orcaPrinter'&&!Array.isArray(v))store.last[k]={vendor:String(v.vendor||''),name:String(v.name||'')}});
+      if(d.settings&&confirm(t('Auch die Düsen-Umrechnung aus der Datei übernehmen?')))importSettings(d.settings);
       persist();
       if(hasLast){
         if(store.last.printer&&PRINTERS[store.last.printer])$('printer').value=store.last.printer;

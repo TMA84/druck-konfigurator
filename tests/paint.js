@@ -122,5 +122,12 @@ for (const c of split.concat(Object.keys(single))) check('Baum hin und zurück: 
   check('Attribute: Stützen des Designers bleiben', at(3) === ' paint_supports="8"', at(3));
   check('Erzwingen erkannt', P.paintHasEnforcers(part) && !P.paintHasEnforcers({ paintSup: { codes: { 0: '8' } } })); }
 
+// Befund der Prüfung: paintMain (Import, Anzeige) gewichtet die Kinder wie paintTreeMain (Orca-Flächenanteile ¼ ¼ ½),
+// nicht gleich – sonst wählten beide für dasselbe Dreieck verschiedene Filamente
+for (const c of split) check('paintMain = paintTreeMain: ' + c, P.paintMain(c) === P.paintTreeMain(P.paintTree(c)), [P.paintMain(c), P.paintTreeMain(P.paintTree(c))]);
+// 2 Seiten geteilt: Kinder ¼ ¼ ½ – Filament 2 (c[2]) hat ½, Filament 1 ¼ + ⅛; gleich gewichtet (je ⅓) gewann Filament 1 (½ gegen ⅓)
+{ const code = P.paintCode({ split: 2, side: 0, c: [{ s: 1 }, { split: 1, side: 0, c: [{ s: 1 }, { s: 3 }] }, { s: 2 }] });
+  check('2 Seiten: halbe Fläche gewinnt (Filament 2)', P.paintMain(code) === 2 && P.paintTreeMain(P.paintTree(code)) === 2, [code, P.paintMain(code)]); }
+
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exitCode = fail ? 1 : 0;

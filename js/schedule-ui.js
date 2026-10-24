@@ -35,7 +35,9 @@ function sendLaterReset() {
   $('sendHeat').checked = pre > 0; $('sendHeatBed').value = String(Math.min(110, Math.max(40, bed || 100))); $('sendHeatMin').value = String(pre || 10);
   if (sendCtx.own) $('sendHeat').checked = false;
   $('sendHeat').closest('label').classList.toggle('hidden', !!(sendCtx.onStarted || sendCtx.own)); $('sendHeatRow').classList.toggle('hidden', !pre || !!sendCtx.own);
-  schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && renderSendDialog());
+  // nur für dieselbe Öffnung des Dialogs (sendReq, js/send-ui.js) und erst mit dem Stand des Druckers
+  const req = typeof sendReq !== 'undefined' ? sendReq + 1 : 0;   // openSendDialog zählt gleich danach hoch
+  schedLoad().then(() => typeof renderSendDialog === 'function' && $('sendDlg').open && sendInfo && (typeof sendReq === 'undefined' || sendReq === req) && renderSendDialog());
 }
 // Zustand für den Knopf: null = jetzt drucken; sonst {ok, why, req}
 function sendLaterState(p) {

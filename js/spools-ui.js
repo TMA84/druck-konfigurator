@@ -87,7 +87,7 @@ const spoolShortageText = list => list.map(x => x.low
 
 // Neue Spule erkannt: wie viel ist drauf? (ACE-Karte in ④ und Dialog)
 function spoolCheckHTML() {
-  return spoolChecks().map(s => '<div class="spool-check-row"><span class="spool-sw" style="background:' + esc(s.colour) + '"></span><span>' +
+  return spoolChecks().map(s => '<div class="spool-check-row"><span class="spool-sw" style="background:' + safeColour(s.colour) + '"></span><span>' +
     esc(t('Neue Spule in Slot {n} erkannt ({type}, {colour}) – wie viel ist drauf?', { n: s.slot + 1, type: s.type, colour: s.colour })) + '</span>' +
     '<button type="button" class="linkbtn" data-spool-full="' + s.id + '">' + t('Voll ({g})', { g: spoolGrams(s.net_g) }) + '</button>' +
     '<button type="button" class="linkbtn" data-spool-weigh="' + s.id + '">' + t('Restmenge eingeben …') + '</button></div>').join('');
@@ -149,7 +149,7 @@ function renderSpoolDialog() {
     const byId = Object.fromEntries(all.map(s => [s.id, s]));
     html += '<h4 class="spool-h">' + t('Letzte Drucke') + '</h4><ul class="spool-hist">' + hist.map(h => {
       const name = typeof wbJobTitle === 'function' ? wbJobTitle(String(h.job).replace(/^.*\//, '').replace(/\.(gcode|3mf)$/i, '')).title : h.job;
-      const used = Object.entries(h.used || {}).map(([id, g]) => { const s = byId[id]; return '<span class="spool-chip"><i style="background:' + esc(s ? s.colour : '#999') + '"></i>' + (s ? esc(s.type) : '?') + ' ' + spoolGrams(g) + '</span>'; }).join('');
+      const used = Object.entries(h.used || {}).map(([id, g]) => { const s = byId[id]; return '<span class="spool-chip"><i style="background:' + safeColour(s && s.colour, '#999999') + '"></i>' + (s ? esc(s.type) : '?') + ' ' + spoolGrams(g) + '</span>'; }).join('');
       return '<li><b>' + esc(name) + '</b><small>' + new Date((h.end || 0) * 1000).toLocaleString(LOCALE(), { dateStyle: 'short', timeStyle: 'short' }) + (h.changes ? ' · ' + t('{n} Farbwechsel', { n: h.changes }) : '') +
         (typeof h.cost_eur === 'number' ? ' · ≈ ' + de(h.cost_eur, 2) + ' €' : '') + '</small><span>' + (used || '–') + '</span></li>';
     }).join('') + '</ul>' + (typeof openHistoryDialog === 'function' ? '<p class="small"><button type="button" class="linkbtn" data-spool-history>' + t('Alle Drucke & Statistik …') + '</button></p>' : '');
@@ -202,7 +202,7 @@ async function spoolCreateProfile(s) {
 
 function spoolRow(s) {
   const where = s.slot != null ? t('Slot {n}', { n: s.slot + 1 }) : t('zuletzt gesehen {date}', { date: new Date((s.last_seen || s.added) * 1000).toLocaleDateString(LOCALE()) });
-  const head = '<div class="spool-row"><span class="spool-sw" style="background:' + esc(s.colour) + '"></span>' +
+  const head = '<div class="spool-row"><span class="spool-sw" style="background:' + safeColour(s.colour) + '"></span>' +
     '<span class="spool-name"><b>' + esc(spoolName(s)) + '</b><small>' + [where, s.sku ? 'RFID ' + esc(s.sku) : t('ohne RFID')].join(' · ') + '</small></span>' +
     '<span class="spool-rest' + (spoolLow(s) ? ' low' : '') + '"><span class="spool-bar"><i style="width:' + spoolPct(s).toFixed(0) + '%"></i></span><small>' +
     t('{rest} von {net}', { rest: spoolGrams(s.remaining_g), net: spoolGrams(s.net_g) }) + '</small></span>' +

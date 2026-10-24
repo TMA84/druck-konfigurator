@@ -6,9 +6,9 @@
    Anzeige: Summen für diesen Monat und die letzten 12 Monate, Balken je Monat (Gramm nach Filamenttyp gestapelt),
    Tabelle der Drucke (neueste zuerst) mit Filter nach Monat, Export als CSV.
 
-   Plan (Schätzung) an den Server: Startet die Seite einen Druck (Senden-Dialog, auch aus der Warteschlange), geht
-   POST api/anycubic/print über fetch. Diese Datei hängt sich an window.fetch und schickt nach einer erfolgreichen
-   Antwort {action: plan, job_name, plate, estimate} an api/spools – ohne js/send-ui.js zu ändern. */
+   Plan (Schätzung) an den Server: Startet die Seite einen Druck (Senden-Dialog, auch aus der Warteschlange und für
+   eigenen G-Code), meldet js/send-ui.js das Ereignis „print-started“ ({req: Anfrage an api/anycubic/print, res: Antwort}).
+   Darauf geht {action: plan, job_name, plate, estimate} an api/spools. */
 
 const HIST_TYPES = ['PLA', 'PETG', 'ABS', 'ASA', 'TPU'];          // feste Reihenfolge = feste Farbe (css/history.css)
 let histData = null, histMonth = '', histErr = '';
@@ -39,22 +39,10 @@ function histSendPlan(req, res) {
   fetch('api/spools', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'plan', job_name: histJobName(req, res), plate: parseInt(req.plate, 10), estimate }) }).catch(() => {});
 }
-if (typeof window !== 'undefined' && window.fetch && !window.fetch.histWrapped) {
-  const origFetch = window.fetch;
-  const wrapped = function (input, init) {
-    const p = origFetch.apply(this, arguments);
-    try {
-      const url = typeof input === 'string' ? input : input && input.url || '';
-      if (/(^|\/)api\/anycubic\/print(\?|$)/.test(url) && init && String(init.method || '').toUpperCase() === 'POST' && typeof init.body === 'string') {
-        const req = JSON.parse(init.body);
-        p.then(r => { if (r.ok) r.clone().json().then(res => histSendPlan(req, res), () => histSendPlan(req, null)); }, () => {});
-      }
-    } catch (e) { /* nie den Druckstart stören */ }
-    return p;
-  };
-  wrapped.histWrapped = true;
-  window.fetch = wrapped;
-}
+if (typeof document !== 'undefined') document.addEventListener('print-started', e => {
+  const d = e.detail || {};
+  try { if (d.req) histSendPlan(d.req, d.res || null); } catch (err) { /* nie den Druckstart stören */ }
+});
 
 /* ---------- Daten ---------- */
 const histMonthKey = ts => { const d = new Date(ts * 1000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
