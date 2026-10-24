@@ -160,7 +160,6 @@ let ptShowQueued = false;
 function ptStrokeColour(part, layer, slots) {
   if (layer === 'color') {
     const cache = new Map(), rgb = s => { let v = cache.get(s); if (!v) { v = viewRgb(slotColour(s, slots)); cache.set(s, v); } return v; };
-    const map = (project.threemf && project.threemf.designMap) || {};
     return (s, i) => { if (s) return rgb(s - 1); const b = ptBaseSlot(part, i); return viewRgb(showHex(b.s, b.d, slots)); };
   }
   return (s, i) => s ? PT_MARK_RGB[s] || PT_MARK_RGB[1] : layer === 'seam' ? PT_SEAM_BASE : Viewer.triColor(i);

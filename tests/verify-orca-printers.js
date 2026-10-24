@@ -13,7 +13,6 @@ const first = v => (Array.isArray(v) ? v[0] : v);
 
 const ROOT = path.join(__dirname, '..');
 const ORCA = process.env.ORCA || 'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe';
-const RES = process.env.ORCA_PROFILES || 'C:/Program Files/OrcaSlicer/resources/profiles';
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'verifyorca-'));
 
 const ctx = vm.createContext({ console, TextDecoder });
@@ -60,7 +59,7 @@ for (const [vendor, frag] of SAMPLE) {
   if (!gfile) { check(false, 'kein G-Code'); continue; }
   const text = fs.readFileSync(path.join(dir, gfile), 'utf8');
   const cfg = {}; for (const m of text.matchAll(/^; ([a-z0-9_]+) = (.*)$/gm)) cfg[m[1]] = m[2].trim();
-  let x = null, y = null, type = '', maxZ = 0; const bb = [1e9, 1e9, -1e9, -1e9], temps = [];
+  let x = null, y = null, type = ''; const bb = [1e9, 1e9, -1e9, -1e9], temps = [];
   for (const l of text.split('\n')) {
     if (l.startsWith(';TYPE:')) type = l.slice(6);
     if (l.startsWith('; FEATURE:')) type = l.slice(10).trim();   // Bambu kennzeichnet so

@@ -78,7 +78,7 @@ const bboxOf = ms => { const mn = [1e9, 1e9], mx = [-1e9, -1e9]; for (const s of
 
 /* 2) Stützen: Tisch ohne Stützen, Unterseite erzwingen (ganz und halb); mit Stützen verhindern */
 {
-  const pos = box(15, 15, 0, 25, 25, 20).concat(box(0, 0, 20, 40, 40, 25)), under = [12, 13];   // Unterseite der Platte
+  const pos = box(15, 15, 0, 25, 25, 20).concat(box(0, 0, 20, 40, 40, 25));   // Unterseite der Platte: Dreiecke 12, 13
   const supCount = g => g.filter(l => /^;TYPE:Support/.test(l)).length, supLen = g => moves(g).filter(s => /Support/.test(s.feat)).reduce((n, s) => n + Math.hypot(s.x1 - s.x0, s.y1 - s.y0), 0);
   const ex = (name, codes, ov) => exportPart(name, pos, codes ? { paintSup: { rev: 1, codes, slots: [] } } : {}, ov);
   const off = { support: 'off' };

@@ -58,7 +58,7 @@ for bad, text in [(dict(CREATE, job="../etc"), "Slice-Auftrag"), (dict(CREATE, p
                   (dict(CREATE, order=[{"plate": 1, "state": "kaputt"}]), "Zustand"),
                   ({"action": "zaubern"}, "unbekannte Aktion"), ({"action": "skip", "plate": 7}, "nicht in der Warteschlange"),
                   ({"action": "skip", "plate": True}, "Plattennummer")]:
-    check("abgelehnt: " + text, raises(lambda: pq.update(s, bad), text), bad)
+    check("abgelehnt: " + text, raises(lambda bad=bad: pq.update(s, bad), text), bad)
 check("nicht-Objekt abgelehnt", raises(lambda: pq.update(s, [1]), "JSON"))
 
 # Start, gesehen, fertig

@@ -131,7 +131,7 @@ function renderBodies() {
   box.classList.toggle('hidden', !multi && !joinable && !modColours);
   if (!part) { paintBodies(null); return; }
   if (typeof secSum === 'function') secSum('bodies', multi ? t('{n} Körper', { n: part.bodies.length }) : '');
-  const slots = slotChoices(), own = part.slot ?? null;
+  const own = part.slot ?? null;
   const places = samePlacements(part), plates = [...new Set(places.map(p => p.plate || 1))].sort((a, b) => a - b);
   $('bodyInfo').innerHTML = multi
     ? t('{n} Körper – jeder kann einen eigenen Slot bekommen: oben in der Teileliste unter dem Teil. „wie Teil“ = {slot}.', { n: part.bodies.length, slot: own === null ? t('Slot aus dem Export-Dialog') : 'Slot ' + (own + 1) }) +

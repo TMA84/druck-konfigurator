@@ -8,7 +8,7 @@ const Viewer = (() => {
   const CLICK_TOLERANCE_PX = 5;
 
   let renderer = null, scene, camera, controls, stage;
-  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100, volBox = null, volume = null;
+  let mesh = null, grid = null, axes, geomRef = null, maxDim = 100, volBox = null;
   let wireframeOn = false;
   const clip = { on: false, axis: 'x', fraction: 0, plane: null, helper: null };
   const measure = { on: false, points: [], markers: [], line: null, onChange: () => {} };
@@ -85,7 +85,6 @@ const Viewer = (() => {
   /* Bauraum des Druckers als Drahtbox um das Teil (Mitte wie das Teil, Boden z = 0); rot, wenn das Teil
      nicht hineinpasst. vol = [Breite, Tiefe, Höhe] oder null. */
   function setVolume(vol, over) {
-    volume = vol;
     if (!renderer) return;
     if (volBox) { scene.remove(volBox); volBox.geometry.dispose(); volBox.material.dispose(); volBox = null; }
     if (!vol) return;

@@ -194,7 +194,7 @@ function renderPlates() {
   box.classList.remove('hidden');
   const plan = exportPlan(costDefaultSlot()), slots = typeof slotChoices === 'function' ? slotChoices() : [];
   const mats = slotMaterials(plan), kinds = slotKindsFor(tpl, plan), canAdopt = slotMaterialChanges().length > 0, sl = costState.slice && costState.sig === costSignature() ? costState.slice : null;
-  const sel = project.parts[project.selected], fixed = lay.fixed3mf, tm = project.threemf;
+  const fixed = lay.fixed3mf, tm = project.threemf;
   const plN = t(lay.count > 1 ? '{n} Platten' : '{n} Platte', { n: lay.count });
   if (typeof secSum === 'function') secSum('plates', plN);
   // Anordnung nach Grundfläche rechnet im Hintergrund (js/nest.js)

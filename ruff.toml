@@ -1,0 +1,16 @@
+# Statische Prüfung der Python-Teile (CI-Job „lint“, Version dort fest: ruff==0.17.2). Lokal: ruff check
+# Bewusst zurückhaltend: nur Regeln, die echte Fehler finden – keine Stil-/Formatregeln.
+#   E9  – Syntaxfehler, Datei nicht lesbar
+#   F   – pyflakes: undefinierte Namen, ungenutzte Importe/Variablen, Neudefinitionen, f-Strings ohne Platzhalter …
+#   B   – flake8-bugbear: veränderliche Standardargumente, Schleifenvariable in Closures, assert False, … (Auswahl unten)
+target-version = "py312"
+include = ["tools/**/*.py", "tests/**/*.py"]
+line-length = 200
+
+[lint]
+select = ["E9", "F", "B"]
+ignore = [
+  "B008",   # Funktionsaufruf im Standardargument – hier nur unveränderliche Werte
+  "B904",   # raise … from err in except – reine Stilfrage für Fehlermeldungen
+  "B905",   # zip() ohne strict= – Längen sind überall gewollt gleich bzw. bewusst gekürzt
+]

@@ -4,8 +4,6 @@
    Chrome-Pfad per CHROME=<Pfad> änderbar (sonst Standardpfad je System, siehe tools/headless.js). */
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const MD = path.join(ROOT, 'HANDBUCH.md');

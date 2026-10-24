@@ -74,7 +74,7 @@ r = K.arrangeParts([T, T], tpl);
 vm.runInContext('setPackGap(PART_GAP_MM)', ctx);
 // 7) Brim zählt mit: je 5 mm Brim → Abstand der Teile ≥ 8 + 5 + 5 mm; Brim bleibt auf dem Bett
 r = K.arrangeParts([T, T], tpl, null, [5, 5]);
-{ const A = placed(T, tri, r.places[0]), C = placed(T, tri, r.places[1]), grow = P => P;
+{ const A = placed(T, tri, r.places[0]), C = placed(T, tri, r.places[1]);
   check('Brim 5 mm: Abstand ≥ 18 mm', r.plateCount === 1 && polyDist(A, C) >= 18 - 0.01, [r.plateCount, polyDist(A, C)]);
   const inBed5 = P => P.every(([x, y]) => x >= 5 - 0.01 && y >= 5 - 0.01 && x <= 245.01 && y <= 245.01);
   check('Brim 5 mm bleibt auf dem Bett', inBed5(A) && inBed5(C), [A, C]); }
