@@ -9,6 +9,9 @@ Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](
 - **Druckzeit lernt aus der Druckhistorie:** Das Tool vergleicht Orcas Schätzung mit der echten Dauer der letzten Drucke (bis 20, nur fertige, ohne übersprungene Objekte; Vorbereitung herausgerechnet) und passt seine Schätzungen an – Median, begrenzt auf 0,7–1,5, ab 3 Drucken. Gilt für die Druckzeit in ③ (mit Orcas Wert daneben: „Orca 2 h 50 min + Vorbereitung, angepasst nach 12 Drucken: +8 %“), die Platten, die Restzeit der Warteschlange (auch in Home Assistant), „fertig ≈“ beim geplanten Druck und die eigene Restzeit in ④. Die Restzeit, die der Drucker meldet, bleibt unverändert. Die Historie merkt sich dafür, ob ein Druck fertig wurde oder abgebrochen.
 - **Wartungszähler in der Werkbank:** Druckstunden seit dem letzten „Erledigt“ für Düse (alle 200 h), Achsen schmieren/Riemen prüfen (300 h) und Druckplatte gründlich reinigen (50 h), Intervalle änderbar. Fällige Punkte stehen rot in der Karte **Wartung**. Home Assistant: neuer binary_sensor **Wartung fällig** (`maintenance_due`, Liste im Attribut `maintenance_note`). Wartung geht mit Export/Import der Spulen mit.
 
+### Verbessert
+- **Kosten bei großen Modellen ohne Einfrieren:** Die 3MF für das Slicen der Kostenkalkulation entsteht bei großen Modellen (ab etwa 50 000 Dreiecken, 3MF-Dateien nach Größe) im Hintergrund – vorher hing die Seite dabei mehrere Sekunden. Der Ladebalken zeigt solange „Erstelle 3MF …“. Wird ein neues Modell geladen, bricht der Bau ab. Die Datei ist dieselbe wie zuvor (Test `tests/export-worker.js`); geht der Hintergrund nicht, baut die Seite sie wie bisher selbst.
+
 ## [10.45.2] – 2026-10-24
 
 ### Behoben

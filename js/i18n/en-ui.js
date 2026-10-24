@@ -930,3 +930,7 @@ I18N.add({
  "Achsen schmieren, Riemen prüfen": "Lubricate axes, check belts",
  "Druckplatte gründlich reinigen": "Clean build plate thoroughly",
 });
+/* 3MF für die Kosten im Hintergrund bauen (js/export-ui.js exportBytesAsync, js/slicebar.js) */
+I18N.add({
+ "Erstelle 3MF …": "Building 3MF …",
+});

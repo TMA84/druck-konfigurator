@@ -217,3 +217,33 @@ function build3mf(tpl, r, parts, slot, zipLib, liveSlots, machine) {
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
   return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount, objectChanges, notes };
 }
+
+/* ---------- Export im Hintergrund (js/export-worker.js, js/export-ui.js exportBytesAsync) ----------
+   a = {tpl, r, jobs, slot, live, threemf, machine} wie aus exportArgs – derselbe Bau im Fenster und im Worker. */
+function build3mfFor(a, zipLib) {
+  return a.threemf ? build3mfFromProject(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.threemf, a.machine)
+    : build3mf(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.machine);
+}
+/* Nur, was der Export liest, als reine Daten (Zahlenarrays, keine THREE-Objekte, keine Analyse-Felder) – geht per
+   postMessage an den Worker. Gemeinsame Objekte (Geometrie von Kopien, r) bleiben gemeinsam (Kopien teilen sich beim
+   Anordnen die Grundfläche). Dazu die globalen Schalter des Anordnens (Reihenfolge, Abstand). */
+const EXPORT_PART_KEYS = ['name', 'objectId', 'instance', 'plate', 'extra', 'copy', 'moved', 'R', 'scale', 'origPos', 'geom', 'slot', 'bodies', 'input', 'overrides',
+  'texts', 'painted', 'paintState', 'paintCodes', 'paintSrc', 'paintSlots', 'modSlots', 'paintUser', 'paintSup', 'paintSeam', 'supCodes', 'seamCodes'];
+function exportArgsPlain(a) {
+  const geoms = new Map(), parts = new Map();
+  const geom = g => { if (!g) return g; if (!geoms.has(g)) geoms.set(g, { name: g.name, pos: g.pos, n: g.n, mn: g.mn, mx: g.mx, x: g.x, y: g.y, z: g.z }); return geoms.get(g); };
+  const part = p => {
+    if (!p) return p;
+    if (!parts.has(p)) { const o = {}; for (const k of EXPORT_PART_KEYS) if (p[k] !== undefined) o[k] = k === 'geom' ? geom(p[k]) : p[k]; parts.set(p, o); }
+    return parts.get(p);
+  };
+  const tm = a.threemf;
+  return { tpl: a.tpl, r: a.r, slot: a.slot, live: a.live, machine: a.machine, byObject: printSeq.byObject, packGap: packGapMm,
+    threemf: tm ? { zip: tm.zip, designMap: tm.designMap, layout: tm.layout, removed: tm.removed } : null,
+    jobs: a.jobs.map(j => ({ ...j, geom: geom(j.geom), part: part(j.part) })) };
+}
+// im Worker: Schalter wie im Fenster setzen, dann bauen
+function build3mfPlain(a, zipLib) {
+  printSeq.byObject = !!a.byObject; packGapMm = a.packGap;
+  return build3mfFor(a, zipLib);
+}

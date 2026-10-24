@@ -361,7 +361,7 @@ Preise und Sätze stellst du unter **Preise & Sätze …** ein (auch **⚙ Einst
 
 Brauchen die Filamente zu unterschiedliche Temperaturen (z. B. PLA und ASA in einem Druck), slict Orca nicht; das Tool sagt das dann.
 
-**Ladebalken:** Nach einer Änderung zeigt ein Balken oben im Tab ③, dass neu geslict wird – erst „Änderung erkannt“, dann der Fortschritt (geschätzt nach der Dauer der letzten Läufe; OrcaSlicer selbst meldet keinen), zuletzt „Lade Vorschau“. Rechnet das Tool im Hintergrund, während du in einem anderen Tab bist, dreht sich am Reiter „③ Slicen & Kosten“ ein kleiner Kreisel.
+**Ladebalken:** Nach einer Änderung zeigt ein Balken oben im Tab ③, dass neu geslict wird – erst „Änderung erkannt“, bei großen Modellen kurz „Erstelle 3MF …“ (das Tool baut die Datei im Hintergrund, die Seite bleibt bedienbar), dann der Fortschritt (geschätzt nach der Dauer der letzten Läufe; OrcaSlicer selbst meldet keinen), zuletzt „Lade Vorschau“. Rechnet das Tool im Hintergrund, während du in einem anderen Tab bist, dreht sich am Reiter „③ Slicen & Kosten“ ein kleiner Kreisel.
 
 ### Slice-Vorschau
 
