@@ -154,7 +154,7 @@ function ovRenderPanel() {
 // nach jedem update(): neu zeichnen, wenn sich etwas Relevantes geändert hat; Fokus und Reiter bleiben
 function ovPanelSync() {
   const p = ovPart(), r = lastResult;
-  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, r.printer.id === 'orca' && r.printer.orca ? r.printer.orca.name : r.printer.id, r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel], JSON.stringify(ovCapped), typeof LANG !== 'undefined' ? LANG : '']) : '';
+  const key = p && r ? JSON.stringify([project.selected, project.parts.length, r.m.id, r.printer.id === 'orca' && r.printer.orca ? r.printer.orca.name : r.printer.id, r.dSel, p.overrides, r.ovDefaults, r.suggested, r.limits && [r.limits.speed, r.limits.accel], JSON.stringify(ovCapped), I18N.lang]) : '';
   $('ovPanel').classList.toggle('hidden', !p);
   if (key === ovPanelKey) return;
   ovPanelKey = key;

@@ -45,8 +45,7 @@ const ROW_OV={'Düse':'nozzle','Heizbett':'bed','Lüfter':'fan','Lüfter Folgesc
   'Außenwand / Innenwand':'sp_outer','Außenwand':'sp_outer','Innere Wand':'sp_inner','Füllung / Travel':'sp_fill','Füllung':'sp_fill','Travel':'sp_travel',
   'Erste Schicht':'sp_first','Obere Fläche':'sp_top','Lückenfüllung':'sp_gap','Beschleunigung':'accel','Rückzug':'retr_len',
   'Max. Volumenstrom':'max_vol','Maximale Volumengeschwindigkeit':'max_vol','Durchflussverhältnis':'flow','Pressure Advance':'pa','Z-Hop':'zhop',
-  'Support':'support','Stützstrukturen':'support','Nur kritische Bereiche':'critical','Brim':'brim',
-  'Lüfter erste Schicht':'fan_first','Hilfs- / Gehäuselüfter':'fan_aux','Maximale Volumengeschwindigkeit':'max_vol'};
+  'Support':'support','Stützstrukturen':'support','Nur kritische Bereiche':'critical','Brim':'brim'};
 const ROW_OV_T=Object.fromEntries(Object.entries(ROW_OV).map(([k,v])=>[t(k),v]));
 const ORDER_THEME={'Qualität':'Qualität','Struktur':'Struktur','Geschwindigkeit':'Tempo','Stützen':'Stützen','Material / Filament':'Filament','Sonstiges':'Sonstiges'};
 const ROW_THEME={'Düse':'Temperatur','Heizbett':'Temperatur','Herstellerbereich':'Temperatur','Lüfter erste Schicht':'Kühlung','Lüfter Folgeschichten':'Kühlung',
@@ -101,7 +100,6 @@ $('hintsFold').addEventListener('toggle',e=>{if(e.isTrusted)$('hintsFold').datas
 function update(){
   if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
-  const row=x=>rowHTML(x,r.m.kind);
   $('mainTitle').textContent=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
   document.title=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;

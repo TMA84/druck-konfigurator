@@ -6,8 +6,8 @@
 const tbPart = () => project && project.parts[project.selected];
 
 function updateToolbar() {
-  const p = tbPart(), many = !!project && project.parts.length > 1, tpl = typeof plTpl === 'function' && plTpl();
-  const lay = p && tpl ? projectLayout(tpl) : null, n = p && typeof copyGroupOf === 'function' ? copyGroupOf(p).length : 0;
+  const p = tbPart(), many = !!project && project.parts.length > 1;
+  const n = p && typeof copyGroupOf === 'function' ? copyGroupOf(p).length : 0;
   // ausgegraut mit Grund im Tooltip (sonst der normale Tooltip)
   const dis = (id, why) => { const b = $(id); if (!b) return; if (!b.dataset.title) b.dataset.title = b.title;
     b.disabled = !!why; b.title = why ? b.dataset.title + ' – ' + why : b.dataset.title; b.setAttribute('aria-label', b.title); };

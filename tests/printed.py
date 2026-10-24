@@ -1,7 +1,6 @@
 """Prüft die Vorschau gestarteter Drucke (Live-Ansicht ④): tools/serve.py remember_print / printed_preview.
 Sie liegt dauerhaft beim Server (DATA_DIR/printed) – übersteht Neuladen der Seite, andere Browser und Server-Neustart.
 Aufruf: python tests/printed.py (ohne Drucker)."""
-import importlib
 import os
 import sys
 import tempfile

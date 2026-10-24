@@ -1,0 +1,13 @@
+{
+  "name": "druck-konfigurator-lint",
+  "private": true,
+  "description": "Nur Entwicklungswerkzeuge (statische Prüfung, siehe eslint.config.mjs) – die Anwendung selbst braucht kein npm.",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "10.13.0",
+    "espree": "11.2.0",
+    "globals": "17.13.0"
+  }
+}

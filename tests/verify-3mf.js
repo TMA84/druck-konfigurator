@@ -165,7 +165,7 @@ function sliceParts(label, printer, parts, expectPlates) {
 const [bw1] = [250];
 let res = ONLY_MW ? null : sliceParts('Mehrteilig', 'kobra_s1', [MODELS.cube, MODELS.mushroom, MODELS.pillar], 1);
 if (res) {
-  const g = res.gcodes[0], [bx, by] = res.tpl.bedCenter;
+  const g = res.gcodes[0], [bx] = res.tpl.bedCenter;
   // erwartete Breite aus der Anordnung des Tools (kompakter Block, 8 mm Abstand) – Orca muss sie so übernehmen
   const ms = [MODELS.cube, MODELS.mushroom, MODELS.pillar], lay = K.arrangeParts(ms, res.tpl), w = g.bb[2] - g.bb[0];
   const sumW = Math.max(...lay.places.map((p, i) => p.lx + K.footprint(ms[i], p)[0] / 2)) - Math.min(...lay.places.map((p, i) => p.lx - K.footprint(ms[i], p)[0] / 2));

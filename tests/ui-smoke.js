@@ -16,7 +16,7 @@ async function runSmoke(opts={}){
   HTMLAnchorElement.prototype.click=function(){if(this.download){downloads.push({name:this.download,href:this.href});return}return origClick.call(this)};
   const origRevoke=URL.revokeObjectURL;URL.revokeObjectURL=()=>{}; // Downloads bleiben lesbar
   const alerts=[];window.alert=m=>alerts.push(m);window.confirm=()=>true;
-  let printed=0;window.print=()=>{window.dispatchEvent(new Event('beforeprint'));printed++;window.dispatchEvent(new Event('afterprint'))};
+  window.print=()=>{window.dispatchEvent(new Event('beforeprint'));window.dispatchEvent(new Event('afterprint'))};
   const blobText=async d=>(await fetch(d.href)).text();
   const blobBytes=async d=>new Uint8Array(await (await fetch(d.href)).arrayBuffer());
   const menuClick=id=>{const b=$(id);b.closest('.menu').querySelector('.menu-btn').click();b.click()};
@@ -686,7 +686,7 @@ async function runSmoke(opts={}){
         selectPart(0);await wait(30);}
       project.parts.forEach((q,i)=>{q.overrides=keep[i]});update();await wait(30); }
     // 3D-Fortschritt: Vorschau beim ersten Abruf noch nicht da (geplanter Start) – die Seite fragt später erneut
-    { const of=window.fetch;let calls=0;const tiny=new Uint8Array([71,67,80,86,51]);
+    { const of=window.fetch;let calls=0;
       window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/printing/preview')){calls++;return Promise.resolve(new Response('{}',{status:404}))}return of(u,o)};
       const st={connected:true,printing:true,job:{name:'Spaet_Platte1',layer:1,layers:10}};lv.name=null;lv.missing=false;
       liveUpdate(st);await wait(200);ok(lv.missing&&calls===1,'Vorschau fehlt beim ersten Abruf');
@@ -752,7 +752,7 @@ async function runSmoke(opts={}){
         $('sendGo').click();await wait(500);
         ok(calls.length===2&&calls[1]==='0123456789abcdef'&&calls[0]!==calls[1],'Slice-Stand weg: neu geslict und mit neuem Auftrag gestartet ('+calls.join(' → ')+')');
         window.lanApi=ol;window.runCosts=orc;costState=cs0;if($('sendDlg').open)$('sendDlg').close();if(document.body.dataset.tab!=='slice')setTab('slice'); }
-      { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials,tab=document.body.dataset.tab;let adopted=0,resliced=0;
+      { const id=lastResult.printer.id,ms0=JSON.stringify(store.settings.manualSlots||null),rc=window.runCosts,os=window.openSendDialog,ad=window.adoptSlotMaterials;let adopted=0,resliced=0;
         store.settings.manualSlots={...(store.settings.manualSlots||{}),[id]:[null,{type:'PLA',colour:'#00FF00',override:true},{type:'PETG',colour:'#FFFFFF',override:true},null]};
         window.runCosts=async()=>{resliced++};window.openSendDialog=()=>{};window.adoptSlotMaterials=()=>{adopted++};
         await sendAdopt();const rows=store.settings.manualSlots[id];

@@ -3,7 +3,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ctx = vm.createContext({ console });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'anycubic-models.js'), 'utf8') + ';this.M={anycubicLanModel,lanModelOf,isLanPrinter,ANYCUBIC_LAN_MODELS}', ctx);
-const { anycubicLanModel, lanModelOf, isLanPrinter } = ctx.M;
+const { anycubicLanModel, isLanPrinter } = ctx.M;
 let passed = 0, failed = 0;
 const check = (n, ok, d) => { if (ok) passed++; else { failed++; console.log('FEHLER', n, d ?? ''); } };
 const key = n => (anycubicLanModel(n) || {}).key;

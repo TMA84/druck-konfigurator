@@ -1,4 +1,5 @@
 # Tests bei jedem Push auf main und bei Pull Requests:
+#   lint    – statische Prüfung: ESLint (eslint.config.mjs) und Ruff (ruff.toml)
 #   node    – Rechenkern (tests/*.js, die ohne Browser und ohne OrcaSlicer laufen)
 #   python  – Server-Teile (LAN-Modus gegen nachgebauten Drucker, Spulen, Warteschlange, MQTT, Zugriffsschutz …)
 #   orca    – gegen die echte OrcaSlicer-CLI (2.4.2, wie im Dockerfile)
@@ -24,6 +25,28 @@ env:
   ORCA_VERSION: "2.4.2"
 
 jobs:
+  # statische Prüfung (eslint.config.mjs, ruff.toml): undefinierte Namen über alle Seitendateien hinweg, doppelte
+  # Deklarationen/Schlüssel, unerreichbarer Code, ungenutzte Python-Importe … – schnell, läuft neben den anderen Jobs
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: npm ci --no-audit --no-fund
+      - name: ESLint (js/, tests/, tools/, ha/)
+        run: npx eslint .
+      - name: Ruff (tools/, tests/)
+        run: |
+          pip install ruff==0.17.2
+          ruff check --output-format github
+
   node:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
