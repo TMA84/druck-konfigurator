@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.2] – 2026-10-25
+
+### Behoben
+- **Rinkhals-Kamera auch in Home Assistant:** Über den HA-Ingress blieb das MJPEG-Bild leer – Home Assistant komprimiert `multipart/x-mixed-replace`, dabei kommt der Strom nicht an. Der Server zerlegt den Strom jetzt in einzelne Bilder (`/api/anycubic/camera?frames=1`: je Bild 4 Byte Länge + JPEG als `application/octet-stream`, wird nicht komprimiert), die Seite liest sie mit `fetch` und zeigt sie im Bild an. Neu dabei: Bleibt das Bild 6 s stehen, verbindet die Seite selbst neu. Gemessen am Drucker: 1280 × 720, knapp 15 Bilder/s.
+
 ## [10.47.1] – 2026-10-25
 
 ### Verbessert

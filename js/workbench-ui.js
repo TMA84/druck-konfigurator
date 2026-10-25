@@ -359,9 +359,11 @@ function wbCamStart(reconnect) {
     }
   }, 1000);
 }
-/* MJPEG im <img>: der Browser zeigt jedes Bild selbst an. Stoppen = src entfernen und das Bild aus der Seite nehmen – das
-   schließt die Verbindung (Server und Drucker hören auf zu senden). Fehler (Drucker weg, Rinkhals beendet): nach 2 s neu,
-   höchstens CAM_RETRY_MAX-mal hintereinander, dann fragt die Seite die Quelle neu ab (vielleicht wieder Werksfirmware). */
+/* MJPEG: der Server zerlegt den Strom in einzelne Bilder (?frames=1: je Bild 4 Byte Länge + JPEG) – multipart direkt im
+   <img> käme über den Home-Assistant-Ingress nicht an (der komprimiert multipart/x-mixed-replace). Die Seite liest mit
+   fetch, zeigt jedes Bild als Blob im <img> und verwirft Bilder, solange das vorige noch dekodiert wird. Stoppen = abbrechen
+   (schließt die Verbindung). Kein Bild seit CAM_STALL_MS oder Fehler: nach 2 s neu, höchstens CAM_RETRY_MAX-mal
+   hintereinander, dann fragt die Seite die Quelle neu ab (vielleicht wieder Werksfirmware). */
 function wbCamStartMjpeg(info, reconnect) {
   wbCamStop(true);
   wb.camOn = true;
@@ -370,22 +372,58 @@ function wbCamStartMjpeg(info, reconnect) {
   img.className = 'wb-mjpeg'; img.alt = t('Kamerabild'); img.decoding = 'async';
   const tf = [info.rotation ? 'rotate(' + info.rotation + 'deg)' : '', info.flip_h ? 'scaleX(-1)' : '', info.flip_v ? 'scaleY(-1)' : ''].filter(Boolean).join(' ');
   if (tf) img.style.transform = tf;
-  const player = { destroy() { img.onload = img.onerror = null; img.removeAttribute('src'); img.remove(); } };
-  img.onload = () => { if (wb.player === player) { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; } };
-  img.onerror = () => {
-    if (wb.player !== player) return;
+  const ctl = new AbortController();
+  let shown = '', busy = false, done = false;
+  const player = { destroy() { done = true; ctl.abort(); img.onload = img.onerror = null; img.removeAttribute('src'); img.remove(); if (shown) URL.revokeObjectURL(shown); shown = ''; } };
+  const fail = () => {
+    if (done || wb.player !== player) return;
+    wbCamStop(true);
     wb.camRetries = (wb.camRetries || 0) + 1;
     if (wb.camRetries > CAM_RETRY_MAX) {
       wbCamStop(); wb.camSrc = null; $('wbCamBtn').textContent = t('Kamera starten');
       $('wbCamNote').textContent = t('Kamera liefert keine Bilder – später erneut starten'); $('wbCamNote').classList.remove('hidden'); return;
     }
+    wb.camOn = true;
     $('wbCamNote').textContent = t('Kamera nicht verfügbar – verbinde neu …'); $('wbCamNote').classList.remove('hidden');
-    setTimeout(() => { if (wb.player === player && !document.hidden) wbCamStartMjpeg(info, true); }, 2000);
+    setTimeout(() => { if (wb.camOn && !wb.player && !document.hidden) wbCamStartMjpeg(info, true); }, 2000);
   };
-  // „&t=“ gegen zwischengespeicherte Antworten (wie bei FLV)
-  img.src = 'api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&t=' + Date.now();
+  const show = jpeg => {
+    wb.camLast = Date.now();
+    if (busy) return;   // voriges Bild noch nicht fertig dekodiert: dieses auslassen statt Rückstand aufzubauen
+    busy = true;
+    const u = URL.createObjectURL(new Blob([jpeg], { type: 'image/jpeg' }));
+    img.onload = img.onerror = () => {
+      busy = false;
+      if (shown && shown !== u) URL.revokeObjectURL(shown);
+      shown = u;
+      if (wb.player === player) { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; }
+    };
+    img.src = u;
+  };
+  fetch('api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&frames=1&t=' + Date.now(), { signal: ctl.signal, cache: 'no-store' }).then(async r => {
+    if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    const reader = r.body.getReader();
+    let buf = new Uint8Array(0);
+    for (;;) {
+      const { value, done: end } = await reader.read();
+      if (end) break;
+      const next = new Uint8Array(buf.length + value.length); next.set(buf); next.set(value, buf.length); buf = next;
+      let off = 0;
+      while (buf.length - off >= 4) {
+        const n = ((buf[off] << 24) >>> 0) + (buf[off + 1] << 16) + (buf[off + 2] << 8) + buf[off + 3];
+        if (n <= 0 || n > 8 * 1024 * 1024) throw new Error('Rahmen');
+        if (buf.length - off - 4 < n) break;
+        show(buf.slice(off + 4, off + 4 + n)); off += 4 + n;
+      }
+      if (off) buf = buf.slice(off);
+    }
+    throw new Error('Ende');
+  }).catch(fail);
   $('wbVideo').after(img);
   wb.player = player; $('wbCamBtn').textContent = t('Kamera stoppen');
+  wb.camLast = Date.now();
+  // Strom steht ohne Fehler (WLAN weg, Drucker hängt): neu verbinden
+  wb.camWatch = setInterval(() => { if (!document.hidden && Date.now() - wb.camLast > CAM_STALL_MS) fail(); }, 1000);
 }
 $('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); wb.camUserOff = true; return; } wb.camUserOff = false; wb.camRetries = 0; wbCamStart(false); });
 /* Fenster/Tab im Hintergrund: Kamera anhalten (sonst liefe der Strom vom Drucker über den Server weiter, ohne dass ihn

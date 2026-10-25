@@ -9,7 +9,8 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/mesh?host=<ip>        → Bettnetz (Nivellierung) über Moonraker, nur mit Rinkhals (tools/mesh.py)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS);
-                                              mit Rinkhals MJPEG von mjpg-streamer (ohne startCapture, tools/camera_src.py)
+                                              mit Rinkhals MJPEG von mjpg-streamer (ohne startCapture, tools/camera_src.py);
+                                              &frames=1: dieselben Bilder als Länge + JPEG (geht auch über den HA-Ingress)
   GET  /api/anycubic/camera/info?host=<ip> → {"source": "mjpeg"|"flv", "fps", "aspect", …}: welcher Spieler in der Seite
   GET  /api/anycubic/camera/snapshot?host=<ip> → ein JPEG (nur Rinkhals; Werksfirmware → 404 unsupported)
   POST /api/anycubic/print  {host, job, plate, name, options, own?, slots?}  → G-Code einer geslicten Platte hochladen und drucken
@@ -470,7 +471,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._api(lambda: camera_src.info(anycubic_lan.check_host(host)))
             if url.path.endswith("/snapshot"):
                 return self._snapshot(host)
-            return self._camera(host)
+            return self._camera(host, urllib.parse.parse_qs(url.query).get("frames", [""])[0] == "1")
         m = re.match(r"^/api/slice/([0-9a-f]{16})/plate_(\d+)\.(preview|gcode)$", url.path)
         if m:
             path = slicer.job_file(m.group(1), m.group(2), m.group(3))
@@ -488,7 +489,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return None
         return super().do_GET()
 
-    def _camera(self, host):
+    def _camera(self, host, as_frames=False):
         """Kamerastrom des Druckers weiterreichen, solange der Browser zusieht."""
         try:
             host = anycubic_lan.check_host(host)
@@ -496,7 +497,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except anycubic_lan.LanError as e:
             return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
         if rinkhals:
-            return self._camera_mjpeg(host, rinkhals)
+            return self._camera_mjpeg(host, rinkhals, as_frames)
         try:
             cam = anycubic_lan.camera_url(host)
             upstream = urllib.request.urlopen(cam, timeout=10)
@@ -524,15 +525,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             upstream.close()
             anycubic_lan.camera_watch(host, -1)   # letzter Zuschauer weg: Kamera später stoppen
 
-    def _camera_mjpeg(self, host, cam):
+    def _camera_mjpeg(self, host, cam, as_frames=False):
         """Rinkhals: MJPEG von mjpg-streamer durchreichen – kein MQTT, kein startCapture (das Licht bleibt, wie es ist),
-        kein camera_watch (mjpg-streamer läuft ohnehin; nichts zu stoppen)."""
+        kein camera_watch (mjpg-streamer läuft ohnehin; nichts zu stoppen). as_frames (?frames=1, die Seite nutzt das):
+        je Bild 4 Byte Länge (big-endian) + JPEG als application/octet-stream – multipart käme über den HA-Ingress
+        komprimiert und damit nicht an."""
         try:
             upstream = camera_src.open_first(cam["streams"], "multipart/x-mixed-replace")
         except OSError as e:
             camera_src.forget(host)   # beim nächsten Versuch neu bestimmen (Rinkhals aus, Drucker neu gestartet)
             return self._json(502, {"error": "Kamera nicht erreichbar: " + str(e), "kind": "unreachable"})
         self.send_response(200)
+        if as_frames:
+            self.send_header("Content-Type", camera_src.FRAMES_TYPE)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                for jpeg in camera_src.frames(upstream):
+                    self.wfile.write(len(jpeg).to_bytes(4, "big") + jpeg)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass   # Seite hat abgebrochen (AbortController)
+            finally:
+                upstream.close()
+            return None
         self.send_header("Content-Type", upstream.headers.get("Content-Type"))   # mit boundary=…
         self.end_headers()
         try:

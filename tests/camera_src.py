@@ -199,6 +199,32 @@ camera_src.forget(H)
 st, hd, data = req("/api/anycubic/camera?host=" + H)
 check("ohne Port 80 → mjpg-streamer direkt", st == 200 and data == FRAME * 2 and fake["stream_paths"][-1] == (camera_src.MJPEG_PORT, "/?action=stream"), (st, len(data), fake["stream_paths"][-1:]))
 
+# 5b) ?frames=1 (für den HA-Ingress): je Bild 4 Byte Länge + JPEG, application/octet-stream (komprimiert HA nicht)
+st, hd, data = req("/api/anycubic/camera?frames=1&host=" + H)
+want = (len(JPEG).to_bytes(4, "big") + JPEG) * 2
+check("frames=1: Länge + JPEG je Bild", st == 200 and hd.get("Content-Type") == camera_src.FRAMES_TYPE and data == want, (st, hd.get("Content-Type"), len(data)))
+check("frames=1: kein startCapture", calls == [], calls)
+
+
+class Lines:
+    """urlopen-Antwort nachgebaut: readline/read auf festen Bytes."""
+    def __init__(self, b):
+        import io
+        self.f = io.BytesIO(b)
+
+    def readline(self, n=-1):
+        return self.f.readline(n)
+
+    def read(self, n=-1):
+        return self.f.read(n)
+
+
+check("frames(): zwei Bilder, Leerzeilen dazwischen", list(camera_src.frames(Lines(b"\r\n" + FRAME + b"\r\n" + FRAME))) == [JPEG, JPEG])
+no_len = ("--%s\r\nContent-Type: image/jpeg\r\n\r\n" % BOUNDARY).encode() + JPEG
+check("frames(): ohne Content-Length → Ende", list(camera_src.frames(Lines(FRAME + no_len))) == [JPEG])
+check("frames(): abgeschnittenes Bild verworfen", list(camera_src.frames(Lines(FRAME + FRAME[:-200]))) == [JPEG])
+check("frames(): zu großes Bild → Ende", list(camera_src.frames(Lines(FRAME), max_bytes=100)) == [])
+
 # 6) Standbild
 st, hd, data = req("/api/anycubic/camera/snapshot?host=" + H)
 check("Standbild: JPEG", st == 200 and hd.get("Content-Type") == "image/jpeg" and data == JPEG, (st, hd.get("Content-Type"), len(data)))

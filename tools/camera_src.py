@@ -117,6 +117,42 @@ def info(host):
     return {k: cam[k] for k in ("source", "fps", "aspect", "flip_h", "flip_v", "rotation")}
 
 
+FRAMES_TYPE = "application/octet-stream"   # HA-Ingress komprimiert application/* (außer json/xml/js) nicht
+
+
+def frames(r, max_bytes=SNAPSHOT_MAX):
+    """MJPEG (multipart/x-mixed-replace von mjpg-streamer) → einzelne JPEG-Bilder (bytes), bis der Strom endet.
+
+    Für serve.py ?frames=1: Home Assistants Ingress komprimiert multipart/x-mixed-replace (should_compress, gemessen
+    2026-10-25 im Quelltext) – gzip puffert, der Browser zeigt dann nichts. Jeder Teil braucht Content-Length
+    (mjpg-streamer sendet sie immer); fehlt sie oder ist sie unplausibel, endet der Strom."""
+    while True:
+        line = r.readline(1024)
+        if not line:
+            return
+        if not line.startswith(b"--"):
+            continue   # Leerzeile zwischen den Teilen
+        length = None
+        while True:
+            h = r.readline(1024)
+            if not h:
+                return
+            if not h.strip():
+                break
+            k, _, v = h.partition(b":")
+            if k.strip().lower() == b"content-length":
+                try:
+                    length = int(v.strip())
+                except ValueError:
+                    length = None
+        if length is None or not 0 < length <= max_bytes:
+            return
+        data = r.read(length)
+        if len(data) < length:
+            return
+        yield data
+
+
 def open_first(urls, ctype, timeout=10):
     """Erste Adresse, die mit diesem Inhaltstyp antwortet (urlopen-Antwort) – sonst OSError mit dem letzten Grund."""
     err = OSError("keine Kamera-Adresse")
