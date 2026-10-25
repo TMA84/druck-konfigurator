@@ -8,7 +8,10 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/anycubic/status?host=<ip>      → Stand für Werkbank und Belegung (stehende Verbindung, alle 5 s)
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/mesh?host=<ip>        → Bettnetz (Nivellierung) über Moonraker, nur mit Rinkhals (tools/mesh.py)
-  GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS)
+  GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS);
+                                              mit Rinkhals MJPEG von mjpg-streamer (ohne startCapture, tools/camera_src.py)
+  GET  /api/anycubic/camera/info?host=<ip> → {"source": "mjpeg"|"flv", "fps", "aspect", …}: welcher Spieler in der Seite
+  GET  /api/anycubic/camera/snapshot?host=<ip> → ein JPEG (nur Rinkhals; Werksfirmware → 404 unsupported)
   POST /api/anycubic/print  {host, job, plate, name, options, own?, slots?}  → G-Code einer geslicten Platte hochladen und drucken
                              (own: eigener G-Code, Name ohne „_Platte1“; slots: {Werkzeug: ACE-Slot})
   POST /api/anycubic/command  {host, type, action, data}  → nur freigegebene Einstellungen (WRITABLE)
@@ -59,6 +62,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anycubic_lan  # noqa: E402
 import backup  # noqa: E402
+import camera_src  # noqa: E402
 import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
@@ -457,10 +461,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
-        if url.path == "/api/anycubic/camera":
-            if self._cross_site():   # startet die Kamera am Drucker – nur von der eigenen Seite
+        if url.path in ("/api/anycubic/camera", "/api/anycubic/camera/info", "/api/anycubic/camera/snapshot"):
+            # startet die Kamera am Drucker bzw. fragt ihn ab – nur von der eigenen Seite (nicht für „nur ansehen“: fehlt in VIEWER_GET)
+            if self._cross_site():
                 return self._json(403, {"error": "Kamera nur von der eigenen Seite", "kind": "forbidden"})
-            return self._camera(urllib.parse.parse_qs(url.query).get("host", [""])[0])
+            host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
+            if url.path.endswith("/info"):
+                return self._api(lambda: camera_src.info(anycubic_lan.check_host(host)))
+            if url.path.endswith("/snapshot"):
+                return self._snapshot(host)
+            return self._camera(host)
         m = re.match(r"^/api/slice/([0-9a-f]{16})/plate_(\d+)\.(preview|gcode)$", url.path)
         if m:
             path = slicer.job_file(m.group(1), m.group(2), m.group(3))
@@ -480,6 +490,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _camera(self, host):
         """Kamerastrom des Druckers weiterreichen, solange der Browser zusieht."""
+        try:
+            host = anycubic_lan.check_host(host)
+            rinkhals = camera_src.detect(host)
+        except anycubic_lan.LanError as e:
+            return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
+        if rinkhals:
+            return self._camera_mjpeg(host, rinkhals)
         try:
             cam = anycubic_lan.camera_url(host)
             upstream = urllib.request.urlopen(cam, timeout=10)
@@ -506,6 +523,53 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         finally:
             upstream.close()
             anycubic_lan.camera_watch(host, -1)   # letzter Zuschauer weg: Kamera später stoppen
+
+    def _camera_mjpeg(self, host, cam):
+        """Rinkhals: MJPEG von mjpg-streamer durchreichen – kein MQTT, kein startCapture (das Licht bleibt, wie es ist),
+        kein camera_watch (mjpg-streamer läuft ohnehin; nichts zu stoppen)."""
+        try:
+            upstream = camera_src.open_first(cam["streams"], "multipart/x-mixed-replace")
+        except OSError as e:
+            camera_src.forget(host)   # beim nächsten Versuch neu bestimmen (Rinkhals aus, Drucker neu gestartet)
+            return self._json(502, {"error": "Kamera nicht erreichbar: " + str(e), "kind": "unreachable"})
+        self.send_response(200)
+        self.send_header("Content-Type", upstream.headers.get("Content-Type"))   # mit boundary=…
+        self.end_headers()
+        try:
+            read = getattr(upstream, "read1", upstream.read)   # wie bei FLV: jedes Bild sofort weiter
+            while True:
+                chunk = read(64 * 1024)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass   # Browser hat die Ansicht geschlossen (img.src = '')
+        finally:
+            upstream.close()
+
+    def _snapshot(self, host):
+        """Ein Standbild (JPEG) – nur mit Rinkhals; die Werksfirmware hat keins."""
+        try:
+            host = anycubic_lan.check_host(host)
+            cam = camera_src.detect(host)
+        except anycubic_lan.LanError as e:
+            return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
+        if not cam:
+            return self._json(404, {"error": "Standbild nur mit Rinkhals", "kind": "unsupported"})
+        try:
+            with camera_src.open_first(cam["snapshots"], "image/jpeg") as r:
+                body = r.read(camera_src.SNAPSHOT_MAX + 1)
+        except OSError as e:
+            camera_src.forget(host)
+            return self._json(502, {"error": "Kamera nicht erreichbar: " + str(e), "kind": "unreachable"})
+        if len(body) > camera_src.SNAPSHOT_MAX or not body.startswith(b"\xff\xd8"):
+            return self._json(502, {"error": "Kamera lieferte kein JPEG", "kind": "bad_response"})
+        self.send_response(200)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _file(self, path, ctype, download_name=None):
         size = os.path.getsize(path)

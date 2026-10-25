@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.1] – 2026-10-25
+
+### Verbessert
+- **Bessere Kamera mit Rinkhals, Licht bleibt aus:** Läuft auf dem Kobra S1 Rinkhals, zeigen Werkbank ④ und die Dashboard-Karte das MJPEG-Bild von dessen mjpg-streamer (gemessen 1280 × 720, knapp 15 Bilder/s) statt des FLV-Stroms der Werksfirmware. Dafür schickt die Druckwerkstatt keinen Kamera-Startbefehl an den Drucker – der schaltete jedes Mal das Licht ein. Erkannt wird Rinkhals über Moonraker (`/server/webcams/list` auf Port 7125, 5 Minuten gemerkt); ohne Rinkhals bleibt alles wie bisher. Neu: `GET /api/anycubic/camera/info` (welche Quelle) und `GET /api/anycubic/camera/snapshot` (ein JPEG, nur mit Rinkhals). Test `tests/camera_src.py`.
+
 ## [10.47.0] – 2026-10-25
 
 ### Neu
