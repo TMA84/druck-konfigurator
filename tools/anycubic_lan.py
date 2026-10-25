@@ -214,6 +214,9 @@ class PrinterLink:
         self.print_log = collections.deque(maxlen=20)
         self.sent = {}             # (Art, Aktion) → Zeitpunkt des letzten eigenen Befehls
         self.light_off = None      # Wunsch „Licht aus“: {"payload", "until" (Ende des Fensters), "tries", "last"} (_hold_light)
+        self.cam_viewers = 0       # Kamera: Zuschauer über den Server (serve.py _camera)
+        self.cam_ours = False      # Kamera von uns gestartet (startCapture) – nur dann stoppen wir sie auch
+        self.cam_stopper = False   # Thread für „ohne Zuschauer stoppen“ läuft
         self.paused_since = None   # seit wann der laufende Druck pausiert (aus info.project.pause)
         self.connected = threading.Event()
         self.first = threading.Event()
@@ -854,6 +857,7 @@ def camera_url(host):
         link.request("video", "startCapture", {}, timeout=8)
     except LanError:
         pass   # läuft sie schon, antwortet der Drucker teils nicht – dann trotzdem versuchen
+    link.cam_ours = True
     w = link.light_off   # einmal lesen: _hold_light setzt es im Verbindungs-Thread auf None
     if w:
         # Kamerastart schaltet am Kobra S1 das Licht ein (bestätigt 2026-10-16: „nach jedem Neuladen der Kamera erst wieder an“):
@@ -861,6 +865,49 @@ def camera_url(host):
         w.update(until=max(w["until"], time.time() + LIGHT_CAM_HOLD_S), tries=0)
         threading.Thread(target=_light_off_after_cam, args=(link,), daemon=True).start()
     return url
+
+
+CAM_IDLE_S = 60   # so lange ohne Zuschauer, dann die Kamera stoppen (nur außerhalb eines Drucks)
+
+
+def camera_watch(host, delta):
+    """Zuschauer +1/−1 (serve.py _camera). Ohne Zuschauer stoppt ein Thread die von uns gestartete Kamera nach CAM_IDLE_S –
+    sonst lief sie endlos weiter (2026-10-25: nach dem Druck noch an; video/stopCapture → „pushStopped“, getestet im
+    Leerlauf). Während eines Drucks wartet er bis danach: stopCapture ist beim Drucken nicht erprobt."""
+    with _links_lock:
+        link = _links.get(host)
+    if not link:
+        return
+    with link.lock:
+        link.cam_viewers = max(0, link.cam_viewers + delta)
+        start = link.cam_viewers == 0 and link.cam_ours and not link.cam_stopper
+        if start:
+            link.cam_stopper = True
+    if start:
+        threading.Thread(target=_camera_idle_stop, args=(link,), daemon=True).start()
+
+
+def _camera_idle_stop(link):
+    try:
+        while True:
+            time.sleep(CAM_IDLE_S)
+            with link.lock:
+                if link.cam_viewers > 0 or not link.cam_ours:
+                    return
+            if not link.client or link.stopped:
+                return
+            if link.data("info").get("state") != "free":
+                continue                          # druckt (oder sonst beschäftigt): später noch einmal
+            link.publish("video", "stopCapture", None)
+            with link.lock:
+                link.cam_ours = False
+            return
+    except Exception as e:   # eigener Thread: nichts darf ungemeldet verschwinden
+        if not isinstance(e, LanError):
+            print("Kamera stoppen: " + (str(e) or type(e).__name__), flush=True)
+    finally:
+        with link.lock:
+            link.cam_stopper = False
 
 
 # ---------- Druck senden: G-Code hochladen und starten ----------

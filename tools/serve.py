@@ -476,6 +476,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", upstream.headers.get("Content-Type") or "video/x-flv")
         self.end_headers()
+        anycubic_lan.camera_watch(host, +1)
         try:
             # read1: sofort weiterreichen, was angekommen ist – read(64 KB) wartete, bis ein ganzer Block voll war; bei der
             # geringen Datenrate der Kamera kam das Bild dann Sekunden zu spät („altes Bild“)
@@ -490,6 +491,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             pass   # Browser hat die Ansicht geschlossen
         finally:
             upstream.close()
+            anycubic_lan.camera_watch(host, -1)   # letzter Zuschauer weg: Kamera später stoppen
 
     def _file(self, path, ctype, download_name=None):
         size = os.path.getsize(path)

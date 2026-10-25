@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.46.4] – 2026-10-25
+
+### Behoben
+- **Kamera lief nach dem Druck endlos weiter:** Die Druckwerkstatt startete die Druckerkamera (Werkbank, Dashboard-Karte), stoppte sie aber nie – sie lief nach dem Druck weiter, solange der Drucker an war. Jetzt stoppt sie die selbst gestartete Kamera (`video/stopCapture`), wenn eine Minute lang niemand zusieht und der Drucker nicht druckt. Eine von der Anycubic-App gestartete Kamera bleibt unberührt.
+
 ## [10.46.3] – 2026-10-25
 
 ### Behoben

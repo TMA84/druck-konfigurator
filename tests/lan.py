@@ -404,6 +404,20 @@ lan._stream_running = lambda url: False
 check("Kamera aus: startCapture", lan.camera_url("127.0.0.1") == "http://127.0.0.1:18088/flv" and caps == [("video", "startCapture")], caps)
 link.request, lan._stream_running = req, run
 check("Stream-Probe: nichts unter der Adresse → nicht laufend", lan._stream_running("http://127.0.0.1:9/flv") is False)
+# Ohne Zuschauer: von uns gestartete Kamera nach CAM_IDLE_S stoppen – nur im Leerlauf, nicht wenn jemand zusieht
+stops = lambda: sum(1 for _t, m in broker.commands if (m.get("type"), m.get("action")) == ("video", "stopCapture"))
+lan.CAM_IDLE_S, idle = 0.2, lan.CAM_IDLE_S
+link.cam_ours, n0 = True, stops()
+lan.camera_watch("127.0.0.1", +1); lan.camera_watch("127.0.0.1", +1); lan.camera_watch("127.0.0.1", -1); time.sleep(0.6)
+check("ein Zuschauer bleibt: Kamera läuft weiter", stops() == n0 and link.cam_ours, stops() - n0)
+lan.camera_watch("127.0.0.1", -1); time.sleep(0.8)
+check("letzter Zuschauer weg: stopCapture, danach nicht mehr unsere", stops() == n0 + 1 and not link.cam_ours and not link.cam_stopper, stops() - n0)
+link.cam_ours = False
+lan.camera_watch("127.0.0.1", +1); lan.camera_watch("127.0.0.1", -1); time.sleep(0.6)
+check("Kamera nicht von uns gestartet: kein stopCapture", stops() == n0 + 1, stops() - n0)
+lan.camera_watch("127.0.0.1", -1)
+check("Zähler nie negativ", link.cam_viewers == 0, link.cam_viewers)
+lan.CAM_IDLE_S = idle
 lan.POLL_S = 5
 lan.command("127.0.0.1", "axis", "move", {"axis": 1, "move_type": 1, "distance": 10})
 lan.command("127.0.0.1", "axis", "move", {"axis": 3, "move_type": 2})
