@@ -315,6 +315,7 @@ spools.track(hs, pj, 0, now=2000)
 spools.track(hs, dict(pj, supplies_usage=1000, progress=50), 0, now=2600)
 spools.track(hs, dict(pj, supplies_usage=1000, progress=60), 1, now=2700)
 spools.track(hs, dict(pj, supplies_usage=2000, progress=90), 1, now=3000)
+spools.track(hs, dict(pj, supplies_usage=2000, progress=99), 1, now=5000)
 spools.track(hs, None, 1, now=5600)
 e = hs["history"][-1]
 ga, gg = spools.mm_to_g(1000, "ASA"), spools.mm_to_g(1000, "PLA") + spools.purge_g(1.5)
@@ -377,6 +378,7 @@ fin.setdefault("spools", []); fin.setdefault("history", [])
 job = {"filename": "Satz_Platte1.gcode", "progress": 0, "supplies_usage": 0, "print_status": 1, "state": "printing"}
 spools.track(fin, job, -1, now=1000)
 spools.track(fin, dict(job, progress=50, supplies_usage=100), -1, now=4000)
+spools.track(fin, dict(job, progress=99, supplies_usage=200), -1, now=6500)
 spools.track(fin, dict(job, progress=100, print_status=2, state="finished"), -1, now=7000)
 spools.track(fin, dict(job, progress=100, print_status=2, state="finished"), -1, now=50000)   # Stunden später noch gemeldet
 check("Fertig gemeldet: genau ein Eintrag, Dauer bis „fertig“", len(fin["history"]) == 1 and fin["history"][0]["duration_s"] == 6000, fin["history"])
@@ -387,6 +389,26 @@ check("Abgebrochen ohne vorherigen Druck: kein Eintrag", len(fin["history"]) == 
 spools.track(fin, job, -1, now=70000)
 spools.track(fin, dict(job, state="stoped", print_status=2), -1, now=70085)
 check("Gleicher Name nochmal gedruckt, dann abgebrochen: neuer Eintrag mit 85 s", len(fin["history"]) == 2 and fin["history"][1]["duration_s"] == 85, fin["history"][-1:])
+
+# Drucker nach dem Druck ausgeschaltet: Ende erst beim nächsten Einschalten gesehen → Ende = zuletzt laufend + gemeldete Restzeit
+off = {"spools": [], "track": {}, "history": []}
+job = {"filename": "Halter_Platte1.gcode", "progress": 0, "supplies_usage": 0, "print_status": 1, "state": "printing"}
+for k in range(0, 14400, 60):                                   # 4 h lang jede Minute gesehen
+    spools.track(off, dict(job, progress=k // 160, remain_time=(15300 - k) // 60), -1, now=100000 + k)
+spools.track(off, dict(job, progress=100, print_status=2, state="finished"), -1, now=100000 + 90000)   # am nächsten Tag
+e = off["history"][-1]
+check("Ausgeschaltet: Ende = zuletzt gesehen + Restzeit, nicht beim Einschalten", e["end"] == 100000 + 14340 + (15300 - 14340) // 60 * 60
+      and e["duration_s"] < 4.5 * 3600 and e["result"] == "finished", e)
+off = {"spools": [], "track": {}, "history": []}
+spools.track(off, dict(job, remain_time=600), -1, now=1000)
+spools.track(off, None, -1, now=2000)                           # Auftrag weg nach kurzer Zeit (Drucker lief): Ende jetzt
+check("Ohne Lücke: Ende jetzt", off["history"][-1]["end"] == 2000, off["history"][-1])
+spools.track(off, dict(job, remain_time=600), -1, now=10000)
+spools.track(off, None, -1, now=10000 + 86400)                  # einen Tag später gesehen: Ende = zuletzt gesehen + Restzeit
+check("Lücke: Ende = zuletzt gesehen + Restzeit, nie nach jetzt", off["history"][-1]["end"] <= 10000 + 86400 and off["history"][-1]["end"] == 10000 + 36000, off["history"][-1])
+spools.track(off, dict(job, remain_time=True), -1, now=200000)
+spools.track(off, None, -1, now=300000)
+check("Kaputte Restzeit: Ende = zuletzt gesehen", off["history"][-1]["end"] == 200000, off["history"][-1])
 
 
 # Neue Spule gleicher Sorte/Farbe eingelegt: alte archiviert, frische im Slot, Füllgewicht übernommen

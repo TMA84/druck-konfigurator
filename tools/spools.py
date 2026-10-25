@@ -195,6 +195,21 @@ def finish_entry(state, t, now, result=None):
     return e
 
 
+SEEN_GAP_S = 15 * 60   # so lange ohne Stand vom Drucker → das Ende kam nicht „jetzt“, sondern während der Lücke
+SEEN_EVERY_S = 60      # „zuletzt laufend gesehen“ höchstens so oft speichern
+
+
+def end_time(t, now):
+    """Zeitpunkt des Druckendes. Sah der Server den Druck zuletzt vor mehr als SEEN_GAP_S laufen (Drucker nach dem Druck
+    ausgeschaltet, Server-Neustart), endete er damals: zuletzt gesehen + die da gemeldete Restzeit, höchstens jetzt
+    (2026-10-25: Druck vom 23.10. stand mit 25,5 h in der Historie – Ende erst beim Einschalten am nächsten Tag erkannt)."""
+    seen = t.get("seen")
+    if not isinstance(seen, (int, float)) or now - seen <= SEEN_GAP_S:
+        return now
+    eta = t.get("eta")
+    return min(now, max(seen, eta if isinstance(eta, (int, float)) else seen))
+
+
 def end_result(project):
     """finished | aborted aus dem gemeldeten Ende. state hat Vorrang: der S1 meldet „stoped“ auch mit print_status 2."""
     s = str(project.get("state") or "").lower()
@@ -398,7 +413,7 @@ def track(state, project, loaded_slot, now=None, skipped=None):
     ended = bool(project) and (project.get("print_status") in (2, 3) or str(project.get("state") or "").lower() in ENDED_STATES)
     if ended:
         if t.get("job") and not t.get("done"):
-            state.setdefault("history", []).append(finish_entry(state, t, now, end_result(project)))
+            state.setdefault("history", []).append(finish_entry(state, t, end_time(t, now), end_result(project)))
             state["history"] = state["history"][-HISTORY:]
             state["track"] = {"job": t["job"], "done": True}
             return True
@@ -433,6 +448,11 @@ def track(state, project, loaded_slot, now=None, skipped=None):
                     t["used"][sp["id"]] = round(t["used"].get(sp["id"], 0) + g, 3)
                 t["mm"] = mm
                 changed = True
+        if now - (t.get("seen") or 0) >= SEEN_EVERY_S:
+            rt = project.get("remain_time")
+            t["seen"] = now
+            t["eta"] = now + rt * 60 if isinstance(rt, (int, float)) and not isinstance(rt, bool) and 0 <= rt < 10000 else None
+            changed = True
         if skipped is not None and sorted(skipped) != t.get("skipped", []):
             t["skipped"] = sorted(int(x) for x in skipped)
             changed = True
@@ -442,7 +462,7 @@ def track(state, project, loaded_slot, now=None, skipped=None):
         changed = True
     elif t.get("job"):
         # Druck zu Ende: in die Liste der letzten Drucke
-        state.setdefault("history", []).append(finish_entry(state, t, now))
+        state.setdefault("history", []).append(finish_entry(state, t, end_time(t, now)))
         state["history"] = state["history"][-HISTORY:]
         state["track"] = {}
         changed = True

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.46.3] – 2026-10-25
+
+### Behoben
+- **Druckhistorie mit viel zu langer Dauer** (z. B. 25 h 31 min statt gut 4 h): Wurde der Drucker nach dem Druck ausgeschaltet, sah die Druckwerkstatt das Ende erst beim nächsten Einschalten und zählte die ganze Zeit dazwischen mit. Jetzt merkt sie sich, wann sie den Druck zuletzt laufen sah und welche Restzeit der Drucker da meldete; nach einer Lücke von über 15 Minuten gilt das als Ende. Ältere Einträge bleiben unverändert (für die gelernte Druckzeit zählen solche Ausreißer ohnehin nicht).
+
 ## [10.46.2] – 2026-10-25
 
 ### Behoben
