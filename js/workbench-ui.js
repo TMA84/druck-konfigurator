@@ -304,7 +304,26 @@ function wbCamOff() {
   wbCamStop();
   $('wbCamBtn').textContent = t('Kamera starten'); $('wbCamNote').textContent = t('Kamera aus'); $('wbCamNote').classList.remove('hidden');
 }
+/* Rinkhals: mjpg-streamer liefert MJPEG (api/anycubic/camera/info → source „mjpeg“) – im <img> statt mpegts.js, ohne
+   video/startCapture am Drucker, das Licht bleibt also, wie es ist. Die Quelle merkt sich die Seite je Drucker 5 min wie der
+   Server; geht die Abfrage nicht (älterer Server), wie bisher FLV. */
+const CAM_SRC_MS = 300000;
+const wbCamSrcFresh = host => wb.camSrc && wb.camSrc.host === host && Date.now() - wb.camSrc.t < CAM_SRC_MS;
 function wbCamStart(reconnect) {
+  const host = wbHost();
+  if (!wbCamSrcFresh(host)) {
+    if (wb.camSrcBusy) return;
+    wb.camSrcBusy = true; wb.camOn = true;
+    $('wbCamNote').textContent = reconnect ? t('Kamerabild hing – verbinde neu …') : t('Starte Kamera …'); $('wbCamNote').classList.remove('hidden');
+    lanApi('api/anycubic/camera/info?host=' + encodeURIComponent(host)).catch(() => ({ source: 'flv' })).then(info => {
+      wb.camSrc = { host, info, t: Date.now() };
+      wb.camSrcBusy = false;
+      // inzwischen gestoppt, verdeckt, anderer Tab oder 3D-Ansicht: nicht starten
+      if (wb.camOn && !wb.player && !document.hidden && wbHost() === host && document.body.dataset.tab === 'printer' && (typeof lv === 'undefined' || lv.mode === 'cam')) wbCamStart(reconnect);
+    });
+    return;
+  }
+  if (wb.camSrc.info.source === 'mjpeg') { wbCamStartMjpeg(wb.camSrc.info, reconnect); return; }
   if (typeof mpegts === 'undefined' || !mpegts.isSupported() || !mpegts.getFeatureList().mseLivePlayback) {
     $('wbCamNote').textContent = /iPhone|iPod/.test(navigator.userAgent) ? t('Das Kamerabild braucht auf dem iPhone iOS 17.1 oder neuer.') : t('Dieser Browser kann das Kamerabild (FLV) nicht abspielen.'); $('wbCamNote').classList.remove('hidden'); return;
   }
@@ -338,6 +357,34 @@ function wbCamStart(reconnect) {
       wbCamStart(true);
     }
   }, 1000);
+}
+/* MJPEG im <img>: der Browser zeigt jedes Bild selbst an. Stoppen = src entfernen und das Bild aus der Seite nehmen – das
+   schließt die Verbindung (Server und Drucker hören auf zu senden). Fehler (Drucker weg, Rinkhals beendet): nach 2 s neu,
+   höchstens CAM_RETRY_MAX-mal hintereinander, dann fragt die Seite die Quelle neu ab (vielleicht wieder Werksfirmware). */
+function wbCamStartMjpeg(info, reconnect) {
+  wbCamStop(true);
+  wb.camOn = true;
+  $('wbCamNote').textContent = reconnect ? t('Kamerabild hing – verbinde neu …') : t('Starte Kamera …'); $('wbCamNote').classList.remove('hidden');
+  const img = document.createElement('img');
+  img.className = 'wb-mjpeg'; img.alt = t('Kamerabild'); img.decoding = 'async';
+  const tf = [info.rotation ? 'rotate(' + info.rotation + 'deg)' : '', info.flip_h ? 'scaleX(-1)' : '', info.flip_v ? 'scaleY(-1)' : ''].filter(Boolean).join(' ');
+  if (tf) img.style.transform = tf;
+  const player = { destroy() { img.onload = img.onerror = null; img.removeAttribute('src'); img.remove(); } };
+  img.onload = () => { if (wb.player === player) { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; } };
+  img.onerror = () => {
+    if (wb.player !== player) return;
+    wb.camRetries = (wb.camRetries || 0) + 1;
+    if (wb.camRetries > CAM_RETRY_MAX) {
+      wbCamStop(); wb.camSrc = null; $('wbCamBtn').textContent = t('Kamera starten');
+      $('wbCamNote').textContent = t('Kamera liefert keine Bilder – später erneut starten'); $('wbCamNote').classList.remove('hidden'); return;
+    }
+    $('wbCamNote').textContent = t('Kamera nicht verfügbar – verbinde neu …'); $('wbCamNote').classList.remove('hidden');
+    setTimeout(() => { if (wb.player === player && !document.hidden) wbCamStartMjpeg(info, true); }, 2000);
+  };
+  // „&t=“ gegen zwischengespeicherte Antworten (wie bei FLV)
+  img.src = 'api/anycubic/camera?host=' + encodeURIComponent(wbHost()) + '&t=' + Date.now();
+  $('wbVideo').after(img);
+  wb.player = player; $('wbCamBtn').textContent = t('Kamera stoppen');
 }
 $('wbCamBtn').addEventListener('click', () => { if (wb.player) { wbCamOff(); wb.camUserOff = true; return; } wb.camUserOff = false; wb.camRetries = 0; wbCamStart(false); });
 /* Fenster/Tab im Hintergrund: Kamera anhalten (sonst liefe der Strom vom Drucker über den Server weiter, ohne dass ihn
