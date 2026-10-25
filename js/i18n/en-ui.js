@@ -934,3 +934,33 @@ I18N.add({
 I18N.add({
  "Erstelle 3MF …": "Building 3MF …",
 });
+/* Nivellierung (js/mesh-ui.js, tools/mesh.py) */
+I18N.add({
+ "Nivellierung": "Bed mesh",
+ "Zahlen": "Numbers",
+ "Aktualisieren": "Refresh",
+ "Noch nicht abgefragt.": "Not queried yet.",
+ "Ziehen dreht, Mausrad/zwei Finger zoomen": "Drag to rotate, scroll wheel/two fingers to zoom",
+ "Positiv = Bett an dieser Stelle höher, negativ = tiefer (mm). Blick von vorn, Höhen überhöht. Gemessen beim letzten Vermessen des Betts.": "Positive = bed is higher at this point, negative = lower (mm). Viewed from the front, heights exaggerated. Measured at the last bed probing.",
+ "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus.": "Bed mesh data is only available with Rinkhals (Moonraker) – the stock firmware doesn't expose it.",
+ "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus": "Bed mesh data is only available with Rinkhals (Moonraker) – the stock firmware doesn't expose it",
+ "Drucker hat kein Bettnetz geladen – er vermisst das Bett beim nächsten Druckstart (oder am Display: Nivellierung)": "The printer has no bed mesh loaded – it probes the bed at the next print start (or on the display: Levelling)",
+ "Drucker antwortet nicht (Zeitüberschreitung) – eingeschaltet, im selben Netz?": "The printer isn't answering (timeout) – switched on, on the same network?",
+ "Antwort von Moonraker ist kein JSON": "Moonraker's answer isn't JSON",
+ "Unerwartete Antwort von Moonraker": "Unexpected answer from Moonraker",
+ "Antwort von Moonraker zu groß": "Moonraker's answer is too large",
+ "Nicht abgefragt: {msg}": "Not queried: {msg}",
+ "Stand von {time} – jetzt nicht abgefragt: {msg}": "As of {time} – couldn't query now: {msg}",
+ "Spanne {span}": "Range {span}",
+ "{cols} × {rows} Punkte": "{cols} × {rows} points",
+ "Profil „{name}“": "Profile “{name}”",
+ "Spanne (Distanz)": "Range (distance)",
+ "Mittelwert": "Mean",
+ "Höhe überhöht": "Height exaggerated",
+ "Blick von oben, vorne = unten": "Viewed from above, front = bottom",
+ "Werte in mm; X links → rechts, Y vorne → hinten": "Values in mm; X left → right, Y front → back",
+ "vorne": "front",
+ "hinten": "back",
+ "links": "left",
+ "rechts": "right",
+});

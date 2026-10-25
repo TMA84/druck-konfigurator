@@ -749,6 +749,35 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-maint .wb-heatbar > i { background: var(--accent); }
 .wb-maint li.due .wb-heatbar > i { background: #c0392b; }
 .wb-maint .btn { justify-self: start; }
+/* Nivellierung (js/mesh-ui.js): 3D-Fläche, daneben Farbskala und Kennzahlen; schmal untereinander */
+.wb-meshcard { grid-column: 1 / -1; }
+.wb-meshcard > p { margin: 0; }
+.wb-mesh-btns { display: flex; gap: 14px; margin-left: auto; }
+.wb-meshcard .wb-head { justify-content: flex-start; flex-wrap: wrap; }
+.wb-mesh { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }
+.wb-mesh.hidden, .wb-mesh-table.hidden { display: none; }
+.wb-mesh-stage { position: relative; height: 360px; border-radius: var(--r-s); overflow: hidden; background: var(--paper-2); touch-action: none; }
+.wb-mesh-stage canvas { display: block; width: 100%; height: 100%; }
+.wb-mesh-side { display: grid; gap: 12px; }
+.wb-mesh-side p { margin: 0; }
+.wb-mesh-scale { display: grid; grid-template-columns: 14px auto; grid-template-rows: auto 1fr auto; column-gap: 8px; height: 150px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.wb-mesh-scale i { grid-row: 1 / 4; border-radius: 3px; border: 1px solid var(--rule-strong);
+  background: linear-gradient(to top, #2166ac, #67a9cf 25%, #f7f7f7 50%, #ef8a62 75%, #b2182b); }
+.wb-mesh-scale span:nth-of-type(2) { align-self: center; color: var(--ink-3); }
+.wb-mesh-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.wb-mesh-stats dt { color: var(--ink-3); }
+.wb-mesh-stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.wb-mesh-table { grid-column: 1 / -1; overflow-x: auto; }
+.wb-mesh-table table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin: 0 auto; }
+.wb-mesh-table th, .wb-mesh-table td { padding: 3px 7px; text-align: right; border: 1px solid var(--rule); }
+.wb-mesh-table th { color: var(--ink-3); font-weight: 500; background: var(--paper); }
+.wb-mesh-table caption { caption-side: bottom; font-size: 11px; color: var(--ink-3); padding-top: 4px; }
+@media (max-width: 800px) {
+  .wb-mesh { grid-template-columns: 1fr; }
+  .wb-mesh-stage { height: 300px; }
+  .wb-mesh-side { grid-template-columns: 96px 1fr; align-items: start; }
+  .wb-mesh-side p { grid-column: 1 / -1; }
+}
 
 @media (max-width: 1250px) {
   .wb-job, .wb-cam { grid-column: 1 / -1; }

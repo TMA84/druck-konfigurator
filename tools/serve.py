@@ -7,6 +7,7 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   GET  /api/health                         → {"ok": true, "lan": <LAN-Modus verfügbar>}
   GET  /api/anycubic/status?host=<ip>      → Stand für Werkbank und Belegung (stehende Verbindung, alle 5 s)
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
+  GET  /api/anycubic/mesh?host=<ip>        → Bettnetz (Nivellierung) über Moonraker, nur mit Rinkhals (tools/mesh.py)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS)
   POST /api/anycubic/print  {host, job, plate, name, options, own?, slots?}  → G-Code einer geslicten Platte hochladen und drucken
                              (own: eigener G-Code, Name ohne „_Platte1“; slots: {Werkzeug: ACE-Slot})
@@ -62,6 +63,7 @@ import gcode_preview  # noqa: E402
 import gcode_thumbnail  # noqa: E402
 import ha_mqtt  # noqa: E402
 import ha_users  # noqa: E402
+import mesh  # noqa: E402
 import prefs  # noqa: E402
 import printqueue  # noqa: E402
 import schedule  # noqa: E402
@@ -98,8 +100,8 @@ _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
 # Nur ansehen (Benutzer ohne Admin-Rechte): Lesen für den 3D-Fortschritt, ohne Kamera, Dateien und Änderungen
-VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/printing/preview", "/api/printing/objects", "/api/printing/slots", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
-QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview", "/api/printing/slots"}
+VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/printing/preview", "/api/printing/objects", "/api/printing/slots", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
+QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/spools", "/api/printing/objects", "/api/printing/preview", "/api/printing/slots"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 # Nur diese Dateien der Seite ausliefern (sonst 404) – nicht .git, tools/, Datenordner, Verzeichnislisten
 STATIC_DIRS = ("js/", "css/", "vendor/", "img/", "docs/", "templates/", "ha/")
@@ -216,6 +218,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _api(self, fn):
         try:
             res = fn()
+        except mesh.MeshError as e:   # eigene Codes: ohne Moonraker 404 (Hinweis in der Karte, kein Fehler)
+            return self._json(e.status, {"error": str(e), "kind": e.kind})
         except (anycubic_lan.LanError, slicer.SliceError) as e:
             return self._json(STATUS_FOR.get(e.kind, 500), {"error": str(e), "kind": e.kind})
         except ClientGone:
@@ -396,6 +400,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     return self._json(403, {"error": "Nur von der eigenen Seite", "kind": "forbidden"})
                 host, pos = printer_host(), False
             return self._api(lambda: anycubic_lan.status(host, pos=pos))
+        if url.path == "/api/anycubic/mesh":
+            # Bettnetz (Karte „Nivellierung“): wie der Stand – nur ansehen/fremde Seite → eingestellter Drucker
+            host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
+            if self._viewer():
+                host = printer_host() or host
+            elif self._cross_site():
+                if not printer_host():
+                    return self._json(403, {"error": "Nur von der eigenen Seite", "kind": "forbidden"})
+                host = printer_host()
+            return self._api(lambda: mesh.fetch(host))
         if url.path == "/api/printing/preview":
             # Schichtvorschau des laufenden Drucks (nur für Drucke, die das Tool gestartet hat) – Live-Ansicht in ④
             path = printed_preview(urllib.parse.parse_qs(url.query).get("name", [""])[0])

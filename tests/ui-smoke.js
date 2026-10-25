@@ -693,6 +693,21 @@ async function runSmoke(opts={}){
       liveUpdate(st);await wait(100);ok(calls===1,'nicht sofort erneut gefragt');
       lv.missingAt=Date.now()-30000;liveUpdate(st);await wait(200);ok(calls===2,'nach 20 s erneut gefragt');
       window.fetch=of;lv.name=null;lv.missing=false; }
+    // Nivellierung: Bettnetz über Moonraker (Fläche, Kennzahlen, Tabelle), Abfrage nur bei Anlass, Werksfirmware → Hinweis statt Fehler
+    { const of=window.fetch,hosts=store.settings.printerHosts;let calls=0,answer=null;
+      window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/mesh')){calls++;return Promise.resolve(new Response(JSON.stringify(answer.body),{status:answer.status,headers:{'Content-Type':'application/json'}}))}return of(u,o)};
+      store.settings.printerHosts={...(hosts||{}),[WB_PRINTER]:'10.0.0.9'};
+      const P=[[1.014,0.705,0.666,0.697,1.104],[0.517,0.331,0.329,0.511,0.869],[0.261,-0.034,0.096,0.412,0.745],[0.012,0.126,0.193,0.351,0.452],[0.011,0.26,0.298,0.296,0.335]];
+      answer={status:200,body:{probed:P,mesh:P,min:[5,5],max:[245,245],profile:'<b>x</b>',source:'moonraker'}};
+      mh.host=null;mh.printing=null;meshOnStatus({connected:true,printing:false});await wait(150);
+      ok(calls===1&&!$('wbMeshBody').classList.contains('hidden')&&/1[,.]138 mm/.test($('wbMeshStats').textContent),'Nivellierung: Netz geladen, Spanne 1,138 mm');
+      ok(!$('wbMeshSum').innerHTML.includes('<b>')&&$('wbMeshTable').querySelectorAll('td').length===25,'Nivellierung: Profilname maskiert, Tabelle 5 × 5');
+      meshOnStatus({connected:true,printing:false});await wait(50);ok(calls===1,'Nivellierung: ohne Anlass nicht erneut abgefragt');
+      meshOnStatus({connected:true,printing:true});meshOnStatus({connected:true,printing:false});await wait(150);ok(calls===2,'Nivellierung: nach Druckende neu abgefragt');
+      answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};
+      $('wbMeshLoad').click();await wait(150);
+      ok($('wbMeshBody').classList.contains('hidden')&&/Rinkhals/.test($('wbMeshNote').textContent),'Nivellierung: Werksfirmware → Hinweis');
+      window.fetch=of;store.settings.printerHosts=hosts;mh.host=null; }
     // Kobra-S1-Vorgaben je Filament: ABS → Hilfslüfter 0, Abluft 10, Bett ≥ 100, Brim 5 mm, 10 min vorwärmen
     { const m0=$('material').value;setTab('settings');sel('material','abs');await wait(80);const r=lastResult;
       ok(r.fans2&&r.fans2.aux===0&&r.fans2.box===10&&r.m.bed>=100&&r.preheatMin===10&&/5 mm/.test(r.brim||''),'Kobra S1 + ABS: Hilfslüfter 0, Abluft 10, Bett '+r.m.bed+', Brim '+r.brim+', vorwärmen 10 min');

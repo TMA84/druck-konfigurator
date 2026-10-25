@@ -62,6 +62,7 @@ async function wbPoll() {
     if (!wb.err && typeof onQueueStatus === 'function') wbSafe('queue', () => onQueueStatus(wb.st));   // Warteschlange (js/queue-ui.js)
     if (!wb.err && typeof liveUpdate === 'function') wbSafe('live', () => liveUpdate(wb.st));   // 3D-Fortschritt (js/live-ui.js)
     wbSafe('camera', wbCamAuto);
+    if (!wb.err && typeof meshOnStatus === 'function') wbSafe('mesh', () => meshOnStatus(wb.st));   // Nivellierung (js/mesh-ui.js)
     if (typeof schedPoll === 'function') wbSafe('schedule', schedPoll);   // geplanter Druck (js/schedule-ui.js)
   } catch (e) { console.error('wbPoll', e); }
   finally {
