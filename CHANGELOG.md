@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
-## [Unreleased]
+## [10.47.0] – 2026-10-25
 
 ### Neu
 - **Nivellierung in der Werkbank:** Neue Karte zeigt das Bettnetz des Druckers als 3D-Fläche (blau = tief, rot = hoch, überhöht, mit Nullebene und Beschriftung vorne/hinten/links/rechts), dazu Farbskala, Max, Min, Spanne und Mittelwert sowie auf Wunsch die Messpunkte als Tabelle. Geht ohne Druckauftrag, sobald der Drucker verbunden ist; neu abgefragt nach jedem Druckende und mit „Aktualisieren“. Nur mit Rinkhals: Der Server liest das Netz über Moonraker auf dem Drucker (`GET /api/anycubic/mesh`, Port 7125, nur lesend, nur private Adressen, Daten streng geprüft). Mit Werksfirmware steht in der Karte ein Hinweis statt eines Fehlers. Test `tests/mesh.py` gegen einen nachgebauten Moonraker.
