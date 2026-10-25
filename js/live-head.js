@@ -86,13 +86,20 @@ function lvMechUpdate(p, force) {
   }
 }
 function lvAceFlowing() { return !!(lv.aceSpools && lv.aceG && lv.aceG.visible && lv.aceSpools.some(sp => sp.active)); }
+/* Farbe eines Werkzeugs im laufenden Druck: die des ACE-Slots, aus dem es wirklich gedruckt wird (Zuordnung vom Start,
+   api/printing/slots; ohne: Werkzeug n = Slot n) – nicht die Slot-Einstellung im Konfigurator (falsche Farbe, 2026-10-25) */
+function lvToolColour(k) {
+  const st = typeof wb !== 'undefined' && wb.st, slots = st && st.ace && st.ace.length ? aceSlots(st) : [];
+  const m = lv.toolSlot || {}, s = slots[m[k] != null ? m[k] : k];
+  return s && s.present && s.colour ? safeColour(s.colour, toolColour(k)) : toolColour(k);
+}
 // Filamentfarbe im Schlauch: Werkzeug der gerade gedruckten Bahn
 function lvFilamentAt(seg) {
   if (!lv.filM || seg == null || !lv.data || !lv.data.a) return;
   const k = lv.data.a[2 * seg + 1];
   if (k === lv.filTool) return;
   lv.filTool = k;
-  const c = typeof toolColour === 'function' ? toolColour(k) : null;
+  const c = lvToolColour(k);
   if (c) lv.filM.color.set(c);
 }
 // Kopf und Mechanik an die Stelle p (Düsenspitze)
@@ -364,7 +371,7 @@ function lvSkipSet(objs) {
 // gerade gedruckt: in der Filamentfarbe der Bahn (2026-10-08, vorher Petrol) – noch nicht gedruckt: blass
 function lvFilRgb(i) {
   const k = lv.data.a[2 * i + 1], c = lv.filRgb || (lv.filRgb = {});
-  return c[k] || (c[k] = lvVisible(hexToRgb01(toolColour(k))));
+  return c[k] || (c[k] = lvVisible(hexToRgb01(lvToolColour(k))));
 }
 function lvCurColour(i, split, withHead) { return lv.skip && lv.skip[i] ? LV_SKIP : !withHead || i < split ? lvFilRgb(i) : LV_PENDING; }
 function lvColour(cur, done) {
@@ -372,7 +379,7 @@ function lvColour(cur, done) {
   const start = d.layers[cur][1], end = cur + 1 < d.layers.length ? d.layers[cur + 1][1] : d.count, withHead = done != null;
   for (let i = 0; i < end; i++) {
     let c;
-    if (i < start) { const k = d.a[2 * i + 1]; c = lv.skip && lv.skip[i] ? LV_SKIP : cache[k] || (cache[k] = lvVisible(hexToRgb01(toolColour(k)))); }
+    if (i < start) { const k = d.a[2 * i + 1]; c = lv.skip && lv.skip[i] ? LV_SKIP : cache[k] || (cache[k] = lvVisible(hexToRgb01(lvToolColour(k)))); }
     else c = lvCurColour(i, done, withHead);
     lvPaint(i, c);
   }

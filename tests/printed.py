@@ -51,6 +51,16 @@ objs = json.load(open(p[:-len(".preview")] + ".objects.json"))
 check("Objekte aus dem G-Code gemerkt (Nummer, Name, Mitte, Umriss)", [o["id"] for o in objs] == [0, 1] and objs[1]["name"] == "halter.stl_id_0_copy_1"
       and objs[0]["center"] == [100.0, 120.0] and len(objs[0]["polygon"]) == 5, objs)
 
+# Werkzeug → Slot vom Start (Farben der 3D-Ansicht): ohne Zuordnung leer, mit nur gültige Einträge
+import progress_image  # noqa: E402
+check("ohne Zuordnung: leer (Werkzeug n = Slot n)", progress_image.tool_slots(p) == {}, progress_image.tool_slots(p))
+serve.remember_print("halter_Platte1.gcode", job, 1, slots={"0": 3, 1: 5, "x": 1, "2": 99, "3": True, "4": "2"})
+check("Zuordnung gemerkt, Ungültiges verworfen", progress_image.tool_slots(p) == {0: 3, 1: 5}, progress_image.tool_slots(p))
+check("Farbe je Werkzeug aus dem zugeordneten Slot", progress_image.tool_colours(["#111111", "#222222", "#333333", "#212721", "", "#ff0000"], {0: 3, 1: 5}, 3)
+      == ["#212721", "#ff0000", "#333333"])
+check("Slot ohne Farbe → Vorgabe, keine Lücke", progress_image.tool_colours(["#111111", None], {}, 3) == ["#111111", "#5aaaf0", "#78c878"],
+      progress_image.tool_colours(["#111111", None], {}, 3))
+
 # Slice-Auftrag wird aufgeräumt (neu geslict) → Vorschau bleibt trotzdem
 import shutil  # noqa: E402
 shutil.rmtree(os.path.join(tmp, "jobs", job))

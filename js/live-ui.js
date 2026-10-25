@@ -35,7 +35,10 @@ async function lvLoad(name) {
     const r = await fetch('api/printing/preview?name=' + encodeURIComponent(name));
     if (lv.name !== name) return;
     if (!r.ok) { lv.missing = true; lv.missingAt = Date.now(); return; }
-    lv.data = parsePreview(await r.arrayBuffer()); lv.filRgb = null;
+    lv.data = parsePreview(await r.arrayBuffer()); lv.filRgb = null; lv.filTool = null;
+    // Werkzeug → Slot vom Start (fehlt bei älteren Drucken: Werkzeug n = Slot n)
+    lv.toolSlot = await fetch('api/printing/slots?name=' + encodeURIComponent(name)).then(q => q.ok ? q.json() : {}).then(j => (j && j.slots) || {}, () => ({}));
+    if (lv.name !== name) return;
     if (!lvInit()) { lv.missing = true; return; }
     lvResize(); lvBuild();
     if (typeof skDrawLines === 'function' && wb.st && wb.st.job) skDrawLines(new Set(wb.st.job.skipped || []));
@@ -46,6 +49,9 @@ async function lvLoad(name) {
 // Aus der Werkbank bei jedem Stand (alle 3 s): passende Vorschau laden, Schicht nachführen
 function liveUpdate(st) {
   lvFx(st); lvAceColours(st); lvDisplay(st);
+  // Spule gewechselt (andere Farbe im Slot): gedruckte Bahnen und Schlauch neu einfärben
+  const ck = st && st.ace ? aceSlots(st).map(s => s.colour).join() : '';
+  if (ck !== lv.aceKey) { lv.aceKey = ck; lv.filRgb = null; lv.filTool = null; if (lv.data && lv.mesh && lv.shown >= 0) lvColour(lv.shown, lv.shownDone); }
   const job = st && st.job, card = $('wbLiveStage');
   if (!card) return;
   if (!job || !job.name) {

@@ -98,8 +98,8 @@ _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
 # Nur ansehen (Benutzer ohne Admin-Rechte): Lesen für den 3D-Fortschritt, ohne Kamera, Dateien und Änderungen
-VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/printing/preview", "/api/printing/objects", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
-QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview"}
+VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/printing/preview", "/api/printing/objects", "/api/printing/slots", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
+QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/spools", "/api/printing/objects", "/api/printing/preview", "/api/printing/slots"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 # Nur diese Dateien der Seite ausliefern (sonst 404) – nicht .git, tools/, Datenordner, Verzeichnislisten
 STATIC_DIRS = ("js/", "css/", "vendor/", "img/", "docs/", "templates/", "ha/")
@@ -409,6 +409,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not objs or not os.path.exists(objs):
                 return self._json(404, {"error": "Keine Objektliste für diesen Druck (nur für Drucke aus dem Tool)", "kind": "not_found"})
             return self._file(objs, "application/json")
+        if url.path == "/api/printing/slots":
+            # Werkzeug → ACE-Slot des laufenden Drucks (Farben der 3D-Ansicht); nur für Drucke aus dem Tool
+            path = printed_preview(urllib.parse.parse_qs(url.query).get("name", [""])[0])
+            if not path:
+                return self._json(404, {"error": "Keine Zuordnung für diesen Druck (nur für Drucke aus dem Tool)", "kind": "not_found"})
+            return self._json(200, {"slots": {str(k): v for k, v in progress_image.tool_slots(path).items()}})
         if url.path == "/api/spools":
             return self._api(spools.api_get)
         if url.path == "/api/queue":
@@ -561,10 +567,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 name = re.sub(r"[^\w.\-]+", "_", str(req.get("name") or "druck"))[:80] + ("" if req.get("own") else "_Platte" + str(int(req["plate"]))) + ".gcode"
                 with_thumbnail(str(req.get("job", "")), str(req.get("plate", "")), gcode)   # Bild fürs Display des Druckers
                 # Vorschau und Objekte VOR dem Start ablegen – sobald der Drucker den Auftrag meldet, fragt die Seite danach
-                remember_print(name, str(req.get("job", "")), int(req["plate"]))
+                remember_print(name, str(req.get("job", "")), int(req["plate"]), slots=req.get("slots"))
                 res = anycubic_lan.print_gcode(req["host"], gcode, name, req.get("options") or {}, req.get("slots"))
                 if res.get("filename") and res["filename"] != name:
-                    remember_print(res["filename"], str(req.get("job", "")), int(req["plate"]))
+                    remember_print(res["filename"], str(req.get("job", "")), int(req["plate"]), slots=req.get("slots"))
                 return res
             return self._api(send)
 
@@ -793,10 +799,10 @@ def scheduled_start(plan):
     name = plan["name"] + ("" if plan.get("own") else "_Platte" + str(plan["plate"])) + ".gcode"
     # Vorschau und Objekte VOR dem Start ablegen (2026-10-05: geplanter ASA-Druck ohne 3D-Fortschritt – die Seite hatte
     # schon nachgefragt, bevor die Vorschau da war, und es danach nicht mehr versucht)
-    remember_print(name, "", plan["plate"], gcode_path=gcode, preview_path=prev)
+    remember_print(name, "", plan["plate"], gcode_path=gcode, preview_path=prev, slots=plan.get("slots"))
     res = anycubic_lan.print_gcode(host, gcode, name, plan.get("options") or {}, plan.get("slots"))
     if res.get("filename") and res["filename"] != name:
-        remember_print(res["filename"], "", plan["plate"], gcode_path=gcode, preview_path=prev)
+        remember_print(res["filename"], "", plan["plate"], gcode_path=gcode, preview_path=prev, slots=plan.get("slots"))
     print("Geplanter Druck gestartet: " + name, flush=True)
 
 
@@ -837,9 +843,10 @@ def with_thumbnail(job, plate, gcode):
         print("Vorschaubild nicht eingesetzt: " + (str(e) or type(e).__name__), flush=True)
 
 
-def remember_print(filename, job, plate, gcode_path=None, preview_path=None):
+def remember_print(filename, job, plate, gcode_path=None, preview_path=None, slots=None):
     """Vorschau und Objekte für 3D-Fortschritt und Überspringen aufheben – aus dem Slice-Auftrag oder (geplanter Druck)
-    aus den angegebenen Dateien."""
+    aus den angegebenen Dateien. slots: {Werkzeug: ACE-Slot} wie an anycubic_lan.print_gcode – damit die 3D-Ansicht in der
+    Farbe des Slots zeigt, aus dem wirklich gedruckt wird (nicht der Slot-Einstellung im Konfigurator)."""
     try:
         prev = preview_path or slicer.job_file(job, plate, "preview")
         if not prev or not os.path.isfile(prev):
@@ -848,6 +855,10 @@ def remember_print(filename, job, plate, gcode_path=None, preview_path=None):
         os.makedirs(d, exist_ok=True)
         key = re.sub(r"[^\w.\-]+", "_", _stem(filename))[:120] or "druck"
         shutil.copyfile(prev, os.path.join(d, key + ".preview"))
+        smap = {str(k): v for k, v in (slots if isinstance(slots, dict) else {}).items()
+                if str(k).isdigit() and isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 16}
+        with open(os.path.join(d, key + ".slots.json"), "w", encoding="utf-8") as f:
+            json.dump(smap, f)
         # Objekte des G-Codes (zum Überspringen im Tab ④)
         gcode = gcode_path or slicer.job_file(job, plate, "gcode")
         if gcode:
@@ -856,8 +867,9 @@ def remember_print(filename, job, plate, gcode_path=None, preview_path=None):
         old = sorted((os.path.join(d, f) for f in os.listdir(d) if f.endswith(".preview")), key=os.path.getmtime)
         for f in old[:max(0, len(old) - PRINTED_KEEP)]:
             os.remove(f)
-            if os.path.exists(f[:-len(".preview")] + ".objects.json"):
-                os.remove(f[:-len(".preview")] + ".objects.json")
+            for ext in (".objects.json", ".slots.json"):
+                if os.path.exists(f[:-len(".preview")] + ext):
+                    os.remove(f[:-len(".preview")] + ext)
     except OSError as e:
         print("Vorschau für die Live-Ansicht nicht gespeichert: " + str(e), flush=True)
 

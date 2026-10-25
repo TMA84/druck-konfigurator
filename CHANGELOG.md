@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.46.2] – 2026-10-25
+
+### Behoben
+- **3D-Ansicht druckte in der falschen Farbe:** Werkbank ④, Dashboard-Karte und das Bild „3D-Fortschritt“ in Home Assistant färbten die Bahnen nach den Filament-Slots aus den Einstellungen des Konfigurators. Jetzt nehmen sie die Farbe des ACE-Slots, aus dem der Drucker wirklich druckt – mit der Zuordnung Werkzeug → Slot vom Druckstart (eigener G-Code mit umgestellten Slots, geplanter Druck). Wechselt eine Spule während des Drucks, färbt die Ansicht neu.
+
 ## [10.46.1] – 2026-10-24
 
 ### Behoben

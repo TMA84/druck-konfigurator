@@ -141,6 +141,28 @@ def preview_layer(job, n):
     return min(n - 1, max(0, round(L / T * n) - 1)) if T > 0 else min(n - 1, max(0, L - 1))
 
 
+def tool_slots(preview_path):
+    """Werkzeug → ACE-Slot des Drucks (tools/serve.py remember_print legt „<Auftrag>.slots.json“ neben die Vorschau);
+    fehlt die Datei oder ist sie kaputt: {} – dann druckt Werkzeug n aus Slot n (wie anycubic_lan.print_gcode ohne Zuordnung)."""
+    try:
+        with open(preview_path[:-len(".preview")] + ".slots.json", encoding="utf-8") as f:
+            d = json.load(f)
+        return {int(k): v for k, v in d.items() if str(k).isdigit() and isinstance(v, int) and 0 <= v < 16} if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def tool_colours(slot_colours, smap, n=16):
+    """Farbe je Werkzeug: Farbe des Slots, aus dem es gedruckt wird (ohne gültige Farbe: Vorgabe – die Liste darf keine Lücken
+    haben, sonst rutschen die Werkzeuge auf falsche Farben)."""
+    out = []
+    for t in range(n):
+        i = smap.get(t, t)
+        c = slot_colours[i] if i < len(slot_colours) else None
+        out.append(c if _colour(c) else "#%02x%02x%02x" % DEFAULT_COLOURS[t % len(DEFAULT_COLOURS)])
+    return out
+
+
 class ProgressImages:
     """Für ha_mqtt: aus dem Druckerstand das Bild – nur wenn sich die Schicht geändert hat (sonst None)."""
 
@@ -159,7 +181,7 @@ class ProgressImages:
         # neue Datei – oder dieselbe noch einmal gedruckt (Schicht fällt zurück): neu zeichnen
         if not self.r or self.r.path != path or (layer is not None and layer < self.r.drawn):
             slots = [s for box in (st.get("ace") or []) for s in (box.get("slots") or [])]
-            self.r, self.key = Renderer(path, [s.get("colour") for s in slots]), None
+            self.r, self.key = Renderer(path, tool_colours([s.get("colour") for s in slots], tool_slots(path))), None
             layer = preview_layer(job, len(self.r.layers))
         key = (path, layer)
         if key == self.key:
