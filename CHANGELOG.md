@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.4] – 2026-10-26
+
+### Behoben
+- **Kamera flackerte in Home Assistant:** Die Bilder der Rinkhals-Kamera landen jetzt auf einer Leinwand (`createImageBitmap`), die das letzte Bild hält, bis das nächste fertig dekodiert ist. Vorher tauschte die Seite 15-mal je Sekunde die Blob-Adresse eines `<img>` – in der Home-Assistant-Ansicht zeichnete der Browser dabei zwischendurch leer. Ohne `createImageBitmap` (sehr alte Browser) bleibt es beim `<img>`.
+
 ## [10.47.3] – 2026-10-26
 
 ### Behoben

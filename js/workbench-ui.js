@@ -361,15 +361,19 @@ function wbCamStart(reconnect) {
 }
 /* MJPEG: der Server zerlegt den Strom in einzelne Bilder (?frames=1: je Bild 4 Byte Länge + JPEG) – multipart direkt im
    <img> käme über den Home-Assistant-Ingress nicht an (der komprimiert multipart/x-mixed-replace). Die Seite liest mit
-   fetch, zeigt jedes Bild als Blob im <img> und verwirft Bilder, solange das vorige noch dekodiert wird. Stoppen = abbrechen
+   fetch, zeichnet jedes Bild auf eine Leinwand und verwirft Bilder, solange das vorige noch dekodiert wird. Stoppen = abbrechen
    (schließt die Verbindung). Kein Bild seit CAM_STALL_MS oder Fehler: nach 2 s neu, höchstens CAM_RETRY_MAX-mal
    hintereinander, dann fragt die Seite die Quelle neu ab (vielleicht wieder Werksfirmware). */
 function wbCamStartMjpeg(info, reconnect) {
   wbCamStop(true);
   wb.camOn = true;
   $('wbCamNote').textContent = reconnect ? t('Kamerabild hing – verbinde neu …') : t('Starte Kamera …'); $('wbCamNote').classList.remove('hidden');
-  const img = document.createElement('img');
-  img.className = 'wb-mjpeg'; img.alt = t('Kamerabild'); img.decoding = 'async';
+  // Leinwand statt <img>: behält das letzte Bild, bis das nächste fertig dekodiert ist – ein <img> mit wechselnder Blob-
+  // Adresse flackerte im Home-Assistant-Ingress (Safari/App zeichnen dabei kurz leer); ohne createImageBitmap doch <img>
+  const canvas = typeof createImageBitmap === 'function';
+  const img = document.createElement(canvas ? 'canvas' : 'img');
+  img.className = 'wb-mjpeg';
+  if (canvas) { img.setAttribute('role', 'img'); img.setAttribute('aria-label', t('Kamerabild')); } else { img.alt = t('Kamerabild'); img.decoding = 'async'; }
   const tf = [info.rotation ? 'rotate(' + info.rotation + 'deg)' : '', info.flip_h ? 'scaleX(-1)' : '', info.flip_v ? 'scaleY(-1)' : ''].filter(Boolean).join(' ');
   if (tf) img.style.transform = tf;
   const ctl = new AbortController();
@@ -387,16 +391,26 @@ function wbCamStartMjpeg(info, reconnect) {
     $('wbCamNote').textContent = t('Kamera nicht verfügbar – verbinde neu …'); $('wbCamNote').classList.remove('hidden');
     setTimeout(() => { if (wb.camOn && !wb.player && !document.hidden) wbCamStartMjpeg(info, true); }, 2000);
   };
+  const shownOk = () => { busy = false; if (wb.player === player) { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; } };
   const show = jpeg => {
     wb.camLast = Date.now();
     if (busy) return;   // voriges Bild noch nicht fertig dekodiert: dieses auslassen statt Rückstand aufzubauen
     busy = true;
-    const u = URL.createObjectURL(new Blob([jpeg], { type: 'image/jpeg' }));
+    const blob = new Blob([jpeg], { type: 'image/jpeg' });
+    if (canvas) {
+      createImageBitmap(blob).then(bmp => {
+        if (!done) {
+          if (img.width !== bmp.width || img.height !== bmp.height) { img.width = bmp.width; img.height = bmp.height; }
+          img.getContext('2d').drawImage(bmp, 0, 0);
+        }
+        bmp.close(); shownOk();
+      }, () => { busy = false; });   // ein kaputtes Bild: auslassen, das nächste kommt gleich
+      return;
+    }
+    const u = URL.createObjectURL(blob);
     img.onload = img.onerror = () => {
-      busy = false;
       if (shown && shown !== u) URL.revokeObjectURL(shown);
-      shown = u;
-      if (wb.player === player) { $('wbCamNote').classList.add('hidden'); wb.camRetries = 0; }
+      shown = u; shownOk();
     };
     img.src = u;
   };
