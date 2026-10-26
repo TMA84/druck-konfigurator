@@ -854,6 +854,8 @@ I18N.add({
  "Gehäuse": "Enclosure",
  "Gehäuse mit Glastür und Glasdeckel einblenden": "Show enclosure with glass door and lid",
  "ACE-Einheiten mit Spulen und Schläuchen einblenden": "Show ACE units with spools and tubes",
+ "Kopf folgen": "Follow head",
+ "Ansicht folgt dem Druckkopf, nah an der Düse (drehen und zoomen geht weiter)": "View follows the print head, close to the nozzle (rotate and zoom still work)",
 });
 /* Modell im Hintergrund lesen (js/app.js importInWorker) */
 I18N.add({

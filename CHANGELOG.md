@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.48.0] – 2026-10-26
+
+### Neu
+- **3D-Fortschritt: „Kopf folgen“:** Neuer Schalter unten links in der 3D-Ansicht. Er holt die Kamera nah an die Düse (etwa 19 cm, flach von vorn, so dass man unter dem Kopf auf das Teil sieht) und fährt mit dem Druckkopf mit. Drehen und Zoomen gehen weiter und bleiben relativ zum Kopf; ausgeschaltet passt die Ansicht wieder alles ein. Die Wahl bleibt gespeichert.
+
 ## [10.47.6] – 2026-10-26
 
 ### Behoben

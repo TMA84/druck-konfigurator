@@ -168,7 +168,30 @@ function lvRefit() { if (lv.autoFit) { lv.fitPending = true; lvTryFit(); } }
 function lvTryFit() {
   const el = $('wbLiveStage');
   if (!lv.fitPending || !lv.head || !lv.head.visible || !el || !el.clientWidth || !el.clientHeight) return;
-  lv.fitPending = false; lvFitAll(); lvRender();
+  lv.fitPending = false;
+  if (lv.follow) lvFollowView(); else lvFitAll();
+  lvRender();
+}
+/* „Kopf folgen“: Blickpunkt auf der Düsenspitze, Kamera LV_FOLLOW_DIST mm davor (von vorn, leicht von oben). Danach fährt
+   die Kamera mit dem Kopf mit (lvFollow aus lvPlaceHead) – Drehen und Zoomen gehen weiter und bleiben relativ zum Kopf. */
+const LV_FOLLOW_DIST = 190;
+function lvFollowView() {
+  if (!lv.controls || !lv.head || !lv.head.visible) return;
+  const p = lv.head.position, dir = new THREE.Vector3(0, -1, 0.3).normalize();   // flach: unter den Kopf auf die Düse sehen
+  lv.controls.target.copy(p); lv.camera.position.copy(p).add(dir.multiplyScalar(LV_FOLLOW_DIST)); lv.controls.update();
+}
+function lvFollow(p) {
+  if (!lv.follow || !lv.controls || lv.fitPending) return;
+  const tgt = lv.controls.target, dx = p.x - tgt.x, dy = p.y - tgt.y, dz = p.z - tgt.z;
+  if (!dx && !dy && !dz) return;
+  tgt.set(p.x, p.y, p.z); lv.camera.position.x += dx; lv.camera.position.y += dy; lv.camera.position.z += dz; lv.controls.update();
+}
+function lvFollowSet(on) {
+  lv.follow = on;
+  if (!lv.controls) return;
+  if (on) { lv.autoFit = false; lv.fitPending = false; lvFollowView(); }
+  else { lv.autoFit = true; lv.fitPending = true; lvTryFit(); }   // wieder alles im Bild
+  lvRender();
 }
 function lvFitAll() {
   if (!lv.gantry) return;

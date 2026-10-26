@@ -140,4 +140,8 @@ for (const [id, key, grp] of [['wbLiveEnc', 'liveEnclosure', 'enclosureG'], ['wb
   $(id).checked = store.settings[key] !== false;
   $(id).addEventListener('change', e => { store.settings[key] = e.currentTarget.checked; persist(); if (lv[grp]) { lv[grp].visible = e.currentTarget.checked; if (lv.head && lv.head.visible) lvMechUpdate(lv.head.position, true); lvRefit(); lvRender(); } });
 }
+// Kopf folgen (nah am Druckkopf, js/live-scene.js lvFollowSet) – Wahl bleibt gespeichert
+lv.follow = store.settings.liveFollow === true;
+$('wbLiveFollow').checked = lv.follow;
+$('wbLiveFollow').addEventListener('change', e => { store.settings.liveFollow = e.currentTarget.checked; persist(); lvFollowSet(e.currentTarget.checked); });
 liveMode(!EMBED_3D && store.settings.wbView === 'cam' ? 'cam' : 'live');

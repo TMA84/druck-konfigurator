@@ -112,6 +112,7 @@ function lvPlaceHead(p) {
   else { lv.gantry.position.y = 0; lv.gantry.userData.beam.position.y = p.y + LV_BEAM_DY; }
   lvMechUpdate(p);
   lvTryFit();
+  lvFollow(p);
 }
 // Sehr dunkle Filamentfarben (schwarz, anthrazit) für die Ansicht aufhellen – sonst verschwinden sie auf dem dunklen Grund
 function lvVisible(rgb) {
