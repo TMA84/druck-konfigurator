@@ -424,7 +424,8 @@ def track(state, project, loaded_slot, now=None, skipped=None):
         mm = float(mm) if isinstance(mm, (int, float)) else None
         if t.get("job") != name or t.get("done"):
             # Neuer Druck. Sieht der Server ihn erst mittendrin (z. B. nach einem Neustart), zählt er ab jetzt.
-            early = (project.get("progress") or 0) <= 2
+            # Vorbereitung (heizt vor, nivelliert …): progress gilt dort dem Schritt (Nivellieren 100 %), nicht dem Druck
+            early = (project.get("progress") or 0) <= 2 or (project.get("print_status") in (4, 5, 6, 7, 9) and not project.get("curr_layer"))
             t = {"job": name, "start": now, "mm": 0.0 if early or mm is None else mm, "slot": loaded_slot, "used": {}, "changes": 0}
             changed = True
         if mm is not None and mm < t["mm"] - 1:

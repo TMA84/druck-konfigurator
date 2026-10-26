@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.5] – 2026-10-26
+
+### Behoben
+- **Neuer Druck stand anfangs auf 100 %:** Während der Vorbereitung (heizt vor, nivelliert, prüft …) meldet der Kobra S1 als Fortschritt den des Vorbereitungsschritts – nach dem Nivellieren 100 %. Werkbank, Reiter-Abzeichen, 3D-Fortschritt und Home Assistant zeigen bis zur ersten Schicht jetzt 0 %. Auch der Filamentzähler erkennt einen Druck, der in der Vorbereitung beginnt, wieder sicher als „von Anfang an“.
+
 ## [10.47.4] – 2026-10-26
 
 ### Behoben

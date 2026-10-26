@@ -535,6 +535,17 @@ def loaded_slot(boxes):
 
 
 PRINT_STATUS = {1: "druckt", 2: "fertig", 3: "abgebrochen", 4: "lädt herunter", 5: "prüft", 6: "heizt vor", 7: "slict", 9: "nivelliert"}
+# Vorbereitung: dann meldet info.project.progress den Fortschritt dieses Schritts (beim Nivellieren 100 %, gemessen
+# 2026-10-26), nicht den des Drucks
+PREP_STATUS = (4, 5, 6, 7, 9)
+
+
+def job_progress(project):
+    """Fortschritt des Drucks in % – während der Vorbereitung 0 statt des Werts des Vorbereitungsschritts."""
+    p = (project or {}).get("progress")
+    if project and project.get("print_status") in PREP_STATUS and not project.get("curr_layer"):
+        return 0
+    return p
 
 
 def _reported_skips(project):
@@ -551,7 +562,7 @@ def _job(project):
         return None
     name = str(project.get("filename") or "").replace("\\", "/").rsplit("/", 1)[-1]
     name = re.sub(r"(\.(gcode|3mf|gco|g))+$", "", name, flags=re.I)
-    return {"name": name, "task_id": project.get("task_id"), "progress": project.get("progress"),
+    return {"name": name, "task_id": project.get("task_id"), "progress": job_progress(project),
             "layer": project.get("curr_layer"), "layers": project.get("total_layers"),
             "elapsed_min": project.get("print_time"), "remaining_min": project.get("remain_time"),
             "state": project.get("state"), "status": PRINT_STATUS.get(project.get("print_status"), project.get("print_status")),

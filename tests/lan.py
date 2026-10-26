@@ -652,6 +652,12 @@ flat = lan.all_slots(two)
 check("zwei ACE: Slots 1–3 und 5–7, Box und Slot darin", [(s["index"], s["box"], s["local"]) for s in flat] == [(0, 0, 0), (1, 0, 1), (2, 0, 2), (4, 1, 0), (5, 1, 1), (6, 1, 2)], flat)
 check("zwei ACE: geladener Slot = ACE 2, Slot 2 → 5 (0-basiert)", lan.loaded_slot(two) == 5, lan.loaded_slot(two))
 
+# ---------- Fortschritt während der Vorbereitung (gemessen 2026-10-26: beim Nivellieren meldet die Firmware 100 %) ----------
+check("nivelliert, Schicht 0 → 0 %", lan._job({"filename": "a.gcode", "progress": 100, "print_status": 9, "curr_layer": 0})["progress"] == 0)
+check("heizt vor → 0 %", lan.job_progress({"progress": 100, "print_status": 6}) == 0)
+check("druckt → Wert des Druckers", lan.job_progress({"progress": 37, "print_status": 1, "curr_layer": 12}) == 37)
+check("fertig → 100 %", lan.job_progress({"progress": 100, "print_status": 2, "curr_layer": 87}) == 100)
+
 # ---------- Pausengrund ----------
 class _L:
     def __init__(self, sent=None, since=None):
