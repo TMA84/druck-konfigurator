@@ -521,6 +521,9 @@ table.changes td small { display: block; color: var(--ink-3); font-family: var(-
 .part-scope b { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .part-scope label { font-size: 13px; color: var(--ink-2); }
 .part-scope select { padding: 5px 8px; font-size: 13px; }
+/* „Druckwerte gelten für“ (js/part-settings.js valScope) – über beide Spalten wie Teil und Slot */
+.part-scope .part-where { display: contents; }
+.part-scope .part-where.hidden { display: none; }
 .plan-title { font-size: 14px; margin: 14px 0 6px; }
 .plan-notes { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--warn); }
 .plan-notes:empty { display: none; }

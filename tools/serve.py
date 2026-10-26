@@ -19,6 +19,7 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   POST /api/slice  (3MF als application/octet-stream)  → Verbrauch je Slot und Druckzeit je Platte (OrcaSlicer), job-Id
   POST /api/gcode?name=<Datei>  (G-Code als application/octet-stream) → fertiger G-Code als Auftrag mit einer Platte (wie /api/slice)
        ?plates=2,3&count=4&reuse=<job>                  → nur diese Platten neu slicen, die übrigen aus <job> übernehmen
+       …&partial=1                                      → Druckwerte je Platte: auch ohne vollständiges <job> (Kette je Wertegruppe)
   GET  /api/slice/<job>/plate_<n>.preview              → kompakte Schichtvorschau (tools/gcode_preview.py)
   GET  /api/slice/<job>/plate_<n>.gcode                → G-Code zum Herunterladen
   GET  /api/spools                                     → Filamentverwaltung: Spulen mit Restmenge (tools/spools.py)
@@ -709,7 +710,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 plates = [int(n) for n in q.get("plates", [""])[0].split(",") if n.isdigit()] if "plates" in q else None
                 count = int(q["count"][0]) if q.get("count", [""])[0].isdigit() else None
                 reuse = q.get("reuse", [""])[0] or None
-                return self._api(lambda: slicer.slice_3mf(receive(), plates, count, reuse))
+                partial = q.get("partial", [""])[0] == "1"   # Druckwerte je Platte: nur diese Platten (+ was reuse hat)
+                return self._api(lambda: slicer.slice_3mf(receive(), plates, count, reuse, partial))
             # Fertiger G-Code zum Drucken (Tab ④ „G-Code drucken …“): wird ein Auftrag mit einer Platte wie nach dem Slicen
             name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name", [""])[0][:120]
 

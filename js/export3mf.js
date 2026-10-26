@@ -7,10 +7,14 @@
    js/export3mf-mesh.js (XML, Netze, Bemalung), js/export3mf-pack.js (Anordnen, Turm), js/export3mf-relayout.js
    (Makerworld-/Orca-3MF); hier das Zusammensetzen der 3MF (build3mfFiles, build3mfFromProject, build3mf). */
 
-function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
+/* focus (Druckwerte je Platte, js/plate-values.js): Platten (j.vp, wie in der Platten-Übersicht), die diese 3MF slict –
+   r/slot sind dann deren Werte; Filamentwerte je Slot und Objekt-Einstellungen kommen zuerst von Teilen dieser Platten. */
+const focusFn = focus => (focus && focus.length ? j => focus.includes(j.vp) : null);
+const focusFirst = (items, f) => (f ? items.filter(f).concat(items.filter(j => !f(j))) : items);
+function build3mfFiles(tpl, r, parts, slot, liveSlots, machine, focus) {
   const items = (Array.isArray(parts) ? parts : [parts]).map(p => p.geom ? p : { geom: p }).map(p => p.pad != null ? p : { ...p, pad: brimPad(p.r || r) });
   const list = items.map(p => p.geom);
-  const { extra, notes, partSlot } = slotPlan(items, r, slot);
+  const { extra, notes, partSlot } = slotPlan(items, r, slot, focusFn(focus));
   const { settings, changes } = buildProjectSettings(tpl, r, slot, liveSlots, extra, machine);
   // Plattenzuordnung je Teil beachten (plate 1-basiert); ohne Angabe alles automatisch
   const { places, plateCount, overflow } = items.some(p => p.plate) ? arrangeByPlate(items, tpl) : arrangeParts(list, tpl, null, items.map(p => p.pad));
@@ -83,15 +87,15 @@ function build3mfFiles(tpl, r, parts, slot, liveSlots, machine) {
 /* jobs: [{geom, r, slot, bodies?, part:{objectId, plate}}] wie aus partJobs(); threemf = Import-Ergebnis mit zip.
    Ist die 3MF neu angeordnet oder kommen eigene Teile/Kopien dazu (needsRelayout), schreibt relayout3mf Build-Items,
    Platten und die neuen Objekte; sonst bleiben Lage und Platten des Designers (je Platte auf die Bettmitte gerückt). */
-function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, machine) {
-  const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate }));
-  const { extra, notes, partSlot } = slotPlan(items, r, slot);
+function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, machine, focus) {
+  const items = jobs.map(j => ({ ...j, plate: j.part && j.part.plate })), inFocus = focusFn(focus);
+  const { extra, notes, partSlot } = slotPlan(items, r, slot, inFocus);
   const nFil = tpl.settings.filament_settings_id.length;
   // Slots, die nur Farb-Modifikatoren des Designers nutzen (z. B. ein Schriftzug), bekommen die Filamentwerte ihres Teils –
   // sonst blieben dort die Vorlagenwerte, und Orca lehnt die Mischung ab („nozzle temperatures are incompatible“)
   const dmap = threemf.designMap || {};
   // dasselbe für die Bemalung je Dreieck (js/paint.js: Filamente des Designers, umgelegt über designMap)
-  items.forEach(j => [...((j.part && j.part.modSlots) || []), ...((j.part && j.part.paintSlots) || [])].forEach(d => { const s = dmap[d] ?? d;
+  focusFirst(items, inFocus).forEach(j => [...((j.part && j.part.modSlots) || []), ...((j.part && j.part.paintSlots) || [])].forEach(d => { const s = dmap[d] ?? d;
     if (s !== slot && s < nFil && !extra.some(e => e.slot === s)) extra.push({ slot: s, r: j.r || r }); }));
   items.forEach(j => { if (partSlot(j) >= nFil) notes.push(t('{part}: Slot {n} gibt es an deinem Drucker nicht – bitte in Orca zuweisen.', { part: j.geom.name, n: partSlot(j) + 1 })); });
   items.forEach(j => (j.bodies || []).forEach(b => { if (b.slot != null && b.slot >= nFil) notes.push(t('{part} · {body}: Slot {n} gibt es an deinem Drucker nicht – Slot {last} wird verwendet.', { part: j.geom.name, body: b.name, n: b.slot + 1, last: nFil })); }));
@@ -177,8 +181,8 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
   const computedKeys = [...new Set(plannedChanges(r, 0, null).filter(c => !c.perSlot && isObjectKey(c.key)).map(c => c.key).concat([...OBJECT_KEYS], supportChanges(r).map(x => x[1])))];
   const objectChanges = [];
   let ms = zipLib.strFromU8(out['Metadata/model_settings.config'] || zipLib.strToU8('<?xml version="1.0" encoding="UTF-8"?>\n<config>\n</config>\n'));
-  const done = new Set(); // Objekt mit mehreren Instanzen nur einmal anpassen
-  for (const j of items) {
+  const done = new Set(); // Objekt mit mehreren Instanzen nur einmal anpassen (zuerst die Platzierung auf einer geslicten Platte)
+  for (const j of focusFirst(items, inFocus)) {
     if (j.part.objectId == null || j.part.extra || done.has(j.part.objectId)) continue;   // hinzugefügte Teile: relayout3mf
     done.add(j.part.objectId);
     const own = objectOverrides(settings, j.r, j.part);
@@ -211,8 +215,8 @@ function build3mfFromProject(tpl, r, jobs, slot, zipLib, liveSlots, threemf, mac
 }
 
 // ZIP über fflate (vendor/fflate.min.js); zipLib wird übergeben, damit der Test es in Node nutzen kann.
-function build3mf(tpl, r, parts, slot, zipLib, liveSlots, machine) {
-  const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots, machine);
+function build3mf(tpl, r, parts, slot, zipLib, liveSlots, machine, focus) {
+  const { files, changes, plateCount, objectChanges, notes } = build3mfFiles(tpl, r, parts, slot, liveSlots, machine, focus);
   const entries = {};
   for (const [p, text] of Object.entries(files)) entries[p] = zipLib.strToU8(text);
   return { bytes: zipLib.zipSync(entries, { level: 6 }), changes, plateCount, objectChanges, notes };
@@ -221,8 +225,8 @@ function build3mf(tpl, r, parts, slot, zipLib, liveSlots, machine) {
 /* ---------- Export im Hintergrund (js/export-worker.js, js/export-ui.js exportBytesAsync) ----------
    a = {tpl, r, jobs, slot, live, threemf, machine} wie aus exportArgs – derselbe Bau im Fenster und im Worker. */
 function build3mfFor(a, zipLib) {
-  return a.threemf ? build3mfFromProject(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.threemf, a.machine)
-    : build3mf(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.machine);
+  return a.threemf ? build3mfFromProject(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.threemf, a.machine, a.focus)
+    : build3mf(a.tpl, a.r, a.jobs, a.slot, zipLib, a.live, a.machine, a.focus);
 }
 /* Nur, was der Export liest, als reine Daten (Zahlenarrays, keine THREE-Objekte, keine Analyse-Felder) – geht per
    postMessage an den Worker. Gemeinsame Objekte (Geometrie von Kopien, r) bleiben gemeinsam (Kopien teilen sich beim
@@ -238,7 +242,7 @@ function exportArgsPlain(a) {
     return parts.get(p);
   };
   const tm = a.threemf;
-  return { tpl: a.tpl, r: a.r, slot: a.slot, live: a.live, machine: a.machine, byObject: printSeq.byObject, packGap: packGapMm,
+  return { tpl: a.tpl, r: a.r, slot: a.slot, live: a.live, machine: a.machine, focus: a.focus || null, byObject: printSeq.byObject, packGap: packGapMm,
     threemf: tm ? { zip: tm.zip, designMap: tm.designMap, layout: tm.layout, removed: tm.removed } : null,
     jobs: a.jobs.map(j => ({ ...j, geom: geom(j.geom), part: part(j.part) })) };
 }

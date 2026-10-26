@@ -106,6 +106,7 @@
         <label for="partPick">Teil</label><select id="partPick" aria-label="Teil wählen"></select>
         <label for="partSlot">Slot</label><select id="partSlot"></select>
         <button type="button" class="linkbtn" id="partSlotAll">Für alle Teile übernehmen</button>
+        <span id="partWhereRow" class="part-where hidden"><label for="partWhere">Druckwerte gelten für</label><select id="partWhere"></select></span>
         <div id="partUses" class="part-uses hidden"></div>
       </div>
       <div class="field"><label for="material">Filament<span id="matBadge"></span></label><select id="material"></select>
@@ -162,7 +163,7 @@
         <div id="ovRows"></div><p id="ovNoHit" class="muted small" hidden>Keine Einstellung gefunden.</p>
         <div class="ov-panel-foot">
           <span id="ovInfo" class="muted small"></span>
-          <label class="wb-toggle hidden" id="ovAllRow"><input type="checkbox" id="ovAll"> Änderungen für alle Teile des Projekts</label>
+          <label class="wb-toggle hidden" id="ovAllRow">Änderungen gelten für <select id="ovWhere"><option value="all">alle Teile des Projekts</option><option value="plate">alle Teile auf der Platte</option><option value="part">nur dieses Teil</option></select></label>
           <span class="ov-foot-actions"><button type="button" class="linkbtn hidden" id="ovReset">Alle Anpassungen zurücknehmen</button><button class="linkbtn hidden" type="button" id="ovDefReset">Standard zurücksetzen</button><button class="btn sec" type="button" id="ovDefSave">Als Standard merken</button></span>
           <p id="ovDefInfo" class="muted small ov-def-info"></p>
         </div>
@@ -722,6 +723,7 @@
 <script src="js/export-ui.js"></script>
 <script src="js/orient-ui.js"></script>
 <script src="js/part-settings.js"></script>
+<script src="js/plate-values.js"></script>
 <script src="js/holes-ui.js"></script>
 <script src="js/modpaint.js"></script>
 <script src="js/bodies-ui.js"></script>

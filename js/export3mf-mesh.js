@@ -126,22 +126,28 @@ function modelSettingsXML(objs, plateCount) {
    bekommt die Filamentwerte dieses Teils. notes: Werte, die Orca nur global kennt. */
 /* Welche Slots welche Filamentwerte bekommen: der Standard-Slot die von r, jeder weitere Slot die des
    ersten Teils darin. Teile mit anderem Material im selben Slot → Hinweis (Orca kennt ein Filament je Slot). */
-function slotPlan(items, r, slot) {
+/* first (Druckwerte je Platte, js/plate-values.js): Teile der Platten, die diese 3MF slict, belegen die Slots zuerst – die
+   Filamentwerte eines Slots kommen dann von dort, nicht von einem Teil auf einer anderen Platte; Slots, die nur andere
+   Platten nutzen, behalten deren Werte (Orca prüft die Filamente des ganzen Projekts). */
+function slotPlan(items, r, slot, first) {
   const partSlot = p => (p.slot === null || p.slot === undefined ? slot : p.slot);
   const extra = [], notes = [];
+  const own = first ? items.filter(first) : items;
+  if (first) items = own.concat(items.filter(p => !first(p)));
   // Körper mit eigenem Slot belegen diesen Slot mit dem Filament ihres Teils
-  const users = items.flatMap(p => [p, ...(p.bodies || []).filter(b => b.slot !== null && b.slot !== undefined)
+  const usersOf = list => list.flatMap(p => [p, ...(p.bodies || []).filter(b => b.slot !== null && b.slot !== undefined)
     .map(b => ({ geom: { name: p.geom.name + ' · ' + b.name }, r: p.r, slot: b.slot })),
     ...textSlots(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Beschriftung') }, r: p.r, slot: s })),
     ...paintSlotsOf(p).map(s => ({ geom: { name: p.geom.name + ' · ' + t('Bemalung') }, r: p.r, slot: s }))]);
-  for (const p of users) {
-    const ps = partSlot(p), pr = p.r || r;
-    if (ps === slot) { if (pr.m.kind !== r.m.kind) notes.push(t('{part}: {material} im selben Slot wie {main} – es gelten die Filamentwerte von {main}.', { part: p.geom.name, material: pr.m.name, main: r.m.name })); continue; }
+  const users = usersOf(items), nOwn = first ? usersOf(own).length : users.length;
+  for (const [i, p] of users.entries()) {
+    const ps = partSlot(p), pr = p.r || r, say = i < nOwn ? n => notes.push(n) : () => {};   // Hinweise nur für die geslicten Platten
+    if (ps === slot) { if (pr.m.kind !== r.m.kind) say(t('{part}: {material} im selben Slot wie {main} – es gelten die Filamentwerte von {main}.', { part: p.geom.name, material: pr.m.name, main: r.m.name })); continue; }
     const other = extra.find(e => e.slot === ps);
     if (!other) extra.push({ slot: ps, r: pr });
-    else if (other.r.m.kind !== pr.m.kind) notes.push(t('{part}: Slot {n} ist schon mit {material} belegt – es gelten dessen Filamentwerte.', { part: p.geom.name, n: ps + 1, material: other.r.m.name }));
+    else if (other.r.m.kind !== pr.m.kind) say(t('{part}: Slot {n} ist schon mit {material} belegt – es gelten dessen Filamentwerte.', { part: p.geom.name, n: ps + 1, material: other.r.m.name }));
   }
-  for (const p of items) if (p.r && Math.abs(p.r.layer - r.layer) > 1e-9) notes.push(t('{part}: Schichthöhe {layer} mm empfohlen – Orca nutzt für alle Teile {used} mm.', { part: p.geom.name, layer: de(p.r.layer, 2), used: de(r.layer, 2) }));
+  for (const p of own) if (p.r && Math.abs(p.r.layer - r.layer) > 1e-9) notes.push(t('{part}: Schichthöhe {layer} mm empfohlen – Orca nutzt für alle Teile {used} mm.', { part: p.geom.name, layer: de(p.r.layer, 2), used: de(r.layer, 2) }));
   return { extra, notes, partSlot };
 }
 

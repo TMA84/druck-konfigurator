@@ -628,7 +628,7 @@ I18N.add({
 
 I18N.add({
  "gilt für die ganze Platte": "applies to the whole plate",
- "gilt für alle Teile mit Slot {n}": "applies to all parts on slot {n}"
+ "gilt für alle Teile mit Slot {n} auf der Platte": "applies to all parts on slot {n} on this plate"
 });
 
 I18N.add({
@@ -777,7 +777,14 @@ I18N.add({
  "Wert": "Value",
  "Vorschlag": "Suggestion",
  "Einstellung": "Setting",
- "Änderungen für alle Teile des Projekts": "Changes for all parts of the project",
+ "Änderungen gelten für": "Changes apply to",
+ "Druckwerte gelten für": "Print values apply to",
+ "alle Teile des Projekts": "all parts of the project",
+ "alle Teile auf Platte {n}": "all parts on plate {n}",
+ "alle Teile auf der Platte": "all parts on the plate",
+ "nur dieses Teil": "this part only",
+ "Slicen mit OrcaSlicer – {n} Plattengruppen mit eigenen Druckwerten …": "Slicing with OrcaSlicer – {n} plate groups with their own print values …",
+ "Die Platten haben eigene Druckwerte – eine 3MF für OrcaSlicer kennt nur einen Satz, Orca bekommt die Werte von Platte 1. Slicen und Drucken in der Druckwerkstatt nimmt je Platte ihre eigenen Werte.": "The plates have their own print values – a 3MF for OrcaSlicer holds only one set, so Orca gets the values of plate 1. Slicing and printing in Print Workshop uses each plate's own values.",
  "Werte für diesen Auftrag": "Values for this job",
  "Für {n} Teile übernommen": "Applied to {n} parts",
 });

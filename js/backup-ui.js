@@ -11,7 +11,7 @@ const BK_FORMAT = 'druckwerkstatt-backup', BK_VERSION = 1, BK_MAX_BYTES = 8 * 10
 // Einstellungen, die zum Umzug gehören, mit erwarteter Art; alles andere bleibt im Browser (Bedienzustand)
 const BK_SETTINGS = {
   steelOffset: 'number', steelVol: 'number', aceFlush: 'number', packGap: 'number', prepS: 'number', sliceMsPerPlate: 'number',
-  costAuto: 'boolean', ovAll: 'boolean',
+  costAuto: 'boolean', ovAll: 'boolean', valScope: 'string',
   costs: 'object', filamentPrices: 'object', typePrices: 'object', manualSlots: 'object', aceCount: 'object',
   printerHosts: 'object', printerLinkMode: 'object', acePurgeOwn: 'object?'
 };

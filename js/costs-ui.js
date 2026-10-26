@@ -214,21 +214,37 @@ async function runCosts() {
   try {
     // 3MF bauen – große Modelle im Hintergrund (js/export-ui.js exportBytesAsync); null = neues Modell, Ergebnis verworfen
     const sigs = sliceSigs(), sig = JSON.stringify(sigs);
-    if (typeof sliceBar === 'function') sliceBar('build');
-    const built = await exportBytesAsync(costDefaultSlot());
-    costState.building = false;
-    if (!built || costState.stale || project !== costProject) { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; if (typeof sliceBar === 'function') sliceBar(null); renderCostPanel(); return; }
-    const { bytes, plan, notes } = built;
+    const reset = () => { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; };
+    // Druckwerte je Platte (js/plate-values.js): mehrere Gruppen gleicher Werte → je Gruppe eine 3MF, nur deren Platten
+    const tpl = exportTemplate(lastResult.printer.id, lastResult.dSel), groups = tpl ? plateGroups(tpl, exportPlan(costDefaultSlot()), partPlates()) : [];
+    const perPlate = groups.length > 1;
     // Nur geänderte Platten neu slicen, wenn der letzte Stand noch auf dem Server liegt
     const prev = costState.slice && costState.slice.job ? costState.sigs : null, changed = changedPlates(prev, sigs);
     const partial = changed && changed.length < sigs.plates.length;
-    $('costPanelInfo').textContent = partial ? (changed.length ? t('Slicen: nur Platte {list} …', { list: changed.join(', ') }) : t('Übernehme den letzten Stand …')) : t('Slicen mit OrcaSlicer …');
-    const nSlice = partial ? changed.length : sigs.plates.length, t0 = performance.now();
-    if (typeof sliceBar === 'function') sliceBar('slice', { plates: nSlice, note: $('costPanelInfo').textContent.replace(/ …$/, '') });
-    const q = partial ? '?plates=' + changed.join(',') + '&count=' + sigs.plates.length + '&reuse=' + costState.slice.job : '';
-    const res = await fetch('api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw Error(data.error || t('Server antwortet mit HTTP {status}', { status: res.status }));
+    const todo = partial ? changed : sigs.plates.map((x, i) => i + 1);
+    const runs = perPlate ? groups.map(g => ({ g, plates: g.plates.filter(k => todo.includes(k)) })).filter(x => x.plates.length) : [{ g: null, plates: todo }];
+    if (!runs.length) runs.push({ g: perPlate ? groups[0] : null, plates: [] });   // nichts geändert: letzten Stand übernehmen
+    $('costPanelInfo').textContent = partial ? (changed.length ? t('Slicen: nur Platte {list} …', { list: changed.join(', ') }) : t('Übernehme den letzten Stand …'))
+      : perPlate ? t('Slicen mit OrcaSlicer – {n} Plattengruppen mit eigenen Druckwerten …', { n: runs.length }) : t('Slicen mit OrcaSlicer …');
+    const nSlice = todo.length, t0 = performance.now();
+    let data = null, plan = null, job = partial ? costState.slice.job : null;
+    const notes = [];
+    for (const run of runs) {
+      if (typeof sliceBar === 'function') sliceBar('build');
+      const built = await exportBytesAsync(costDefaultSlot(), run.g);
+      costState.building = false;
+      if (!built || costState.stale || project !== costProject) { reset(); if (typeof sliceBar === 'function') sliceBar(null); renderCostPanel(); return; }
+      plan = built.plan; built.notes.forEach(n => { if (!notes.includes(n)) notes.push(n); });
+      if (typeof sliceBar === 'function') sliceBar('slice', { plates: nSlice, note: $('costPanelInfo').textContent.replace(/ …$/, '') });
+      // eine Gruppe: wie bisher (alle Platten oder nur geänderte mit reuse); mehrere: partial, Kette über den letzten Auftrag
+      const q = perPlate ? '?plates=' + run.plates.join(',') + '&count=' + sigs.plates.length + '&partial=1' + (job ? '&reuse=' + job : '')
+        : partial ? '?plates=' + changed.join(',') + '&count=' + sigs.plates.length + '&reuse=' + costState.slice.job : '';
+      const res = await fetch('api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: built.bytes });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Error(data.error || t('Server antwortet mit HTTP {status}', { status: res.status }));
+      if (costState.stale || project !== costProject) { reset(); renderCostPanel(); return; }
+      job = data.job;
+    }
     if (costState.stale || project !== costProject) { costState = { sig: null, sigs: null, slice: null, materials: null, busy: false, error: '', failedSig: null }; renderCostPanel(); return; }
     costState = { sig, sigs, slice: data, materials: slotMaterials(plan), notes, busy: false, error: '', failedSig: null };
     if (typeof sbLearn === 'function' && nSlice) sbLearn(performance.now() - t0, nSlice);

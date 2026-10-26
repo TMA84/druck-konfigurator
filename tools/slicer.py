@@ -7,6 +7,9 @@ Uploads (3MF, G-Code) kommen als Datei (upload_file, im Auftragsordner – gleic
 kopieren); slice_3mf und import_gcode nehmen einen Pfad oder bytes und lesen die Datei nie ganz in den Speicher.
 Neu slicen nur geänderter Platten: slice_3mf(data, plates=[2, 3], count=4, reuse=<job>) slict Platte 2 und 3
 einzeln (--slice N) und übernimmt die übrigen G-Codes aus dem früheren Auftrag.
+Druckwerte je Platte (partial=True): Die Seite schickt je Gruppe von Platten mit gleichen Werten eine eigene 3MF und
+slict nur deren Platten; was der frühere Auftrag von den übrigen schon hat, wird übernommen, Fehlendes bleibt weg (die
+nächste Gruppe ergänzt es). Erst der letzte Auftrag der Kette hat alle Platten.
 """
 import contextlib
 import json
@@ -314,6 +317,14 @@ def _reusable(reuse, keep):
     return paths if all(os.path.isfile(p) for p in paths.values()) else None
 
 
+def _reusable_some(reuse, keep):
+    """Wie _reusable, aber nur die G-Codes, die es gibt (partial: die übrigen Platten kommen aus einer weiteren 3MF)."""
+    if not reuse or not JOB_ID.match(str(reuse)):
+        return {}
+    paths = {n: os.path.join(JOBS_DIR, reuse, "plate_%d.gcode" % n) for n in keep}
+    return {n: p for n, p in paths.items() if os.path.isfile(p)}
+
+
 def _run(orca, src, out, tmp, index):
     try:
         return subprocess.run([orca, "--slice", str(index), "--outputdir", out, src], cwd=tmp,
@@ -322,10 +333,11 @@ def _run(orca, src, out, tmp, index):
         raise SliceError("Slicen dauert zu lange (über %d min)" % (TIMEOUT_S // 60), "timeout")
 
 
-def slice_3mf(data, plates=None, count=None, reuse=None):
+def slice_3mf(data, plates=None, count=None, reuse=None, partial=False):
     """data: Pfad der 3MF (z. B. upload_file; wird verknüpft, der Aufrufer räumt sie weg) oder bytes.
     plates/count/reuse: nur diese Platten (1-basiert) neu slicen, die übrigen der count Platten aus reuse
-    übernehmen. Fehlt dort etwas, wird alles geslict. Ergebnis je Platte mit "reused": True/False."""
+    übernehmen. Fehlt dort etwas, wird alles geslict – außer mit partial (Druckwerte je Platte): dann nur diese
+    Platten plus, was reuse von den übrigen hat. Ergebnis je Platte mit "reused": True/False."""
     with _source(data) as upload:
         size = os.path.getsize(upload)
         if not size or size > MAX_BYTES or _head(upload, 2) != b"PK":
@@ -335,16 +347,20 @@ def slice_3mf(data, plates=None, count=None, reuse=None):
             raise SliceError("OrcaSlicer ist auf dem Server nicht installiert (im Container enthalten; lokal ORCA_PATH setzen)", "no_slicer")
         reuse = str(reuse) if reuse and JOB_ID.match(str(reuse)) else None
         with _protect(reuse):
-            return _slice(orca, upload, plates, count, reuse)
+            return _slice(orca, upload, plates, count, reuse, partial)
 
 
-def _slice(orca, upload, plates, count, reuse):
+def _slice(orca, upload, plates, count, reuse, partial=False):
     todo, keep = None, {}
     if plates is not None and count:
         todo = sorted({int(n) for n in plates if 1 <= int(n) <= int(count)})
-        keep = _reusable(reuse, [n for n in range(1, int(count) + 1) if n not in todo]) or {}
-        if len(keep) + len(todo) != int(count) or not (todo or keep):
-            todo, keep = None, {}
+        others = [n for n in range(1, int(count) + 1) if n not in todo]
+        if partial and todo:
+            keep = _reusable_some(reuse, others)
+        else:
+            keep = _reusable(reuse, others) or {}
+            if len(keep) + len(todo) != int(count) or not (todo or keep):
+                todo, keep = None, {}
     os.makedirs(JOBS_DIR, exist_ok=True)
     # Arbeitsordner im Auftragsordner: 3MF hinein und G-Codes heraus ohne Kopie (gleiches Dateisystem)
     with _lock, tempfile.TemporaryDirectory(prefix=WORK_PREFIX, dir=JOBS_DIR) as tmp:

@@ -29,10 +29,43 @@ function samePlacements(part) {
   return project && part.copyGroup ? project.parts.filter(p => p.copyGroup === part.copyGroup) : [part];
 }
 
-// Aus update(): aktuelle Auswahl gehört zum gewählten Teil (und allen Platzierungen desselben Objekts)
+/* Druckwerte je Platte (2026-10-26): Wofür gelten Änderungen in ② – „all“ alle Teile des Projekts, „plate“ alle Teile
+   auf der Platte des gewählten Teils, „part“ nur dieses Teil (mit Kopien und Platzierungen desselben Objekts). Werte, die
+   Orca nur je Platte kennt (Schichthöhe, erste Schicht, Beschleunigung) und die Filamentwerte je Slot gelten bei „plate“
+   und „part“ für die Platte des Teils. Jede Platte slict mit ihren eigenen Werten (js/plate-values.js). */
+function valScope() {
+  const v = store.settings.valScope;
+  return v === 'all' || v === 'plate' || v === 'part' ? v : store.settings.ovAll === false ? 'part' : 'all';
+}
+// Platte (1-basiert) je Teil-Index – so, wie die Platten-Übersicht sie zeigt
+function partPlates() {
+  const tpl = typeof plTpl === 'function' ? plTpl() : null, lay = tpl && project ? projectLayout(tpl) : null;
+  return project ? project.parts.map((q, i) => (lay && lay.plateOf[i]) || 1) : [];
+}
+// Teile, für die eine Änderung am Teil p gilt (where: all | plate | part)
+function scopeParts(p, where, plates) {
+  if (!project) return [];
+  if (where === 'all') return project.parts;
+  if (where === 'plate') { const pl = plates || partPlates(), k = pl[project.parts.indexOf(p)]; return project.parts.filter((q, i) => pl[i] === k); }
+  return samePlacements(p);
+}
+function setValScope(v) {
+  store.settings.valScope = v; persist();
+  for (const id of ['partWhere', 'ovWhere']) if ($(id) && $(id).value !== v) $(id).value = v;
+}
+
+/* Aus update(): aktuelle Auswahl gehört zum gewählten Teil (und allen Platzierungen desselben Objekts). Bei „Platte“
+   übernehmen die anderen Teile der Platte geänderte Felder (Objektart, Priorität, Belastung, Support) – das Filament nicht,
+   das folgt dem Slot des Teils. Bei „alle Teile“ bleibt die Auswahl je Teil wie bisher (dort gelten nur die Anpassungen
+   ✎ für alle; sonst würde jede Änderung Teile mit Absicht anderer Objektart überschreiben). */
 function savePartFromForm() {
   const p = project && project.parts[project.selected];
-  if (p) { const input = formSnapshot(); samePlacements(p).forEach(x => { x.input = { ...input }; }); }
+  if (!p) return;
+  const input = formSnapshot(), prev = p.input || {}, own = samePlacements(p);
+  const changed = PART_FIELDS.filter(id => id !== 'material' && prev[id] !== undefined && prev[id] !== input[id]);
+  own.forEach(x => { x.input = { ...input }; });
+  if (!changed.length || project.parts.length < 2 || valScope() !== 'plate') return;
+  for (const q of scopeParts(p, 'plate')) if (q.input && !own.includes(q)) changed.forEach(id => { q.input[id] = input[id]; });
 }
 
 // Slots des aktuellen Druckers: live vom Drucker, sonst aus der Orca-Vorlage
@@ -50,6 +83,13 @@ function renderPartScope() {
   $('partSlotAll').classList.toggle('hidden', !multi);
   const p = project.parts[project.selected], sel = $('partSlot'), slots = slotChoices();
   $('partScopeName').textContent = p.name;
+  { // Geltungsbereich (Druckwerte je Platte): nur bei mehreren Teilen; „Platte N“ nennt die Platte des Teils
+    const pl = partPlates(), n = Math.max(1, ...pl), w = $('partWhere');
+    $('partWhereRow').classList.toggle('hidden', !multi);
+    w.innerHTML = '<option value="all">' + t('alle Teile des Projekts') + '</option><option value="plate">' + (n > 1 ? t('alle Teile auf Platte {n}', { n: pl[project.selected] }) : t('alle Teile auf der Platte')) +
+      '</option><option value="part">' + t('nur dieses Teil') + '</option>';
+    w.value = valScope();
+  }
   // Teil hier wählen, ohne in den Tab „Modell“ zu wechseln
   $('partPick').innerHTML = project.parts.map((x, i) => '<option value="' + i + '"' + (i === project.selected ? ' selected' : '') + '>' + esc(x.name) + (project.threemf && project.threemf.plates.length > 1 ? ' · ' + t('Platte {n}', { n: x.plate }) : '') + '</option>').join('');
   sel.innerHTML = '<option value="">' + t('wie beim Export gewählt') + '</option>' +
@@ -84,6 +124,7 @@ $('partSlotAll').addEventListener('click', () => {
   const v = $('partSlot').value;
   applySlotToAll(v === '' ? null : +v);
 });
+$('partWhere').addEventListener('change', () => { setValScope($('partWhere').value); update(); });
 $('partPick').addEventListener('change', () => { const i = +$('partPick').value; if (i !== project.selected) selectPart(i); });
 $('partSlot').addEventListener('change', () => {
   const p = project.parts[project.selected], v = $('partSlot').value;

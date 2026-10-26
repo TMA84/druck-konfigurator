@@ -94,6 +94,12 @@ if slicer.find_orca():
         check("übernommene Platte gleich", part["plates"][0]["total_g"] == full["plates"][0]["total_g"] and part["plates"][0]["time_s"] == full["plates"][0]["time_s"])
         check("Summe wie beim vollen Slicen", abs(part["total"]["total_g"] - full["total"]["total_g"]) < 0.05, (part["total"], full["total"]))
         check("G-Code beider Platten im neuen Auftrag", all(slicer.job_file(part["job"], n, "gcode") for n in (1, 2)))
+        # Druckwerte je Platte (partial): erst nur Platte 1 (ohne früheren Auftrag), dann Platte 2 aus einer zweiten 3MF dazu
+        p1 = slicer.slice_3mf(two, plates=[1], count=2, partial=True)
+        check("partial: nur Platte 1", [p["plate"] for p in p1["plates"]] == [1] and p1["sliced"] == 1, p1["plates"])
+        p2 = slicer.slice_3mf(two, plates=[2], count=2, reuse=p1["job"], partial=True)
+        check("partial: Platte 2 dazu, Platte 1 übernommen", [(p["plate"], p["reused"]) for p in p2["plates"]] == [(1, True), (2, False)], p2["plates"])
+        check("partial: Summe wie beim vollen Slicen", abs(p2["total"]["total_g"] - full["total"]["total_g"]) < 0.05, (p2["total"], full["total"]))
         # Kostenwerte in der 3MF kommen im G-Code an (auch für OrcaSlicer/AnycubicSlicerNext selbst)
         costly = slicer.slice_3mf(subprocess.run(["node", os.path.join(ROOT, "tests", "make-test-3mf.js"), "kosten"], capture_output=True, check=True).stdout)
         with open(slicer.job_file(costly["job"], 1, "gcode"), "rb") as f:

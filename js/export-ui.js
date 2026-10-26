@@ -86,6 +86,7 @@ function renderExportDialog(){
   const live=exportSlots(tpl);
   const {extra,notes,partSlot}=slotPlan(plan.jobs,r,slot);
   const {settings,changes}=buildProjectSettings(tpl,r,slot,live,extra,exportMachine(tpl));
+  if(platesDiffer(chosenSlot()))notes.unshift(PLATES_DIFFER_NOTE());
   renderPartPlan(tpl,plan,partSlot,notes,settings);
   renderPurge(tpl,plan,slot);
   // Das Tool weiß ohne Belegung nicht, was im Drucker steckt: den Nutzer den passenden Slot wählen lassen
@@ -264,9 +265,12 @@ function openExportDialog(){
 }
 
 // Die 3MF genau wie beim Speichern – auch für das exakte Slicen der Kostenkalkulation
-function exportArgs(defaultSlot){
-  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),plan=exportPlan(defaultSlot);
-  return {plan,a:{tpl,r:plan.r,jobs:plan.jobs,slot:plan.slot,live:exportSlots(tpl),threemf:project.threemf||null,machine:exportMachine(tpl)}};
+/* group (Druckwerte je Platte, js/plate-values.js): {plates, r, slot} – diese 3MF trägt die Werte dieser Platten; jedes Teil
+   kennt seine Platte (vp, wie in der Platten-Übersicht) */
+function exportArgs(defaultSlot,group){
+  const tpl=exportTemplate(lastResult.printer.id,lastResult.dSel),plan=exportPlan(defaultSlot),pl=partPlates();
+  const jobs=plan.jobs.map((j,i)=>({...j,vp:pl[i]}));
+  return {plan,a:{tpl,r:group?group.r:plan.r,jobs,slot:group?group.slot:plan.slot,live:exportSlots(tpl),threemf:project.threemf||null,machine:exportMachine(tpl),focus:group?group.plates:null}};
 }
 const towerNotes=notes=>(notes||[]).filter(n=>/Reinigungsturm|prime tower/i.test(n));
 function exportBytes(defaultSlot){
@@ -286,9 +290,9 @@ function exportWeight(a){
   if(a.threemf&&a.threemf.zip)for(const d of Object.values(a.threemf.zip))n+=d.length/50;   // ~50 Byte XML je Dreieck
   return n;
 }
-async function exportBytesAsync(defaultSlot){
+async function exportBytesAsync(defaultSlot,group){
   exportStop();
-  const seq=exportSeq,{plan,a}=exportArgs(defaultSlot);
+  const seq=exportSeq,{plan,a}=exportArgs(defaultSlot,group);
   let res=null;
   if(exportWeight(a)>=EXPORT_WORKER_MIN&&exportWorkerOk())res=await export3mfInWorker(a);
   if(seq!==exportSeq)return null;
@@ -308,6 +312,8 @@ function export3mfInWorker(a){
     try{w.postMessage({lang:I18N.lang,i18n,args:exportArgsPlain(a)})}catch(err){console.error('export-worker',err);end(null)}
   });
 }
+// Eine 3MF kennt nur einen Satz Druckwerte (js/plate-values.js) – für OrcaSlicer gelten die des Leitteils (meist Platte 1)
+const PLATES_DIFFER_NOTE=()=>t('Die Platten haben eigene Druckwerte – eine 3MF für OrcaSlicer kennt nur einen Satz, Orca bekommt die Werte von Platte 1. Slicen und Drucken in der Druckwerkstatt nimmt je Platte ihre eigenen Werte.');
 async function save3mf(){
   // Anordnung nach Grundfläche läuft noch im Hintergrund (js/nest.js): erst fertig rechnen, dann exportieren
   if(typeof nestBusy==='function'&&nestBusy()){$('export3mfSave').disabled=true;await nestIdle();$('export3mfSave').disabled=false}
@@ -322,7 +328,7 @@ async function save3mf(){
     document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
     if(plan.usesDefault){store.last[slotKey(r.printer.id)]=slot;persist()}
     $('exportDlg').close();
-    toast(t('3MF gespeichert: {file}',{file:a.download})+(towerNotes.length?' · '+towerNotes.join(' '):''));
+    toast(t('3MF gespeichert: {file}',{file:a.download})+(towerNotes.length?' · '+towerNotes.join(' '):'')+(platesDiffer(chosenSlot())?' · '+PLATES_DIFFER_NOTE():''));
   }catch(e){
     toast(t('3MF konnte nicht erstellt werden: {error}',{error:e.message}));
   }

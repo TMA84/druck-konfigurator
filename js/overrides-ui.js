@@ -126,7 +126,7 @@ function ovRenderPanel() {
       : '<input data-ov="' + k + '" type="number" inputmode="decimal" min="' + min + '" max="' + max + '" step="' + step + '" value="' + (cur ?? '') + '" placeholder="' + esc(ph) + '" aria-label="' + esc(label) + '"' +
         (lm ? ' title="' + esc(t('höchstens {v} {unit} (Herstellerangabe)', { v: de(lm, 0), unit })) + '"' : '') + '>' + (unit ? '<small class="ov-unit muted">' + unit + '</small>' : '');
     const sc = project.parts.length > 1 ? ovScope(k) : null;
-    const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n}', { n: ovSlotOf(p) + 1 }) : '';
+    const scTxt = sc === 'plate' ? t('gilt für die ganze Platte') : sc === 'slot' ? t('gilt für alle Teile mit Slot {n} auf der Platte', { n: ovSlotOf(p) + 1 }) : '';
     // Erklärung (?) wie im Datenblatt: über die deutsche Zeilenbezeichnung (js/panel.js ROW_OV, helpFor)
     const rowName = typeof ROW_OV !== 'undefined' ? Object.keys(ROW_OV).find(l => ROW_OV[l] === k) : null, hp = rowName && typeof helpFor === 'function' ? helpFor(rowName, r.m.kind) : '';
     html += '<div class="ov-row' + (cur !== undefined ? ' set' : '') + '" data-theme="' + esc(grp) + '"><span>' + esc(label) + (hp ? '<span class="help" title="' + esc(hp) + '">?</span>' : '') + (scTxt ? '<small class="ov-scope muted">' + esc(scTxt) + '</small>' : '') + '</span>' +
@@ -144,8 +144,10 @@ function ovRenderPanel() {
   ovTab(ovTabNow && $('ovRows').querySelector('[data-theme="' + CSS.escape(ovTabNow) + '"]') ? ovTabNow : t(VALUE_THEMES[0]));
   ovBrimInfo();
   $('ovAllRow').classList.toggle('hidden', project.parts.length < 2);
-  // „für alle Teile“: Standard an (2026-10-08 – sonst galten Werte nur für das gewählte Teil), Wahl bleibt gespeichert
-  $('ovAll').checked = store.settings.ovAll !== false;
+  // Geltungsbereich wie in ② (js/part-settings.js valScope): Standard „alle Teile“ (2026-10-08), Wahl bleibt gespeichert
+  { const pl = partPlates(), n = Math.max(1, ...pl), o = $('ovWhere').querySelector('option[value="plate"]');
+    o.textContent = n > 1 ? t('alle Teile auf Platte {n}', { n: pl[project.selected] }) : t('alle Teile auf der Platte');
+    $('ovWhere').value = valScope(); }
   const nDef = Object.keys(def).length;
   $('ovDefSave').textContent = t('Als Standard für {mat} merken', { mat: r.m.name });
   $('ovDefReset').classList.toggle('hidden', !nDef);
@@ -284,12 +286,15 @@ function ovCollect() {
 }
 function ovApply(quiet) {
   const out = ovCollect(); if (!out) return;
-  const p = ovPart(), base = $('ovAll').checked ? project.parts : samePlacements(p), touched = new Set();
+  // Geltungsbereich: Werte je Objekt für die gewählten Teile; Werte je Platte für die ganze Platte (bei „alle Teile“ für
+  // alle Platten), Werte je Slot für die Teile mit demselben Slot auf dieser Platte (bzw. im ganzen Projekt)
+  const where = valScope(), pl = partPlates(), p = ovPart(), base = scopeParts(p, where, pl), touched = new Set();
+  const plate = where === 'all' ? project.parts : scopeParts(p, 'plate', pl);
   for (const q of project.parts) {
     const next = { ...(q.overrides || {}) };
     for (const f of ovFields()) {
       const k = f[0], sc = ovScope(k) || 'object';
-      if (!(sc === 'plate' || base.includes(q) || (sc === 'slot' && ovSlotOf(q) === ovSlotOf(p)))) continue;
+      if (!(base.includes(q) || (sc === 'plate' && plate.includes(q)) || (sc === 'slot' && plate.includes(q) && ovSlotOf(q) === ovSlotOf(p)))) continue;
       const before = JSON.stringify(next[k]);
       if (k in out) next[k] = out[k]; else delete next[k];
       if (JSON.stringify(next[k]) !== before) touched.add(q);
@@ -300,7 +305,7 @@ function ovApply(quiet) {
   update();
   if (!quiet && touched.size > 1) toast(t('Für {n} Teile übernommen', { n: touched.size }));
 }
-$('ovAll').addEventListener('change', () => { store.settings.ovAll = $('ovAll').checked; persist(); });
+$('ovWhere').addEventListener('change', () => setValScope($('ovWhere').value));
 // Änderung gilt sofort: Auswahl, Feld verlassen, Enter, × (Vorschlag)
 $('ovRows').addEventListener('change', e => { if (e.target.closest('[data-ov]')) ovApply(); });
 $('ovRows').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[data-ov]')) { e.preventDefault(); ovApply(); } });

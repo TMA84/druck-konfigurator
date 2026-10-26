@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.49.0] – 2026-10-26
+
+### Neu
+- **Druckwerte je Platte:** Neue Auswahl „Druckwerte gelten für“ in ② (und „Änderungen gelten für“ im Dialog ✎ Anpassen): alle Teile des Projekts, alle Teile auf Platte N oder nur dieses Teil. Auch Werte, die Orca nur einmal je Datei kennt – Schichthöhe, erste Schicht, Beschleunigung, Fahrgeschwindigkeit, Temperaturen, Lüfter, Fluss –, gelten jetzt je Platte. Haben Platten unterschiedliche Werte, baut die Seite je Gruppe gleicher Werte eine eigene 3MF und der Server slict nur deren Platten (`api/slice?…&partial=1`, Kette über `reuse`); ändert sich eine Platte, wird nur sie neu geslict. Geprüft mit OrcaSlicer 2.4.2: Platte 1 mit 0,2 mm, Platte 2 mit 0,28 mm, danach nur Platte 2 auf 0,24 mm neu. Die 3MF für OrcaSlicer bekommt die Werte von Platte 1 (mit Hinweis). Tests in `tests/slice.py` und im Bedientest.
+
 ## [10.48.0] – 2026-10-26
 
 ### Neu

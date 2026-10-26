@@ -684,12 +684,25 @@ async function runSmoke(opts={}){
         ovApply();await wait(80);
         const plan=exportPlan(costDefaultSlot()),pc=plannedChanges(plan.r,plan.slot),v=k=>(pc.find(c=>c.key===k)||{}).value;
         ok(v('hot_plate_temp')==='63'&&v('initial_layer_speed')==='25','Am 2. Teil angepasst: Bett 63 und erste Schicht 25 im Export (globale Werte)');
-        ok($('ovAll').checked&&project.parts[0].overrides&&project.parts[0].overrides.w===5,'Standard „für alle Teile“: Wände an allen Teilen');
+        ok($('ovWhere').value==='all'&&project.parts[0].overrides&&project.parts[0].overrides.w===5,'Standard „für alle Teile“: Wände an allen Teilen');
         // nur dieses Teil: Schalter aus
         project.parts.forEach(q=>{q.overrides=null});update();await wait(50);openOverrideDialog();await wait(50);
-        $('ovAll').checked=false;$('ovAll').dispatchEvent(new Event('change'));set('w',4);ovApply();await wait(80);
-        ok(project.parts[1].overrides.w===4&&!(project.parts[0].overrides||{}).w&&store.settings.ovAll===false,'Schalter aus: Wände nur am 2. Teil, Wahl gespeichert');
-        $('ovAll').checked=true;$('ovAll').dispatchEvent(new Event('change'));
+        $('ovWhere').value='part';$('ovWhere').dispatchEvent(new Event('change'));set('w',4);ovApply();await wait(80);
+        ok(project.parts[1].overrides.w===4&&!(project.parts[0].overrides||{}).w&&store.settings.valScope==='part'&&$('partWhere').value==='part','„nur dieses Teil“: Wände nur am 2. Teil, Wahl gespeichert (auch in ②)');
+        // Druckwerte je Platte: 2. Teil auf eigene Platte, Schichthöhe nur dort – jede Platte bekommt ihre eigene 3MF-Gruppe
+        { const tpl=plTpl(),k=project.parts.length;movePart(1,projectLayout(tpl).count+1);await wait(80);
+          project.parts.forEach(q=>{q.overrides=null});update();await wait(50);openOverrideDialog();await wait(50);
+          $('ovWhere').value='plate';$('ovWhere').dispatchEvent(new Event('change'));set('layer',0.28);ovApply();await wait(80);
+          const pl=partPlates(),p2=pl[1];
+          ok(project.parts.every((q,i)=>(pl[i]===p2)===((q.overrides||{}).layer===0.28)),'„Platte“: Schichthöhe nur an den Teilen der Platte '+p2);
+          const groups=plateGroups(tpl,exportPlan(costDefaultSlot()),pl);
+          ok(groups.length===2&&groups.some(g=>g.plates.includes(p2)&&!g.plates.includes(pl[0])),'zwei Plattengruppen mit eigenen Werten ('+groups.map(g=>g.plates.join('+')).join(' | ')+')');
+          const lh=g=>{const z=fflate.unzipSync(build3mfFor(exportArgs(costDefaultSlot(),g).a,fflate).bytes);const st=JSON.parse(fflate.strFromU8(z['Metadata/project_settings.config']));return String(st.layer_height)};
+          const g2=groups.find(g=>g.plates.includes(p2)),g1=groups.find(g=>g!==g2);
+          ok(lh(g2)==='0.28'&&lh(g1)!=='0.28','3MF je Gruppe: Platte '+p2+' mit 0,28 mm, die andere mit '+lh(g1)+' mm');
+          ok(platesDiffer(costDefaultSlot()),'Hinweis für die Orca-3MF: Platten haben eigene Werte');
+          project.parts.forEach(q=>{q.overrides=null});$('plateAuto').click();await wait(100);ok(project.parts.length===k,'aufgeräumt'); }
+        $('ovWhere').value='all';$('ovWhere').dispatchEvent(new Event('change'));
         selectPart(0);await wait(30);}
       project.parts.forEach((q,i)=>{q.overrides=keep[i]});update();await wait(30); }
     // 3D-Fortschritt: Vorschau beim ersten Abruf noch nicht da (geplanter Start) – die Seite fragt später erneut
