@@ -426,6 +426,13 @@ async function runSmoke(opts={}){
     ok(projectLayout(plTpl()).count===2&&!$('plateAuto').classList.contains('hidden'),'Teil auf neue Platte verschoben, „Platzsparend anordnen“ erscheint');
     $('plateAuto').click();await wait(100);
     ok(projectLayout(plTpl()).count===1,'Platzsparend anordnen: wieder eine Platte');
+    { // Kopien ziehen mit: erst Anzahl erhöhen, dann „Neue Platte“ – alle Kopien landen dort (vorher nur das gewählte Teil)
+      const k=project.parts.findIndex(p=>p.copyGroup&&copyGroupOf(p).length===2);selectPart(k);await wait(50);
+      const mv=document.querySelector('#partList [data-part-move="'+k+'"]');mv.value=String(projectLayout(plTpl()).count+1);mv.dispatchEvent(new Event('change',{bubbles:true}));await wait(100);
+      const lay=projectLayout(plTpl()),pl=copyGroupOf(project.parts[k]).map(p=>lay.plateOf[project.parts.indexOf(p)]);
+      ok(lay.count===2&&pl.length===2&&pl.every(n=>n===2),'Neue Platte: beide Kopien wandern mit ('+pl.join(',')+')');
+      $('plateAuto').click();await wait(100);
+    }
     // Größe (① Modell → Größe / Werkzeugleiste) und Werkzeugleiste
     { selectPart(0);await wait(50);const x0=project.parts[0].geom.x;
       document.querySelector('[data-sz="50"]').click();await wait(80);

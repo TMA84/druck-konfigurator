@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.6] – 2026-10-26
+
+### Behoben
+- **Kopien ziehen auf eine neue Platte mit:** Wer erst die Anzahl erhöhte und das Teil dann auf „Neue Platte“ schickte (Teileliste oder Werkzeugleiste), verschob nur das gewählte Exemplar – die Kopien blieben auf der alten Platte. Jetzt wandern alle Kopien mit, die auf derselben Platte stehen; Kopien auf anderen Platten bleiben, wo sie sind. Bedientest ergänzt.
+
 ## [10.47.5] – 2026-10-26
 
 ### Behoben

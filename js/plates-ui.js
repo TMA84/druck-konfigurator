@@ -115,11 +115,16 @@ function normalizePlates(tpl) {
   project.parts.forEach((p, i) => { p.plate = lay.plateOf[i]; });
 }
 
+/* Teil auf eine Platte verschieben – mit seinen Kopien, die auf derselben Platte stehen (die Teileliste zeigt sie als eine
+   Zeile „×n“; vorher wanderte nur das gewählte Teil, die Kopien blieben). Kopien auf anderen Platten bleiben, wo sie sind. */
 function movePart(i, plate) {
   const tpl = plTpl(); if (!tpl) return;
   fixPlates(tpl);
-  project.parts[i].plate = plate;
-  if (project.threemf) project.parts[i].moved = true;   // Platte packt ab jetzt das Tool
+  const p = project.parts[i], from = p.plate;
+  for (const q of copyGroupOf(p).filter(q => q === p || q.plate === from)) {
+    q.plate = plate;
+    if (project.threemf) q.moved = true;   // Platte packt ab jetzt das Tool
+  }
   normalizePlates(tpl);
   update();
 }
