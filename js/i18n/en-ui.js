@@ -845,6 +845,8 @@ I18N.add({
  "Druck abgebrochen: {name}": "Print cancelled: {name}",
  "Pausiert": "Paused",
  "am Drucker pausiert – Grund nicht gemeldet": "paused on the printer – no reason reported",
+ "Filament steckt fest – Düse verstopft oder Zuführung hängt": "filament is stuck – nozzle clogged or feed jammed",
+ "am Drucker pausiert": "paused on the printer",
  "von der Druckwerkstatt pausiert (Werkbank oder Home Assistant)": "paused from Print Workshop (workbench or Home Assistant)",
  "kein Filament im Drucker (ACE meldet keinen geladenen Slot) – Spule leer oder Zuführung hängt": "no filament in the printer (ACE reports no loaded slot) – spool empty or feed stuck",
 });

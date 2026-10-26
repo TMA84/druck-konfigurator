@@ -664,6 +664,17 @@ check("alter Befehl zählt nicht", "Druckwerkstatt" not in lan.pause_reason(_L({
 check("Code der Druck-Meldung", lan.pause_reason(_L(), pr(), {"code": 10403, "msg": "filament runout"}, [], now) == "Drucker meldet Code 10403: filament runout")
 check("Text ohne Code", lan.pause_reason(_L(), pr(), {"code": 200, "data": {"reason": "x"}}, [], now) == "Drucker meldet: x")
 check("ACE ohne geladenen Slot", "kein Filament" in lan.pause_reason(_L(), pr(), {"code": 200}, [{"loaded_slot": -1}], now))
+class _LL(_L):
+    def __init__(self, log, since=None):
+        super().__init__(since=since)
+        self.print_log = log
+# echter Fall 2026-10-26: 11518 „Filament is stuck“, 11 s später 10401 „用户发起“ – der Grund ist die 11518
+night = [{"t": 980, "action": "pause", "state": "paused", "code": 11518, "msg": "Filament is stuck", "data": {}},
+         {"t": 991, "action": "pause", "state": "paused", "code": 10401, "msg": "用户发起", "data": {}}]
+check("Verstopfung vor der allgemeinen 10401", lan.pause_reason(_LL(night, 995.0), pr(), night[-1], [], now) == lan.PAUSE_CODES[11518])
+check("nur 10401 → am Drucker pausiert", lan.pause_reason(_LL(night[1:], 995.0), pr(), night[-1], [], now) == "am Drucker pausiert")
+check("alte Pause zählt nicht", lan.pause_reason(_LL([dict(night[0], t=100)], 995.0), pr(), {"code": 200}, [], now) == "am Drucker pausiert – Grund nicht gemeldet")
+check("chinesischer Text nicht angezeigt", lan.pause_reason(_L(), pr(), {"code": 12345, "msg": "喷头堵塞"}, [], now) == "Drucker meldet Code 12345")
 check("sonst: nicht gemeldet", lan.pause_reason(_L(), pr(), {"code": 200}, [{"loaded_slot": 2}], now) == "am Drucker pausiert – Grund nicht gemeldet")
 
 print("%d/%d bestanden" % (passed, passed + failed))

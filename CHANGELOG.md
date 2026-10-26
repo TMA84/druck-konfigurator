@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.47.3] – 2026-10-26
+
+### Behoben
+- **Pausengrund bei Verstopfung:** Erkennt der Kobra S1 festsitzendes Filament (Code 11518 „Filament is stuck“), schickt die Firmware 11 s später selbst eine zweite Pause-Meldung (Code 10401, chinesischer Text „vom Nutzer ausgelöst“) – Werkbank und Home Assistant zeigten dann diese statt des echten Grunds. Jetzt zählt die aussagekräftige Meldung dieser Pause: „Filament steckt fest – Düse verstopft oder Zuführung hängt“; 10401 allein heißt „am Drucker pausiert“. Chinesische Firmware-Texte werden nicht mehr angezeigt (nur der Code).
+
 ## [10.47.2] – 2026-10-25
 
 ### Behoben

@@ -573,6 +573,15 @@ def _job_with_skips(link, project):
 # schickt, steht in PrinterLink.print_log (Rohdaten der Werkbank) – bis das an echten Pausen geprüft ist, gilt: eigener
 # Befehl (Werkbank/Home Assistant) → Code/Text der Druck-Meldung → ACE ohne Filament im Drucker → „Grund nicht gemeldet“.
 PAUSE_OWN_S = 90            # so lange nach unserem Pause-Befehl gilt eine Pause als „von hier“
+PAUSE_LOOKBACK_S = 300      # Druck-Meldungen so lange vor dem Erkennen der Pause zählen noch zu ihr
+# Codes der Werksfirmware (gemessen 2026-10-26: 11518 „Filament is stuck“, 11 s danach von selbst 10401 „用户发起“ =
+# „vom Nutzer ausgelöst“ – die Firmware pausiert nach einer Störung über denselben Weg wie die Pause-Taste)
+PAUSE_GENERIC = (0, 200, 10401)
+PAUSE_CODES = {
+    11518: "Filament steckt fest – Düse verstopft oder Zuführung hängt",
+    10401: "am Drucker pausiert",
+}
+_CJK = re.compile("[\u3000-\u9fff\uf900-\ufaff]")
 
 
 def pause_reason(link, project, print_rep, boxes, now=None):
@@ -583,10 +592,16 @@ def pause_reason(link, project, print_rep, boxes, now=None):
     t = link.sent.get(("print", "pause"))
     if t and -5 <= since - t <= PAUSE_OWN_S:
         return "von der Druckwerkstatt pausiert (Werkbank oder Home Assistant)"
-    pr = print_rep or {}
+    # Pause-Meldungen dieser Pause: die mit einem echten Grund vor der allgemeinen 10401, die die Firmware hinterherschickt
+    pauses = [e for e in getattr(link, "print_log", ()) if e.get("action") == "pause" and e.get("t", 0) >= since - PAUSE_LOOKBACK_S]
+    pr = next((e for e in pauses if e.get("code") not in PAUSE_GENERIC), None) or (pauses[-1] if pauses else print_rep or {})
     data = pr.get("data") if isinstance(pr.get("data"), dict) else {}
     text = next((str(v) for v in (pr.get("msg"), data.get("reason"), data.get("msg"), data.get("err_msg"), data.get("error")) if v), "")
+    if _CJK.search(text):
+        text = ""   # chinesischer Text der Firmware: nur der Code (bzw. seine Übersetzung)
     code = pr.get("code")
+    if code in PAUSE_CODES:
+        return PAUSE_CODES[code]   # fester Text, damit die Seite ihn übersetzen kann (Code steht in den Rohdaten)
     if isinstance(code, int) and code not in (0, 200):
         return "Drucker meldet Code %s%s" % (code, ": " + text if text else "")
     if text:
