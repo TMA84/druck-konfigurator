@@ -14,7 +14,8 @@ Jetzt vermessen (calibrate): nur wenn der Drucker frei ist (print_stats/idle_tim
 POST /printer/gcode/script mit G9111 (wie beim Druckstart: heizt, wischt, Z-Offset), BED_MESH_CALIBRATE, Heizungen aus
 und BED_MESH_OUTPUT. Die Anycubic-Firmware tastet immer 5 × 5 ab – PROBE_COUNT=7,7 ignoriert sie (geprüft 2026-11-02). Moonraker antwortet erst am Ende
 (einige Minuten) – das läuft in einem eigenen Thread; calib_state (GET …/mesh/calibrate) sagt, ob es fertig ist.
-Geprüft 2026-11-02 am Kobra S1 (Rinkhals): G9111 allein misst nur den Z-Offset; BED_MESH_CALIBRATE tastet ab, das Netz
+Geprüft 2026-11-02 am Kobra S1 (Rinkhals): G9111 allein misst nur den Z-Offset; PID_CALIBRATE läuft nur kurz, gibt nichts aus
+und speichert nichts (nicht benutzt); BED_MESH_CALIBRATE tastet ab, das Netz
 bleibt aber nur im Speicher – Moonraker (bed_mesh) und printer_mutable.cfg zeigen weiter das Netz des letzten Druckstarts,
 auch BED_MESH_PROFILE SAVE ändert daran nichts (nur SAVE_CONFIG, das startet die Firmware neu – nicht benutzt). Darum
 liest der Server das Netz danach mit BED_MESH_OUTPUT aus der Konsole (/server/gcode_store) und merkt es sich
@@ -48,7 +49,6 @@ CALIB_NOZZLE = 170           # °C, wie LeviQ3 (extru_temp) – Düse sauber wis
 CALIB_TIMEOUT_S = 1800
 BUSY_STATES = ("printing", "paused")
 _calib = {}                  # Drucker → {"started", "bed", "done", "error"}
-_pid = {}                    # Drucker → {"started", "target", "done", "error", "old", "new", "saved"}
 UNSUPPORTED = "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus"
 EMPTY = "Drucker hat kein Bettnetz geladen – er vermisst das Bett beim nächsten Druckstart (oder am Display: Nivellierung)"
 
@@ -304,92 +304,10 @@ def ensure_idle(host):
 
 
 def _claim(host):
-    """Unter _lock: je Drucker nur ein Ablauf (Vermessen oder PID-Abgleich) zur selben Zeit."""
-    for jobs, name in ((_calib, "Vermessen"), (_pid, "PID-Abgleich")):
-        c = jobs.get(host)
-        if c and not c.get("done"):
-            raise MeshError("%s läuft schon" % name, "busy")
-
-
-# ---------- PID-Abgleich des Heizbetts (z. B. nach dem Umbau auf ein anderes Bett) ----------
-PID_TARGETS = (50, 110)
-PID_TIMEOUT_S = 3600
-_PID_RE = re.compile(r"Kp\s*=\s*(-?[\d.]+)\s*,?\s*(?:pid_)?Ki\s*=\s*(-?[\d.]+)\s*,?\s*(?:pid_)?Kd\s*=\s*(-?[\d.]+)", re.I)
-
-
-def parse_pid(store):
-    """PID-Werte aus der Konsole: letzte Antwort mit Kp/Ki/Kd nach dem letzten PID_CALIBRATE → {kp, ki, kd}."""
-    items = store.get("result", {}).get("gcode_store") if isinstance(store, dict) else None
-    if not isinstance(items, list):
-        raise MeshError("Konsole des Druckers nicht lesbar", "bad_response")
-    found = None
-    for it in items:
-        msg = it.get("message", "") if isinstance(it, dict) else ""
-        if not isinstance(msg, str):
-            continue
-        if it.get("type") == "command" and "PID_CALIBRATE" in msg.upper():
-            found = None
-        elif it.get("type") == "response":
-            m = _PID_RE.search(msg)
-            if m:
-                found = m
-    if not found:
-        raise MeshError("PID-Ergebnis nicht in der Konsole gefunden", "bad_response")
-    v = [float(x) for x in found.groups()]
-    if not all(math.isfinite(x) and x > 0 for x in v):
-        raise MeshError("PID-Ergebnis unplausibel", "bad_response")
-    return {"kp": v[0], "ki": v[1], "kd": v[2]}
-
-
-def saved_pid(host, heater="heater_bed"):
-    """PID-Werte, die die Firmware gespeichert hat (printer_mutable.cfg, JSON) → {kp, ki, kd} oder None."""
-    try:
-        d = _moon(host, "/server/files/config/printer_mutable.cfg")
-        h = d.get(heater) or {}
-        v = {"kp": float(h["pid_Kp"]), "ki": float(h["pid_Ki"]), "kd": float(h["pid_Kd"])}
-    except (MeshError, AttributeError, KeyError, TypeError, ValueError):
-        return None
-    return v if all(math.isfinite(x) for x in v.values()) else None
-
-
-def pid_state(host):
-    host = anycubic_lan.check_host(host)
-    with _lock:
-        c = _pid.get(host)
-        return dict(c) if c else None
-
-
-def pid_calibrate(host, target=60, run_async=True):
-    """PID-Abgleich des Betts starten (nur wenn frei) → {"started": True, "target"}. Ergebnis über pid_state:
-    old (gespeichert vorher), new (aus der Konsole), saved (stehen die neuen Werte danach in printer_mutable.cfg?)."""
-    host = anycubic_lan.check_host(host)
-    if isinstance(target, bool) or not isinstance(target, int) or not PID_TARGETS[0] <= target <= PID_TARGETS[1]:
-        raise MeshError("Zieltemperatur %d–%d °C" % PID_TARGETS, "bad_request")
-    ensure_idle(host)
-    old = saved_pid(host)
-    with _lock:
-        _claim(host)
-        _pid[host] = {"started": int(time.time()), "target": target, "done": None, "error": None, "old": old, "new": None, "saved": None}
-
-    def run():
-        err, new, saved = None, None, None
-        try:
-            _moon(host, "/printer/gcode/script", {"script": "PID_CALIBRATE HEATER=heater_bed TARGET=%d\nM140 S0" % target},
-                  timeout=PID_TIMEOUT_S)
-            new = parse_pid(_moon(host, "/server/gcode_store?count=100"))
-            now = saved_pid(host)
-            saved = bool(now and all(abs(now[k] - new[k]) <= max(0.01, abs(new[k]) * 0.001) for k in new))
-        except MeshError as e:
-            err = str(e)
-        except Exception as e:   # noqa: BLE001
-            err = str(e) or type(e).__name__
-        with _lock:
-            _pid[host].update(done=int(time.time()), error=err, new=new, saved=saved)
-    if run_async:
-        threading.Thread(target=run, daemon=True, name="pid-calibrate").start()
-    else:
-        run()
-    return {"started": True, "target": target}
+    """Unter _lock: je Drucker nur ein Vermessen zur selben Zeit."""
+    c = _calib.get(host)
+    if c and not c.get("done"):
+        raise MeshError("Vermessen läuft schon", "busy")
 
 
 def calib_state(host):

@@ -126,7 +126,6 @@ async function meshCalibPoll(once) {
 function meshRunState() {
   const c = mh.calib, running = !!(c && !c.done), note = $('wbMeshRunNote');
   $('wbMeshRunRow').classList.toggle('hidden', mh.kind === 'unsupported');
-  if (typeof pidSync === 'function') pidSync();
   $('wbMeshRun').disabled = running || !!mh.printing || !wbHost();
   $('wbMeshBed').disabled = running;
   $('wbMeshRun').title = mh.printing ? t('Nur wenn der Drucker frei ist') : '';

@@ -756,16 +756,6 @@ async function runSmoke(opts={}){
         mh.printing=null;meshOnStatus({connected:true,printing:true});ok($('wbMeshRun').disabled,'Nivellierung: beim Drucken gesperrt');
         meshOnStatus({connected:true,printing:false});await wait(150);mh.calib=null;meshRunState();
         window.fetch=of2;window.confirm=c0; }
-      // PID-Abgleich: Karte sichtbar mit Moonraker-Netz, POST mit Ziel, Ergebnis vorher/neu, Hinweis „nicht übernommen“
-      { const posts=[];let pst=null;const of3=window.fetch,c1=window.confirm;
-        window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/pid')){if(o&&o.method==='POST')posts.push(JSON.parse(o.body));return Promise.resolve(new Response(JSON.stringify(o&&o.method==='POST'?{started:true}:{state:pst}),{status:200,headers:{'Content-Type':'application/json'}}))}return of3(u,o)};
-        window.confirm=()=>true;pid.host=null;pidSync();await wait(100);
-        ok(!$('wbPidCard').classList.contains('hidden'),'PID: Karte sichtbar (Moonraker da)');
-        $('wbPidTarget').value='70';$('wbPidRun').click();await wait(150);
-        ok(posts.length===1&&posts[0].target===70&&posts[0].host==='10.0.0.9'&&$('wbPidRun').disabled&&/läuft/.test($('wbPidNote').textContent),'PID: gestartet mit 70 °C: '+JSON.stringify(posts)+' '+$('wbPidRun').disabled+' '+$('wbPidNote').textContent);
-        pst={started:1,target:70,error:null,done:2,old:{kp:35.576,ki:0.563,kd:561.66},new:{kp:73.517,ki:1.132,kd:1193.763},saved:false};clearTimeout(pid.timer);await pidPoll();
-        ok(/73[,.]517/.test($('wbPidResult').textContent)&&/35[,.]576/.test($('wbPidResult').textContent)&&/SAVE_CONFIG/.test($('wbPidSaved').textContent)&&!$('wbPidRun').disabled,'PID: Ergebnis vorher/neu, nicht übernommen');
-        window.fetch=of3;window.confirm=c1;pid.state=null;pidRender(); }
       answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};
       $('wbMeshLoad').click();await wait(150);
       ok($('wbMeshBody').classList.contains('hidden')&&/Rinkhals/.test($('wbMeshNote').textContent),'Nivellierung: Werksfirmware → Hinweis');

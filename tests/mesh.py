@@ -328,63 +328,6 @@ st, d = post({"host": "127.0.0.1", "bed": 60})
 check("Vermessen: läuft schon → 409", st == 409 and "läuft schon" in d.get("error", ""), (st, d))
 mesh._calib.clear()
 
-# PID-Abgleich des Betts: nur wenn frei, Ergebnis aus der Konsole, vorher/nachher gespeicherte Werte
-def pid_post(body):
-    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
-    c.request("POST", "/api/anycubic/pid", json.dumps(body), {"Content-Type": "application/json"})
-    r = c.getresponse()
-    data = json.loads(r.read() or b"{}")
-    c.close()
-    return r.status, data
-
-
-def pid_done():
-    for _ in range(100):
-        c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
-        c.request("GET", "/api/anycubic/pid?host=127.0.0.1")
-        r = c.getresponse()
-        d = json.loads(r.read() or b"{}")
-        c.close()
-        if d.get("state") and d["state"].get("done"):
-            return d["state"]
-        time.sleep(0.05)
-    return None
-
-
-OLD = {"heater_bed": {"control": "pid", "pid_Kd": "561.660", "pid_Ki": "0.563", "pid_Kp": "35.576"}}
-fake["mutable"] = OLD
-fake["store"] = [{"type": "command", "message": "PID_CALIBRATE HEATER=heater_bed TARGET=60\nM140 S0"},
-                 {"type": "response", "message": "PID parameters: pid_Kp=73.517 pid_Ki=1.132 pid_Kd=1193.763\nThe SAVE_CONFIG command will update the printer config file"}]
-fake["scripts"].clear()
-fake["state"] = "printing"
-st, d = pid_post({"host": "127.0.0.1", "target": 60})
-check("PID: druckt → 409, nichts gesendet", st == 409 and not fake["scripts"], (st, d))
-fake["state"] = "complete"
-for bad in ({"host": "127.0.0.1", "target": 200}, {"host": "127.0.0.1", "target": "60"}, {"host": "127.0.0.1", "target": True}):
-    st, d = pid_post(bad)
-    check("PID: ungültig %s → 400" % bad, st == 400 and not fake["scripts"], (st, d))
-st, d = pid_post({"host": "127.0.0.1", "target": 60})
-state = pid_done()
-check("PID: Befehl gesendet", fake["scripts"] == [("/printer/gcode/script", "PID_CALIBRATE HEATER=heater_bed TARGET=60\nM140 S0")], fake["scripts"])
-check("PID: Ergebnis, alte Werte, nicht gespeichert erkannt", state and state["error"] is None and state["new"] == {"kp": 73.517, "ki": 1.132, "kd": 1193.763}
-      and state["old"] == {"kp": 35.576, "ki": 0.563, "kd": 561.66} and state["saved"] is False, state)
-# Firmware übernimmt die Werte selbst → saved
-fake["scripts"].clear()
-fake["mutable"] = {"heater_bed": {"pid_Kd": "1193.763", "pid_Ki": "1.132", "pid_Kp": "73.517"}}
-st, d = pid_post({"host": "127.0.0.1", "target": 60})
-state = pid_done()
-check("PID: gespeichert erkannt", state and state["saved"] is True, state)
-# kein Ergebnis in der Konsole
-fake["store"] = [{"type": "command", "message": "PID_CALIBRATE HEATER=heater_bed TARGET=60"}, {"type": "response", "message": "!! Heater heater_bed not heating at expected rate"}]
-st, d = pid_post({"host": "127.0.0.1", "target": 60})
-state = pid_done()
-check("PID: kein Ergebnis → Fehler", state and "nicht in der Konsole" in (state.get("error") or ""), state)
-# während des Vermessens kein PID-Abgleich
-mesh._calib["127.0.0.1"] = {"started": 1, "done": None}
-st, d = pid_post({"host": "127.0.0.1", "target": 60})
-check("PID: während Vermessen → 409", st == 409 and "Vermessen läuft schon" in d.get("error", ""), (st, d))
-mesh._calib.clear()
-fake["store"] = None
 
 srv.shutdown()
 moon.shutdown()

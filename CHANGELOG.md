@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.52.1] – 2026-11-02
+
+### Entfernt
+- **Heizbett einregeln (PID):** Die Karte ist wieder weg. Beim Test am Kobra S1 lief `PID_CALIBRATE` nur etwa 2,5 Minuten, gab kein Ergebnis aus und speicherte nichts. Die Anycubic-Firmware kennt den Befehl zwar, macht damit aber keinen PID-Abgleich wie Klipper. Mit den bisherigen Werten regelt der Drucker auch das Funssor-Aluminiumbett brauchbar: Bei Ziel 60 °C schwingt es höchstens auf 63 °C über.
+
 ## [10.52.0] – 2026-11-02
 
 ### Neu
