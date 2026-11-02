@@ -6,7 +6,7 @@
    Klipper: probed_matrix[y][x], Zeile 0 = vorn (mesh_min Y). Positiv = Bett an dieser Stelle höher.
    Zeichnen nur bei Änderungen (wie js/miniview.js), Farben hell/dunkel wie js/live-scene.js.
    Vergleich: der Server merkt sich jede neue Messung (tools/mesh.py, history) – gewählte frühere Messung gestrichelt über
-   der Fläche, Änderung je Punkt in der Tabelle. Schrauben: Schätzung aus den Eckpunkten, wie weit welche Ecke zu drehen ist. */
+   der Fläche, Änderung je Punkt in der Tabelle. Schrauben: Schätzung aus dem Netz an den Schrauben (inneres Quadrat oder Ecken), wie weit welche zu drehen ist. */
 
 const mh = { host: null, data: null, err: null, kind: '', busy: false, printing: null, at: 0, seq: 0, nums: false,
   renderer: null, scene: null, camera: null, controls: null, group: null, lines: [], prevLines: [], outline: null,
@@ -103,6 +103,8 @@ $('wbMeshCmp').addEventListener('change', e => {
 });
 $('wbMeshPitch').value = String(store.settings.meshPitch || 0.5);
 if (!$('wbMeshPitch').value) $('wbMeshPitch').value = '0.5';
+$('wbMeshScrewAt').value = store.settings.meshScrewAt === 'corners' ? 'corners' : 'inner';
+$('wbMeshScrewAt').addEventListener('change', e => { store.settings.meshScrewAt = e.currentTarget.value; persist(); if (mh.data) meshScrews(mh.data); });
 $('wbMeshPitch').addEventListener('change', e => { store.settings.meshPitch = Number(e.currentTarget.value); persist(); if (mh.data) meshScrews(mh.data); });
 
 function meshRender() {
@@ -158,13 +160,24 @@ function meshCmpSelect(d) {
 /* Stellschrauben an den Ecken: Höhe der Eckpunkte des Netzes, Bezug = die Ecke, bei der insgesamt am wenigsten zu drehen ist.
    Höher als der Bezug → anziehen (senkt die Ecke bei Schrauben mit Feder), tiefer → lösen. Umdrehungen = Höhe / Steigung, auf ⅛. */
 const MESH_CORNERS = [['hinten links', 1, 0], ['hinten rechts', 1, 1], ['vorne links', 0, 0], ['vorne rechts', 0, 1]];
+/* Lage der Schrauben als Anteil der vermessenen Fläche: Kobra S1 – inneres Quadrat (¼ und ¾, beim 5 × 5-Netz 5…245 mm
+   genau die Messpunkte bei 65 und 185 mm; Angabe des Nutzers 2026-11-02), sonst Ecken (0 und 1) */
+const MESH_SCREW_AT = { inner: [0.25, 0.75], corners: [0, 1] };
+const meshScrewWhere = () => MESH_SCREW_AT[$('wbMeshScrewAt').value] ? $('wbMeshScrewAt').value : 'inner';
+// Höhe an einer Stelle (Anteil fx, fy der vermessenen Fläche), bilinear zwischen den Messpunkten
+function meshAt(m, fx, fy) {
+  const r = m.length, c = m[0].length, x = fx * (c - 1), y = fy * (r - 1);
+  const i = Math.min(c - 2, Math.floor(x)), j = Math.min(r - 2, Math.floor(y)), u = x - i, v = y - j;
+  return (m[j][i] * (1 - u) + m[j][i + 1] * u) * (1 - v) + (m[j + 1][i] * (1 - u) + m[j + 1][i + 1] * u) * v;
+}
 function meshScrewPlan(d) {
-  const m = d.probed, r = m.length, c = m[0].length;
-  const pts = MESH_CORNERS.map(([name, yb, xb]) => ({ name, z: m[yb ? r - 1 : 0][xb ? c - 1 : 0] }));
+  const m = d.probed, at = MESH_SCREW_AT[meshScrewWhere()];
+  const pts = MESH_CORNERS.map(([name, yb, xb]) => ({ name, fx: at[xb], fy: at[yb], z: meshAt(m, at[xb], at[yb]) }));
   let ref = pts[0], best = Infinity;
   for (const p of pts) { const sum = pts.reduce((a, q) => a + Math.abs(q.z - p.z), 0); if (sum < best - 1e-9) { best = sum; ref = p; } }
   return pts.map(p => ({ ...p, ref: p === ref, dz: p.z - ref.z }));
 }
+const meshPos = (d, f, k) => d.min[k] + (d.max[k] - d.min[k]) * f;
 const MESH_EIGHTHS = ['', '⅛', '¼', '⅜', '½', '⅝', '¾', '⅞'];
 function meshTurns(mm, pitch) {
   const e = Math.round(Math.abs(mm) / pitch * 8);
@@ -178,15 +191,15 @@ function meshScrews(d) {
   $('wbMeshScrewGrid').innerHTML = plan.map(p => {
     const ok = Math.abs(p.dz) < MESH_OK_MM, turns = meshTurns(p.dz, pitch);
     const what = p.ref ? t('Bezug – nicht drehen') : ok || !turns ? t('passt')
-      : p.dz > 0 ? t('anziehen (im Uhrzeigersinn) – senkt diese Ecke') : t('lösen (gegen den Uhrzeigersinn) – hebt diese Ecke');
+      : p.dz > 0 ? t('anziehen (im Uhrzeigersinn) – senkt das Bett hier') : t('lösen (gegen den Uhrzeigersinn) – hebt das Bett hier');
     return '<div class="wb-mesh-screw' + (p.ref ? ' ref' : ok ? ' ok' : p.dz > 0 ? ' down' : ' up') + '"><b>' + esc(t(p.name)) + '</b>'
       + '<span class="wb-mesh-screw-dz">' + esc(meshMmS(p.dz)) + '</span>'
       + '<span>' + esc(what) + '</span>' + (!p.ref && !ok && turns ? '<span class="wb-mesh-screw-turns">' + esc(turns) + '</span>' : '') + '</div>';
   }).join('');
   const all = plan.every(p => Math.abs(p.dz) < MESH_OK_MM);
   $('wbMeshScrewNote').textContent = (all ? t('Alle Ecken liegen innerhalb von {mm} – nichts zu drehen.', { mm: meshMm(MESH_OK_MM) }) + ' ' : '')
-    + t('Schätzung aus den Eckpunkten des Netzes (gemessen {x} mm vom Rand) für Stellschrauben mit Feder an den Ecken: Anziehen senkt das Bett. Ob und wo dein Bett solche Schrauben hat, bitte selbst prüfen. In kleinen Schritten drehen, dann neu vermessen und mit dieser Messung vergleichen – den Rest gleicht das Bettnetz beim Druck ohnehin aus.',
-      { x: de(Math.min(d.min[0], d.min[1]), 0) });
+    + t('Schätzung aus dem Bettnetz an den Schrauben (X {x1} / {x2}, Y {y1} / {y2} mm) für Stellschrauben mit Feder: Anziehen senkt das Bett an dieser Stelle. In kleinen Schritten drehen, dann neu vermessen und mit dieser Messung vergleichen – den Rest gleicht das Bettnetz beim Druck ohnehin aus.',
+      { x1: de(meshPos(d, plan[2].fx, 0), 0), x2: de(meshPos(d, plan[3].fx, 0), 0), y1: de(meshPos(d, plan[2].fy, 1), 0), y2: de(meshPos(d, plan[0].fy, 1), 0) });
 }
 
 // Messpunkte als Tabelle von oben, vor dem Drucker stehend: vorn (Zeile 0, mesh_min Y) unten, hinten oben; gefärbt wie die Fläche

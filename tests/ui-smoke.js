@@ -736,7 +736,13 @@ async function runSmoke(opts={}){
         $('wbMeshCmp').value='';$('wbMeshCmp').dispatchEvent(new Event('change'));
         ok($('wbMeshCmpNote').classList.contains('hidden')&&!/Größte Änderung/.test($('wbMeshStats').textContent),'Nivellierung: ohne Vergleich');
         mh.cmp=null;$('wbMeshScrewsBtn').click();$('wbMeshPitch').value='0.5';$('wbMeshPitch').dispatchEvent(new Event('change'));
+        const at0=$('wbMeshScrewAt').value;$('wbMeshScrewAt').value='inner';$('wbMeshScrewAt').dispatchEvent(new Event('change'));
+        const si=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
+        ok(/hinten rechts.*Bezug/.test(si[1])&&/vorne links.*−0[,.]020.*passt/.test(si[2])&&/vorne rechts.*\+0[,.]160.*anziehen.*⅜ Umdrehung \(115°\)/.test(si[3])&&/hinten links.*−0[,.]225.*lösen.*½ Umdrehung \(162°\)/.test(si[0])
+          &&/X 65 \/ 185, Y 65 \/ 185/.test($('wbMeshScrewNote').textContent),'Nivellierung: Schrauben am inneren Quadrat (65/185 mm): '+si.join(' | '));
+        $('wbMeshScrewAt').value='corners';$('wbMeshScrewAt').dispatchEvent(new Event('change'));
         const sc=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
+        $('wbMeshScrewAt').value=at0;$('wbMeshScrewAt').dispatchEvent(new Event('change'));
         ok(!$('wbMeshScrews').classList.contains('hidden')&&/hinten rechts.*Bezug/.test(sc[1])&&/vorne rechts.*\+0[,.]769.*anziehen.*1 ½ Umdrehungen/.test(sc[3])&&/hinten links.*−0[,.]324.*lösen.*⅝ Umdrehung \(233°\)/.test(sc[0]),'Nivellierung: Schrauben – Bezug, anziehen 1 ½, lösen ⅝: '+sc.join(' | '));
         $('wbMeshScrewsBtn').click(); }
       answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};

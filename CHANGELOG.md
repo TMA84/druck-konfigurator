@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.50.1] – 2026-11-02
+
+### Geändert
+- **Schrauben am inneren Quadrat:** Beim Kobra S1 sitzen die Stellschrauben etwa am inneren Quadrat, nicht an den Ecken. Die Schätzung nimmt deshalb jetzt die Höhe an ¼ und ¾ der vermessenen Fläche (beim 5 × 5-Netz die Messpunkte bei X/Y 65 und 185 mm, sonst bilinear dazwischen). Neue Auswahl „Schrauben am“: inneres Quadrat (Standard) oder Rand. Bedientest ergänzt.
+
 ## [10.50.0] – 2026-11-02
 
 ### Neu
