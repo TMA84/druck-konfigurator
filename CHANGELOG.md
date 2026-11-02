@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.53.0] – 2026-11-02
+
+### Neu
+- **Farbwechsel der ACE anzeigen:** In der ACE-Karte der Werkbank steht während eines Farbwechsels eine Zeile mit alter und neuer Farbe, dem Schritt („Slot 1 wird zurückgezogen“, „Slot 3 wird zum Kopf geführt“, „Farbe gewechselt“) und der Zeit seit Beginn. Der alte Slot ist gestrichelt umrandet, der neue pulsiert. Das Display in der 3D-Ansicht zeigt „Farbwechsel → Slot 3“, und Home Assistant bekommt den Sensor **ACE**. Grundlage ist ein Mitschnitt eines echten Wechsels am Kobra S1 mit zwei ACE: Die ACE meldet Status 2, solange sie arbeitet, und der geladene Slot geht vom alten auf −1 und dann auf den neuen. Ein Wechsel dauert etwa 45 s. Dafür gibt es keine neue Abfrage an den Drucker; ausgewertet werden die Meldungen, die ohnehin kommen. Tests in `tests/lan.py`, `tests/ha_mqtt.py` und im Bedientest.
+
+### Behoben
+- **ACE-Kacheln verschwanden beim Farbwechsel kurz:** Der S1 schickt dabei Teilmeldungen mit nur einem Slot und ohne geladenen Slot. Die ersetzten bisher die vollständige Liste beider Einheiten. Jetzt bleibt der letzte vollständige Stand stehen.
+
 ## [10.52.1] – 2026-11-02
 
 ### Entfernt

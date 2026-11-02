@@ -203,7 +203,10 @@ function wbRender() {
   $('wbAceTabs').classList.toggle('hidden', boxes.length < 2);
   $('wbAceTabs').innerHTML = boxes.length < 2 ? '' : boxes.map((x, i) => '<button type="button" data-wb-box="' + i + '" aria-pressed="' + (i === bi) + '">ACE ' + (i + 1) +
     (x.drying && x.drying.status ? ' <small>' + t('trocknet') + '</small>' : '') + '</button>').join('');
-  $('wbAceSlots').innerHTML = box ? box.slots.map(s => { const si = safeInt(s.index), g = base + si; return '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') + '">' +
+  const act = st.ace_activity, moving = act && act.phase !== 'done';
+  wbAceAct(st);
+  $('wbAceSlots').innerHTML = box ? box.slots.map(s => { const si = safeInt(s.index), g = base + si; return '<li class="' + (s.loaded ? 'loaded' : '') + (s.present ? '' : ' empty') +
+      (moving && act.to === g ? ' feeding' : '') + (moving && act.phase === 'unload' && act.from === g ? ' outgoing' : '') + '">' +
       '<div class="wb-swatch" style="' + (s.present ? 'background:' + safeColour(s.colour, '#dddddd') : '') + '"><span>' + (g + 1) + '</span></div>' +
       '<div class="wb-slotinfo"><b>' + (s.present ? esc(s.type) : t('leer')) + '</b><small>' + (s.present ? (s.loaded ? t('im Drucker') : s.rfid ? 'RFID' : t('von Hand')) : '–') + '</small>' +
         (s.present && typeof spoolTileHTML === 'function' ? spoolTileHTML(g) : '') + '</div>' +
@@ -216,6 +219,30 @@ function wbRender() {
   $('wbDryState').textContent = dry.status ? t('{temp} °C · noch {left}', { temp: dry.target_temp, left: wbMin(dry.remain_time) }) : t('aus');
   $('wbDryBar').style.width = dry.status && dry.duration ? Math.max(0, Math.min(100, (1 - (dry.remain_time || 0) / dry.duration) * 100)) + '%' : '0';
   document.querySelectorAll('#wbDryTemp,#wbDryMin').forEach(el => { el.disabled = !!dry.status; });
+}
+
+// Was die ACE gerade tut (st.ace_activity aus tools/anycubic_lan.py ace_activity): Farbwechsel mit Farben der Slots
+function wbAceSlot(boxes, g) {
+  let base = 0;
+  for (const b of boxes || []) { const s = (b.slots || []).find(x => base + safeInt(x.index) === g); if (s) return s; base += (b.slots || []).length; }
+  return null;
+}
+function wbAceText(act) {
+  const f = act.from + 1, to = act.to + 1;
+  if (act.phase === 'done') return act.from >= 0 ? t('Farbe gewechselt') : t('Slot {n} geladen', { n: to });
+  if (act.phase === 'unload') return t('Farbwechsel: Slot {n} wird zurückgezogen', { n: f });
+  if (act.phase === 'load') return act.to >= 0 ? t('Farbwechsel: Slot {n} wird zum Kopf geführt', { n: to }) : t('Farbwechsel: Filament wird geladen');
+  return t('ACE arbeitet');
+}
+function wbAceAct(st) {
+  const el = $('wbAceAct'), act = st && st.ace_activity;
+  el.classList.toggle('hidden', !act);
+  if (!act) { el.innerHTML = ''; return; }
+  const dot = g => { const s = g >= 0 && wbAceSlot(st.ace, g); return s && s.present ? '<i style="background:' + safeColour(s.colour, '#dddddd') + '" title="Slot ' + (g + 1) + '"></i>' : ''; };
+  const pair = act.from >= 0 || act.to >= 0 ? dot(act.from) + (act.from >= 0 && (act.to >= 0 || act.phase !== 'done') ? '<span class="arrow">→</span>' : '') + (act.to >= 0 ? dot(act.to) : act.phase !== 'done' ? '<span class="arrow">?</span>' : '') : '';
+  const secs = Math.max(0, Math.round(Date.now() / 1000 - (+act.since || 0)));
+  el.classList.toggle('busy', act.phase !== 'done');
+  el.innerHTML = pair + '<b>' + esc(wbAceText(act)) + '</b>' + (act.phase !== 'done' && act.since ? '<small>' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + '</small>' : '');
 }
 
 // Befehl senden, Knopf solange sperren, danach sofort neu lesen

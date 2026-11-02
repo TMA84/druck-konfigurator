@@ -703,6 +703,16 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-ace { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .wb-ace li { border: 1px solid var(--rule-strong); border-radius: var(--r-s); overflow: hidden; display: flex; flex-direction: column; background: var(--paper); }
 .wb-ace li.loaded { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* Farbwechsel (st.ace_activity): neuer Slot pulsiert, alter gestrichelt */
+.wb-ace li.feeding { border-color: var(--accent); animation: wb-feed-pulse 1.2s ease-in-out infinite; }
+.wb-ace li.outgoing { border-style: dashed; opacity: .75; }
+@keyframes wb-feed-pulse { 0%, 100% { box-shadow: 0 0 0 1px var(--accent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .wb-ace li.feeding { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
+.wb-ace-act { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 6px 10px; border-radius: var(--r-s); background: var(--sheet); border: 1px solid var(--rule-strong); font-size: 13px; }
+.wb-ace-act i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); flex: none; }
+.wb-ace-act .arrow { color: var(--ink-3); }
+.wb-ace-act small { margin-left: auto; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.wb-ace-act.busy b::after { content: ' …'; }
 .wb-ace .wb-swatch { height: 38px; position: relative; }
 .wb-ace .wb-swatch span { position: absolute; left: 6px; top: 5px; font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 3px; background: rgba(255,255,255,.85); color: #222; }
 .wb-ace .wb-slotinfo { padding: 5px 7px 6px; display: grid; gap: 1px; font-size: 13px; }

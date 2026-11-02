@@ -218,6 +218,7 @@ class PrinterLink:
         self.cam_ours = False      # Kamera von uns gestartet (startCapture) – nur dann stoppen wir sie auch
         self.cam_stopper = False   # Thread für „ohne Zuschauer stoppen“ läuft
         self.paused_since = None   # seit wann der laufende Druck pausiert (aus info.project.pause)
+        self.ace_track = {}        # Verlauf der ACE für ace_activity (Farbwechsel)
         self.connected = threading.Event()
         self.first = threading.Event()
         self.start_lock = threading.Lock()   # nur ein Druckstart zugleich (Doppelklick, Seite + geplanter Druck)
@@ -365,7 +366,7 @@ class PrinterLink:
             # Die Box-Liste nur aus Berichten, die sie vollständig enthalten (getInfo …); Bestätigungen und
             # Teilmeldungen (setInfo ohne Daten, autoUpdateInfo …) unter eigenem Schlüssel
             boxes = (doc.get("data") or {}).get("multi_color_box") if isinstance(doc.get("data"), dict) else None
-            if kind == "multiColorBox" and not (isinstance(boxes, list) and boxes and all("slots" in b for b in boxes)):
+            if kind == "multiColorBox" and not _full_boxes(boxes, self.reports.get("multiColorBox")):
                 self.reports["multiColorBox:" + str(doc.get("action"))] = doc
             elif kind in ("light", "axis", "fan", "tempature") and doc.get("action") not in ("query", "report", "auto", None) and kind in self.reports:
                 self.reports[kind + ":" + str(doc.get("action"))] = doc     # Bestätigung eines Befehls ≠ Stand
@@ -513,9 +514,71 @@ def ace_boxes(reports):
                           # belegten Slots. Im Drucker ist nur der Slot aus loaded_slot (−1 = keiner gemeldet).
                           "loaded": isinstance(loaded, int) and loaded >= 0 and s.get("index") == loaded,
                           "rfid": s.get("edit_status") == 0, "sku": s.get("sku", "")})
-        out.append({"id": bid, "model_id": b.get("model_id"), "auto_feed": b.get("auto_feed"), "loaded_slot": loaded,
+        out.append({"id": bid, "model_id": b.get("model_id"), "auto_feed": b.get("auto_feed"), "loaded_slot": loaded, "status": b.get("status"),
                     "temp": b.get("temp"), "drying": b.get("drying_status"), "slots": slots})
     return out
+
+
+def _full_boxes(boxes, prev):
+    """Vollständige Box-Liste (getInfo …)? Beim Farbwechsel schickt der S1 Teilmeldungen ({id, slots: [ein Slot]}, ohne
+    loaded_slot und status – gemessen 2026-11-02); die dürfen den letzten Stand nicht ersetzen."""
+    if not (isinstance(boxes, list) and boxes and all(isinstance(b, dict) and "slots" in b for b in boxes)):
+        return False
+    old = [b for b in (((prev or {}).get("data") or {}).get("multi_color_box") or []) if isinstance(b, dict)]
+    if not old:
+        return True
+    if len(boxes) < len(old):
+        return False
+    for b in boxes:
+        o = next((x for x in old if x.get("id") == b.get("id")), None)
+        if o and (len(b.get("slots") or []) < len(o.get("slots") or []) or any(k in o and k not in b for k in ("loaded_slot", "status"))):
+            return False
+    return True
+
+
+# ACE-Tätigkeit (gemessen am S1 mit zwei ACE, 2026-11-02, Farbwechsel im Druck, ~47 s): Box-Status 1 = ruht, 2 = arbeitet;
+# loaded_slot geht vom alten Slot auf −1 (Filament zurückgezogen) und dann auf den neuen (am Kopf), danach Status wieder 1.
+# feed_status bleibt dabei leer (nur bei Laden/Zurück von Hand). Spülen danach macht der Drucker, die ACE meldet es nicht.
+ACE_DONE_S = 25      # so lange bleibt „Farbe gewechselt“ stehen
+ACE_IDLE_END_S = 30  # ruht die ACE so lange ohne geladenen Slot, ist der Vorgang vorbei (z. B. Entladen am Druckende)
+
+
+def ace_activity(track, boxes, now):
+    """Was die ACE gerade tut, aus dem Verlauf von Box-Status und geladenem Slot (durchgehende Slotnummern).
+    track: dict je Drucker (wird fortgeschrieben). → None oder {phase: unload|load|done|busy, from, to, since}."""
+    loaded, busy = loaded_slot(boxes), any(b.get("status") == 2 for b in boxes)
+    if busy:
+        track["busy_at"] = now
+    ch = track.get("change")
+    if ch is None and boxes and ((loaded < 0 and track.get("last", -1) >= 0) or busy):
+        ch = track["change"] = {"from": track.get("last", -1), "to": -1, "since": now, "done_at": None}
+    if loaded >= 0:
+        track["last"] = loaded
+    if ch is None:
+        return None
+    if loaded >= 0 and loaded != ch["from"]:
+        ch["to"] = loaded
+    if not busy and ch["done_at"] is None and (loaded >= 0 or now - max(track.get("busy_at", 0), ch["since"]) > ACE_IDLE_END_S):
+        if ch["to"] < 0:          # nur gearbeitet (z. B. Slot nachgeschoben) oder entladen und liegen geblieben
+            track["change"] = None
+            return None
+        ch["done_at"] = now
+    if busy and ch["done_at"] is not None:   # nächster Vorgang direkt hinterher
+        ch = track["change"] = {"from": track.get("last", -1), "to": -1, "since": now, "done_at": None}
+    if ch["done_at"] is not None:
+        if now - ch["done_at"] > ACE_DONE_S:
+            track["change"] = None
+            return None
+        phase = "done"
+    elif ch["to"] >= 0:
+        phase = "load"
+    elif loaded < 0 and ch["from"] >= 0:
+        phase = "unload"
+    elif loaded < 0:
+        phase = "load"
+    else:
+        phase = "busy"
+    return {"phase": phase, "from": ch["from"], "to": ch["to"], "since": ch["since"], "busy": busy}
 
 
 def all_slots(boxes):
@@ -649,6 +712,7 @@ def status(host, pos=False):
         else:
             link.paused_since = None
         reason = pause_reason(link, project, reps.get("print"), boxes)
+        ace_act = ace_activity(link.ace_track, boxes, time.time())
         print_log = list(link.print_log)[-10:]
     lights = light.get("lights") if isinstance(light.get("lights"), list) else ([light] if light.get("type") is not None else [])
     return {"model": info.get("model") or link.discovery.get("modelName"), "model_id": link.model_id,
@@ -661,7 +725,7 @@ def status(host, pos=False):
             "position": (axis.get("coordinates") if isinstance(axis, dict) else None),
             "position_age_s": round(pos_age, 1) if pos_age is not None else None,
             "camera": bool(peri.get("camera")), "has_ace": peri.get("multiColorBox"), "features": info.get("features") or {},
-            "ace": boxes, "pause_reason": reason, "paused_since": link.paused_since, "print_log": print_log,
+            "ace": boxes, "ace_activity": ace_act, "pause_reason": reason, "paused_since": link.paused_since, "print_log": print_log,
             "connected": link.connected.is_set(), "error": link.error, "missing": [k for k, _ in POLL_QUERIES if k not in reps],
             # Rohdaten zum Nachsehen (z. B. ob die Firmware die Spülmenge meldet); Geheimnisse entfernt
             "raw": {k: [v.get("data")] for k, v in reps.items()}, "recent": recent}

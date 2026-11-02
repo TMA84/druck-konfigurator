@@ -11,7 +11,9 @@ function lvDisplay(st) {
   const line1 = job ? (job.paused ? t('Pausiert') : t('Druckt')) : fin ? (fin === 'ok' ? t('Fertig') + ' ✓' : t('Abgebrochen')) : st && st.connected === false ? t('Nicht verbunden') : t('Bereit');
   const why = job && job.paused && st.pause_reason ? String(st.pause_reason) : '';
   const prep = job && !(+job.layer >= 1) ? t('Vorbereitung') + (job.status ? ' (' + t(job.status) + ')' : '') : '';   // vor der ersten Schicht
-  const line2 = job ? (why ? (why.length > 30 ? why.slice(0, 29) + '…' : why) : prep || t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' })) : '';
+  // Farbwechsel der ACE (st.ace_activity): solange er läuft statt der Schicht
+  const act = st && st.ace_activity, swap = job && act && act.phase !== 'done' ? t('Farbwechsel') + (act.to >= 0 ? ' → ' + t('Slot {n}', { n: act.to + 1 }) : act.phase === 'busy' ? '' : ' …') : '';
+  const line2 = job ? (why ? (why.length > 30 ? why.slice(0, 29) + '…' : why) : swap || prep || t('Schicht {l} von {n}', { l: +job.layer || 0, n: +job.layers || '–' })) : '';
   const line3 = job && rem != null ? (typeof wbMin === 'function' ? wbMin(rem) : rem + ' min') : '';
   const key = [line1, pct, line2, line3].join('|');
   if (key + (fin || '') === D.key) return; D.key = key + (fin || '');

@@ -60,6 +60,8 @@ ENTITIES = [
     ("speed_mode", "sensor", "Druckgeschwindigkeit", None, None, None, "mdi:speedometer"),
     ("elapsed_min", "sensor", "Druckdauer bisher", "min", "duration", None, "mdi:timer-outline"),
     ("filament_m", "sensor", "Filament dieser Druck", "m", "distance", None, "mdi:printer-3d-nozzle"),
+    # was die ACE gerade tut (tools/anycubic_lan.py ace_activity): Farbwechsel mit Slots, sonst „ruht“
+    ("ace_state", "sensor", "ACE", None, None, None, "mdi:swap-horizontal-circle-outline"),
     ("light", "binary_sensor", "Licht", None, None, None, "mdi:lightbulb"),   # ohne device_class „light“ – die zeigt „Licht erkannt“ statt „An“
     ("queue_state", "sensor", "Warteschlange", None, None, None, "mdi:format-list-numbered"),
     ("queue_remaining_min", "sensor", "Warteschlange Restzeit", "min", "duration", None, "mdi:timer-sand"),
@@ -85,6 +87,20 @@ def num(v, nd=None):
     return (round(v, nd) if nd is not None else v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
 
+def ace_text(act):
+    """ACE-Tätigkeit als Text (Slots ab 1, über alle Einheiten)."""
+    if not act:
+        return "ruht"
+    f, t = act.get("from", -1), act.get("to", -1)
+    if act.get("phase") == "done":
+        return "Farbe gewechselt (Slot %d → Slot %d)" % (f + 1, t + 1) if f >= 0 else "Slot %d geladen" % (t + 1)
+    if act.get("phase") == "load":
+        return ("Farbwechsel: lädt Slot %d" % (t + 1)) if t >= 0 else "Farbwechsel: lädt"
+    if act.get("phase") == "unload":
+        return "Farbwechsel: zieht Slot %d zurück" % (f + 1)
+    return "arbeitet"
+
+
 def machine_values(st):
     """Ziele, Lüfter, Geschwindigkeit, Dauer, Filament, Licht und je ACE Temperatur und Trocknen (aceN_temp, aceN_drying)."""
     st = st or {}
@@ -96,6 +112,7 @@ def machine_values(st):
            "elapsed_min": num(job.get("elapsed_min")) if job else None,
            "filament_m": round(job["filament_mm"] / 1000, 2) if job and isinstance(job.get("filament_mm"), (int, float)) else None,
            "light": ("ON" if light.get("status") else "OFF") if light else None}
+    out["ace_state"] = ace_text(st.get("ace_activity")) if st.get("ace") else None
     for i, b in enumerate(st.get("ace") or [], 1):
         dry = b.get("drying") or {}
         out["ace%d_temp" % i] = num(b.get("temp"))

@@ -371,6 +371,11 @@ mv = ha_mqtt.machine_values({"temps": {"target_nozzle_temp": 215, "target_hotbed
     "ace": [{"temp": 31, "drying": {"status": 0}}, {"temp": 45, "drying": {"status": 1, "target_temp": 55, "remain_time": 120}}]})
 check("Werte wie in der Werkbank", mv == {"nozzle_target": 215, "bed_target": 50, "fan_part": 100, "fan_aux": 60, "fan_box": 40, "speed_mode": "Standard",
     "elapsed_min": 96, "filament_m": 14.17, "light": "ON", "ace1_temp": 31, "ace1_drying": "aus", "ace2_temp": 45, "ace2_drying": "trocknet 55 °C, noch 120 min"}, mv)
+check("ACE ruht", ha_mqtt.machine_values({"ace": [{"slots": []}]})["ace_state"] == "ruht")
+check("ACE ohne Einheit: leer", ha_mqtt.machine_values({})["ace_state"] is None)
+check("ACE zieht zurück", ha_mqtt.ace_text({"phase": "unload", "from": 0, "to": -1}) == "Farbwechsel: zieht Slot 1 zurück")
+check("ACE lädt", ha_mqtt.ace_text({"phase": "load", "from": 0, "to": 2}) == "Farbwechsel: lädt Slot 3")
+check("ACE gewechselt", ha_mqtt.machine_values({"ace": [{}], "ace_activity": {"phase": "done", "from": 0, "to": 5}})["ace_state"] == "Farbe gewechselt (Slot 1 → Slot 6)")
 check("ohne Stand: leer", ha_mqtt.machine_values(None)["fan_part"] is None and ha_mqtt.machine_values(None)["light"] is None)
 check("Pausengrund im Stand nur bei Pause", ha_mqtt.payload(S(J(paused=True), pause_reason="x"), None)["pause_reason"] == "x" and ha_mqtt.payload(S(J(), pause_reason="x"), None)["pause_reason"] is None)
 

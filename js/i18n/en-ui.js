@@ -1022,4 +1022,12 @@ I18N.add({
  "Klipper auf dem Drucker ist nicht bereit": "Klipper on the printer isn't ready",
  "Neues Netz nicht in der Konsole gefunden": "New mesh not found in the console",
  "Konsole des Druckers nicht lesbar": "Printer console not readable",
+ "Farbe gewechselt": "Color changed",
+ "Slot {n} geladen": "Slot {n} loaded",
+ "Farbwechsel: Slot {n} wird zurückgezogen": "Color change: retracting slot {n}",
+ "Farbwechsel: Slot {n} wird zum Kopf geführt": "Color change: feeding slot {n} to the head",
+ "Farbwechsel: Filament wird geladen": "Color change: loading filament",
+ "ACE arbeitet": "ACE working",
+ "Farbwechsel": "Color change",
+ "Slot {n}": "Slot {n}",
 });

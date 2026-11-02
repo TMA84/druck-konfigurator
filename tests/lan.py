@@ -683,5 +683,40 @@ check("alte Pause zählt nicht", lan.pause_reason(_LL([dict(night[0], t=100)], 9
 check("chinesischer Text nicht angezeigt", lan.pause_reason(_L(), pr(), {"code": 12345, "msg": "喷头堵塞"}, [], now) == "Drucker meldet Code 12345")
 check("sonst: nicht gemeldet", lan.pause_reason(_L(), pr(), {"code": 200}, [{"loaded_slot": 2}], now) == "am Drucker pausiert – Grund nicht gemeldet")
 
+# ---- ACE-Tätigkeit: echter Farbwechsel am S1 (2026-11-02, zwei ACE, Slot 1 → Slot 3, ~47 s) ----
+def _bx(st0, l0, st1=1, l1=-1):
+    return lan.ace_boxes({"multiColorBox": [{"data": {"multi_color_box": [dict(ACE, status=st0, loaded_slot=l0), dict(ACE, id=1, status=st1, loaded_slot=l1)]}}]})
+tr, t0 = {}, 1000.0
+check("ACE ruht → nichts", lan.ace_activity(tr, _bx(1, 0), t0) is None)
+a = lan.ace_activity(tr, _bx(1, -1), t0 + 2)
+check("Slot raus → zieht zurück (von Slot 1)", a and a["phase"] == "unload" and a["from"] == 0 and a["to"] == -1, a)
+a = lan.ace_activity(tr, _bx(2, -1), t0 + 7)
+check("ACE arbeitet, noch nichts geladen → weiter unload", a and a["phase"] == "unload" and a["busy"], a)
+a = lan.ace_activity(tr, _bx(2, 2), t0 + 41)
+check("neuer Slot am Kopf → lädt Slot 3", a and a["phase"] == "load" and a["to"] == 2 and a["since"] == t0 + 2, a)
+a = lan.ace_activity(tr, _bx(1, 2), t0 + 47)
+check("ACE ruht wieder → gewechselt", a and a["phase"] == "done" and (a["from"], a["to"]) == (0, 2), a)
+check("„gewechselt“ verschwindet", lan.ace_activity(tr, _bx(1, 2), t0 + 47 + lan.ACE_DONE_S + 1) is None)
+a = lan.ace_activity(tr, _bx(1, -1, 2, -1), t0 + 100)
+check("Wechsel in die zweite ACE: zieht Slot 3 zurück", a and a["phase"] == "unload" and a["from"] == 2, a)
+a = lan.ace_activity(tr, _bx(1, -1, 1, 1), t0 + 140)
+check("… Slot 6 geladen → gewechselt (durchgehende Nummer)", a and a["phase"] == "done" and a["to"] == 5, a)
+tr2 = {}
+lan.ace_activity(tr2, _bx(1, 0), t0)
+a = lan.ace_activity(tr2, _bx(1, -1), t0 + 1)
+check("Entladen am Druckende: erst unload", a and a["phase"] == "unload", a)
+check("… und nach Ruhe ohne Slot vorbei", lan.ace_activity(tr2, _bx(1, -1), t0 + 1 + lan.ACE_IDLE_END_S + 5) is None)
+tr3 = {}
+lan.ace_activity(tr3, _bx(1, 0), t0)
+a = lan.ace_activity(tr3, _bx(2, 0), t0 + 1)
+check("arbeitet ohne Wechsel → busy", a and a["phase"] == "busy", a)
+check("… danach nichts", lan.ace_activity(tr3, _bx(1, 0), t0 + 5) is None)
+check("ace_boxes gibt Box-Status weiter", _bx(2, 0)[0]["status"] == 2)
+# Teilmeldung beim Farbwechsel ({id, slots: [ein Slot]}) ersetzt den Stand nicht
+full = {"data": {"multi_color_box": [ACE, dict(ACE, id=1)]}}
+check("Teilmeldung ist keine Box-Liste", not lan._full_boxes([{"id": 0, "slots": [ACE["slots"][0]]}], full))
+check("vollständige Liste schon", lan._full_boxes([ACE, dict(ACE, id=1)], full) and lan._full_boxes([ACE], None))
+check("ohne slots keine Liste", not lan._full_boxes([{"id": 0, "loaded_slot": 1}], full))
+
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

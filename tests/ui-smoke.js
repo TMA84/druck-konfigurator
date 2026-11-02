@@ -339,6 +339,14 @@ async function runSmoke(opts={}){
         ok($('wbAceTabs').querySelectorAll('button').length===2&&/trocknet/.test($('wbAceTabs').textContent),'Werkstatt: Reiter ACE 1/ACE 2, ACE 2 trocknet');
         $('wbAceTabs').querySelectorAll('button')[1].click();
         ok([...$('wbAceSlots').querySelectorAll('.wb-swatch span')].map(x=>x.textContent).join()==='5,6,7,8'&&/PETG/.test($('wbAceSlots').textContent),'Werkstatt: ACE 2 zeigt Slot 5–8');
+        /* Farbwechsel (ace_activity): Zeile mit Farben und Text, neuer Slot pulsiert */
+        wb.st=Object.assign({},wb.st,{ace_activity:{phase:'load',from:0,to:5,since:Date.now()/1000-12,busy:true}});wbRender();
+        ok(!$('wbAceAct').classList.contains('hidden')&&/Slot 6/.test($('wbAceAct').textContent)&&$('wbAceAct').querySelectorAll('i').length===2&&/0:1[0-9]/.test($('wbAceAct').textContent),'Werkstatt: Farbwechsel-Zeile (Slot 1 → Slot 6, Zeit)');
+        ok($('wbAceSlots').querySelectorAll('li.feeding').length===1&&$('wbAceSlots').querySelector('li.feeding .wb-swatch span').textContent==='6','Werkstatt: geladener Slot pulsiert');
+        wb.st=Object.assign({},wb.st,{ace_activity:{phase:'unload',from:5,to:-1,since:Date.now()/1000}});wbRender();
+        ok(/zurückgezogen|retracting/.test($('wbAceAct').textContent)&&$('wbAceSlots').querySelectorAll('li.outgoing').length===1,'Werkstatt: Zurückziehen markiert den alten Slot');
+        wb.st=Object.assign({},wb.st,{ace_activity:null});wbRender();
+        ok($('wbAceAct').classList.contains('hidden'),'Werkstatt: ohne ACE-Tätigkeit keine Zeile');
       }catch(e){ok(false,'Werkstatt mit zwei ACE: '+e.message)}
       finally{wb.st=saved;wb.box=0;if(saved)wbRender()} }
     $('exportDlg').close();
