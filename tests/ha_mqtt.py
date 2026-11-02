@@ -240,7 +240,7 @@ status["st"] = ST
 check("Discovery neu mit Modell", wait(lambda: disc("sensor", "slot4_remaining") is not None))
 keys = ["printer_state", "progress", "remaining_min", "finish", "job", "layer", "nozzle_temp", "bed_temp", "queue_state",
         "queue_remaining_min", "plates", "month_filament_g", "month_cost_eur", "month_prints", "pause_reason",
-        "nozzle_target", "bed_target", "fan_part", "fan_aux", "fan_box", "speed_mode", "elapsed_min", "filament_m"]
+        "nozzle_target", "bed_target", "fan_part", "fan_aux", "fan_box", "speed_mode", "elapsed_min", "filament_m", "ace_state"]
 check("alle Sensoren angemeldet", all(disc("sensor", k) for k in keys), [k for k in keys if not disc("sensor", k)])
 check("Discovery retained", all(disc("sensor", k)[2] for k in keys) and disc("binary_sensor", "bed_clear")[2])
 c = json.loads(disc("sensor", "progress")[1])
@@ -370,7 +370,7 @@ mv = ha_mqtt.machine_values({"temps": {"target_nozzle_temp": 215, "target_hotbed
     "speed_mode": 2, "lights": [{"type": 2, "status": 1}], "job": {"elapsed_min": 96, "filament_mm": 14166},
     "ace": [{"temp": 31, "drying": {"status": 0}}, {"temp": 45, "drying": {"status": 1, "target_temp": 55, "remain_time": 120}}]})
 check("Werte wie in der Werkbank", mv == {"nozzle_target": 215, "bed_target": 50, "fan_part": 100, "fan_aux": 60, "fan_box": 40, "speed_mode": "Standard",
-    "elapsed_min": 96, "filament_m": 14.17, "light": "ON", "ace1_temp": 31, "ace1_drying": "aus", "ace2_temp": 45, "ace2_drying": "trocknet 55 °C, noch 120 min"}, mv)
+    "elapsed_min": 96, "filament_m": 14.17, "light": "ON", "ace_state": "ruht", "ace1_temp": 31, "ace1_drying": "aus", "ace2_temp": 45, "ace2_drying": "trocknet 55 °C, noch 120 min"}, mv)
 check("ACE ruht", ha_mqtt.machine_values({"ace": [{"slots": []}]})["ace_state"] == "ruht")
 check("ACE ohne Einheit: leer", ha_mqtt.machine_values({})["ace_state"] is None)
 check("ACE zieht zurück", ha_mqtt.ace_text({"phase": "unload", "from": 0, "to": -1}) == "Farbwechsel: zieht Slot 1 zurück")
