@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.53.2] – 2026-11-02
+
+### Behoben
+- **3D-Fortschritt zeigte das Zurückziehen beim Farbwechsel falsch:** Die ACE-Animation lief bisher erst los, wenn der neue Slot schon geladen war, und zwar als kurzer 7-Sekunden-Ablauf. Während der knapp 2 Minuten davor lief das alte Filament einfach weiter vorwärts, oder es stand still. Jetzt folgt sie dem echten Ablauf (`ace_activity` vom Server): Solange die ACE zurückzieht, spult die alte Spule auf und das Filament läuft im Schlauch und im Kopfschlauch rückwärts zur ACE. Danach läuft der neue Slot schnell vor, mit seiner Farbe im Kopfschlauch, und sobald der Wechsel fertig ist, fallen die Spültropfen. Ältere Server ohne `ace_activity` bekommen weiter die kurze Animation.
+
 ## [10.53.1] – 2026-11-02
 
 ### Behoben

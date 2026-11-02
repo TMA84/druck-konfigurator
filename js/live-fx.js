@@ -35,10 +35,12 @@ function lvDisplay(st) {
 
 /* Farbwechsel (lv.swap aus lvAceColours): 0–2,5 s läuft das alte Filament rückwärts zur ACE (Spule spult auf),
    2,5–5 s das neue schnell vor, ab 3,5 s fallen Tropfen der Spülmenge (alte → neue Farbe) unter der Düse heraus */
-const LV_SWAP_BACK_S = 2.5, LV_SWAP_FEED_S = 5, LV_SWAP_END_S = 7;
+const LV_SWAP_BACK_S = 2.5, LV_SWAP_FEED_S = 5, LV_SWAP_END_S = 7, LV_SWAP_DROPS_S = 3.5;
+// Tempo beim echten Farbwechsel (st.ace_activity, lvAceColours): Zurückziehen und Vorschieben im Vielfachen des Druckflusses
+const LV_SWAP_BACK_V = 2.5, LV_SWAP_FEED_V = 3;
 function lvSwapTick(now, dt) {
   const w = lv.swap; if (!w) return;
-  const a = (now - w.t0) / 1000, back = a < LV_SWAP_BACK_S, feed = !back && a < LV_SWAP_FEED_S;
+  const a = (now - w.t0) / 1000, back = !w.dropsOnly && a < LV_SWAP_BACK_S, feed = !w.dropsOnly && !back && a < LV_SWAP_FEED_S;
   const show = (sp, on) => { sp.tubes[1].material = on ? sp.flow : sp.line; sp.strand.material = on ? sp.flowS : sp.line; sp.glow.visible = sp.glowS.visible = on; };
   if (back) {
     show(w.from, true); show(w.to, false);

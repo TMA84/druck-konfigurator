@@ -132,12 +132,19 @@ function lvEnclosureInit(g) {
 function lvAceColours(st) {
   if (!lv.aceSpools) return;
   const boxes = (st && st.ace) || [], printing = !!(st && st.job && st.job.name && !st.job.paused);
+  /* Farbwechsel laut Server (st.ace_activity, gemessen am S1: gut 1 min zieht die ACE das alte Filament aus dem Kopf, dann
+     ~40 s bis der neue Slot am Kopf ist): solange läuft der alte Slot rückwärts (Spule spult auf), danach der neue schnell vor */
+  const act = st && st.ace_activity, moving = printing && act && (act.phase === 'unload' || act.phase === 'load');
+  const spAt = g => g >= 0 ? lv.aceSpools.find(sp => sp.unit * 4 + sp.slot === g) || null : null;
+  const prevMove = lv.aceMove;
+  lv.aceMove = moving ? { sp: spAt(act.phase === 'unload' ? act.from : act.to), dir: act.phase === 'unload' ? -LV_SWAP_BACK_V : LV_SWAP_FEED_V } : null;
+  if (lv.aceMove && !lv.aceMove.sp) lv.aceMove = null;
   for (const sp of lv.aceSpools) {
     const box = boxes[sp.unit], s = box && (box.slots || [])[sp.slot], on = !!(s && s.present && s.colour);
     sp.group.visible = on; sp.tubes[1].visible = on; sp.tubes[0].visible = !!box;   // Schlauch nur, wenn die Einheit da ist
     if (on) { sp.fil.color.set(s.colour); sp.line.color.set(s.colour); }
     // geladener Slot: Einlass leuchtet in Filamentfarbe; beim Drucken dreht die Spule und Pulse laufen im Schlauch (lvAceTick)
-    sp.loaded = on && !!s.loaded; sp.active = sp.loaded && printing;
+    sp.loaded = on && !!s.loaded; sp.active = lv.aceMove ? on && sp === lv.aceMove.sp : sp.loaded && printing;
     if (sp.loaded) { sp.funnel.color.set(s.colour); sp.funnel.emissive.set(s.colour); sp.funnel.emissiveIntensity = 0.8; }
     else { sp.funnel.color.set(0xe8552b); sp.funnel.emissiveIntensity = 0; }
     sp.lbl.material.opacity = boxes.some(b => (b.slots || []).some(x => x.loaded)) && !sp.loaded ? 0.45 : 1;   // andere Slots gedimmt
@@ -188,11 +195,17 @@ function lvAceColours(st) {
     }
   });
   if (lv.filGlow) lv.filGlow.visible = lvAceFlowing();   // Fluss zum Kopf endet mit dem Druck
-  // Farbwechsel: anderer Slot geladen, während gedruckt wird → altes Filament zurück, neues vor, Spülmenge (lvAceAnimate)
+  // Kopfschlauch in der Farbe des Filaments, das gerade darin läuft
+  if (lv.aceMove && lv.filM) { lv.filM.color.copy(lv.aceMove.sp.fil.color); if (lv.filGlowM) lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3); }
   const now = lv.aceSpools.find(sp => sp.loaded) || null;
-  if (printing && lv.aceLast && now && now !== lv.aceLast && !lv.swap)
+  if (st && 'ace_activity' in st) {
+    // Wechsel fertig (neuer Slot am Kopf): Tropfen der Spülmenge alte → neue Farbe unter der Düse
+    if (printing && prevMove && !lv.aceMove && now && lv.aceLast && now !== lv.aceLast && !lv.swap)
+      lv.swap = { dropsOnly: true, from: lv.aceLast, to: now, t0: performance.now() - LV_SWAP_DROPS_S * 1000, c0: lv.aceLast.fil.color.clone(), c1: now.fil.color.clone(), drops: [] };
+  } else if (printing && lv.aceLast && now && now !== lv.aceLast && !lv.swap)
+    // ältere Server ohne ace_activity: kurze Animation, sobald ein anderer Slot geladen ist
     lv.swap = { from: lv.aceLast, to: now, t0: performance.now(), c0: lv.aceLast.fil.color.clone(), c1: now.fil.color.clone(), drops: [] };
-  if (now) lv.aceLast = now;
+  if (now && !lv.aceMove) lv.aceLast = now;
   lvAceAnimate();
   lvRender();
 }
@@ -231,11 +244,12 @@ function lvAceAnimate() {
         if (sp.active) sp.funnel.emissiveIntensity = 0.9 + 0.6 * Math.sin(ph * 3);
         if (!sp.active) continue;
         if (lv.swap && sp === lv.swap.to && (now - lv.swap.t0) / 1000 < LV_SWAP_BACK_S) continue;   // neuer Slot wartet, bis das alte Filament zurück ist
-        sp.group.rotation.x += LV_ACE_SPIN * dt;   // oben läuft das Filament nach vorn (−y) ab
+        const dir = lv.aceMove && sp === lv.aceMove.sp ? lv.aceMove.dir : 1;   // Farbwechsel: rückwärts bzw. schnell vor
+        sp.group.rotation.x += LV_ACE_SPIN * dir * dt;   // oben läuft das Filament nach vorn (−y) ab
         // Streifen laufen von der Spule zum Drucker (u wächst Richtung Drucker); Strang und Schlauch gleich schnell
-        for (const m of [sp.flow, sp.flowS]) m.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;
+        for (const m of [sp.flow, sp.flowS]) m.emissiveMap.offset.x -= dir * LV_FLOW_V / LV_FLOW_MM * dt;
       }
-      if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= LV_FLOW_V / LV_FLOW_MM * dt;   // Kopfschlauch (lvMechUpdate)
+      if (lv.filFlow) lv.filFlow.emissiveMap.offset.x -= (lv.aceMove ? lv.aceMove.dir : 1) * LV_FLOW_V / LV_FLOW_MM * dt;   // Kopfschlauch (lvMechUpdate)
       for (const fx of lv.aceUnitsFx || []) if (fx.dry) fx.lid.emissiveIntensity = 0.35 + 0.25 * Math.sin(ph * 1.6);
       lvSwapTick(now, dt); lvFxTick(ph);
       if (lvFansOn()) lvFanTick();
