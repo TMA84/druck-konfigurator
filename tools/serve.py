@@ -9,7 +9,9 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/mesh?host=<ip>        → Bettnetz (Nivellierung) über Moonraker, nur mit Rinkhals (tools/mesh.py)
   GET  /api/anycubic/mesh/calibrate?host=<ip> → Stand von „Jetzt vermessen“ ({"state": {started, bed, done, error}} oder null)
-  POST /api/anycubic/mesh/calibrate  {host, bed}  → Bett jetzt vermessen (immer 5 × 5) (nur wenn der Drucker frei ist)
+  POST /api/anycubic/mesh/calibrate  {host, bed}  → Bett jetzt vermessen (immer 5 × 5, nur wenn der Drucker frei ist)
+  GET  /api/anycubic/pid?host=<ip>         → Stand des PID-Abgleichs ({"state": {started, target, done, error, old, new, saved}})
+  POST /api/anycubic/pid  {host, target}   → PID-Abgleich des Heizbetts (nur wenn der Drucker frei ist, nur mit Rinkhals)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS);
                                               mit Rinkhals MJPEG von mjpg-streamer (ohne startCapture, tools/camera_src.py);
                                               &frames=1: dieselben Bilder als Länge + JPEG (geht auch über den HA-Ingress)
@@ -108,8 +110,8 @@ _VERSION_RE = re.compile(r'((?:src|href)=")((?:js|vendor|css|img)/[^"?#]+)(")')
 _index_cache = {"key": None, "body": None}
 _gzip_cache = {}
 # Nur ansehen (Benutzer ohne Admin-Rechte): Lesen für den 3D-Fortschritt, ohne Kamera, Dateien und Änderungen
-VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/anycubic/mesh/calibrate", "/api/printing/preview", "/api/printing/objects", "/api/printing/slots", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
-QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/anycubic/mesh/calibrate", "/api/spools", "/api/printing/objects", "/api/printing/preview", "/api/printing/slots"}
+VIEWER_GET = {"/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/anycubic/mesh/calibrate", "/api/anycubic/pid", "/api/printing/preview", "/api/printing/objects", "/api/printing/slots", "/api/prefs", "/api/spools", "/api/queue", "/api/schedule"}
+QUIET_GET = {"/api/prefs", "/api/schedule", "/api/queue", "/api/health", "/api/anycubic/status", "/api/anycubic/mesh", "/api/anycubic/mesh/calibrate", "/api/anycubic/pid", "/api/spools", "/api/printing/objects", "/api/printing/preview", "/api/printing/slots"}
 GZIP_CACHE_MAX = 32 * 1024 * 1024
 # Nur diese Dateien der Seite ausliefern (sonst 404) – nicht .git, tools/, Datenordner, Verzeichnislisten
 STATIC_DIRS = ("js/", "css/", "vendor/", "img/", "docs/", "templates/", "ha/")
@@ -408,7 +410,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     return self._json(403, {"error": "Nur von der eigenen Seite", "kind": "forbidden"})
                 host, pos = printer_host(), False
             return self._api(lambda: anycubic_lan.status(host, pos=pos))
-        if url.path == "/api/anycubic/mesh/calibrate":
+        if url.path in ("/api/anycubic/mesh/calibrate", "/api/anycubic/pid"):
             host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
             if self._viewer():
                 host = printer_host() or host
@@ -416,7 +418,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if not printer_host():
                     return self._json(403, {"error": "Nur von der eigenen Seite", "kind": "forbidden"})
                 host = printer_host()
-            return self._api(lambda: {"state": mesh.calib_state(host)})
+            state = mesh.pid_state if url.path == "/api/anycubic/pid" else mesh.calib_state
+            return self._api(lambda: {"state": state(host)})
         if url.path == "/api/anycubic/mesh":
             # Bettnetz (Karte „Nivellierung“): wie der Stand – nur ansehen/fremde Seite → eingestellter Drucker
             host = urllib.parse.parse_qs(url.query).get("host", [""])[0]
@@ -632,7 +635,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 UPLOAD_SLOTS.release()
         limit = MAX_SPOOL_BODY if path == "/api/spools" else MAX_BACKUP_BODY if path == "/api/backup" else MAX_BODY
         if path not in ("/api/spools", "/api/backup", "/api/queue", "/api/prefs", "/api/schedule", "/api/anycubic/print", "/api/anycubic/command",
-                        "/api/anycubic/mesh/calibrate"):
+                        "/api/anycubic/mesh/calibrate", "/api/anycubic/pid"):
             self.close_connection = True
             return self._json(404, {"error": "unbekannt", "kind": "not_found"})
         # Nur Aufrufe der eigenen Seite (application/json ist kein „einfacher“ Typ – einfacher Schutz gegen fremde Webseiten)
@@ -688,6 +691,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 req = self._body(length)
                 return mesh.calibrate(req["host"], req.get("bed", 60))
             return self._api(calib)
+        if path == "/api/anycubic/pid":
+            def pid():
+                req = self._body(length)
+                return mesh.pid_calibrate(req["host"], req.get("target", 60))
+            return self._api(pid)
 
         def run():   # /api/anycubic/command
             req = self._body(length)

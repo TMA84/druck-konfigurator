@@ -352,6 +352,13 @@
         <div id="wbMeshTable" class="wb-mesh-table hidden"></div>
       </div>
     </section>
+    <section id="wbPidCard" class="wb-card wb-pidcard hidden" aria-labelledby="wbPidT">
+      <div class="wb-head"><h3 id="wbPidT" class="wb-eyebrow">Heizbett einregeln (PID)</h3><span id="wbPidSum" class="muted small"></span></div>
+      <p class="muted small">Nach einem Bettwechsel (z. B. Aluminiumbett) regelt der Drucker die Temperatur noch mit den Werten des alten Betts – sie schwingt dann über oder kommt langsam. Der Abgleich heizt das Bett mehrmals auf die Zieltemperatur und misst, wie es reagiert (etwa 10–20 Minuten). Nur mit Rinkhals.</p>
+      <div class="wb-mesh-run"><label><span>Ziel</span><select id="wbPidTarget"><option value="60">60 °C (PLA)</option><option value="70">70 °C (PETG)</option><option value="100">100 °C (ABS/ASA)</option></select></label><button class="btn small" type="button" id="wbPidRun">PID-Abgleich starten</button><span id="wbPidNote" class="muted small"></span></div>
+      <dl id="wbPidResult" class="wb-pid-result hidden"></dl>
+      <p id="wbPidSaved" class="small hidden"></p>
+    </section>
     <dl id="wbInfo" class="hidden"></dl>
   </div>
 </section>
@@ -751,6 +758,7 @@
 <script src="vendor/mpegts.min.js"></script>
 <script src="js/workbench-ui.js"></script>
 <script src="js/mesh-ui.js"></script>
+<script src="js/pid-ui.js"></script>
 <script src="js/live-scene.js"></script>
 <script src="js/live-mech.js"></script>
 <script src="js/live-ace.js"></script>

@@ -63,7 +63,19 @@ class Moonraker(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send(self, obj, code=200):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
+        if self.path.startswith("/server/files/config/printer_mutable.cfg"):
+            return self._send(fake["mutable"]) if fake.get("mutable") is not None else self._send({"error": {"message": "nf"}}, 404)
+        if self.path.startswith("/server/gcode_store") and fake.get("store") is not None:
+            return self._send({"result": {"gcode_store": fake["store"]}})
         if self.path.startswith("/server/gcode_store"):
             n = len(fake["out"])
             msg = "Mesh Leveling Probed Z positions:\n" + "\n".join(" // " + " ".join("%.6f" % v for v in r) for r in fake["out"])
@@ -281,6 +293,16 @@ check("Vermessen: neues Netz aus der Konsole statt des alten aus Moonraker", st 
       and d["history"] and d["history"][0]["probed"] == PROBED, d)
 st, d = get()
 check("Vermessen: bleibt beim erneuten Abfragen", d["probed"] == NEWMESH and len(d["history"]) >= 1, d)
+# Firmware schreibt beim nächsten G9111 das Netz der Messung DAVOR in die Datei (Moonraker hinkt hinterher): bleibt veraltet
+PREV = [[0.3] * 5 for _ in range(5)]
+mesh._set_override("127.0.0.1", dict(mesh._override("127.0.0.1"), stale=[PREV]))
+fake["body"] = answer({**GOOD, "probed_matrix": PREV, "mesh_matrix": PREV})
+st, d = get()
+check("Vermessen: Moonraker meldet das Netz der Messung davor → weiter das neue", d["probed"] == NEWMESH and d.get("source") == "calibrate", d)
+# Firmware hat es inzwischen selbst gespeichert → gleiches Netz, Merker darf bleiben
+fake["body"] = answer({**GOOD, "probed_matrix": NEWMESH, "mesh_matrix": NEWMESH})
+st, d = get()
+check("Vermessen: Moonraker meldet das neue selbst", d["probed"] == NEWMESH, d)
 # nächster Druckstart: Firmware meldet ein anderes Netz → das gilt, Merker weg
 FW = [[v + 0.2 for v in row] for row in PROBED]
 fake["body"] = answer({**GOOD, "probed_matrix": FW, "mesh_matrix": FW})
@@ -305,6 +327,64 @@ mesh._calib["127.0.0.1"]["done"] = None
 st, d = post({"host": "127.0.0.1", "bed": 60})
 check("Vermessen: läuft schon → 409", st == 409 and "läuft schon" in d.get("error", ""), (st, d))
 mesh._calib.clear()
+
+# PID-Abgleich des Betts: nur wenn frei, Ergebnis aus der Konsole, vorher/nachher gespeicherte Werte
+def pid_post(body):
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
+    c.request("POST", "/api/anycubic/pid", json.dumps(body), {"Content-Type": "application/json"})
+    r = c.getresponse()
+    data = json.loads(r.read() or b"{}")
+    c.close()
+    return r.status, data
+
+
+def pid_done():
+    for _ in range(100):
+        c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
+        c.request("GET", "/api/anycubic/pid?host=127.0.0.1")
+        r = c.getresponse()
+        d = json.loads(r.read() or b"{}")
+        c.close()
+        if d.get("state") and d["state"].get("done"):
+            return d["state"]
+        time.sleep(0.05)
+    return None
+
+
+OLD = {"heater_bed": {"control": "pid", "pid_Kd": "561.660", "pid_Ki": "0.563", "pid_Kp": "35.576"}}
+fake["mutable"] = OLD
+fake["store"] = [{"type": "command", "message": "PID_CALIBRATE HEATER=heater_bed TARGET=60\nM140 S0"},
+                 {"type": "response", "message": "PID parameters: pid_Kp=73.517 pid_Ki=1.132 pid_Kd=1193.763\nThe SAVE_CONFIG command will update the printer config file"}]
+fake["scripts"].clear()
+fake["state"] = "printing"
+st, d = pid_post({"host": "127.0.0.1", "target": 60})
+check("PID: druckt → 409, nichts gesendet", st == 409 and not fake["scripts"], (st, d))
+fake["state"] = "complete"
+for bad in ({"host": "127.0.0.1", "target": 200}, {"host": "127.0.0.1", "target": "60"}, {"host": "127.0.0.1", "target": True}):
+    st, d = pid_post(bad)
+    check("PID: ungültig %s → 400" % bad, st == 400 and not fake["scripts"], (st, d))
+st, d = pid_post({"host": "127.0.0.1", "target": 60})
+state = pid_done()
+check("PID: Befehl gesendet", fake["scripts"] == [("/printer/gcode/script", "PID_CALIBRATE HEATER=heater_bed TARGET=60\nM140 S0")], fake["scripts"])
+check("PID: Ergebnis, alte Werte, nicht gespeichert erkannt", state and state["error"] is None and state["new"] == {"kp": 73.517, "ki": 1.132, "kd": 1193.763}
+      and state["old"] == {"kp": 35.576, "ki": 0.563, "kd": 561.66} and state["saved"] is False, state)
+# Firmware übernimmt die Werte selbst → saved
+fake["scripts"].clear()
+fake["mutable"] = {"heater_bed": {"pid_Kd": "1193.763", "pid_Ki": "1.132", "pid_Kp": "73.517"}}
+st, d = pid_post({"host": "127.0.0.1", "target": 60})
+state = pid_done()
+check("PID: gespeichert erkannt", state and state["saved"] is True, state)
+# kein Ergebnis in der Konsole
+fake["store"] = [{"type": "command", "message": "PID_CALIBRATE HEATER=heater_bed TARGET=60"}, {"type": "response", "message": "!! Heater heater_bed not heating at expected rate"}]
+st, d = pid_post({"host": "127.0.0.1", "target": 60})
+state = pid_done()
+check("PID: kein Ergebnis → Fehler", state and "nicht in der Konsole" in (state.get("error") or ""), state)
+# während des Vermessens kein PID-Abgleich
+mesh._calib["127.0.0.1"] = {"started": 1, "done": None}
+st, d = pid_post({"host": "127.0.0.1", "target": 60})
+check("PID: während Vermessen → 409", st == 409 and "Vermessen läuft schon" in d.get("error", ""), (st, d))
+mesh._calib.clear()
+fake["store"] = None
 
 srv.shutdown()
 moon.shutdown()

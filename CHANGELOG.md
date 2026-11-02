@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.52.0] – 2026-11-02
+
+### Neu
+- **Heizbett einregeln (PID):** Neue Karte in ④ Drucker, nur mit Rinkhals. Gedacht für einen Bettwechsel, etwa auf das 8-mm-Aluminiumbett von Funssor. Nach einer Rückfrage und nur bei freiem Drucker schickt der Server `PID_CALIBRATE HEATER=heater_bed TARGET=…` (60, 70 oder 100 °C). Danach liest er die neuen Werte aus der Konsole und vergleicht sie mit `printer_mutable.cfg`, also ob die Firmware sie gespeichert hat. Die Karte zeigt die alten und neuen Werte. `SAVE_CONFIG` schickt die Druckwerkstatt nicht von selbst. Endpunkte: `POST /api/anycubic/pid`, `GET /api/anycubic/pid`. Vermessen und PID-Abgleich schließen sich gegenseitig aus. Tests in `tests/mesh.py` und im Bedientest.
+
+### Behoben
+- **„Jetzt vermessen“ zeigte das alte Netz und das neue nur gestrichelt:** Die Firmware schreibt ein Netz erst beim nächsten `G9111` in ihre Datei, Moonraker meldet also das Netz der Messung davor. Der Server hielt das für ein neues Netz der Firmware und hat die eigene Messung verworfen. Jetzt gelten das Netz beim Start und alle Netze, die schon vorher in der Konsole standen, als veraltet. Geprüft mit der echten Konsole des Druckers.
+
 ## [10.51.0] – 2026-11-02
 
 ### Neu

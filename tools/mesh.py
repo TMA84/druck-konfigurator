@@ -18,7 +18,10 @@ Geprüft 2026-11-02 am Kobra S1 (Rinkhals): G9111 allein misst nur den Z-Offset;
 bleibt aber nur im Speicher – Moonraker (bed_mesh) und printer_mutable.cfg zeigen weiter das Netz des letzten Druckstarts,
 auch BED_MESH_PROFILE SAVE ändert daran nichts (nur SAVE_CONFIG, das startet die Firmware neu – nicht benutzt). Darum
 liest der Server das Netz danach mit BED_MESH_OUTPUT aus der Konsole (/server/gcode_store) und merkt es sich
-($DATA_DIR/mesh-calibrated.json); fetch zeigt es, solange Moonraker noch das Netz von vorher meldet.
+($DATA_DIR/mesh-calibrated.json); fetch zeigt es, solange Moonraker ein älteres Netz meldet. Die Firmware schreibt das
+Netz aus dem Speicher erst beim nächsten G9111 in die Datei – Moonraker hinkt also eine Messung hinterher (gesehen
+2026-11-02 10:34: nach dem Vermessen meldete Moonraker das Netz der Messung davor). Veraltet sind darum das Netz von
+Moonraker beim Start und alle Netze, die vorher schon in der Konsole standen ("stale").
 """
 import json
 import math
@@ -45,6 +48,7 @@ CALIB_NOZZLE = 170           # °C, wie LeviQ3 (extru_temp) – Düse sauber wis
 CALIB_TIMEOUT_S = 1800
 BUSY_STATES = ("printing", "paused")
 _calib = {}                  # Drucker → {"started", "bed", "done", "error"}
+_pid = {}                    # Drucker → {"started", "target", "done", "error", "old", "new", "saved"}
 UNSUPPORTED = "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus"
 EMPTY = "Drucker hat kein Bettnetz geladen – er vermisst das Bett beim nächsten Druckstart (oder am Display: Nivellierung)"
 
@@ -149,9 +153,9 @@ def fetch(host, timeout=TIMEOUT_S):
         if o and e.kind == "empty":
             return remember(host, _as_mesh(o))
         raise
-    if o and (o["base"] is None or o["base"] == d["probed"]):
+    if o and (o["base"] is None or d["probed"] in [o["base"], o["probed"]] + o["stale"]):
         return remember(host, _as_mesh(o, d.get("profile", "")))
-    if o:   # Firmware hat inzwischen selbst neu vermessen (Druckstart) – deren Netz gilt
+    if o:   # Firmware meldet ein Netz, das es vor dem Vermessen noch nicht gab (neuer Druckstart) – deren Netz gilt
         with _lock:
             _set_override(host, None)
     return remember(host, d)
@@ -204,6 +208,19 @@ def calib_script(bed):
 _ROW_RE = re.compile(r"^\s*//\s*(-?\d+(?:\.\d+)?(?:\s+-?\d+(?:\.\d+)?)*)\s*$")
 
 
+def console_meshes(store):
+    """Alle Netze aus BED_MESH_OUTPUT in der Konsole, älteste zuerst (unlesbare fallen weg)."""
+    out = []
+    for it in (store.get("result", {}).get("gcode_store") or []) if isinstance(store, dict) else []:
+        msg = it.get("message", "") if isinstance(it, dict) else ""
+        if isinstance(msg, str) and it.get("type") == "response" and "Probed Z positions" in msg:
+            try:
+                out.append(_matrix([[float(v) for v in m.group(1).split()] for m in map(_ROW_RE.match, msg.splitlines()) if m], "out"))
+            except MeshError:
+                pass
+    return out
+
+
 def parse_output(store):
     """Netz aus der Konsole (/server/gcode_store): letzte Antwort „Probed Z positions“ nach dem letzten BED_MESH_CALIBRATE."""
     items = store.get("result", {}).get("gcode_store") if isinstance(store, dict) else None
@@ -238,9 +255,15 @@ def _override(host):
         base = o.get("base")
         if base is not None:
             base = _matrix(base, "base")
+        stale = []
+        for m in o.get("stale") or []:
+            try:
+                stale.append(_matrix(m, "stale"))
+            except MeshError:
+                pass
     except (OSError, ValueError, AttributeError, MeshError):
         return None
-    return dict(e, base=base) if e else None
+    return dict(e, base=base, stale=stale) if e else None
 
 
 def _set_override(host, o):
@@ -267,6 +290,108 @@ def _set_override(host, o):
         print("Vermessenes Netz nicht gespeichert: %s" % e, file=sys.stderr)
 
 
+def ensure_idle(host):
+    """Nur wenn Klipper bereit ist und der Drucker weder druckt noch pausiert – sonst MeshError busy."""
+    st = _moon(host, "/printer/objects/query?print_stats=state&idle_timeout=state&webhooks=state")
+    try:
+        status = st["result"]["status"]
+    except (KeyError, TypeError):
+        raise MeshError("Unerwartete Antwort von Moonraker", "bad_response")
+    if (status.get("webhooks") or {}).get("state") not in (None, "ready"):
+        raise MeshError("Klipper auf dem Drucker ist nicht bereit", "busy")
+    if (status.get("print_stats") or {}).get("state") in BUSY_STATES or (status.get("idle_timeout") or {}).get("state") == "Printing":
+        raise MeshError("Drucker ist beschäftigt (druckt oder pausiert) – das geht nur, wenn er frei ist", "busy")
+
+
+def _claim(host):
+    """Unter _lock: je Drucker nur ein Ablauf (Vermessen oder PID-Abgleich) zur selben Zeit."""
+    for jobs, name in ((_calib, "Vermessen"), (_pid, "PID-Abgleich")):
+        c = jobs.get(host)
+        if c and not c.get("done"):
+            raise MeshError("%s läuft schon" % name, "busy")
+
+
+# ---------- PID-Abgleich des Heizbetts (z. B. nach dem Umbau auf ein anderes Bett) ----------
+PID_TARGETS = (50, 110)
+PID_TIMEOUT_S = 3600
+_PID_RE = re.compile(r"Kp\s*=\s*(-?[\d.]+)\s*,?\s*(?:pid_)?Ki\s*=\s*(-?[\d.]+)\s*,?\s*(?:pid_)?Kd\s*=\s*(-?[\d.]+)", re.I)
+
+
+def parse_pid(store):
+    """PID-Werte aus der Konsole: letzte Antwort mit Kp/Ki/Kd nach dem letzten PID_CALIBRATE → {kp, ki, kd}."""
+    items = store.get("result", {}).get("gcode_store") if isinstance(store, dict) else None
+    if not isinstance(items, list):
+        raise MeshError("Konsole des Druckers nicht lesbar", "bad_response")
+    found = None
+    for it in items:
+        msg = it.get("message", "") if isinstance(it, dict) else ""
+        if not isinstance(msg, str):
+            continue
+        if it.get("type") == "command" and "PID_CALIBRATE" in msg.upper():
+            found = None
+        elif it.get("type") == "response":
+            m = _PID_RE.search(msg)
+            if m:
+                found = m
+    if not found:
+        raise MeshError("PID-Ergebnis nicht in der Konsole gefunden", "bad_response")
+    v = [float(x) for x in found.groups()]
+    if not all(math.isfinite(x) and x > 0 for x in v):
+        raise MeshError("PID-Ergebnis unplausibel", "bad_response")
+    return {"kp": v[0], "ki": v[1], "kd": v[2]}
+
+
+def saved_pid(host, heater="heater_bed"):
+    """PID-Werte, die die Firmware gespeichert hat (printer_mutable.cfg, JSON) → {kp, ki, kd} oder None."""
+    try:
+        d = _moon(host, "/server/files/config/printer_mutable.cfg")
+        h = d.get(heater) or {}
+        v = {"kp": float(h["pid_Kp"]), "ki": float(h["pid_Ki"]), "kd": float(h["pid_Kd"])}
+    except (MeshError, AttributeError, KeyError, TypeError, ValueError):
+        return None
+    return v if all(math.isfinite(x) for x in v.values()) else None
+
+
+def pid_state(host):
+    host = anycubic_lan.check_host(host)
+    with _lock:
+        c = _pid.get(host)
+        return dict(c) if c else None
+
+
+def pid_calibrate(host, target=60, run_async=True):
+    """PID-Abgleich des Betts starten (nur wenn frei) → {"started": True, "target"}. Ergebnis über pid_state:
+    old (gespeichert vorher), new (aus der Konsole), saved (stehen die neuen Werte danach in printer_mutable.cfg?)."""
+    host = anycubic_lan.check_host(host)
+    if isinstance(target, bool) or not isinstance(target, int) or not PID_TARGETS[0] <= target <= PID_TARGETS[1]:
+        raise MeshError("Zieltemperatur %d–%d °C" % PID_TARGETS, "bad_request")
+    ensure_idle(host)
+    old = saved_pid(host)
+    with _lock:
+        _claim(host)
+        _pid[host] = {"started": int(time.time()), "target": target, "done": None, "error": None, "old": old, "new": None, "saved": None}
+
+    def run():
+        err, new, saved = None, None, None
+        try:
+            _moon(host, "/printer/gcode/script", {"script": "PID_CALIBRATE HEATER=heater_bed TARGET=%d\nM140 S0" % target},
+                  timeout=PID_TIMEOUT_S)
+            new = parse_pid(_moon(host, "/server/gcode_store?count=100"))
+            now = saved_pid(host)
+            saved = bool(now and all(abs(now[k] - new[k]) <= max(0.01, abs(new[k]) * 0.001) for k in new))
+        except MeshError as e:
+            err = str(e)
+        except Exception as e:   # noqa: BLE001
+            err = str(e) or type(e).__name__
+        with _lock:
+            _pid[host].update(done=int(time.time()), error=err, new=new, saved=saved)
+    if run_async:
+        threading.Thread(target=run, daemon=True, name="pid-calibrate").start()
+    else:
+        run()
+    return {"started": True, "target": target}
+
+
 def calib_state(host):
     host = anycubic_lan.check_host(host)
     with _lock:
@@ -279,19 +404,9 @@ def calibrate(host, bed=60, run_async=True):
     host = anycubic_lan.check_host(host)
     if isinstance(bed, bool) or not isinstance(bed, int) or not CALIB_BED[0] <= bed <= CALIB_BED[1]:
         raise MeshError("Betttemperatur %d–%d °C" % CALIB_BED, "bad_request")
-    st = _moon(host, "/printer/objects/query?print_stats=state&idle_timeout=state&webhooks=state")
-    try:
-        status = st["result"]["status"]
-    except (KeyError, TypeError):
-        raise MeshError("Unerwartete Antwort von Moonraker", "bad_response")
-    if (status.get("webhooks") or {}).get("state") not in (None, "ready"):
-        raise MeshError("Klipper auf dem Drucker ist nicht bereit", "busy")
-    if (status.get("print_stats") or {}).get("state") in BUSY_STATES or (status.get("idle_timeout") or {}).get("state") == "Printing":
-        raise MeshError("Drucker ist beschäftigt (druckt oder pausiert) – vermessen nur, wenn er frei ist", "busy")
+    ensure_idle(host)
     with _lock:
-        c = _calib.get(host)
-        if c and not c.get("done"):
-            raise MeshError("Vermessen läuft schon", "busy")
+        _claim(host)
         _calib[host] = {"started": int(time.time()), "bed": bed, "done": None, "error": None}
     script = calib_script(bed)
     try:   # Netz, das Moonraker jetzt meldet – solange es das noch meldet, gilt das selbst vermessene
@@ -303,9 +418,11 @@ def calibrate(host, bed=60, run_async=True):
         err = None
         try:
             _moon(host, "/printer/gcode/script", {"script": script}, timeout=CALIB_TIMEOUT_S)
-            probed = parse_output(_moon(host, "/server/gcode_store?count=100"))
+            store = _moon(host, "/server/gcode_store?count=100")
+            probed = parse_output(store)
+            stale = [m for m in console_meshes(store) if m != probed][-10:]
             now = int(time.time())
-            o = {"at": now, "probed": probed, "min": [5.0, 5.0], "max": [245.0, 245.0], "profile": "", "base": base}
+            o = {"at": now, "probed": probed, "min": [5.0, 5.0], "max": [245.0, 245.0], "profile": "", "base": base, "stale": stale}
             with _lock:
                 _set_override(host, o)
             remember(host, o, now=now)

@@ -775,6 +775,14 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-mesh-table th, .wb-mesh-table td { padding: 3px 7px; text-align: right; border: 1px solid var(--rule); }
 .wb-mesh-table th { color: var(--ink-3); font-weight: 500; background: var(--paper); }
 .wb-mesh-table td small { display: block; font-size: 10px; opacity: .85; }
+.wb-pidcard { grid-column: 1 / -1; }
+.wb-pidcard.hidden, .wb-pid-result.hidden { display: none; }
+.wb-pidcard > p { margin: 0; }
+.wb-pidcard > p + p, .wb-pidcard > dl + p { margin-top: 8px; }
+.wb-pid-result { display: grid; grid-template-columns: auto auto auto; justify-content: start; gap: 4px 24px; margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.wb-pid-result dt { color: var(--ink-3); }
+.wb-pid-result dd { margin: 0; text-align: right; }
+.wb-pid-result dd.new { font-weight: 600; }
 .wb-mesh-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0 12px; font-size: 13px; }
 .wb-mesh-run.hidden { display: none; }
 .wb-mesh-run label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-3); }
