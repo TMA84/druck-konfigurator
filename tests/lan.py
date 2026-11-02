@@ -709,8 +709,17 @@ check("… und nach Ruhe ohne Slot vorbei", lan.ace_activity(tr2, _bx(1, -1), t0
 tr3 = {}
 lan.ace_activity(tr3, _bx(1, 0), t0)
 a = lan.ace_activity(tr3, _bx(2, 0), t0 + 1)
-check("arbeitet ohne Wechsel → busy", a and a["phase"] == "busy", a)
-check("… danach nichts", lan.ace_activity(tr3, _bx(1, 0), t0 + 5) is None)
+check("arbeitet, alter Slot noch geladen → zieht zurück (Beginn des Wechsels, ~70 s)", a and a["phase"] == "unload" and a["from"] == 0, a)
+a = lan.ace_activity(tr3, _bx(2, -1), t0 + 71)
+check("… Slot raus, Zeit läuft seit Beginn", a and a["phase"] == "unload" and a["since"] == t0 + 1, a)
+check("arbeitet und hört ohne Wechsel auf → nichts", lan.ace_activity({"last": 0}, _bx(1, 0), t0) is None)
+tr4 = {}
+a = lan.ace_activity(tr4, _bx(2, 2), t0)
+check("erste Meldung mitten im Wechsel: geladener Slot ist der alte", a and a["phase"] == "unload" and a["from"] == 2 and a["to"] == -1, a)
+tr5 = {}
+lan.ace_activity(tr5, _bx(1, 0), t0)
+lan.ace_activity(tr5, _bx(2, 0), t0 + 1)
+check("arbeitet ohne Wechsel, dann Ruhe → nichts", lan.ace_activity(tr5, _bx(1, 0), t0 + 5) is None)
 check("ace_boxes gibt Box-Status weiter", _bx(2, 0)[0]["status"] == 2)
 # Teilmeldung beim Farbwechsel ({id, slots: [ein Slot]}) ersetzt den Stand nicht
 full = {"data": {"multi_color_box": [ACE, dict(ACE, id=1)]}}

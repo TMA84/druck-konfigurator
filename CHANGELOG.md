@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.53.1] – 2026-11-02
+
+### Behoben
+- **Farbwechsel-Anzeige ab dem ersten Moment:** Die ACE arbeitet zu Beginn eines Wechsels gut eine Minute lang, während der alte Slot noch als geladen gemeldet wird. Erst danach springt der Slot auf −1. Das zeigte bisher nur „ACE arbeitet“; jetzt steht dort gleich „Slot X wird zurückgezogen“, und die Zeit läuft ab diesem Moment. Geprüft an zwei echten Wechseln am Kobra S1 (Slot 1 → 3, Slot 3 → 1, knapp 2 Minuten).
+
 ## [10.53.0] – 2026-11-02
 
 ### Neu

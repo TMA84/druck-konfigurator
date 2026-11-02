@@ -536,8 +536,9 @@ def _full_boxes(boxes, prev):
     return True
 
 
-# ACE-Tätigkeit (gemessen am S1 mit zwei ACE, 2026-11-02, Farbwechsel im Druck, ~47 s): Box-Status 1 = ruht, 2 = arbeitet;
-# loaded_slot geht vom alten Slot auf −1 (Filament zurückgezogen) und dann auf den neuen (am Kopf), danach Status wieder 1.
+# ACE-Tätigkeit (gemessen am S1 mit zwei ACE, 2026-11-02, Farbwechsel im Druck, gut 2 min): Box-Status 1 = ruht, 2 = arbeitet.
+# Erst arbeitet die ACE gut 1 min mit dem alten Slot als geladen (Filament wird aus dem Kopf gezogen), dann geht loaded_slot
+# auf −1, nach ~40 s auf den neuen Slot (am Kopf), danach Status wieder 1. Im Druck ohne Wechsel ruht die ACE (Status 1).
 # feed_status bleibt dabei leer (nur bei Laden/Zurück von Hand). Spülen danach macht der Drucker, die ACE meldet es nicht.
 ACE_DONE_S = 25      # so lange bleibt „Farbe gewechselt“ stehen
 ACE_IDLE_END_S = 30  # ruht die ACE so lange ohne geladenen Slot, ist der Vorgang vorbei (z. B. Entladen am Druckende)
@@ -551,7 +552,7 @@ def ace_activity(track, boxes, now):
         track["busy_at"] = now
     ch = track.get("change")
     if ch is None and boxes and ((loaded < 0 and track.get("last", -1) >= 0) or busy):
-        ch = track["change"] = {"from": track.get("last", -1), "to": -1, "since": now, "done_at": None}
+        ch = track["change"] = {"from": loaded if loaded >= 0 else track.get("last", -1), "to": -1, "since": now, "done_at": None}
     if loaded >= 0:
         track["last"] = loaded
     if ch is None:
@@ -564,7 +565,7 @@ def ace_activity(track, boxes, now):
             return None
         ch["done_at"] = now
     if busy and ch["done_at"] is not None:   # nächster Vorgang direkt hinterher
-        ch = track["change"] = {"from": track.get("last", -1), "to": -1, "since": now, "done_at": None}
+        ch = track["change"] = {"from": loaded if loaded >= 0 else track.get("last", -1), "to": -1, "since": now, "done_at": None}
     if ch["done_at"] is not None:
         if now - ch["done_at"] > ACE_DONE_S:
             track["change"] = None
@@ -572,7 +573,7 @@ def ace_activity(track, boxes, now):
         phase = "done"
     elif ch["to"] >= 0:
         phase = "load"
-    elif loaded < 0 and ch["from"] >= 0:
+    elif ch["from"] >= 0 and (loaded < 0 or busy):   # alter Slot noch geladen, ACE arbeitet: er wird herausgezogen
         phase = "unload"
     elif loaded < 0:
         phase = "load"
