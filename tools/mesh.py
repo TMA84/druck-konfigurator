@@ -5,11 +5,18 @@ Moonraker (Port 7125, ohne Anmeldung): GET /printer/objects/query?bed_mesh liefe
 probed_matrix[y][x] (Zeilen von mesh_min bis mesh_max in Y, Spalten in X), mesh_matrix (interpoliert, oft gleich).
 Geprüft 2026-10-25 am Kobra S1 mit Rinkhals: 5 × 5 Punkte, mesh_min [5, 5], mesh_max [245, 245].
 Nur lesen, nur private Adressen (anycubic_lan.check_host). Port: KONFIGURATOR_MOONRAKER_PORT (Standard 7125).
+
+Verlauf (Vergleich mit früheren Messungen): jedes neue Netz (anders als das zuletzt gesehene) landet mit Zeitpunkt in
+$DATA_DIR/mesh-history.json (bzw. $MESH_HISTORY_FILE), je Drucker die letzten HISTORY_MAX. Die Antwort trägt dazu
+"at" (wann dieses Netz zuerst gesehen wurde) und "history" (ältere Messungen, neueste zuerst).
 """
 import json
 import math
 import os
 import socket
+import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -18,6 +25,10 @@ import anycubic_lan
 TIMEOUT_S = 5
 MAX_BYTES = 2 * 1024 * 1024   # Antwort enthält auch andere Objekte (Rinkhals: mmu …) – ein paar kB
 DIM_MIN, DIM_MAX = 2, 50
+HISTORY_MAX = 30      # Messungen je Drucker
+HISTORY_HOSTS = 8     # Drucker im Verlauf
+SAME_MM = 0.0005      # gleiche Messung, wenn kein Punkt weiter abweicht
+_lock = threading.Lock()
 UNSUPPORTED = "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus"
 EMPTY = "Drucker hat kein Bettnetz geladen – er vermisst das Bett beim nächsten Druckstart (oder am Display: Nivellierung)"
 
@@ -115,4 +126,83 @@ def fetch(host, timeout=TIMEOUT_S):
         data = json.loads(body)
     except ValueError:
         raise MeshError("Antwort von Moonraker ist kein JSON", "bad_response")
-    return parse(data)
+    return remember(host, parse(data))
+
+
+def history_file():
+    if os.environ.get("MESH_HISTORY_FILE"):
+        return os.environ["MESH_HISTORY_FILE"]
+    d = os.environ.get("DATA_DIR") or os.path.join(os.path.expanduser("~"), ".druck-konfigurator")
+    return os.path.join(d, "mesh-history.json")
+
+
+def _entry(e):
+    """Gespeicherte Messung prüfen → {at, probed, min, max, profile} oder None (kaputte Einträge fallen weg)."""
+    try:
+        if not isinstance(e, dict) or not _num(e.get("at")):
+            return None
+        probed = _matrix(e.get("probed"), "probed")
+        lo, hi = _point(e.get("min"), "min"), _point(e.get("max"), "max")
+    except MeshError:
+        return None
+    prof = e.get("profile")
+    return {"at": int(e["at"]), "probed": probed, "min": lo, "max": hi, "profile": prof[:64] if isinstance(prof, str) else ""}
+
+
+def load_history(path=None):
+    try:
+        with open(path or history_file(), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    out = {}
+    for host, lst in d.items():
+        if isinstance(host, str) and isinstance(lst, list):
+            ok = [x for x in map(_entry, lst[-HISTORY_MAX:]) if x]
+            if ok:
+                out[host[:64]] = ok
+    return out
+
+
+def _save_history(state, path=None):
+    p = path or history_file()
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, p)
+    except OSError as e:   # Verlauf ist Beiwerk – das Netz trotzdem zeigen
+        print("Bettnetz-Verlauf nicht gespeichert: %s" % e, file=sys.stderr)
+
+
+def same(a, b):
+    """Gleiches Raster und kein Punkt weiter als SAME_MM entfernt."""
+    pa, pb = a["probed"], b["probed"]
+    if a["min"] != b["min"] or a["max"] != b["max"] or len(pa) != len(pb) or len(pa[0]) != len(pb[0]):
+        return False
+    return all(abs(x - y) <= SAME_MM for ra, rb in zip(pa, pb) for x, y in zip(ra, rb))
+
+
+def remember(host, d, now=None, path=None):
+    """Netz im Verlauf ablegen (nur wenn anders als das zuletzt gesehene) → d mit "at" und "history" (neueste zuerst)."""
+    entry = {"at": int(now if now is not None else time.time()), "probed": d["probed"], "min": d["min"], "max": d["max"],
+             "profile": d.get("profile", "")}
+    with _lock:
+        state = load_history(path)
+        lst = state.pop(host, [])
+        if lst and same(lst[-1], entry):
+            entry = lst[-1]
+            state[host] = lst
+        else:
+            lst = (lst + [entry])[-HISTORY_MAX:]
+            state[host] = lst   # zuletzt gemessener Drucker steht hinten
+            while len(state) > HISTORY_HOSTS:
+                state.pop(next(iter(state)))
+            _save_history(state, path)
+    out = dict(d)
+    out["at"] = entry["at"]
+    out["history"] = list(reversed(lst[:-1]))
+    return out

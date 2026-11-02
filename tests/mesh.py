@@ -156,6 +156,38 @@ os.environ["KONFIGURATOR_MOONRAKER_PORT"] = "abc"
 check("Port ungültig → 7125", mesh.port() == 7125)
 os.environ["KONFIGURATOR_MOONRAKER_PORT"] = str(moon.server_address[1])
 
+# Verlauf: neue Messung → vorige in history; gleiche Messung → kein neuer Eintrag; kaputte Datei → leer
+hist = os.path.join(tmp, "mesh-history.json")
+if os.path.exists(hist):
+    os.remove(hist)
+fake["body"] = answer(GOOD)
+st, d = get()
+check("Verlauf: erste Messung ohne Vorgänger", st == 200 and d.get("history") == [] and isinstance(d.get("at"), int), d)
+first_at = d["at"]
+st, d = get()
+check("Verlauf: gleiche Messung bleibt eine", d.get("history") == [] and d.get("at") == first_at, d)
+NEW = [[v + 0.05 for v in row] for row in PROBED]
+fake["body"] = answer({**GOOD, "probed_matrix": NEW, "mesh_matrix": NEW})
+st, d = get()
+check("Verlauf: neue Messung, Vorgänger in history", len(d.get("history", [])) == 1 and d["history"][0]["probed"] == PROBED
+      and d["history"][0]["min"] == [5.0, 5.0] and d["probed"] == NEW, d)
+st, d = get()
+check("Verlauf: erneut abgefragt – weiter ein Vorgänger", len(d.get("history", [])) == 1, d)
+fake["body"] = answer(GOOD)
+st, d = get()
+check("Verlauf: zurück zum alten Netz zählt als neue Messung, neueste zuerst",
+      len(d["history"]) == 2 and d["history"][0]["probed"] == NEW and d["history"][1]["probed"] == PROBED, d)
+for i in range(mesh.HISTORY_MAX + 5):
+    mesh.remember("10.0.0.9", {"probed": [[i, 0], [0, 0]], "min": [0.0, 0.0], "max": [1.0, 1.0], "profile": ""}, now=i)
+check("Verlauf: höchstens HISTORY_MAX je Drucker", len(mesh.load_history()["10.0.0.9"]) == mesh.HISTORY_MAX)
+with open(hist, "w") as f:
+    f.write('{"127.0.0.1": [{"at": 1, "probed": "x"}, {"at": 2, "probed": [[1, 2], [3, 4]], "min": [0, 0], "max": [1, 1]}], "x": 5}')
+check("Verlauf: kaputte Einträge fallen weg", list(mesh.load_history()) == ["127.0.0.1"] and len(mesh.load_history()["127.0.0.1"]) == 1)
+with open(hist, "w") as f:
+    f.write("kein json")
+st, d = get()
+check("Verlauf: kaputte Datei – Netz trotzdem da", st == 200 and d.get("history") == [], (st, d))
+
 srv.shutdown()
 moon.shutdown()
 print("Bettnetz: %d ok, %d Fehler" % (passed, failed))

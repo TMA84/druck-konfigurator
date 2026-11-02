@@ -332,14 +332,21 @@
       <p class="muted small">Gezählt werden Druckstunden laut Druckhistorie, auch Drucke aus anderen Programmen. Intervall anpassen, nach der Arbeit „Erledigt“.</p>
     </section>
     <section id="wbMeshCard" class="wb-card wb-meshcard" aria-labelledby="wbMeshT">
-      <div class="wb-head"><h3 id="wbMeshT" class="wb-eyebrow">Nivellierung</h3><span id="wbMeshSum" class="muted small"></span><span class="wb-mesh-btns"><button class="linkbtn hidden" type="button" id="wbMeshNums" aria-pressed="false">Zahlen</button><button class="linkbtn" type="button" id="wbMeshLoad">Aktualisieren</button></span></div>
+      <div class="wb-head"><h3 id="wbMeshT" class="wb-eyebrow">Nivellierung</h3><span id="wbMeshSum" class="muted small"></span><span class="wb-mesh-btns"><button class="linkbtn hidden" type="button" id="wbMeshScrewsBtn" aria-pressed="false">Schrauben</button><button class="linkbtn hidden" type="button" id="wbMeshNums" aria-pressed="false">Zahlen</button><button class="linkbtn" type="button" id="wbMeshLoad">Aktualisieren</button></span></div>
       <p id="wbMeshNote" class="muted small">Noch nicht abgefragt.</p>
       <div id="wbMeshBody" class="wb-mesh hidden">
+        <label id="wbMeshCmpRow" class="wb-mesh-cmp hidden"><span>Vergleich mit</span><select id="wbMeshCmp"></select></label>
         <div id="wbMeshStage" class="wb-mesh-stage" title="Ziehen dreht, Mausrad/zwei Finger zoomen"></div>
         <div class="wb-mesh-side">
           <div class="wb-mesh-scale"><i id="wbMeshBar"></i><span id="wbMeshHi"></span><span id="wbMeshMid"></span><span id="wbMeshLo"></span></div>
           <dl id="wbMeshStats" class="wb-mesh-stats"></dl>
           <p class="muted small">Positiv = Bett an dieser Stelle höher, negativ = tiefer (mm). Blick von vorn, Höhen überhöht. Gemessen beim letzten Vermessen des Betts.</p>
+          <p id="wbMeshCmpNote" class="muted small hidden"></p>
+        </div>
+        <div id="wbMeshScrews" class="wb-mesh-screws hidden">
+          <div class="wb-mesh-screws-opts"><label><span>Gewinde</span><select id="wbMeshPitch"><option value="0.5">M3 (0,5 mm je Umdrehung)</option><option value="0.7">M4 (0,7 mm je Umdrehung)</option><option value="0.8">M5 (0,8 mm je Umdrehung)</option></select></label></div>
+          <div id="wbMeshScrewGrid" class="wb-mesh-screw-grid"></div>
+          <p id="wbMeshScrewNote" class="muted small"></p>
         </div>
         <div id="wbMeshTable" class="wb-mesh-table hidden"></div>
       </div>

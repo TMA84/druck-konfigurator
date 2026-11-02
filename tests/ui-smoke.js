@@ -724,6 +724,21 @@ async function runSmoke(opts={}){
       ok(!$('wbMeshSum').innerHTML.includes('<b>')&&$('wbMeshTable').querySelectorAll('td').length===25,'Nivellierung: Profilname maskiert, Tabelle 5 × 5');
       meshOnStatus({connected:true,printing:false});await wait(50);ok(calls===1,'Nivellierung: ohne Anlass nicht erneut abgefragt');
       meshOnStatus({connected:true,printing:true});meshOnStatus({connected:true,printing:false});await wait(150);ok(calls===2,'Nivellierung: nach Druckende neu abgefragt');
+      // Vergleich mit der vorigen Messung (history vom Server) und Schrauben-Schätzung an den Ecken
+      { const Q=P.map(r=>r.slice());Q[0][4]=1.004;const O=[[0,0],[0,0]];
+        answer={status:200,body:{probed:P,mesh:P,min:[5,5],max:[245,245],profile:'',source:'moonraker',at:1790000000,
+          history:[{at:1789000000,probed:Q,min:[5,5],max:[245,245],profile:''},{at:1788000000,probed:O,min:[0,0],max:[1,1],profile:''}]}};
+        $('wbMeshLoad').click();await wait(150);
+        const opts=[...$('wbMeshCmp').options];
+        ok(!$('wbMeshCmpRow').classList.contains('hidden')&&opts.length===3&&opts[1].selected&&opts[2].disabled,'Nivellierung: Vergleich mit voriger Messung vorgewählt, anderes Raster gesperrt');
+        ok(/Größte Änderung\+0[,.]100 mm/.test($('wbMeshStats').textContent)&&/X 245, Y 5/.test($('wbMeshCmpNote').textContent),'Nivellierung: größte Änderung +0,100 mm vorn rechts');
+        ok($('wbMeshTable').querySelectorAll('td small').length===25,'Nivellierung: Tabelle zeigt Änderung je Punkt');
+        $('wbMeshCmp').value='';$('wbMeshCmp').dispatchEvent(new Event('change'));
+        ok($('wbMeshCmpNote').classList.contains('hidden')&&!/Größte Änderung/.test($('wbMeshStats').textContent),'Nivellierung: ohne Vergleich');
+        mh.cmp=null;$('wbMeshScrewsBtn').click();$('wbMeshPitch').value='0.5';$('wbMeshPitch').dispatchEvent(new Event('change'));
+        const sc=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
+        ok(!$('wbMeshScrews').classList.contains('hidden')&&/hinten rechts.*Bezug/.test(sc[1])&&/vorne rechts.*\+0[,.]769.*anziehen.*1 ½ Umdrehungen/.test(sc[3])&&/hinten links.*−0[,.]324.*lösen.*⅝ Umdrehung \(233°\)/.test(sc[0]),'Nivellierung: Schrauben – Bezug, anziehen 1 ½, lösen ⅝: '+sc.join(' | '));
+        $('wbMeshScrewsBtn').click(); }
       answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};
       $('wbMeshLoad').click();await wait(150);
       ok($('wbMeshBody').classList.contains('hidden')&&/Rinkhals/.test($('wbMeshNote').textContent),'Nivellierung: Werksfirmware → Hinweis');

@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.50.0] – 2026-11-02
+
+### Neu
+- **Nivellierung vergleichen:** Der Server merkt sich jede neue Messung des Bettnetzes (`DATA_DIR/mesh-history.json`, je Drucker die letzten 30, nur wenn sich das Netz geändert hat). In der Karte „Nivellierung“ gibt es die Auswahl „Vergleich mit“ (vorgewählt die vorige Messung): Die frühere Messung liegt gestrichelt über der Fläche, dazu kommen Spanne vorher, größte Änderung mit Ort und Änderung im Mittel, und in der Tabelle steht unter jedem Wert die Änderung. Die Kopfzeile zeigt, wann das Netz gemessen wurde.
+- **Schrauben-Schätzung:** Neuer Knopf „Schrauben“. Aus den vier Eckpunkten des Netzes schätzt er je Ecke, ob anziehen (senkt die Ecke) oder lösen (hebt sie) und wie weit, in ⅛-Umdrehungen nach Gewinde M3, M4 oder M5. Bezug ist die Ecke mit dem geringsten Gesamtweg, unter 0,05 mm gilt eine Ecke als passend. Das setzt Stellschrauben mit Feder an den Ecken voraus, deshalb steht ein Hinweis dabei. Tests in `tests/mesh.py` und im Bedientest.
+
 ## [10.49.0] – 2026-10-26
 
 ### Neu

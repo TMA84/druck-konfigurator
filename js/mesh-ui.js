@@ -4,10 +4,13 @@
    Abgefragt einmal je Drucker, sobald er verbunden ist (js/workbench-ui.js wbPoll → meshOnStatus), nach jedem Druckende
    (vor dem Druck vermisst der Drucker das Bett neu) und mit „Aktualisieren“ – kein Dauerabfragen.
    Klipper: probed_matrix[y][x], Zeile 0 = vorn (mesh_min Y). Positiv = Bett an dieser Stelle höher.
-   Zeichnen nur bei Änderungen (wie js/miniview.js), Farben hell/dunkel wie js/live-scene.js. */
+   Zeichnen nur bei Änderungen (wie js/miniview.js), Farben hell/dunkel wie js/live-scene.js.
+   Vergleich: der Server merkt sich jede neue Messung (tools/mesh.py, history) – gewählte frühere Messung gestrichelt über
+   der Fläche, Änderung je Punkt in der Tabelle. Schrauben: Schätzung aus den Eckpunkten, wie weit welche Ecke zu drehen ist. */
 
 const mh = { host: null, data: null, err: null, kind: '', busy: false, printing: null, at: 0, seq: 0, nums: false,
-  renderer: null, scene: null, camera: null, controls: null, group: null, lines: [], outline: null };
+  renderer: null, scene: null, camera: null, controls: null, group: null, lines: [], prevLines: [], outline: null,
+  cmp: null, screws: false };   // cmp: null = vorige Messung, '' = ohne Vergleich, sonst Zeitpunkt (at) als Text
 const MH_RETRY_MS = 60000;   // nach „nicht erreichbar“ höchstens einmal je Minute erneut (nicht bei „nur mit Rinkhals“)
 // Blau – Weiß – Rot (niedrig → hoch), dieselben Stufen wie der Verlauf in css/app.css .wb-mesh-scale
 const MH_STOPS = [[0x21, 0x66, 0xac], [0x67, 0xa9, 0xcf], [0xf7, 0xf7, 0xf7], [0xef, 0x8a, 0x62], [0xb2, 0x18, 0x2b]];
@@ -17,6 +20,28 @@ function meshColour(f) {
 }
 const meshDark = () => document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
 const meshMm = v => de(v, 3) + ' mm';
+const meshMmS = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + de(Math.abs(v), 3) + ' mm';
+const meshWhen = at => new Date(at * 1000).toLocaleString(LOCALE(), { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+const MESH_OK_MM = 0.05;   // Ecke gilt als passend
+// Gleiches Raster (Punkte und Grenzen) – sonst ist ein Vergleich Punkt für Punkt sinnlos
+const meshFits = (a, b) => !!(a && b && a.probed.length === b.probed.length && a.probed[0].length === b.probed[0].length
+  && a.min[0] === b.min[0] && a.min[1] === b.min[1] && a.max[0] === b.max[0] && a.max[1] === b.max[1]);
+function meshPrev() {
+  const h = (mh.data && mh.data.history) || [];
+  if (mh.cmp === '') return null;
+  const e = mh.cmp == null ? h[0] : h.find(x => String(x.at) === mh.cmp);
+  return meshFits(mh.data, e) ? e : null;
+}
+// Änderung je Punkt (jetzt − vorher): größte (mit Vorzeichen und Ort), mittlere Abweichung
+function meshDiff(d, prev) {
+  let max = 0, at = [0, 0], sum = 0, n = 0;
+  d.probed.forEach((row, y) => row.forEach((v, x) => {
+    const dv = v - prev.probed[y][x]; sum += Math.abs(dv); n++;
+    if (Math.abs(dv) > Math.abs(max)) { max = dv; at = [x, y]; }
+  }));
+  return { max, at, mean: sum / n };
+}
+const meshAxis = (d, i, n, k) => d.min[k] + (d.max[k] - d.min[k]) * i / (n - 1);
 
 // Kennzahlen aus den gemessenen Punkten (nicht aus dem interpolierten Netz)
 function meshStats(m) {
@@ -51,6 +76,7 @@ async function meshLoad() {
   try {
     const d = await lanApi('api/anycubic/mesh?host=' + encodeURIComponent(host));
     if (seq !== mh.seq) return;
+    if (mh.cmp && !(d.history || []).some(x => String(x.at) === mh.cmp)) mh.cmp = null;
     mh.data = d; mh.err = null; mh.kind = ''; mh.time = new Date().toLocaleTimeString(LOCALE(), { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     if (seq !== mh.seq) return;
@@ -66,11 +92,24 @@ $('wbMeshNums').addEventListener('click', () => {
   mh.nums = !mh.nums; $('wbMeshNums').setAttribute('aria-pressed', String(mh.nums));
   $('wbMeshTable').classList.toggle('hidden', !mh.nums);
 });
+$('wbMeshScrewsBtn').addEventListener('click', () => {
+  mh.screws = !mh.screws; $('wbMeshScrewsBtn').setAttribute('aria-pressed', String(mh.screws));
+  $('wbMeshScrews').classList.toggle('hidden', !mh.screws);
+});
+$('wbMeshCmp').addEventListener('change', e => {
+  const v = e.currentTarget.value, h = (mh.data && mh.data.history) || [];
+  mh.cmp = h[0] && v === String(h[0].at) ? null : v;
+  meshRender();
+});
+$('wbMeshPitch').value = String(store.settings.meshPitch || 0.5);
+if (!$('wbMeshPitch').value) $('wbMeshPitch').value = '0.5';
+$('wbMeshPitch').addEventListener('change', e => { store.settings.meshPitch = Number(e.currentTarget.value); persist(); if (mh.data) meshScrews(mh.data); });
 
 function meshRender() {
   const d = mh.data, note = $('wbMeshNote');
   $('wbMeshBody').classList.toggle('hidden', !d);
   $('wbMeshNums').classList.toggle('hidden', !d);
+  $('wbMeshScrewsBtn').classList.toggle('hidden', !d);
   if (!d) {
     $('wbMeshSum').textContent = '';
     note.textContent = mh.kind === 'unsupported' ? t('Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus.')
@@ -83,16 +122,75 @@ function meshRender() {
   const s = meshStats(d.probed), rows = d.probed.length, cols = d.probed[0].length;
   const fac = meshFactor(s.span, Math.max(d.max[0] - d.min[0], d.max[1] - d.min[1]));
   $('wbMeshSum').textContent = t('Spanne {span}', { span: meshMm(s.span) }) + ' · ' + t('{cols} × {rows} Punkte', { cols, rows })
-    + (d.profile ? ' · ' + t('Profil „{name}“', { name: d.profile }) : '') + ' · ' + mh.time;
+    + (d.profile ? ' · ' + t('Profil „{name}“', { name: d.profile }) : '') + ' · '
+    + (d.at ? t('gemessen {when}', { when: meshWhen(d.at) }) : mh.time);
+  meshCmpSelect(d);
+  const prev = meshPrev(), ps = prev && meshStats(prev.probed), diff = prev && meshDiff(d, prev);
   $('wbMeshHi').textContent = meshMm(s.hi); $('wbMeshMid').textContent = meshMm((s.hi + s.lo) / 2); $('wbMeshLo').textContent = meshMm(s.lo);
-  $('wbMeshStats').innerHTML = [[t('Max'), meshMm(s.hi)], [t('Min'), meshMm(s.lo)], [t('Spanne (Distanz)'), meshMm(s.span)], [t('Mittelwert'), meshMm(s.mean)],
-    [t('Höhe überhöht'), '× ' + de(fac, 0)]].map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('');
-  meshTable(d, s);
-  meshScene(d, s, fac);
+  const stats = [[t('Max'), meshMm(s.hi)], [t('Min'), meshMm(s.lo)], [t('Spanne (Distanz)'), meshMm(s.span)], [t('Mittelwert'), meshMm(s.mean)]];
+  if (prev) stats.push([t('Spanne vorher'), meshMm(ps.span) + ' (' + meshMmS(s.span - ps.span) + ')'],
+    [t('Größte Änderung'), meshMmS(diff.max)], [t('Änderung im Mittel'), meshMm(diff.mean)]);
+  stats.push([t('Höhe überhöht'), '× ' + de(fac, 0)]);
+  $('wbMeshStats').innerHTML = stats.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('');
+  const cmpNote = $('wbMeshCmpNote');
+  cmpNote.classList.toggle('hidden', !prev);
+  cmpNote.textContent = prev ? t('Gestrichelt: Messung vom {when}. Größte Änderung {d} bei X {x}, Y {y} mm.', { when: meshWhen(prev.at), d: meshMmS(diff.max),
+    x: de(meshAxis(d, diff.at[0], cols, 0), 0), y: de(meshAxis(d, diff.at[1], rows, 1), 0) }) : '';
+  meshTable(d, s, prev);
+  meshScrews(d);
+  meshScene(d, s, fac, prev);
+}
+
+// Auswahl „Vergleich mit“: frühere Messungen (neueste zuerst); anderes Raster nicht wählbar
+function meshCmpSelect(d) {
+  const h = d.history || [], sel = $('wbMeshCmp');
+  $('wbMeshCmpRow').classList.toggle('hidden', !h.length);
+  if (!h.length) return;
+  const cur = mh.cmp == null ? String(h[0].at) : mh.cmp;
+  sel.innerHTML = '<option value="">' + esc(t('ohne Vergleich')) + '</option>' + h.map((e, i) => {
+    const ok = meshFits(d, e), label = (i ? '' : t('vorige Messung') + ' · ') + meshWhen(e.at) + ' · '
+      + (ok ? t('Spanne {span}', { span: meshMm(meshStats(e.probed).span) }) : t('anderes Raster'));
+    return '<option value="' + e.at + '"' + (ok ? '' : ' disabled') + (String(e.at) === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
+  }).join('');
+  if (mh.cmp === '') sel.value = '';
+}
+
+/* Stellschrauben an den Ecken: Höhe der Eckpunkte des Netzes, Bezug = die Ecke, bei der insgesamt am wenigsten zu drehen ist.
+   Höher als der Bezug → anziehen (senkt die Ecke bei Schrauben mit Feder), tiefer → lösen. Umdrehungen = Höhe / Steigung, auf ⅛. */
+const MESH_CORNERS = [['hinten links', 1, 0], ['hinten rechts', 1, 1], ['vorne links', 0, 0], ['vorne rechts', 0, 1]];
+function meshScrewPlan(d) {
+  const m = d.probed, r = m.length, c = m[0].length;
+  const pts = MESH_CORNERS.map(([name, yb, xb]) => ({ name, z: m[yb ? r - 1 : 0][xb ? c - 1 : 0] }));
+  let ref = pts[0], best = Infinity;
+  for (const p of pts) { const sum = pts.reduce((a, q) => a + Math.abs(q.z - p.z), 0); if (sum < best - 1e-9) { best = sum; ref = p; } }
+  return pts.map(p => ({ ...p, ref: p === ref, dz: p.z - ref.z }));
+}
+const MESH_EIGHTHS = ['', '⅛', '¼', '⅜', '½', '⅝', '¾', '⅞'];
+function meshTurns(mm, pitch) {
+  const e = Math.round(Math.abs(mm) / pitch * 8);
+  if (!e) return '';
+  const whole = Math.floor(e / 8), txt = (whole ? String(whole) + (e % 8 ? ' ' : '') : '') + MESH_EIGHTHS[e % 8];
+  return (e > 8 ? t('≈ {n} Umdrehungen', { n: txt }) : t('≈ {n} Umdrehung', { n: txt }))
+    + (e < 8 ? ' (' + Math.round(Math.abs(mm) / pitch * 360) + '°)' : '');
+}
+function meshScrews(d) {
+  const pitch = Number($('wbMeshPitch').value) || 0.5, plan = meshScrewPlan(d);
+  $('wbMeshScrewGrid').innerHTML = plan.map(p => {
+    const ok = Math.abs(p.dz) < MESH_OK_MM, turns = meshTurns(p.dz, pitch);
+    const what = p.ref ? t('Bezug – nicht drehen') : ok || !turns ? t('passt')
+      : p.dz > 0 ? t('anziehen (im Uhrzeigersinn) – senkt diese Ecke') : t('lösen (gegen den Uhrzeigersinn) – hebt diese Ecke');
+    return '<div class="wb-mesh-screw' + (p.ref ? ' ref' : ok ? ' ok' : p.dz > 0 ? ' down' : ' up') + '"><b>' + esc(t(p.name)) + '</b>'
+      + '<span class="wb-mesh-screw-dz">' + esc(meshMmS(p.dz)) + '</span>'
+      + '<span>' + esc(what) + '</span>' + (!p.ref && !ok && turns ? '<span class="wb-mesh-screw-turns">' + esc(turns) + '</span>' : '') + '</div>';
+  }).join('');
+  const all = plan.every(p => Math.abs(p.dz) < MESH_OK_MM);
+  $('wbMeshScrewNote').textContent = (all ? t('Alle Ecken liegen innerhalb von {mm} – nichts zu drehen.', { mm: meshMm(MESH_OK_MM) }) + ' ' : '')
+    + t('Schätzung aus den Eckpunkten des Netzes (gemessen {x} mm vom Rand) für Stellschrauben mit Feder an den Ecken: Anziehen senkt das Bett. Ob und wo dein Bett solche Schrauben hat, bitte selbst prüfen. In kleinen Schritten drehen, dann neu vermessen und mit dieser Messung vergleichen – den Rest gleicht das Bettnetz beim Druck ohnehin aus.',
+      { x: de(Math.min(d.min[0], d.min[1]), 0) });
 }
 
 // Messpunkte als Tabelle von oben, vor dem Drucker stehend: vorn (Zeile 0, mesh_min Y) unten, hinten oben; gefärbt wie die Fläche
-function meshTable(d, s) {
+function meshTable(d, s, prev) {
   const m = d.probed, rows = m.length, cols = m[0].length;
   const at = (lo, hi, i, n) => lo + (hi - lo) * i / (n - 1);
   let h = '<table><thead><tr><th>' + esc(t('Y \\ X (mm)')) + '</th>';
@@ -102,11 +200,13 @@ function meshTable(d, s) {
     h += '<tr><th>' + esc(de(at(d.min[1], d.max[1], y, rows), 0)) + '</th>';
     for (let x = 0; x < cols; x++) {
       const v = m[y][x], c = meshColour(s.span > 0 ? (v - s.lo) / s.span : 0.5), lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
-      h += '<td style="background:rgb(' + c.map(q => Math.round(q * 255)).join(',') + ');color:' + (lum < 0.55 ? '#fff' : '#1b1f24') + '">' + esc(de(v, 3)) + '</td>';
+      h += '<td style="background:rgb(' + c.map(q => Math.round(q * 255)).join(',') + ');color:' + (lum < 0.55 ? '#fff' : '#1b1f24') + '">' + esc(de(v, 3))
+        + (prev ? '<small>' + esc(meshMmS(v - prev.probed[y][x]).replace(' mm', '')) + '</small>' : '') + '</td>';
     }
     h += '</tr>';
   }
-  $('wbMeshTable').innerHTML = h + '</tbody><caption>' + esc(t('Blick von oben, vorne = unten')) + ' · ' + esc(t('Werte in mm; X links → rechts, Y vorne → hinten')) + '</caption></table>';
+  $('wbMeshTable').innerHTML = h + '</tbody><caption>' + esc(t('Blick von oben, vorne = unten')) + ' · ' + esc(t('Werte in mm; X links → rechts, Y vorne → hinten'))
+    + (prev ? ' · ' + esc(t('klein: Änderung seit {when}', { when: meshWhen(prev.at) })) : '') + '</caption></table>';
 }
 
 // ---------- 3D ----------
@@ -157,6 +257,7 @@ function meshTheme() {
   const dark = meshDark();
   mh.scene.background = new THREE.Color(dark ? 0x2a343a : 0xe9eff1);
   for (const l of mh.lines) l.material.color.setHex(dark ? 0x10161a : 0x26343b);
+  for (const l of mh.prevLines) l.material.color.setHex(dark ? 0xffd166 : 0x6a3d9a);
   if (mh.outline) mh.outline.material.color.setHex(dark ? 0xd0d6da : 0x3a454b);
   meshDraw();
 }
@@ -164,11 +265,11 @@ function meshDispose() {
   if (!mh.group) return;
   mh.scene.remove(mh.group);
   mh.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
-  mh.group = null; mh.lines = []; mh.outline = null;
+  mh.group = null; mh.lines = []; mh.prevLines = []; mh.outline = null;
 }
 /* Fläche aus mesh_matrix (interpoliert, wenn feiner als die Messung), sonst probed_matrix. Bett: 0 … mesh_max + mesh_min
    (Rand wie vorn/links auch hinten/rechts), Mitte im Ursprung; z = Abweichung × Überhöhung. */
-function meshScene(d, s, fac) {
+function meshScene(d, s, fac, prev) {
   if (!meshInit()) { if (!mh.nums) $('wbMeshNums').click(); $('wbMeshStage').classList.add('hidden'); return; }
   meshDispose();
   const m = d.mesh.length * d.mesh[0].length > d.probed.length * d.probed[0].length ? d.mesh : d.probed;
@@ -191,6 +292,19 @@ function meshScene(d, s, fac) {
   const line = pts => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat()); mh.lines.push(l); g.add(l); };
   for (let j = 0; j < rows; j++) line(Array.from({ length: cols }, (_, i) => new THREE.Vector3(px(i), py(j), m[j][i] * fac)));
   for (let i = 0; i < cols; i++) line(Array.from({ length: rows }, (_, j) => new THREE.Vector3(px(i), py(j), m[j][i] * fac)));
+  // frühere Messung (Vergleich): gestrichelte Gitterlinien in derselben Überhöhung
+  let plo = s.lo, phi = s.hi;
+  if (prev) {
+    const pm = prev.probed, pr = pm.length, pc = pm[0].length;
+    const qx = i => d.min[0] + (d.max[0] - d.min[0]) * i / (pc - 1) - cx, qy = j => d.min[1] + (d.max[1] - d.min[1]) * j / (pr - 1) - cy;
+    const dash = pts => {
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0x6a3d9a, dashSize: 5, gapSize: 4, depthTest: false, transparent: true, opacity: 0.9 }));
+      l.computeLineDistances(); l.renderOrder = 1; mh.prevLines.push(l); g.add(l);   // auch unter der Fläche sichtbar
+    };
+    for (let j = 0; j < pr; j++) dash(Array.from({ length: pc }, (_, i) => new THREE.Vector3(qx(i), qy(j), pm[j][i] * fac)));
+    for (let i = 0; i < pc; i++) dash(Array.from({ length: pr }, (_, j) => new THREE.Vector3(qx(i), qy(j), pm[j][i] * fac)));
+    const ps = meshStats(pm); plo = Math.min(plo, ps.lo); phi = Math.max(phi, ps.hi);
+  }
   // Nullebene (durchsichtig) und Umriss des Betts
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(bx, by), new THREE.MeshBasicMaterial({ color: 0x8a949a, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
   g.add(plane);
@@ -202,7 +316,7 @@ function meshScene(d, s, fac) {
   for (const [txt, x, y] of [[t('vorne'), 0, -cy - off], [t('hinten'), 0, cy + off], [t('links'), -cx - off * 1.6, 0], [t('rechts'), cx + off * 1.7, 0],
     ['X →', cx * 0.55, -cy - off], ['Y →', -cx - off * 1.6, cy * 0.55], ['0,0', -cx - off * 0.6, -cy - off * 0.6]]) g.add(meshLabel(txt, x, y));
   mh.scene.add(g);
-  mh.fit = { x: cx + off * 2.4, y: cy + off * 1.5, lo: s.lo * fac, hi: s.hi * fac };
+  mh.fit = { x: cx + off * 2.4, y: cy + off * 1.5, lo: plo * fac, hi: phi * fac };
   meshTheme(); meshResize();
 }
 /* Kamera: von vorn, etwas erhöht (wie man vor dem Drucker steht), Bett samt Beschriftung passend zur Größe der Ansicht –

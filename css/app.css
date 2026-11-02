@@ -774,6 +774,21 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-mesh-table table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin: 0 auto; }
 .wb-mesh-table th, .wb-mesh-table td { padding: 3px 7px; text-align: right; border: 1px solid var(--rule); }
 .wb-mesh-table th { color: var(--ink-3); font-weight: 500; background: var(--paper); }
+.wb-mesh-table td small { display: block; font-size: 10px; opacity: .85; }
+.wb-mesh-cmp { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
+.wb-mesh-cmp.hidden, .wb-mesh-screws.hidden { display: none; }
+.wb-mesh-cmp select { max-width: 100%; min-width: 0; flex: 0 1 auto; }
+.wb-mesh-screws { grid-column: 1 / -1; display: grid; gap: 10px; }
+.wb-mesh-screws p { margin: 0; }
+.wb-mesh-screws-opts label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
+.wb-mesh-screw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wb-mesh-screw { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: var(--r-s); font-size: 13px; }
+.wb-mesh-screw .wb-mesh-screw-dz { font-weight: 600; font-variant-numeric: tabular-nums; }
+.wb-mesh-screw .wb-mesh-screw-turns { font-weight: 600; }
+.wb-mesh-screw.ref { background: var(--paper-2); }
+.wb-mesh-screw.down { border-left: 4px solid #b2182b; }
+.wb-mesh-screw.up { border-left: 4px solid #2166ac; }
+.wb-mesh-screw.ok { border-left: 4px solid var(--rule-strong); }
 .wb-mesh-table caption { caption-side: bottom; font-size: 11px; color: var(--ink-3); padding-top: 4px; }
 @media (max-width: 800px) {
   .wb-mesh { grid-template-columns: 1fr; }
