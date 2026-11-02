@@ -6,11 +6,13 @@
    Klipper: probed_matrix[y][x], Zeile 0 = vorn (mesh_min Y). Positiv = Bett an dieser Stelle höher.
    Zeichnen nur bei Änderungen (wie js/miniview.js), Farben hell/dunkel wie js/live-scene.js.
    Vergleich: der Server merkt sich jede neue Messung (tools/mesh.py, history) – gewählte frühere Messung gestrichelt über
-   der Fläche, Änderung je Punkt in der Tabelle. Schrauben: Schätzung aus dem Netz an den Schrauben (inneres Quadrat oder Ecken), wie weit welche zu drehen ist. */
+   der Fläche, Änderung je Punkt in der Tabelle. „Jetzt vermessen“: POST api/anycubic/mesh/calibrate (nur wenn frei),
+   danach alle MH_CALIB_POLL_MS den Stand fragen und am Ende das neue Netz laden. Schrauben: Schätzung aus dem Netz an den Schrauben (inneres Quadrat oder Ecken), wie weit welche zu drehen ist. */
 
 const mh = { host: null, data: null, err: null, kind: '', busy: false, printing: null, at: 0, seq: 0, nums: false,
   renderer: null, scene: null, camera: null, controls: null, group: null, lines: [], prevLines: [], outline: null,
-  cmp: null, screws: false };   // cmp: null = vorige Messung, '' = ohne Vergleich, sonst Zeitpunkt (at) als Text
+  cmp: null, screws: false, calib: null, calibTimer: null };   // cmp: null = vorige Messung, '' = ohne Vergleich, sonst Zeitpunkt (at) als Text
+const MH_CALIB_POLL_MS = 5000;
 const MH_RETRY_MS = 60000;   // nach „nicht erreichbar“ höchstens einmal je Minute erneut (nicht bei „nur mit Rinkhals“)
 // Blau – Weiß – Rot (niedrig → hoch), dieselben Stufen wie der Verlauf in css/app.css .wb-mesh-scale
 const MH_STOPS = [[0x21, 0x66, 0xac], [0x67, 0xa9, 0xcf], [0xf7, 0xf7, 0xf7], [0xef, 0x8a, 0x62], [0xb2, 0x18, 0x2b]];
@@ -60,7 +62,7 @@ function meshOnStatus(st) {
   const host = wbHost();
   if (!host || !st || st.connected === false) return;
   const printing = !!st.printing, ended = mh.printing === true && !printing;
-  mh.printing = printing;
+  if (mh.printing !== printing) { mh.printing = printing; meshRunState(); }
   if (mh.busy) return;
   const retry = mh.err && !['unsupported', 'empty'].includes(mh.kind) && Date.now() - mh.at > MH_RETRY_MS;
   if (mh.host !== host || ended || retry) meshLoad();
@@ -69,6 +71,7 @@ function meshOnStatus(st) {
 async function meshLoad() {
   const host = wbHost();
   if (!host) return;
+  if (!mh.calibTimer && mh.host !== host) meshCalibPoll(true);   // Seite neu geladen, während der Drucker vermisst?
   const seq = ++mh.seq;
   mh.host = host; mh.busy = true; mh.at = Date.now();
   $('wbMeshLoad').disabled = true;
@@ -88,6 +91,49 @@ async function meshLoad() {
   meshRender();
 }
 $('wbMeshLoad').addEventListener('click', meshLoad);
+
+// ---------- Jetzt vermessen ----------
+$('wbMeshBed').value = String([60, 70, 100].includes(store.settings.meshBed) ? store.settings.meshBed : 60);
+$('wbMeshBed').addEventListener('change', e => { store.settings.meshBed = Number(e.currentTarget.value); persist(); });
+$('wbMeshRun').addEventListener('click', async () => {
+  const host = wbHost(), bed = Number($('wbMeshBed').value);
+  if (!host || mh.printing) return;
+  if (!confirm(t('Bett jetzt vermessen (Bett {bed} °C)? Der Drucker fährt in die Ausgangsstellung, heizt, wischt die Düse und tastet das Bett ab (5 × 5 Punkte) – etwa 4–5 Minuten. Das Bett muss leer sein.', { bed }))) return;
+  $('wbMeshRun').disabled = true;
+  try {
+    await lanApi('api/anycubic/mesh/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, bed }) });
+    mh.calib = { started: Date.now() / 1000, bed, done: null, error: null };
+    meshCalibPoll();
+  } catch (e) {
+    mh.calib = { done: Date.now() / 1000, error: e.message };
+  }
+  meshRunState();
+});
+/* Stand vom Server: läuft → weiter fragen; eben fertig → neues Netz laden. once: nur nachsehen (nach dem Laden der Seite). */
+async function meshCalibPoll(once) {
+  clearTimeout(mh.calibTimer); mh.calibTimer = null;
+  const host = wbHost();
+  if (!host) return;
+  let c = null;
+  try { c = (await lanApi('api/anycubic/mesh/calibrate?host=' + encodeURIComponent(host))).state; } catch (e) { if (once) return; }
+  const was = mh.calib && !mh.calib.done;
+  if (c) mh.calib = c;
+  if (c && !c.done) mh.calibTimer = setTimeout(meshCalibPoll, MH_CALIB_POLL_MS);
+  else if (was && c && c.done && !c.error) meshLoad();
+  else if (was && !c && !once) mh.calibTimer = setTimeout(meshCalibPoll, MH_CALIB_POLL_MS);
+  meshRunState();
+}
+function meshRunState() {
+  const c = mh.calib, running = !!(c && !c.done), note = $('wbMeshRunNote');
+  $('wbMeshRunRow').classList.toggle('hidden', mh.kind === 'unsupported');
+  $('wbMeshRun').disabled = running || !!mh.printing || !wbHost();
+  $('wbMeshBed').disabled = running;
+  $('wbMeshRun').title = mh.printing ? t('Nur wenn der Drucker frei ist') : '';
+  note.textContent = running ? t('Vermessen läuft seit {min} min – heizt, wischt, tastet ab …', { min: Math.max(0, Math.floor((Date.now() / 1000 - c.started) / 60)) })
+    : c && c.error ? t('Vermessen fehlgeschlagen: {msg}', { msg: t(c.error) })
+    : c && c.done ? t('Vermessen fertig ({time}).', { time: new Date(c.done * 1000).toLocaleTimeString(LOCALE(), { hour: '2-digit', minute: '2-digit' }) })
+    : mh.printing ? t('Vermessen geht nur, wenn der Drucker frei ist.') : '';
+}
 $('wbMeshNums').addEventListener('click', () => {
   mh.nums = !mh.nums; $('wbMeshNums').setAttribute('aria-pressed', String(mh.nums));
   $('wbMeshTable').classList.toggle('hidden', !mh.nums);
@@ -109,6 +155,7 @@ $('wbMeshPitch').addEventListener('change', e => { store.settings.meshPitch = Nu
 
 function meshRender() {
   const d = mh.data, note = $('wbMeshNote');
+  meshRunState();
   $('wbMeshBody').classList.toggle('hidden', !d);
   $('wbMeshNums').classList.toggle('hidden', !d);
   $('wbMeshScrewsBtn').classList.toggle('hidden', !d);

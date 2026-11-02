@@ -11,6 +11,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -47,11 +48,42 @@ def answer(bm):
 
 GOOD = {"profile_name": "default", "mesh_min": [5.0, 5.0], "mesh_max": [245.0, 245.0], "probed_matrix": PROBED,
         "mesh_matrix": PROBED, "profiles": {}}
-fake = {"body": answer(GOOD), "code": 200}
+fake = {"body": answer(GOOD), "code": 200, "state": "complete", "scripts": [], "gcode_code": 200, "out": [[0.1] * 5 for _ in range(5)]}
 
 
 class Moonraker(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        fake["scripts"].append((self.path, req.get("script")))
+        ok = fake["gcode_code"] == 200
+        body = json.dumps({"result": "ok"} if ok else {"error": {"code": 400, "message": "Unknown command:\"G9111\""}}).encode()
+        self.send_response(fake["gcode_code"])
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
+        if self.path.startswith("/server/gcode_store"):
+            n = len(fake["out"])
+            msg = "Mesh Leveling Probed Z positions:\n" + "\n".join(" // " + " ".join("%.6f" % v for v in r) for r in fake["out"])
+            body = json.dumps({"result": {"gcode_store": [{"type": "command", "message": "G9111\nBED_MESH_CALIBRATE PROBE_COUNT=%d,%d" % (n, n)},
+                                                          {"type": "response", "message": msg}][:2 if n else 1]}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path.startswith("/printer/objects/query?print_stats"):
+            body = json.dumps({"result": {"status": {"print_stats": {"state": fake["state"]}, "idle_timeout": {"state": "Idle"},
+                                                     "webhooks": {"state": "ready"}}}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         body = fake["body"].encode()
         self.send_response(fake["code"])
         self.send_header("Content-Type", "application/json")
@@ -187,6 +219,92 @@ with open(hist, "w") as f:
     f.write("kein json")
 st, d = get()
 check("Verlauf: kaputte Datei – Netz trotzdem da", st == 200 and d.get("history") == [], (st, d))
+
+# Jetzt vermessen: nur wenn frei, Ablauf wie beim Druckstart, feineres Netz danach, Heizungen aus
+def post(body, headers=None):
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
+    c.request("POST", "/api/anycubic/mesh/calibrate", json.dumps(body), {"Content-Type": "application/json", **(headers or {})})
+    r = c.getresponse()
+    data = json.loads(r.read() or b"{}")
+    c.close()
+    return r.status, data
+
+
+def calib_get():
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
+    c.request("GET", "/api/anycubic/mesh/calibrate?host=127.0.0.1")
+    r = c.getresponse()
+    data = json.loads(r.read() or b"{}")
+    c.close()
+    return r.status, data
+
+
+def wait_done():
+    for _ in range(100):
+        st, d = calib_get()
+        if d.get("state") and d["state"].get("done"):
+            return d["state"]
+        time.sleep(0.05)
+    return None
+
+
+st, d = calib_get()
+check("Vermessen: noch nichts gestartet", st == 200 and d.get("state") is None, (st, d))
+fake["state"] = "printing"
+st, d = post({"host": "127.0.0.1", "bed": 60})
+check("Vermessen: druckt → 409, nichts gesendet", st == 409 and d.get("kind") == "busy" and not fake["scripts"], (st, d, fake["scripts"]))
+fake["state"] = "paused"
+st, d = post({"host": "127.0.0.1"})
+check("Vermessen: pausiert → 409", st == 409 and not fake["scripts"], (st, d))
+fake["state"] = "complete"
+for bad in ({"host": "127.0.0.1", "bed": True}, {"host": "127.0.0.1", "bed": 150}, {"host": "127.0.0.1", "bed": "60"}):
+    st, d = post(bad)
+    check("Vermessen: ungültig %s → 400" % bad, st == 400 and not fake["scripts"], (st, d))
+st, d = post({"host": "8.8.8.8"})
+check("Vermessen: öffentliche Adresse → 403", st == 403 and not fake["scripts"], (st, d))
+c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=15)
+c.request("POST", "/api/anycubic/mesh/calibrate", json.dumps({"host": "127.0.0.1"}), {"Content-Type": "text/plain"})
+r = c.getresponse(); r.read(); c.close()
+check("Vermessen: ohne application/json (einfache Anfrage fremder Seiten) → 415", r.status == 415 and not fake["scripts"], r.status)
+NEWMESH = [[round(0.01 * (x - y), 6) for x in range(5)] for y in range(5)]
+fake["out"] = NEWMESH
+fake["body"] = answer(GOOD)
+st, d = post({"host": "127.0.0.1", "bed": 60})
+state = wait_done()
+check("Vermessen 5 × 5: gestartet und fertig", st == 200 and d.get("started") and state and state["error"] is None and state["bed"] == 60, (st, d, state))
+check("Vermessen 5 × 5: G9111 wie beim Druckstart, dann Heizungen aus",
+      fake["scripts"] == [("/printer/gcode/script", "G9111 bedTemp=60 extruderTemp=170\nBED_MESH_CALIBRATE MESH_MIN=5,5 MESH_MAX=245,245"
+                                                     "\nM104 S0\nM140 S0\nBED_MESH_OUTPUT")], fake["scripts"])
+# Firmware behält ihr altes Netz in Moonraker – die Karte zeigt das ausgelesene neue, das alte steht im Verlauf
+st, d = get()
+check("Vermessen: neues Netz aus der Konsole statt des alten aus Moonraker", st == 200 and d["probed"] == NEWMESH and d.get("source") == "calibrate"
+      and d["history"] and d["history"][0]["probed"] == PROBED, d)
+st, d = get()
+check("Vermessen: bleibt beim erneuten Abfragen", d["probed"] == NEWMESH and len(d["history"]) >= 1, d)
+# nächster Druckstart: Firmware meldet ein anderes Netz → das gilt, Merker weg
+FW = [[v + 0.2 for v in row] for row in PROBED]
+fake["body"] = answer({**GOOD, "probed_matrix": FW, "mesh_matrix": FW})
+st, d = get()
+check("Vermessen: neues Netz der Firmware löst das ausgelesene ab", d["probed"] == FW and d.get("source") == "moonraker" and d["history"][0]["probed"] == NEWMESH, d)
+check("Vermessen: Merker gelöscht", mesh._override("127.0.0.1") is None)
+fake["body"] = answer(GOOD)
+# Konsole ohne Netz → Fehler, kein Merker
+fake["out"] = []
+st, d = post({"host": "127.0.0.1", "bed": 60})
+state = wait_done()
+check("Vermessen: kein Netz in der Konsole → Fehler", state and "nicht in der Konsole" in (state.get("error") or "") and mesh._override("127.0.0.1") is None, state)
+fake["out"] = [[0.0] * 5 for _ in range(5)]
+fake["scripts"].clear()
+fake["gcode_code"] = 400
+st, d = post({"host": "127.0.0.1", "bed": 60})
+state = wait_done()
+check("Vermessen: Fehler des Druckers landet im Stand", st == 200 and state and "Unknown command" in (state.get("error") or ""), state)
+fake["gcode_code"] = 200
+# läuft schon → 409
+mesh._calib["127.0.0.1"]["done"] = None
+st, d = post({"host": "127.0.0.1", "bed": 60})
+check("Vermessen: läuft schon → 409", st == 409 and "läuft schon" in d.get("error", ""), (st, d))
+mesh._calib.clear()
 
 srv.shutdown()
 moon.shutdown()

@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.51.0] – 2026-11-02
+
+### Neu
+- **Nivellierung: „Jetzt vermessen“:** Neuer Knopf in der Karte „Nivellierung“, nur aktiv, wenn der Drucker frei ist, und mit Rückfrage. Die Betttemperatur ist wählbar (60, 70 oder 100 °C). Über Moonraker (Rinkhals) laufen dann `G9111` wie beim Druckstart (heizen, Düse wischen, Z-Offset), `BED_MESH_CALIBRATE`, Heizungen aus und `BED_MESH_OUTPUT`. Die Karte zeigt, wie lange das Vermessen schon läuft, und danach das neue Netz samt Vergleich mit dem vorigen. Der Server prüft vor dem Start selbst, ob der Drucker druckt oder pausiert (`POST /api/anycubic/mesh/calibrate`, Stand über `GET …/mesh/calibrate`).
+- Am Kobra S1 geprüft:
+  - `G9111` allein misst nur den Z-Offset.
+  - `BED_MESH_CALIBRATE` tastet immer 5 × 5 ab, `PROBE_COUNT=7,7` wird ignoriert. Deshalb gibt es keine Auswahl der Netzgröße.
+  - Das gemessene Netz bleibt nur im Speicher; weder Moonraker noch `printer_mutable.cfg` übernehmen es, auch nicht mit `BED_MESH_PROFILE SAVE`.
+  - Deshalb liest der Server das Netz aus der Konsole und zeigt es, bis die Firmware beim nächsten Druckstart ein eigenes speichert.
+  - Tests in `tests/mesh.py` und im Bedientest.
+
 ## [10.50.1] – 2026-11-02
 
 ### Geändert

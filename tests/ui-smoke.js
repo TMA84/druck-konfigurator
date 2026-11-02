@@ -715,7 +715,7 @@ async function runSmoke(opts={}){
       window.fetch=of;lv.name=null;lv.missing=false; }
     // Nivellierung: Bettnetz über Moonraker (Fläche, Kennzahlen, Tabelle), Abfrage nur bei Anlass, Werksfirmware → Hinweis statt Fehler
     { const of=window.fetch,hosts=store.settings.printerHosts;let calls=0,answer=null;
-      window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/mesh')){calls++;return Promise.resolve(new Response(JSON.stringify(answer.body),{status:answer.status,headers:{'Content-Type':'application/json'}}))}return of(u,o)};
+      window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/mesh?')){calls++;return Promise.resolve(new Response(JSON.stringify(answer.body),{status:answer.status,headers:{'Content-Type':'application/json'}}))}return of(u,o)};
       store.settings.printerHosts={...(hosts||{}),[WB_PRINTER]:'10.0.0.9'};
       const P=[[1.014,0.705,0.666,0.697,1.104],[0.517,0.331,0.329,0.511,0.869],[0.261,-0.034,0.096,0.412,0.745],[0.012,0.126,0.193,0.351,0.452],[0.011,0.26,0.298,0.296,0.335]];
       answer={status:200,body:{probed:P,mesh:P,min:[5,5],max:[245,245],profile:'<b>x</b>',source:'moonraker'}};
@@ -745,6 +745,17 @@ async function runSmoke(opts={}){
         $('wbMeshScrewAt').value=at0;$('wbMeshScrewAt').dispatchEvent(new Event('change'));
         ok(!$('wbMeshScrews').classList.contains('hidden')&&/hinten rechts.*Bezug/.test(sc[1])&&/vorne rechts.*\+0[,.]769.*anziehen.*1 ½ Umdrehungen/.test(sc[3])&&/hinten links.*−0[,.]324.*lösen.*⅝ Umdrehung \(233°\)/.test(sc[0]),'Nivellierung: Schrauben – Bezug, anziehen 1 ½, lösen ⅝: '+sc.join(' | '));
         $('wbMeshScrewsBtn').click(); }
+      // Jetzt vermessen: nach Rückfrage POST mit Netzgröße und Bett, Stand abfragen, am Ende neues Netz laden; beim Drucken gesperrt
+      { const posts=[];let cstate={started:1,bed:70,done:null,error:null};const of2=window.fetch,c0=window.confirm;
+        window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/mesh/calibrate')){if(o&&o.method==='POST')posts.push(JSON.parse(o.body));return Promise.resolve(new Response(JSON.stringify(o&&o.method==='POST'?{started:true}:{state:cstate}),{status:200,headers:{'Content-Type':'application/json'}}))}return of2(u,o)};
+        window.confirm=()=>true;const n0=calls;
+        $('wbMeshBed').value='70';$('wbMeshRun').click();await wait(150);
+        ok(posts.length===1&&posts[0].size===undefined&&posts[0].bed===70&&posts[0].host==='10.0.0.9'&&$('wbMeshRun').disabled&&/läuft/.test($('wbMeshRunNote').textContent),'Nivellierung: Jetzt vermessen mit 70 °C gesendet, läuft: '+$('wbMeshRunNote').textContent);
+        cstate={...cstate,done:2};clearTimeout(mh.calibTimer);await meshCalibPoll();await wait(150);
+        ok(calls===n0+1&&!$('wbMeshRun').disabled&&/fertig/.test($('wbMeshRunNote').textContent),'Nivellierung: fertig → neues Netz geladen');
+        mh.printing=null;meshOnStatus({connected:true,printing:true});ok($('wbMeshRun').disabled,'Nivellierung: beim Drucken gesperrt');
+        meshOnStatus({connected:true,printing:false});await wait(150);mh.calib=null;meshRunState();
+        window.fetch=of2;window.confirm=c0; }
       answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};
       $('wbMeshLoad').click();await wait(150);
       ok($('wbMeshBody').classList.contains('hidden')&&/Rinkhals/.test($('wbMeshNote').textContent),'Nivellierung: Werksfirmware → Hinweis');
