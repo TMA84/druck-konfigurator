@@ -22,8 +22,8 @@ import globals from 'globals';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
-// Bibliotheken aus vendor/ (index.html): three.min.js, OrbitControls.js (hängt an THREE), fflate.min.js, mpegts.min.js
-const VENDOR = { THREE: 'readonly', fflate: 'readonly', mpegts: 'readonly' };
+// Bibliotheken aus vendor/ (index.html): three.min.js, OrbitControls.js (hängt an THREE), fflate.min.js, mpegts.min.js, earcut.min.js
+const VENDOR = { THREE: 'readonly', fflate: 'readonly', mpegts: 'readonly', earcut: 'readonly' };
 
 const listJs = dir => fs.readdirSync(path.join(ROOT, dir)).filter(f => f.endsWith('.js')).map(f => dir + '/' + f);
 const PAGE_FILES = [...listJs('js'), ...listJs('js/i18n'), ...listJs('js/orca-printers')]

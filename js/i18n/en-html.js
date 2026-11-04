@@ -302,4 +302,8 @@ I18N.add({
   "Handbuch öffnen (PDF)": "Open manual (PDF)",
   "– alle Funktionen mit Bildern, dazu Lösungen für häufige Probleme.": "– all features with pictures, plus solutions to common problems.",
   "In OrcaSlicer über Datei → Einstellungen importieren beide laden. Rückzug bleibt außen vor (Druckerprofil).": "In OrcaSlicer, load both via <b>File → Import configs</b>. Retraction is left out (printer profile).",
+  "Noch kein Modell geladen.": "No model loaded yet.",
+  "STL, OBJ, 3MF oder ZIP hier ablegen oder klicken zum Auswählen": "Drop STL, OBJ, 3MF or ZIP here or click to choose",
+  "oder selbst erstellen: Schild, QR-Code, Lithophane, Logo …": "or create one: sign, QR code, lithophane, logo …",
+  "Modell erstellen … Schild, Anhänger, QR-Code, Lithophane, Logo aus Bild": "Create model … <small>sign, keychain, QR code, lithophane, logo from image</small>",
 });

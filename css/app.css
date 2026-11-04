@@ -1334,3 +1334,20 @@ body[data-tab="3d"] .toast.show { transform: translate(-50%, 0); }
 .ov-sugg .ov-cap { display: block; color: var(--warn); font-size: 11px; margin-top: 2px; }
 .wb-live-show { position: absolute; left: 12px; bottom: 10px; display: inline-flex; gap: 6px; font-size: 12px; }
 .wb-live-show label { color: #d8dbe0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 6px; display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+
+/* Modell erstellen (js/makers-ui.js) */
+.make-dlg { width: min(880px, 96vw); }
+.mk-tabs { margin-bottom: 12px; flex-wrap: wrap; }
+.mk-tabs button { font-size: 13px; padding: 6px 10px; }
+.mk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.mk-side { position: sticky; top: 0; }
+.mk-side canvas { display: block; width: 100%; height: auto; background: var(--paper-2); border-radius: var(--r-s); }
+.mk-side p { margin: 8px 0; }
+.mk-slots { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 13px; font-weight: 600; }
+.mk-slots span { display: inline-flex; gap: 6px; align-items: center; }
+.mk-hint { grid-column: 2; margin-top: -4px; font-size: 12px; }
+.mk-check { display: flex; gap: 6px; align-items: center; font-weight: 400; font-size: 13px; }
+.mk-form .ed-in input[type=range] { padding: 0; }
+.mk-empty { margin-top: 12px; font-family: var(--f-body); font-size: 14px; }
+.clip-cut { margin-left: 8px; }
+@media (max-width: 720px) { .mk-grid { grid-template-columns: 1fr; } .mk-side { position: static; } .mk-hint { grid-column: 1; } }

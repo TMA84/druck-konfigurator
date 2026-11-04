@@ -10,13 +10,14 @@ Startwerte berechnen und direkt als **OrcaSlicer-Projekt (3MF)** speichern – m
 
 - **Anycubic-Drucker:** Kobra S1 mit eigener Vorlage, weitere Anycubic-Modelle aus den OrcaSlicer-Profilen – Geschwindigkeiten und Beschleunigung werden auf das Profil des Druckers begrenzt
 - **Modell laden:** STL (auch mit mehreren Körpern), mehrere Dateien, 3MF, Makerworld-ZIP
+- **Modell erstellen:** Schild, Schlüsselanhänger, QR-Schild (Link, Text, WLAN), Lithophane aus Fotos (flach oder gebogen), Logo/Relief aus Bildern – zweifarbig mit eigenem Slot je Körper
 - **Lage auf dem Bett:** schlägt die Seite vor, die am wenigsten Stützen braucht – Stützen auf dem Teil zählen stärker, weil sie schwer abgehen
 - **Druckwerte:** Temperaturen, Schichthöhe, Geschwindigkeiten, Wände, Füllung, Stützen, Brim – je nach Filament, Objektart, Priorität und Belastung; oben die Kennzahlen, darunter die **Werte-Tafel** (Reiter nach Thema, Suche, Tabelle *Einstellung | Wert | Vorschlag*) – jeder Wert direkt änderbar, auch rund 30 weitere Orca-Einstellungen, eigene Standardwerte je Filament auf dem Server
 - **Brim, der Löcher und Schriften freilässt:** gesetzte Mausohren entlang des Außenrands statt Orcas Rundum-Brim um Inseln in Öffnungen; Brim außen und innen getrennt, innen nur in großen Löchern
 - **Mehrere Teile:** eigenes Filament, eigene Werte und eigener Slot je Teil; Kopien, Modelle kombinieren, einzelne Teile oder Modelle wieder entfernen
 - **Slots wie in OrcaSlicer:** farbige Slot-Chips in der Teileliste, Filamentleiste, bei Makerworld-3MF „Modell → Slot“ mit automatischer Zuordnung nach Farbe und Material; das Filament in den Druckwerten folgt dem Slot
 - **Mehrfarbig:** mehrere Körper in einem Teil, jeder mit eigenem Slot – auch mehrere STLs (eine je Farbe) zu einem Teil vereinen; **Bemalung** und Farb-Modifikatoren von Makerworld-Modellen werden angezeigt und auf die eigenen Slots umgeschrieben (auch mehr Farben als Slots)
-- **Werkzeugleiste in der 3D-Ansicht:** hinzufügen, neue Platte, ausrichten, anordnen, Kopien, trennen, Fläche aufs Bett, drehen, **Größe** (Prozent oder mm je Achse), Schnitt, Text, messen, ganze Platte – auch für Makerworld-3MF
+- **Werkzeugleiste in der 3D-Ansicht:** hinzufügen, neue Platte, ausrichten, anordnen, Kopien, trennen, Fläche aufs Bett, drehen, **Größe** (Prozent oder mm je Achse), Schnitt mit **Teil schneiden**, Text, messen, ganze Platte – auch für Makerworld-3MF
 - **Platten:** platzsparend anordnen, Kosten je Platte, Reihenfolge nach Filament, **Druck Objekt für Objekt** mit Abstand für den Druckkopf
 - **Bemalen wie in OrcaSlicer:** Farbe, Stützen (erzwingen/verhindern) und Naht je Fläche – Kreis, Kugel, Dreieck, Füllen mit Vorschau, Höhenbereich, Lücken füllen, Radierer; Orca-kompatibel (paint_color, paint_supports, paint_seam), auch auf Makerworld-Modellen
 - **Filamente von Anycubic und SUNLU** mit den Druckwerten der Hersteller und ihren Farben (Anycubic mit offiziellen Farbcodes) – Farbe anklicken trägt sie für den Slot ein

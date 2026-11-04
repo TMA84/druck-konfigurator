@@ -888,6 +888,21 @@ async function runSmoke(opts={}){
     }
     window.Worker=W0; }
 
+  /* 13b) Modell erstellen (Schild, QR) und Teil schneiden */
+  { mkOpen('sign');
+    ok($('makeDlg').open&&$('mk_text')&&/×/.test($('mkInfo').textContent),'Erstellen: Dialog mit Vorschau ('+$('mkInfo').textContent+')');
+    $('mk_text').value='Smoke';$('mk_text').dispatchEvent(new Event('input',{bubbles:true}));
+    $('mkCreate').click();await wait(400);
+    const p=project.parts[0];
+    ok(!$('makeDlg').open&&project.parts.length===1&&p.bodies&&p.bodies.length===2&&p.bodies[1].slot!==p.bodies[0].slot,'Erstellen: Schild als ein Teil mit Platte und Schrift (eigener Slot)');
+    mkOpen('qr');$('mk_qrText').value='https://example.com';$('mk_qrText').dispatchEvent(new Event('input',{bubbles:true}));await wait(250);
+    ok(/QR/.test($('mkInfo').textContent),'Erstellen: QR-Vorschau nennt die Version');
+    $('mkAdd').click();await wait(400);
+    ok(project.parts.length===2,'Erstellen: QR-Schild zum Projekt hinzugefügt');
+    selectPart(0);if(!$('btnClip').classList.contains('active'))$('btnClip').click();$('clipAxisZ').click();$('clipSlider').value=0;$('clipCut').click();await wait(300);
+    ok(project.parts.length===3&&project.parts[0].geom.z<4&&project.parts[1].geom.z<4,'Schneiden: Schild in zwei Teile (je unter 4 mm hoch)');
+    $('btnClip').click(); }
+
   /* 14) Modell entfernen */
   menuClick('clear');ok(!$('modelCard').classList.contains('loaded')&&$('export3mf').disabled,'Modell entfernen setzt alles zurück');
 

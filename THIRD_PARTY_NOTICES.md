@@ -8,6 +8,7 @@ Die Dateien in `vendor/` stammen von Dritten und stehen unter deren Lizenz, nich
 | `vendor/OrbitControls.js` | three.js (examples/js) r128 | MIT, Copyright © 2010–2021 three.js authors |
 | `vendor/fflate.min.js` | [fflate](https://github.com/101arrowz/fflate) 0.8.2 | MIT, Copyright © Arjun Barrett |
 | `vendor/mpegts.min.js` | [mpegts.js](https://github.com/xqq/mpegts.js) 1.8.2 (Nachfolger von flv.js) | Apache-2.0, Copyright © Bilibili, xqq; Lizenztext in `vendor/mpegts.js-LICENSE.txt` |
+| `vendor/earcut.min.js` | [earcut](https://github.com/mapbox/earcut) 2.2.4 | ISC, Copyright © 2016 Mapbox (Lizenztext unten) |
 
 Vom Server genutzte Python-Pakete (`requirements.txt`, im Container installiert, nicht mitgeliefert):
 
@@ -32,3 +33,13 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## ISC-Lizenz (earcut, Wortlaut)
+
+Copyright (c) 2016, Mapbox
+
+Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+QR Code ist eine eingetragene Marke der DENSO WAVE INCORPORATED. Der QR-Erzeuger (`js/qr.js`) ist eigener Code nach der Norm ISO/IEC 18004.

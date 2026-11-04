@@ -12,7 +12,7 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 
 1. [Installation und Start](#1-installation-und-start)
 2. [Die Oberfläche](#2-die-oberfläche)
-3. [Modell laden](#3-modell-laden)
+3. [Modell laden](#3-modell-laden) – auch [selbst erstellen](#modell-erstellen-schild-anhänger-qr-code-lithophane-logo) und [Teil schneiden](#teil-schneiden)
 4. [Mehrere Teile](#4-mehrere-teile)
 5. [Lage auf dem Bett](#5-lage-auf-dem-bett)
 6. [Einstellungen und Datenblatt](#6-einstellungen-und-datenblatt)
@@ -97,6 +97,24 @@ Alles läuft lokal in deinem Browser. Es werden keine Modelle oder Daten ins Int
 | **G-Code** | Ist schon geslicet und kein Modell – öffnet direkt **G-Code drucken** (siehe unten unter ④ Drucker). |
 
 Körper, die sich berühren oder überlappen, bleiben ein Teil – z. B. Hohlkörper oder unverschmolzene Exporte aus Tinkercad.
+
+### Modell erstellen: Schild, Anhänger, QR-Code, Lithophane, Logo
+
+**Datei → Modell erstellen …** (oder der Link in der leeren 3D-Ansicht) baut ein druckfertiges Modell ohne Datei. Rechts siehst du eine Vorschau von oben mit Maßen. **Erstellen** macht daraus ein neues Projekt, **Zum Projekt hinzufügen** legt es zu den Teilen, die schon geladen sind. Die Eingaben bleiben gespeichert, das gewählte Bild und das WLAN-Passwort nicht.
+
+| Art | Was entsteht |
+|---|---|
+| **Schild** | Bis zu 3 Zeilen erhabene Schrift auf einer Platte mit runden Ecken. Wählbar sind Schrifthöhe, Plattendicke, Schrifthöhe über der Platte, ein erhabener **Rand** und Löcher (**oben** zum Aufhängen, **4 Ecken** zum Schrauben). Die Platte richtet sich nach dem Text. |
+| **Anhänger** | Kleines Schild für den Schlüsselbund mit Loch links, 1–2 Zeilen. |
+| **QR-Code** | QR-Schild für einen **Link oder Text** oder einen **WLAN-Zugang**. Den WLAN-Code liest eine Handykamera direkt ein, Format `WIFI:`, mit WPA, WEP oder offen. Die dunklen Module stehen erhaben auf einer hellen Platte, eine Beschriftung darunter ist optional. Einstellbar sind die **Modulgröße** (Standard 2 mm; unter 1,2 mm wird es mit einer 0,4-mm-Düse unsauber) und die **Fehlerkorrektur** L/M/Q/H. Mit höherer Korrektur bleibt der Code auch bei kleinen Druckfehlern lesbar, wird aber größer. Die Version wählt das Tool selbst und zeigt sie an. Die Ruhezone ist 2 Module breit, mindestens 3 mm. |
+| **Lithophane** | Ein Foto wird zum Relief: dunkle Stellen sind dick, helle dünn, gegen Licht erscheint das Bild. Einstellbar sind **Breite**, **Dicke hell** und **Dicke dunkel** (Standard 0,8 und 3 mm), ein **Rahmen** und die **Form**: flach und stehend (empfohlen, schönere Übergänge), flach und liegend oder **gebogen** (Biegung in Grad, wie ein Lampenschirm-Stück). Gerechnet wird mit etwa 0,2 mm je Bildpunkt, höchstens rund 260 000 Punkte. Drucken mit **weißem Filament und 100 % Füllung**, stehend mit Brim. |
+| **Bild / Logo** | Die dunklen Flächen eines Bildes, mit **Umkehren** die hellen, werden zum Motiv. Mit der **Schwelle** stellst du ein, was als dunkel gilt; die Vorschau zeigt es sofort. Bei **Motiv auf Platte** steht das Motiv erhaben auf einer Platte, die es mit Rand umschließt, zweifarbig. **Nur das Motiv** druckt den Umriss allein, z. B. ein Logo zum Aufkleben. Am besten eignen sich klare Grafiken mit wenigen Farben (PNG mit Transparenz: durchsichtig gilt als hell). Gerechnet wird mit etwa 0,12 mm je Bildpunkt. |
+
+**Zweifarbig:** Platte und Schrift bzw. Motiv sind zwei Körper eines Teils, so bleiben sie beim Anordnen zusammen. Unter der Vorschau wählst du den **Slot** für jeden Körper. Vorgeschlagen sind der Standard-Slot für die Platte und für das Motiv der Slot mit dem größten Helligkeitsunterschied (weiße Platte → schwarze Schrift). Später änderst du es wie bei jedem Teil unter **Farben**.
+
+### Teil schneiden
+
+In der 3D-Ansicht unter **Schnitt** die Achse wählen, die Ebene mit dem Regler verschieben und **Hier teilen** drücken. Das gewählte Teil wird an der Ebene in zwei Teile zerlegt, die Schnittflächen werden geschlossen, auch mit Löchern darin. Jedes Stück kommt aufs Bett, die Stücke heißen „… · unten/oben“, „links/rechts“ oder „vorne/hinten“. Zweifarbige Teile behalten ihre Körper und Slots. Beschriftung und Bemalung des Teils entfallen. **Rückgängig** (Strg/⌘+Z) setzt das Teil wieder zusammen. So passt ein zu großes Teil in den Bauraum, oder die Schnittfläche liegt als ebene Seite unten (mit **Fläche aufs Bett**). Nicht in der Ansicht **Ganze Platte**.
 
 ---
 
@@ -587,9 +605,9 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 - Maus: **links ziehen** drehen, **rechts ziehen** verschieben, **Rad** zoomen.
 - **Farben | Grenzwinkel** (unten, bleibt gemerkt): „Farben“ zeigt das Teil in Slot-, Körper- und Malfarben, so wie es gedruckt wird; „Grenzwinkel“ zeigt die Überhänge – blau unkritisch, gelb nahe am Grenzwinkel, rot darüber, grau liegt auf dem Bett. Beim Malen schaltet das Tool kurz auf „Farben“.
 - **Überhangwinkel** (unten): Flächen steiler als dieser Winkel gelten als Überhang (rot in „Grenzwinkel“) und zählen für die Stützen-Entscheidung.
-- **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben), **Messen** (zwei Punkte anklicken).
+- **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben; **Hier teilen** schneidet das Teil dort in zwei, siehe [Teil schneiden](#teil-schneiden)), **Messen** (zwei Punkte anklicken).
 - **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Spalte daneben unter „Lage auf dem Bett“.
-- Die Drahtbox zeigt den **Bauraum** des Druckers. Ist sie rot, passt das Teil nicht hinein (der Hinweis oben nennt Breite, Tiefe oder Höhe) – Teil drehen oder in OrcaSlicer skalieren/teilen.
+- Die Drahtbox zeigt den **Bauraum** des Druckers. Ist sie rot, passt das Teil nicht hinein (der Hinweis oben nennt Breite, Tiefe oder Höhe) – Teil drehen, skalieren oder mit **Hier teilen** schneiden.
 
 ---
 

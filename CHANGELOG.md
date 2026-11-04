@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.54.0] – 2026-11-04
+
+### Neu
+- **Modell erstellen** (Datei → Modell erstellen …, auch in der leeren 3D-Ansicht): Schilder mit bis zu 3 Zeilen, Rand und Löchern; Schlüsselanhänger; **QR-Schilder** für Links, Texte oder WLAN-Zugänge (eigener QR-Erzeuger, Fehlerkorrektur L–H, Modulgröße frei); **Lithophanes** aus Fotos, flach stehend, flach liegend oder gebogen, mit Rahmen; **Bild-Relief und Logo** aus Bildern über eine Helligkeitsschwelle, als Motiv auf Platte oder als Umriss allein. Zweifarbige Modelle sind ein Teil mit zwei Körpern und eigenem Slot je Körper, damit sie beim Anordnen zusammenbleiben. Eine Vorschau von oben zeigt Maße und Farben.
+- **Teil schneiden:** Im Schnitt-Feld der 3D-Ansicht zerlegt **Hier teilen** das gewählte Teil an der Ebene in zwei geschlossene Teile, auch mit Löchern in der Schnittfläche. Zweifarbige Teile behalten Körper und Slots, Rückgängig setzt das Teil wieder zusammen.
+- Mitgeliefert: earcut 2.2.4 (ISC) zum Füllen von Flächen. Tests in `tests/makers.js`: QR-Codes Modul für Modul gegen eine Referenz, alle Netze geschlossen, Volumen, Schnitte. Dazu Prüfungen im Bedientest.
+
 ## [10.53.2] – 2026-11-02
 
 ### Behoben
