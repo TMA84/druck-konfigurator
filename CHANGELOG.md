@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.54.1] – 2026-11-04
+
+### Behoben
+- **Große Modelle ließen sich in Home Assistant nicht slicen:** Beim Slicen geht die fertige 3MF an den Server, bei einer STL mit 1,7 Mio. Dreiecken sind das 25 MB. Der Home-Assistant-Ingress weist so große Anfragen ab; direkt über Port 8765 ging es. Jetzt schickt die Seite 3MF und G-Code („G-Code drucken“) ab 8 MB in Teilen (`/api/upload`), und der Server setzt sie wieder zusammen. Mit der Datei aus dem Fehlerfall geprüft: 3 Teile, dasselbe Ergebnis wie direkt (6 h 11 min, 97,7 g). Abgebrochene Teil-Uploads räumt der Server nach einer Stunde weg. Tests in `tests/http_limits.py`.
+
 ## [10.54.0] – 2026-11-04
 
 ### Neu

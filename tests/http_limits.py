@@ -188,6 +188,37 @@ check("G-Code danach angenommen", st == 200 and j(data).get("job"), (st, data[:2
 st, _, data = req("POST", "/api/gcode", b"kein gcode", {"Content-Type": "application/octet-stream"})
 check("Upload-Platz nach Fehler frei", st == 400 and settle(slots_free), st)   # die Antwort kommt vor dem Freigeben
 
+# 5b) Große Dateien in Teilen (Home-Assistant-Ingress): /api/upload, dann ?upload=<id> ohne Inhalt
+OCT = {"Content-Type": "application/octet-stream"}
+sid = "0123456789abcdef"
+gc = b"; G-Code in Teilen\n" + b"G1 X1 Y1 E0.1\n" * 2000
+a, b = gc[:10000], gc[10000:]
+st, _, data = req("POST", "/api/upload?id=%s&offset=0" % sid, a, OCT)
+check("Teil 1 angenommen", st == 200 and j(data).get("size") == len(a), (st, data))
+st, _, data = req("POST", "/api/upload?id=%s&offset=5" % sid, b, OCT)
+check("Teil mit falschem offset → 409", st == 409, (st, data))
+st, _, data = req("POST", "/api/upload?id=%s&offset=%d" % (sid, len(a)), b, OCT)
+check("Teil 2 angehängt", st == 200 and j(data).get("size") == len(gc), (st, data))
+st, _, data = req("POST", "/api/gcode?name=teile.gcode&upload=" + sid, b"", OCT)
+job = j(data).get("job")
+check("G-Code aus Teilen übernommen", st == 200 and job, (st, data[:200]))
+got = open(slicer.job_file(job, 1, "gcode"), "rb").read() if job else b""
+check("G-Code aus Teilen vollständig", got == gc, (len(got), len(gc)))
+check("Sammeldatei danach weg", not os.path.exists(serve._stage_path(sid)))
+st, _, data = req("POST", "/api/gcode?name=x.gcode&upload=" + sid, b"", OCT)
+check("unbekannter Upload → 400", st == 400 and "nicht gefunden" in j(data).get("error", ""), (st, data))
+check("ungültige Upload-id → 400", req("POST", "/api/upload?id=../x&offset=0", b"x", OCT)[0] == 400)
+check("Teil ohne octet-stream → 415", req("POST", "/api/upload?id=%s&offset=0" % sid, b"x", {"Content-Type": "application/json"})[0] == 415)
+st, data = post_len("/api/upload?id=%s&offset=0" % sid, str(serve.UPLOAD_PART + 1), "application/octet-stream")
+check("Teil über 8 MB → 413", st == 413, (st, data))
+st, _, data = req("POST", "/api/upload?id=%s&offset=%d" % (sid, slicer.MAX_BYTES), b"x", OCT)
+check("Gesamtgröße über Grenze → 413", st == 413, (st, data))
+old = serve._stage_path("fedcba9876543210")
+open(old, "wb").write(b"alt")
+os.utime(old, (time.time() - serve.STAGE_TTL_S - 10,) * 2)
+req("POST", "/api/upload?id=%s&offset=0" % sid, b"neu", OCT)
+check("alte Teil-Uploads werden weggeräumt", not os.path.exists(old) and os.path.exists(serve._stage_path(sid)))
+
 # 6) Kamera und Stand von fremden Seiten
 st, _, data = req("GET", "/api/anycubic/camera?host=192.168.1.9", headers={"Sec-Fetch-Site": "cross-site"})
 check("Kamera von fremder Seite → 403", st == 403, (st, data))

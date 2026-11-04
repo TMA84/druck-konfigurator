@@ -20,6 +20,8 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
   POST /api/anycubic/command  {host, type, action, data}  → nur freigegebene Einstellungen (WRITABLE)
   POST /api/slice  (3MF als application/octet-stream)  → Verbrauch je Slot und Druckzeit je Platte (OrcaSlicer), job-Id
   POST /api/gcode?name=<Datei>  (G-Code als application/octet-stream) → fertiger G-Code als Auftrag mit einer Platte (wie /api/slice)
+  POST /api/upload?id=<16 hex>&offset=<n>  (Teil einer großen Datei, höchstens 8 MB) → {size}; danach /api/slice bzw.
+       /api/gcode mit &upload=<id> und leerem Inhalt (für den Home-Assistant-Ingress, der große Anfragen abweist)
        ?plates=2,3&count=4&reuse=<job>                  → nur diese Platten neu slicen, die übrigen aus <job> übernehmen
        …&partial=1                                      → Druckwerte je Platte: auch ohne vollständiges <job> (Kette je Wertegruppe)
   GET  /api/slice/<job>/plate_<n>.preview              → kompakte Schichtvorschau (tools/gcode_preview.py)
@@ -118,6 +120,12 @@ STATIC_FILES = {"", "index.html", "tests/ui-smoke.js"}   # ui-smoke.js: Bediente
 # eine Datei im Auftragsordner (slicer.upload_file), nicht in den Speicher (Raspberry Pi mit dem Add-on)
 UPLOAD_SLOTS = threading.BoundedSemaphore(2)
 UPLOAD_CHUNK = 1024 * 1024
+# Große Dateien kommen über den Home-Assistant-Ingress in Teilen (der lässt nur ~16 MB je Anfrage durch, 2026-11-04:
+# 25-MB-3MF scheiterte dort, direkt ging sie): POST /api/upload?id=<16 hex>&offset=<n> hängt bis UPLOAD_PART an eine
+# Sammeldatei im Auftragsordner, /api/slice bzw. /api/gcode mit ?upload=<id> (leerer Inhalt) nimmt sie dann.
+UPLOAD_PART = 8 * 1024 * 1024
+STAGE_TTL_S = 3600
+STAGE_LOCK = threading.Lock()
 
 
 class ClientGone(Exception):
@@ -615,6 +623,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         path = urllib.parse.urlparse(self.path).path
         ctype = self.headers.get("Content-Type", "").split(";")[0].strip()
+        if path == "/api/upload":
+            if ctype != "application/octet-stream":
+                return self._reject(415, "Datei als application/octet-stream erwartet")
+            length = self._length(UPLOAD_PART)
+            if length is None:
+                return None
+            return self._stage(length)
         if path in ("/api/slice", "/api/gcode"):
             # application/octet-stream ist kein „einfacher“ Typ: fremde Webseiten bräuchten eine CORS-Freigabe
             if ctype != "application/octet-stream":
@@ -713,12 +728,46 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             raise slicer.SliceError("Datei unvollständig übertragen (%d von %d Bytes) – bitte noch einmal versuchen"
                                     % (length - left, length), "bad_request")
 
+    def _stage(self, length):
+        """Ein Teil einer großen Datei: an die Sammeldatei der id anhängen (offset muss ihre Größe sein, 0 = neu)."""
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        sid, off = q.get("id", [""])[0], q.get("offset", [""])[0]
+        if not re.fullmatch(r"[0-9a-f]{16}", sid) or not re.fullmatch(r"[0-9]{1,12}", off):
+            return self._reject(400, "id und offset erwartet")
+        off = int(off)
+        if off + length > slicer.MAX_BYTES:
+            return self._reject(413, "Datei zu groß (höchstens %d MB)" % (slicer.MAX_BYTES // (1024 * 1024)))
+        path = _stage_path(sid)
+        with STAGE_LOCK:
+            _stage_cleanup()
+            have = os.path.getsize(path) if os.path.exists(path) else 0
+            if off and off != have:
+                self.close_connection = True
+                return self._json(409, {"error": "Teil der Datei fehlt – bitte noch einmal versuchen", "kind": "bad_request"})
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | (os.O_TRUNC if off == 0 else os.O_APPEND), 0o600)
+        try:
+            self._receive(fd, length)
+        except slicer.SliceError as e:
+            return self._json(400, {"error": str(e), "kind": "bad_request"})
+        except ClientGone:
+            self.close_connection = True
+            return None
+        return self._json(200, {"size": os.path.getsize(path)})
+
     def _upload(self, path, length):
         files = []
+        staged = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("upload", [""])[0]
 
         def receive():
             fd, tmp = slicer.upload_file()
             files.append(tmp)
+            if staged:   # in Teilen über /api/upload gekommen
+                os.close(fd)
+                src = _stage_path(staged) if re.fullmatch(r"[0-9a-f]{16}", staged) else ""
+                if not src or not os.path.exists(src):
+                    raise slicer.SliceError("Hochgeladene Datei nicht gefunden – bitte noch einmal versuchen", "bad_request")
+                os.replace(src, tmp)
+                return tmp
             self._receive(fd, length)
             return tmp
         try:
@@ -748,6 +797,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     os.unlink(tmp)
                 except OSError:
                     pass
+
+
+def _stage_path(sid):
+    return os.path.join(slicer.JOBS_DIR, "stage-%s.part" % sid)
+
+
+def _stage_cleanup():
+    """Liegengebliebene Teil-Uploads (abgebrochen) nach STAGE_TTL_S wegräumen."""
+    try:
+        os.makedirs(slicer.JOBS_DIR, exist_ok=True)
+        now = time.time()
+        for n in os.listdir(slicer.JOBS_DIR):
+            p = os.path.join(slicer.JOBS_DIR, n)
+            if n.startswith("stage-") and now - os.path.getmtime(p) > STAGE_TTL_S:
+                os.unlink(p)
+    except OSError:
+        pass
 
 
 # ---------- Zugriffsschutz (KONFIGURATOR_PIN) ----------

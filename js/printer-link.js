@@ -60,7 +60,7 @@ function serverHealth() {
 const lanServerAvailable = () => serverHealth().then(j => !!j.lan);
 async function lanApi(path, opts) {
   let res, data = {};
-  try { res = await fetch(path, opts); data = await res.json(); }
+  try { res = opts && opts.binary ? await postBinary(path, opts.binary) : await fetch(path, opts); data = await res.json(); }
   catch (e) { throw Error(t('Server des Konfigurators nicht erreichbar')); }
   if (!res.ok) { const err = Error(data.error ? t(data.error) : t('Server antwortet mit HTTP {status}', { status: res.status })); err.kind = data.kind; throw err; }
   return data;

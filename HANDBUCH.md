@@ -624,6 +624,7 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 
 | Problem | Lösung |
 |---|---|
+| Großes Modell lässt sich in Home Assistant nicht slicen, direkt über Port 8765 schon | Behoben in 10.54.1: Der Home-Assistant-Ingress weist große Anfragen ab, und eine 3MF mit gut 1,5 Mio. Dreiecken hat rund 25 MB. Seitdem schickt die Seite 3MF und G-Code ab 8 MB in Teilen. Steht der Fehler noch da, die Seite neu laden (alte Skripte im Cache). |
 | Fehlermeldung beim Laden nach einem Update, z. B. „… is not defined“ | Der Browser hat alte Dateien gespeichert. Einmal **Strg + F5** drücken. |
 | „Drucker antwortet nicht“ | IP prüfen (⚙ Einstellungen → Drucker-Verbindung → Testen), Drucker eingeschaltet und im selben Netz? Das Tool muss über `Konfigurator starten.cmd` laufen. Der Kobra S1 antwortet manchmal langsam – **Vom Drucker laden** erneut klicken. |
 | „Python wurde nicht gefunden“ | Python installieren (beim Setup „Add python.exe to PATH“ anhaken) oder `index.html` direkt öffnen. |

@@ -10,7 +10,7 @@ async function gcodeOpenFile(file) {
   if (!printerHost(SEND_PRINTER)) { toast(t('Erst unter ⚙ Einstellungen → Drucker-Verbindung den Drucker einrichten')); return; }
   toast(t('Lade {name} …', { name: file.name }));
   try {
-    const r = await lanApi('api/gcode?name=' + encodeURIComponent(file.name), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+    const r = await lanApi('api/gcode?name=' + encodeURIComponent(file.name), { binary: file });   // große Dateien in Teilen (HA-Ingress)
     const f = r.facts || {}, kinds = (f.types || []).map(x => ({ kind: kindOfType(x), name: x }));
     if (!r.plates || !r.plates.length || !(r.plates[0].grams || []).some(g => g > 0))
       toast(t('Im G-Code fehlt die Filament-Statistik von OrcaSlicer – Werkzeuge und Druckzeit unbekannt'));

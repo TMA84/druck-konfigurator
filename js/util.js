@@ -28,3 +28,19 @@ const safeColour=(c,fb='#888888')=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c
 const safeInt=v=>Math.round(+v||0);
 const nkey=d=>String(Number(d));
 const num=v=>{if(v===null||v===undefined)return NaN;const n=parseFloat(String(v).trim().replace(',','.'));return n};
+
+/* Große Dateien (3MF, G-Code) an den Server: über UPLOAD_PART in Teilen (api/upload), danach url mit &upload=<id> ohne
+   Inhalt. Der Home-Assistant-Ingress weist große Anfragen ab (2026-11-04: 25-MB-3MF scheiterte, direkt ging sie).
+   Ergebnis: die Response der letzten Anfrage (bei einem Fehler die des fehlgeschlagenen Teils). */
+const UPLOAD_PART=8*1024*1024;
+async function postBinary(url,data){
+  const H={'Content-Type':'application/octet-stream'},size=data.size??data.byteLength;
+  if(size<=UPLOAD_PART)return fetch(url,{method:'POST',headers:H,body:data});
+  const id=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const blob=data instanceof Blob?data:new Blob([data]);
+  for(let off=0;off<size;off+=UPLOAD_PART){
+    const r=await fetch('api/upload?id='+id+'&offset='+off,{method:'POST',headers:H,body:blob.slice(off,off+UPLOAD_PART)});
+    if(!r.ok)return r;
+  }
+  return fetch(url+(url.includes('?')?'&':'?')+'upload='+id,{method:'POST',headers:H,body:new Uint8Array(0)});
+}

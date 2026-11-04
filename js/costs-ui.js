@@ -239,7 +239,7 @@ async function runCosts() {
       // eine Gruppe: wie bisher (alle Platten oder nur geänderte mit reuse); mehrere: partial, Kette über den letzten Auftrag
       const q = perPlate ? '?plates=' + run.plates.join(',') + '&count=' + sigs.plates.length + '&partial=1' + (job ? '&reuse=' + job : '')
         : partial ? '?plates=' + changed.join(',') + '&count=' + sigs.plates.length + '&reuse=' + costState.slice.job : '';
-      const res = await fetch('api/slice' + q, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: built.bytes });
+      const res = await postBinary('api/slice' + q, built.bytes);   // große 3MF in Teilen (HA-Ingress)
       data = await res.json().catch(() => ({}));
       if (!res.ok) throw Error(data.error || t('Server antwortet mit HTTP {status}', { status: res.status }));
       if (costState.stale || project !== costProject) { reset(); renderCostPanel(); return; }
