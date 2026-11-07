@@ -50,12 +50,18 @@ async function runSmoke(opts={}){
   /* 2) Druckerwechsel */
   document.querySelector('.printer-switch [data-printer="snapmaker_u1"]').click();await wait(50);
   ok(document.body.dataset.printer==='snapmaker_u1','Umschalten auf U1 färbt um');
+  ok($('bedKindRow').classList.contains('hidden'),'U1: keine Druckbett-Auswahl');
   ok([...$('nozM').options].map(o=>o.value).join()==='steel_stainless,steel_hardened','U1: Düsenmaterialien Edelstahl/gehärtet');
   ok($('matBadge').textContent==='Allgemeiner Startwert','U1: getestetes Profil gilt als allgemein');
   ok($('warning').innerHTML.includes('Snapmaker U1'),'U1: Warnhinweis „nicht gegengetestet“');
   const sw=document.querySelector('.printer-switch');sw.querySelector('[aria-checked="true"]').focus();
   sw.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));await wait(30);
   ok(document.body.dataset.printer==='kobra_s1','Pfeiltaste wechselt Drucker zurück');
+  { // Druckbett: nur beim Kobra S1; dickes Alu-Bett +5 °C, im Datenblatt vermerkt, wieder zurück
+    const bed=()=>+(lastResult&&lastResult.m.bed);ok(!$('bedKindRow').classList.contains('hidden'),'Druckbett-Auswahl beim Kobra S1 sichtbar');
+    const b0=bed();sel('bedKind','alu');
+    ok(bed()===b0+5&&lastResult.preheatMin===10&&store.settings.bedKind==='alu'&&/dickes Alu-Bett/.test(JSON.stringify(lastResult.ordered)),'Druckbett Alu: Bett +5 °C, 10 min vorwärmen, Hinweis im Datenblatt');
+    sel('bedKind','stock');ok(bed()===b0&&store.settings.bedKind==='stock','Druckbett Werksbett: wie vorher'); }
 
   /* 3) Alle Auswahloptionen durchspielen */
   let combos=0;

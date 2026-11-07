@@ -35,6 +35,13 @@ const thr = th => val(K.compute({ ...I, thresh: String(th), overrides: { support
 check('Überhangwinkel 45/55/30 → Schwellenwinkel 45/35/60', thr(45) === '45' && thr(55) === '35' && thr(30) === '60', [thr(45), thr(55), thr(30)]);
 const thRow = (K.compute({ ...I, thresh: '55', overrides: { support: 'on' } }, null, c).ordered.flatMap(g => g[1]).find(x => x[0] === 'Schwellenwinkel') || []);
 check('Datenblatt: Schwellenwinkel 35° zur Waagerechten', thRow[1] === '35°' && /55°/.test(thRow[2]), thRow);
+// Druckbett „dickes Alu-Bett“ (store.settings.bedKind): +5 °C Bett, 10 min vorwärmen; eigener Wert gewinnt; nur Kobra S1
+const alu = { getMat: K.getMat, settings: { ...K.store.settings, bedKind: 'alu' } };
+const rStock = K.compute(I, null, c), rAlu = K.compute(I, null, alu), rAluAbs = K.compute({ ...I, material: 'abs' }, null, alu);
+check('Alu-Bett: PLA Bett +5 °C, 10 min vorwärmen', +rAlu.m.bed === +rStock.m.bed + 5 && rAlu.preheatMin === 10 && rStock.preheatMin === 0, [rStock.m.bed, rAlu.m.bed, rAlu.preheatMin]);
+check('Alu-Bett: 3MF hot_plate_temp', val(rAlu, 'hot_plate_temp') === String(+rStock.m.bed + 5), val(rAlu, 'hot_plate_temp'));
+check('Alu-Bett: ABS 105 °C, eigener Wert gewinnt', +rAluAbs.m.bed === 105 && +K.compute({ ...I, overrides: { bed: 58 } }, null, alu).m.bed === 58, rAluAbs.m.bed);
+check('Alu-Bett: Snapmaker unverändert', +K.compute({ ...I, printer: 'snapmaker_u1' }, null, alu).m.bed === +K.compute({ ...I, printer: 'snapmaker_u1' }, null, c).m.bed);
 check('Füllmuster-Zuordnung', K.orcaInfillPattern('Waben') === 'honeycomb' && K.orcaInfillPattern('Gyroid oder Kubisch') === 'gyroid' && K.orcaInfillPattern('Blitz') === 'lightning');
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

@@ -15,6 +15,9 @@ function fillNozzleMaterialSelect(){
 
 $('supportLevel').addEventListener('change',()=>{const a=supportProfile($('supportLevel').value).angle;$('thresh').value=a;$('threshVal').textContent=a+'°';Viewer.colorize(+$('thresh').value)});
 ['material','nozD','nozM'].forEach(id=>$(id).addEventListener('change',()=>{store.last[id]=$(id).value;persist();update()}));
+// Druckbett (Kobra S1): Werksbett oder dickes Alu-Bett – Gerätesache, gilt für alle Aufträge (store.settings.bedKind)
+$('bedKind').value=store.settings.bedKind==='alu'?'alu':'stock';
+$('bedKind').addEventListener('change',e=>{store.settings.bedKind=e.currentTarget.value;persist();update()});
 ['object','goal','load','support','supportLevel'].forEach(id=>$(id).addEventListener('change',update));
 $('printer').addEventListener('change',()=>{store.last.printer=$('printer').value;persist();fillNozzleMaterialSelect();store.last.nozM=$('nozM').value;persist();update()});
 
@@ -100,6 +103,7 @@ $('hintsFold').addEventListener('toggle',e=>{if(e.isTrusted)$('hintsFold').datas
 function update(){
   if(typeof savePartFromForm==='function')savePartFromForm();
   const r=compute(currentInput(),geom,{getMat,settings:store.settings});lastOrdered=r.ordered;
+  $('bedKindRow').classList.toggle('hidden',!r.fans2);
   $('mainTitle').textContent=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
   document.title=t('{printer} – Druckwerkstatt',{printer:r.printer.label});
   const st=STATUS[r.effectiveStatus]||STATUS.generic;

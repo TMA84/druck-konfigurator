@@ -11,6 +11,8 @@ const BRIM_INNER_KINDS={large:'Ohrenkette – nur große Löcher',all:'Ohrenkett
 
 // Objektart „Wasserdicht / Behälter“
 const WATERTIGHT_TEMP_BOOST=5, WATERTIGHT_OUTER_FACTOR=0.7;
+// Dickes Alu-Bett: Aufschlag Betttemperatur und Vorwärmzeit (Kobra S1)
+const BED_ALU_PLUS=5, BED_ALU_PREHEAT_MIN=10;
 function supportProfile(level,tpu){
   const p={
     safe:{angle:45,xy:tpu?'0,40 mm':'0,35 mm',iface:tpu?3:2,gap:'0,50 mm',density:tpu?'15 %':'20 %',branch:tpu?'1,5–2,0 mm':'1,0–1,5 mm',small:'Ein'},
@@ -134,11 +136,16 @@ function compute(I,geom,ctx){
   const lm=typeof lanModelOf==='function'?lanModelOf(printer):null,s1=printer.id==='kobra_s1'||!!(lm&&lm.fans.aux&&lm.fans.box),S1P={pla:{aux:60,box:60},petg:{aux:30,box:40},abs:{aux:0,box:10,bed:100,preheat:10,brim:true},
     asa:{aux:0,box:10,bed:100,preheat:10,brim:true},tpu:{aux:30,box:60}}[m.kind]||{aux:60,box:60};
   m=Object.assign({},m);
-  m.bed=take('bed',s1&&S1P.bed?Math.max(m.bed,S1P.bed):m.bed);m.fan=take('fan',m.fan);
+  /* Dickes Alu-Bett (z. B. Funssor 8 mm mit 1000-W-Heizmatte, Einstellung „Druckbett“, 2026-11-07): Der Fühler sitzt an der
+     Heizmatte, die Oberfläche – vor allem am Rand – bleibt kälter und braucht länger. Darum +BED_ALU_PLUS °C und vorwärmen. */
+  const aluBed=s1&&((ctx.settings||{}).bedKind==='alu');
+  const bedBase=s1&&S1P.bed?Math.max(m.bed,S1P.bed):m.bed;
+  m.bed=take('bed',aluBed?Math.min(110,bedBase+BED_ALU_PLUS):bedBase);
+  const bedNote=[m.bedNote?t(m.bedNote):'',aluBed?t('+{d} °C dickes Alu-Bett',{d:BED_ALU_PLUS}):''].filter(Boolean).join(' · ');m.fan=take('fan',m.fan);
   const fans2=s1,fanAux=s1?take('fan_aux',S1P.aux):null,fanBox=s1?take('fan_box',S1P.box):null;
   // Kobra S1: Hilfs- und Gehäuselüfter immer schreiben (Vorgabe je Filament oder dein Wert)
   const fans2Set=s1?{aux:+fanAux,box:+fanBox}:null;
-  const preheatMin=s1&&S1P.preheat?S1P.preheat:0;
+  const preheatMin=s1?Math.max(S1P.preheat||0,aluBed?BED_ALU_PREHEAT_MIN:0):0;
   const effectiveStatus=(m.status==='tested'&&!printer.testedOK)?'generic':m.status;
   const short=m.name;
   const base=Object.assign({},tpu?ob.tpu:ob.pla);
@@ -275,7 +282,7 @@ function compute(I,geom,ctx){
     const own=c.every(k=>!userSet(k));   // nur aus deinen Standardwerten
     return [row[0],row[1],[t(own?'dein Standard – Werk {v}':'angepasst – Vorschlag {v}',{v:c.map(fmtS).join(' / ')}),row[2]].filter(Boolean).join(' · '),true]};
   const rows=[
-    mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',t(m.bedNote)]),
+    mark(['nozzle'],['Düse',nozzle+' °C',[tOff?t('{d} °C für {mat}',{d:(tOff>0?'+':'−')+Math.abs(tOff),mat:NOZZLE_MATERIALS[mSel].label}):'',wtBoost?t('+{d} °C für dichte Schichten',{d:wtBoost}):''].filter(Boolean).join(' · ')]),mark(['bed'],['Heizbett',m.bed+' °C',bedNote]),
     mark(['layer','first_layer'],['Schichthöhe / erste Schicht',de(layer,2)+' / '+de(firstLayer,2)+' mm']),
     mark(['sp_outer','sp_inner'],['Außenwand / Innenwand',sp_outer+' / '+sp_inner+' mm/s',nOuter||nInner]),mark(['sp_fill','sp_travel'],['Füllung / Travel',sp_fill+' / '+sp_travel+' mm/s',nFill]),
     mark(['w'],['Wandlinien',base.wr&&soft&&!has('w')?base.wr:w]),mark(['t','b'],['Obere / untere Schichten',tt+' / '+b]),
@@ -326,7 +333,7 @@ function compute(I,geom,ctx){
   const dryNeed=tpu||m.kind==='petg'||m.abrasive;
   ordered.push(['Material / Filament',[
     ['Profilname',m.name],['Düse',nozzle+' °C',t('erste und weitere Schichten')],['Herstellerbereich',m.range||t('Angabe auf der Rolle')],
-    ['Heizbett',m.bed+' °C',t(m.bedNote)],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
+    ['Heizbett',m.bed+' °C',bedNote],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
     mark(['max_vol'],['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s']),mark(['flow'],['Durchflussverhältnis',de(m.flow,2)])]
     .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),t(m.dry)]])]);
   {const xo=typeof extraOverrides==='function'?extraOverrides(ov):{};const xk=Object.keys(xo);

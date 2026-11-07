@@ -260,6 +260,8 @@ Links wählst du in Gruppen: **Filament** (mit den Farben des Herstellers), **Wa
 
 **Stützen:** Das Tool empfiehlt Baumstützen, wenn das Teil relevante Überhänge hat. Der Abstand zwischen Stütze und Teil entspricht einer Schichthöhe (PETG 0,05 mm mehr, weil es stärker haftet) – so halten die Stützen sicher und lassen sich trotzdem lösen.
 
+**Druckbett (Kobra S1):** In der Kopfzeile neben der Düse wählst du **Werksbett** oder **Alu-Bett 8 mm**, also ein dickes Aluminiumbett wie das Funssor-Bett mit 1000-W-Heizmatte. Beim Alu-Bett sitzt der Fühler an der Heizmatte, die Oberfläche bleibt vor allem am Rand kälter und braucht länger. Langsam hochkommende Ecken sind die Folge. Mit dieser Wahl legt das Tool **5 °C aufs Bett** (alle Materialien, höchstens 110 °C; steht im Datenblatt beim Heizbett) und hakt beim Senden **10 Minuten Vorwärmen** an. Eine eigene Betttemperatur unter „Werte für diesen Auftrag“ gewinnt. Die Wahl gilt für alle Aufträge.
+
 **Düsen-Umrechnung:** Für 0,25/0,6/0,8 mm und andere Düsenmaterialien rechnet das Tool die Werte um. Der 3MF-Export ist derzeit nur mit der **0,4-mm-Düse** möglich.
 
 ---

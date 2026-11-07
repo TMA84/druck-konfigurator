@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.56.0] – 2026-11-07
+
+### Neu
+- **Druckbett wählbar (Kobra S1): Werksbett oder Alu-Bett 8 mm.** Beim dicken Aluminiumbett (z. B. Funssor mit 1000-W-Heizmatte) bleibt die Oberfläche am Rand kälter als der Fühler meldet, die Ecken heben sich langsam. Mit „Alu-Bett 8 mm“ gibt das Tool 5 °C mehr aufs Bett (im Datenblatt vermerkt, in der 3MF) und schlägt beim Senden 10 Minuten Vorwärmen vor. Eigene Werte gewinnen. Tests in `tests/overrides.js` und im Bedientest.
+
 ## [10.55.1] – 2026-11-07
 
 ### Behoben
