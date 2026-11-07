@@ -775,6 +775,13 @@ async function runSmoke(opts={}){
         ok(calls===n0+1&&!$('wbMeshRun').disabled&&/fertig/.test($('wbMeshRunNote').textContent),'Nivellierung: fertig → neues Netz geladen');
         mh.printing=null;meshOnStatus({connected:true,printing:true});ok($('wbMeshRun').disabled,'Nivellierung: beim Drucken gesperrt');
         meshOnStatus({connected:true,printing:false});await wait(150);mh.calib=null;meshRunState();
+        // Alu-Bett: 10 min durchwärmen mitschicken, Rückfrage und Stand nennen es
+        { const bk=store.settings.bedKind;store.settings.bedKind='alu';let q='';window.confirm=m=>{q=m;return true};posts.length=0;cstate={started:Date.now()/1000,bed:60,soak:10,done:null,error:null};
+          $('wbMeshBed').value='60';$('wbMeshRun').click();await wait(150);
+          ok(posts.length===1&&posts[0].soak===10&&/10 Minuten durchwärmen/.test(q)&&/durch/.test($('wbMeshRunNote').textContent),'Nivellierung: Alu-Bett → 10 min durchwärmen gesendet: '+$('wbMeshRunNote').textContent);
+          cstate={...cstate,done:3};clearTimeout(mh.calibTimer);await meshCalibPoll();await wait(150);mh.calib=null;meshRunState();
+          store.settings.bedKind=bk;posts.length=0;$('wbMeshRun').click();await wait(150);ok(posts[0]&&posts[0].soak===(bk==='alu'?10:0),'Nivellierung: Werksbett → ohne Durchwärmen');
+          cstate={...cstate,done:4};clearTimeout(mh.calibTimer);await meshCalibPoll();await wait(150);mh.calib=null;meshRunState(); }
         window.fetch=of2;window.confirm=c0; }
       answer={status:404,body:{error:'Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus',kind:'unsupported'}};
       $('wbMeshLoad').click();await wait(150);

@@ -47,6 +47,7 @@ _lock = threading.Lock()
 CALIB_BED = (40, 110)        # °C, Bett beim Vermessen (wie beim Druck: PLA 60, PETG 70, ABS 100)
 CALIB_NOZZLE = 170           # °C, wie LeviQ3 (extru_temp) – Düse sauber wischen, ohne zu tropfen
 CALIB_TIMEOUT_S = 1800
+CALIB_SOAK_MAX = 30          # min, Durchwärmen vor dem Messen (dickes Alu-Bett: 10 min, Einstellung „Druckbett“)
 BUSY_STATES = ("printing", "paused")
 _calib = {}                  # Drucker → {"started", "bed", "done", "error"}
 UNSUPPORTED = "Nivellierungsdaten gibt es nur mit Rinkhals (Moonraker) – Werksfirmware gibt sie nicht heraus"
@@ -195,11 +196,15 @@ def _moon(host, path, body=None, timeout=TIMEOUT_S):
         raise MeshError("Antwort von Moonraker ist kein JSON", "bad_response")
 
 
-def calib_script(bed):
-    """G-Code für „Jetzt vermessen“: Ablauf wie beim Druckstart (G9111), dann das Netz."""
+def calib_script(bed, soak=0):
+    """G-Code für „Jetzt vermessen“: Ablauf wie beim Druckstart (G9111), dann das Netz.
+    soak (min): vorher Bett aufheizen (M190 wartet auf die Temperatur) und so lange halten (G4), damit eine dicke
+    Alu-Platte bis an die Oberfläche durchwärmt ist (2026-11-07: Funssor 8 mm, Oberfläche ~6 °C unter dem Fühler).
+    Die Düse bleibt dabei kalt – G9111 heizt sie erst danach zum Wischen."""
+    pre = ["M190 S%d" % bed, "G4 P%d" % (soak * 60000)] if soak else []
     # G9111 allein heizt, wischt und misst nur den Z-Offset (LeviQ3) – das Netz misst die Firmware beim Druck in einem
     # eigenen Schritt (geprüft 2026-11-02: Netz danach unverändert). Darum immer BED_MESH_CALIBRATE hinterher.
-    lines = ["G9111 bedTemp=%d extruderTemp=%d" % (bed, CALIB_NOZZLE),
+    lines = pre + ["G9111 bedTemp=%d extruderTemp=%d" % (bed, CALIB_NOZZLE),
              "BED_MESH_CALIBRATE MESH_MIN=5,5 MESH_MAX=245,245"]
     lines += ["M104 S0", "M140 S0", "BED_MESH_OUTPUT"]
     return "\n".join(lines)
@@ -317,16 +322,18 @@ def calib_state(host):
         return dict(c) if c else None
 
 
-def calibrate(host, bed=60, run_async=True):
-    """Vermessen starten (nur wenn frei). → {"started": True, "bed"}; MeshError busy/… sonst."""
+def calibrate(host, bed=60, run_async=True, soak=0):
+    """Vermessen starten (nur wenn frei). → {"started": True, "bed", "soak"}; MeshError busy/… sonst."""
     host = anycubic_lan.check_host(host)
     if isinstance(bed, bool) or not isinstance(bed, int) or not CALIB_BED[0] <= bed <= CALIB_BED[1]:
         raise MeshError("Betttemperatur %d–%d °C" % CALIB_BED, "bad_request")
+    if isinstance(soak, bool) or not isinstance(soak, int) or not 0 <= soak <= CALIB_SOAK_MAX:
+        raise MeshError("Durchwärmen 0–%d min" % CALIB_SOAK_MAX, "bad_request")
     ensure_idle(host)
     with _lock:
         _claim(host)
-        _calib[host] = {"started": int(time.time()), "bed": bed, "done": None, "error": None}
-    script = calib_script(bed)
+        _calib[host] = {"started": int(time.time()), "bed": bed, "soak": soak, "done": None, "error": None}
+    script = calib_script(bed, soak)
     try:   # Netz, das Moonraker jetzt meldet – solange es das noch meldet, gilt das selbst vermessene
         base = parse(_moon(host, "/printer/objects/query?bed_mesh"))["probed"]
     except MeshError:
@@ -335,7 +342,7 @@ def calibrate(host, bed=60, run_async=True):
     def run():
         err = None
         try:
-            _moon(host, "/printer/gcode/script", {"script": script}, timeout=CALIB_TIMEOUT_S)
+            _moon(host, "/printer/gcode/script", {"script": script}, timeout=CALIB_TIMEOUT_S + soak * 60)
             store = _moon(host, "/server/gcode_store?count=100")
             probed = parse_output(store)
             stale = [m for m in console_meshes(store) if m != probed][-10:]
@@ -354,7 +361,7 @@ def calibrate(host, bed=60, run_async=True):
         threading.Thread(target=run, daemon=True, name="mesh-calibrate").start()
     else:
         run()
-    return {"started": True, "bed": bed}
+    return {"started": True, "bed": bed, "soak": soak}
 
 
 def history_file():

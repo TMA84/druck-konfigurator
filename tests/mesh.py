@@ -269,7 +269,8 @@ fake["state"] = "paused"
 st, d = post({"host": "127.0.0.1"})
 check("Vermessen: pausiert → 409", st == 409 and not fake["scripts"], (st, d))
 fake["state"] = "complete"
-for bad in ({"host": "127.0.0.1", "bed": True}, {"host": "127.0.0.1", "bed": 150}, {"host": "127.0.0.1", "bed": "60"}):
+for bad in ({"host": "127.0.0.1", "bed": True}, {"host": "127.0.0.1", "bed": 150}, {"host": "127.0.0.1", "bed": "60"},
+            {"host": "127.0.0.1", "bed": 60, "soak": 31}, {"host": "127.0.0.1", "bed": 60, "soak": -1}, {"host": "127.0.0.1", "bed": 60, "soak": "10"}):
     st, d = post(bad)
     check("Vermessen: ungültig %s → 400" % bad, st == 400 and not fake["scripts"], (st, d))
 st, d = post({"host": "8.8.8.8"})
@@ -287,6 +288,14 @@ check("Vermessen 5 × 5: gestartet und fertig", st == 200 and d.get("started") a
 check("Vermessen 5 × 5: G9111 wie beim Druckstart, dann Heizungen aus",
       fake["scripts"] == [("/printer/gcode/script", "G9111 bedTemp=60 extruderTemp=170\nBED_MESH_CALIBRATE MESH_MIN=5,5 MESH_MAX=245,245"
                                                      "\nM104 S0\nM140 S0\nBED_MESH_OUTPUT")], fake["scripts"])
+# Alu-Bett: erst heizen und durchwärmen (M190, G4 10 min), Düse bleibt kalt, dann wie oben
+fake["scripts"].clear()
+st, d = post({"host": "127.0.0.1", "bed": 60, "soak": 10})
+state = wait_done()
+check("Vermessen mit Durchwärmen: M190, 10 min G4, dann G9111",
+      st == 200 and d.get("soak") == 10 and state and state["soak"] == 10 and state["error"] is None
+      and fake["scripts"] == [("/printer/gcode/script", "M190 S60\nG4 P600000\nG9111 bedTemp=60 extruderTemp=170\nBED_MESH_CALIBRATE MESH_MIN=5,5 MESH_MAX=245,245"
+                                                       "\nM104 S0\nM140 S0\nBED_MESH_OUTPUT")], (st, d, state, fake["scripts"]))
 # Firmware behält ihr altes Netz in Moonraker – die Karte zeigt das ausgelesene neue, das alte steht im Verlauf
 st, d = get()
 check("Vermessen: neues Netz aus der Konsole statt des alten aus Moonraker", st == 200 and d["probed"] == NEWMESH and d.get("source") == "calibrate"

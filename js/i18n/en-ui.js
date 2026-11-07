@@ -1007,6 +1007,8 @@ I18N.add({
  "inneren Quadrat (¼ / ¾ der Fläche)": "inner square (¼ / ¾ of the area)",
  "Rand (Ecken der Messfläche)": "edge (corners of the probed area)",
  "Bezug": "Reference",
+ "Bett jetzt vermessen (Bett {bed} °C)? Alu-Bett: Der Drucker heizt das Bett und lässt es {soak} Minuten durchwärmen, dann fährt er in die Ausgangsstellung, wischt die Düse und tastet das Bett ab (5 × 5 Punkte) – zusammen etwa {total} Minuten. Das Bett muss leer sein.": "Probe the bed now (bed {bed} °C)? Aluminium bed: the printer heats the bed and lets it soak for {soak} minutes, then homes, wipes the nozzle and probes the bed (5 × 5 points) – about {total} minutes in total. The bed must be empty.",
+ "Vermessen läuft seit {min} min – Bett heizt und wärmt {soak} min durch, danach wischen und abtasten …": "Probing for {min} min – bed heating and soaking for {soak} min, then wiping and probing …",
  "+{d} °C dickes Alu-Bett": "+{d} °C thick aluminium bed",
  "Druckbett": "Print bed",
  "Werksbett": "Stock bed",

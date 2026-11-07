@@ -95,14 +95,19 @@ $('wbMeshLoad').addEventListener('click', meshLoad);
 // ---------- Jetzt vermessen ----------
 $('wbMeshBed').value = String([60, 70, 100].includes(store.settings.meshBed) ? store.settings.meshBed : 60);
 $('wbMeshBed').addEventListener('change', e => { store.settings.meshBed = Number(e.currentTarget.value); persist(); });
+/* Dickes Alu-Bett (Einstellung „Druckbett“, js/engine.js BED_ALU_PREHEAT_MIN): vor dem Messen durchwärmen lassen –
+   sonst misst der Drucker eine Platte, die beim Drucken noch anders liegt (2026-11-07) */
+const meshSoakMin = () => store.settings.bedKind === 'alu' ? BED_ALU_PREHEAT_MIN : 0;
 $('wbMeshRun').addEventListener('click', async () => {
-  const host = wbHost(), bed = Number($('wbMeshBed').value);
+  const host = wbHost(), bed = Number($('wbMeshBed').value), soak = meshSoakMin();
   if (!host || mh.printing) return;
-  if (!confirm(t('Bett jetzt vermessen (Bett {bed} °C)? Der Drucker fährt in die Ausgangsstellung, heizt, wischt die Düse und tastet das Bett ab (5 × 5 Punkte) – etwa 4–5 Minuten. Das Bett muss leer sein.', { bed }))) return;
+  if (!confirm(soak
+    ? t('Bett jetzt vermessen (Bett {bed} °C)? Alu-Bett: Der Drucker heizt das Bett und lässt es {soak} Minuten durchwärmen, dann fährt er in die Ausgangsstellung, wischt die Düse und tastet das Bett ab (5 × 5 Punkte) – zusammen etwa {total} Minuten. Das Bett muss leer sein.', { bed, soak, total: soak + 7 })
+    : t('Bett jetzt vermessen (Bett {bed} °C)? Der Drucker fährt in die Ausgangsstellung, heizt, wischt die Düse und tastet das Bett ab (5 × 5 Punkte) – etwa 4–5 Minuten. Das Bett muss leer sein.', { bed }))) return;
   $('wbMeshRun').disabled = true;
   try {
-    await lanApi('api/anycubic/mesh/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, bed }) });
-    mh.calib = { started: Date.now() / 1000, bed, done: null, error: null };
+    await lanApi('api/anycubic/mesh/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, bed, soak }) });
+    mh.calib = { started: Date.now() / 1000, bed, soak, done: null, error: null };
     meshCalibPoll();
   } catch (e) {
     mh.calib = { done: Date.now() / 1000, error: e.message };
@@ -129,7 +134,9 @@ function meshRunState() {
   $('wbMeshRun').disabled = running || !!mh.printing || !wbHost();
   $('wbMeshBed').disabled = running;
   $('wbMeshRun').title = mh.printing ? t('Nur wenn der Drucker frei ist') : '';
-  note.textContent = running ? t('Vermessen läuft seit {min} min – heizt, wischt, tastet ab …', { min: Math.max(0, Math.floor((Date.now() / 1000 - c.started) / 60)) })
+  const runMin = running ? Math.max(0, Math.floor((Date.now() / 1000 - c.started) / 60)) : 0;
+  note.textContent = running && c.soak && runMin < c.soak + 2 ? t('Vermessen läuft seit {min} min – Bett heizt und wärmt {soak} min durch, danach wischen und abtasten …', { min: runMin, soak: c.soak })
+    : running ? t('Vermessen läuft seit {min} min – heizt, wischt, tastet ab …', { min: runMin })
     : c && c.error ? t('Vermessen fehlgeschlagen: {msg}', { msg: t(c.error) })
     : c && c.done ? t('Vermessen fertig ({time}).', { time: new Date(c.done * 1000).toLocaleTimeString(LOCALE(), { hour: '2-digit', minute: '2-digit' }) })
     : mh.printing ? t('Vermessen geht nur, wenn der Drucker frei ist.') : '';

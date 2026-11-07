@@ -9,7 +9,7 @@ API (nur Drucker mit privater IP-Adresse, siehe tools/anycubic_lan.py):
        &pos=1                                → Kopfposition auch während des Drucks abfragen (Test-Schalter der 3D-Ansicht)
   GET  /api/anycubic/mesh?host=<ip>        → Bettnetz (Nivellierung) über Moonraker, nur mit Rinkhals (tools/mesh.py)
   GET  /api/anycubic/mesh/calibrate?host=<ip> → Stand von „Jetzt vermessen“ ({"state": {started, bed, done, error}} oder null)
-  POST /api/anycubic/mesh/calibrate  {host, bed}  → Bett jetzt vermessen (immer 5 × 5, nur wenn der Drucker frei ist)
+  POST /api/anycubic/mesh/calibrate  {host, bed, soak}  → Bett jetzt vermessen (immer 5 × 5, nur wenn der Drucker frei ist; soak = min durchwärmen)
   GET  /api/anycubic/camera?host=<ip>      → Kamerabild als HTTP-FLV (durchgereicht, der Drucker erlaubt kein CORS);
                                               mit Rinkhals MJPEG von mjpg-streamer (ohne startCapture, tools/camera_src.py);
                                               &frames=1: dieselben Bilder als Länge + JPEG (geht auch über den HA-Ingress)
@@ -701,7 +701,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/anycubic/mesh/calibrate":
             def calib():
                 req = self._body(length)
-                return mesh.calibrate(req["host"], req.get("bed", 60))
+                return mesh.calibrate(req["host"], req.get("bed", 60), soak=req.get("soak", 0))
             return self._api(calib)
 
         def run():   # /api/anycubic/command

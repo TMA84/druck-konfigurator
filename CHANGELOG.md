@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.57.0] – 2026-11-07
+
+### Neu
+- **Jetzt vermessen wartet beim Alu-Bett 10 Minuten:** Steht das Druckbett auf „Alu-Bett 8 mm“, heizt der Drucker vor dem Vermessen das Bett (`M190`) und hält es 10 Minuten (`G4`). Erst dann folgen Wischen, Z-Offset und Abtasten wie bisher. Die Düse bleibt in der Zeit kalt. Die Rückfrage und der Stand nennen die Wartezeit. Tests in `tests/mesh.py` und im Bedientest.
+
 ## [10.56.0] – 2026-11-07
 
 ### Neu
