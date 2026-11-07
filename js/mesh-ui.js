@@ -151,6 +151,11 @@ $('wbMeshPitch').value = String(store.settings.meshPitch || 0.5);
 if (!$('wbMeshPitch').value) $('wbMeshPitch').value = '0.5';
 $('wbMeshScrewAt').value = store.settings.meshScrewAt === 'corners' ? 'corners' : 'inner';
 $('wbMeshScrewAt').addEventListener('change', e => { store.settings.meshScrewAt = e.currentTarget.value; persist(); if (mh.data) meshScrews(mh.data); });
+$('wbMeshScrewRef').value = ['bl', 'br', 'fl', 'fr'].includes(store.settings.meshScrewRef) ? store.settings.meshScrewRef : 'auto';
+function meshSetRef(v) { $('wbMeshScrewRef').value = v; store.settings.meshScrewRef = $('wbMeshScrewRef').value || 'auto'; persist(); if (mh.data) meshScrews(mh.data); }
+$('wbMeshScrewRef').addEventListener('change', e => meshSetRef(e.currentTarget.value));
+// Klick auf eine Schraube: sie wird Bezug
+$('wbMeshScrewGrid').addEventListener('click', e => { const el = e.target.closest('[data-ref]'); if (el) meshSetRef(el.dataset.ref); });
 $('wbMeshPitch').addEventListener('change', e => { store.settings.meshPitch = Number(e.currentTarget.value); persist(); if (mh.data) meshScrews(mh.data); });
 
 function meshRender() {
@@ -204,9 +209,11 @@ function meshCmpSelect(d) {
   if (mh.cmp === '') sel.value = '';
 }
 
-/* Stellschrauben an den Ecken: Höhe der Eckpunkte des Netzes, Bezug = die Ecke, bei der insgesamt am wenigsten zu drehen ist.
+/* Stellschrauben an den Ecken: Höhe der Eckpunkte des Netzes, Bezug wählbar (2026-11-07) – automatisch die Ecke, bei der
+   insgesamt am wenigsten zu drehen ist, oder eine feste Ecke (z. B. die Schraube, die man nicht erreicht oder die fest sitzt).
    Höher als der Bezug → anziehen (senkt die Ecke bei Schrauben mit Feder), tiefer → lösen. Umdrehungen = Höhe / Steigung, auf ⅛. */
-const MESH_CORNERS = [['hinten links', 1, 0], ['hinten rechts', 1, 1], ['vorne links', 0, 0], ['vorne rechts', 0, 1]];
+const MESH_CORNERS = [['hinten links', 1, 0, 'bl'], ['hinten rechts', 1, 1, 'br'], ['vorne links', 0, 0, 'fl'], ['vorne rechts', 0, 1, 'fr']];
+const meshScrewRef = () => MESH_CORNERS.some(c => c[3] === $('wbMeshScrewRef').value) ? $('wbMeshScrewRef').value : 'auto';
 /* Lage der Schrauben als Anteil der vermessenen Fläche: Kobra S1 – inneres Quadrat (¼ und ¾, beim 5 × 5-Netz 5…245 mm
    genau die Messpunkte bei 65 und 185 mm; Angabe des Nutzers 2026-11-02), sonst Ecken (0 und 1) */
 const MESH_SCREW_AT = { inner: [0.25, 0.75], corners: [0, 1] };
@@ -219,9 +226,10 @@ function meshAt(m, fx, fy) {
 }
 function meshScrewPlan(d) {
   const m = d.probed, at = MESH_SCREW_AT[meshScrewWhere()];
-  const pts = MESH_CORNERS.map(([name, yb, xb]) => ({ name, fx: at[xb], fy: at[yb], z: meshAt(m, at[xb], at[yb]) }));
-  let ref = pts[0], best = Infinity;
-  for (const p of pts) { const sum = pts.reduce((a, q) => a + Math.abs(q.z - p.z), 0); if (sum < best - 1e-9) { best = sum; ref = p; } }
+  const pts = MESH_CORNERS.map(([name, yb, xb, key]) => ({ name, key, fx: at[xb], fy: at[yb], z: meshAt(m, at[xb], at[yb]) }));
+  const want = meshScrewRef();
+  let ref = pts.find(p => p.key === want), best = Infinity;
+  if (!ref) for (const p of pts) { const sum = pts.reduce((a, q) => a + Math.abs(q.z - p.z), 0); if (sum < best - 1e-9) { best = sum; ref = p; } }
   return pts.map(p => ({ ...p, ref: p === ref, dz: p.z - ref.z }));
 }
 const meshPos = (d, f, k) => d.min[k] + (d.max[k] - d.min[k]) * f;
@@ -239,7 +247,7 @@ function meshScrews(d) {
     const ok = Math.abs(p.dz) < MESH_OK_MM, turns = meshTurns(p.dz, pitch);
     const what = p.ref ? t('Bezug – nicht drehen') : ok || !turns ? t('passt')
       : p.dz > 0 ? t('anziehen (im Uhrzeigersinn) – senkt das Bett hier') : t('lösen (gegen den Uhrzeigersinn) – hebt das Bett hier');
-    return '<div class="wb-mesh-screw' + (p.ref ? ' ref' : ok ? ' ok' : p.dz > 0 ? ' down' : ' up') + '"><b>' + esc(t(p.name)) + '</b>'
+    return '<div class="wb-mesh-screw' + (p.ref ? ' ref' : ok ? ' ok' : p.dz > 0 ? ' down' : ' up') + '" data-ref="' + p.key + '" title="' + esc(t('Als Bezug nehmen')) + '"><b>' + esc(t(p.name)) + '</b>'
       + '<span class="wb-mesh-screw-dz">' + esc(meshMmS(p.dz)) + '</span>'
       + '<span>' + esc(what) + '</span>' + (!p.ref && !ok && turns ? '<span class="wb-mesh-screw-turns">' + esc(turns) + '</span>' : '') + '</div>';
   }).join('');

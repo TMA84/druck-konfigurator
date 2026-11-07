@@ -748,6 +748,12 @@ async function runSmoke(opts={}){
         const si=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
         ok(/hinten rechts.*Bezug/.test(si[1])&&/vorne links.*−0[,.]020.*passt/.test(si[2])&&/vorne rechts.*\+0[,.]160.*anziehen.*⅜ Umdrehung \(115°\)/.test(si[3])&&/hinten links.*−0[,.]225.*lösen.*½ Umdrehung \(162°\)/.test(si[0])
           &&/X 65 \/ 185, Y 65 \/ 185/.test($('wbMeshScrewNote').textContent),'Nivellierung: Schrauben am inneren Quadrat (65/185 mm): '+si.join(' | '));
+        const ref0=$('wbMeshScrewRef').value;$('wbMeshScrewRef').value='fl';$('wbMeshScrewRef').dispatchEvent(new Event('change'));
+        const sf=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
+        ok(/vorne links.*Bezug/.test(sf[2])&&/hinten rechts.*\+0[,.]020.*passt/.test(sf[1])&&/vorne rechts.*\+0[,.]180.*anziehen/.test(sf[3])&&/hinten links.*−0[,.]205.*lösen/.test(sf[0]),'Nivellierung: Bezug vorne links gewählt: '+sf.join(' | '));
+        $('wbMeshScrewGrid').children[3].click();
+        ok(/vorne rechts.*Bezug/.test($('wbMeshScrewGrid').children[3].textContent)&&$('wbMeshScrewRef').value==='fr','Nivellierung: Klick auf Schraube macht sie zum Bezug');
+        $('wbMeshScrewRef').value=ref0;$('wbMeshScrewRef').dispatchEvent(new Event('change'));
         $('wbMeshScrewAt').value='corners';$('wbMeshScrewAt').dispatchEvent(new Event('change'));
         const sc=[...$('wbMeshScrewGrid').children].map(e=>e.textContent);
         $('wbMeshScrewAt').value=at0;$('wbMeshScrewAt').dispatchEvent(new Event('change'));

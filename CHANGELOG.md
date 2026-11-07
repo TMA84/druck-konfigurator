@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.55.0] – 2026-11-07
+
+### Neu
+- **Nivellierung → Schrauben: Bezug wählbar.** Bisher war der Bezug immer die Schraube mit dem geringsten Gesamtaufwand. Jetzt lässt sich unter **Bezug** eine feste Ecke wählen (hinten/vorne, links/rechts), oder man tippt einfach auf die Schraube. Die anderen werden dann relativ zu ihr angegeben. Die Wahl bleibt gespeichert; „automatisch“ verhält sich wie bisher.
+
 ## [10.54.1] – 2026-11-04
 
 ### Behoben
