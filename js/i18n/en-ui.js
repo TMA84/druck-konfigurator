@@ -1007,6 +1007,7 @@ I18N.add({
  "inneren Quadrat (¼ / ¾ der Fläche)": "inner square (¼ / ¾ of the area)",
  "Rand (Ecken der Messfläche)": "edge (corners of the probed area)",
  "Bezug": "Reference",
+ "zur Waagerechten – Überhänge ab {a}° von der Senkrechten": "from horizontal – overhangs from {a}° off vertical",
  "automatisch (am wenigsten drehen)": "automatic (least turning)",
  "Als Bezug nehmen": "Use as reference",
  "Bett": "Bed",

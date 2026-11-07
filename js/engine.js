@@ -115,6 +115,11 @@ function compute(I,geom,ctx){
   // Beliebiger Orca-Drucker: Geschwindigkeiten, Beschleunigung und Volumenstrom höchstens so hoch wie in seinem Orca-Profil
   let m=printer.orca&&typeof orcaLimitMaterial==='function'?orcaLimitMaterial(ctx.getMat(mk),printer.orca):ctx.getMat(mk);
   const ob=OBJ[o],tpu=m.kind==='tpu',sp=supportProfile(sl,tpu);
+  /* Überhangwinkel (Schieber im Viewer, von der Senkrechten) gilt auch für die Stützen – vorher nur für die Markierung, Orca
+     bekam immer den Wert der Stützreduzierung (2026-11-07). Orca misst zur Waagerechten und stützt, was flacher ist als
+     support_threshold_angle: 90° − Überhangwinkel (per Orca-CLI geprüft: Arm 65° vom Lot bei 20° ohne, bei 45° mit Stützen).
+     Vorher stand der Wert direkt drin – „Weniger Stützen“ (55°) stützte in Orca ab 35° vom Lot, also mehr. */
+  {const th=+I.thresh;if(th>=10&&th<=85)sp.angle=th;sp.orca=90-sp.angle;}
   /* Anpassungen für diesen Auftrag (I.overrides, je Teil): ersetzen den berechneten Vorschlag an der Stelle,
      an der er entsteht – Datenblatt, 3MF, Slicen und Kosten nutzen dann dieselben Werte. sugg = Vorschlag. */
   /* Eigene Standardwerte je Drucker und Filament (store.settings.ovDefaults["kobra_s1|abs"], „Als Standard merken“):
@@ -294,7 +299,7 @@ function compute(I,geom,ctx){
       ['Füllung',sp_fill+' mm/s',nFill],mark(['sp_top'],['Obere Fläche',top+' mm/s']),mark(['sp_gap'],['Lückenfüllung',m.gap+' mm/s']),mark(['sp_travel'],['Travel',sp_travel+' mm/s']),
       mark(['accel'],['Beschleunigung',accelTxt,accelNote]),retrRow].concat(tpu?[['Überhänge','15 / 12 / 10 mm/s'],['Brücken extern / intern','15 / 20 mm/s']]:[])],
     ['Stützen',supOn?[
-      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.angle+'°'],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
+      ['Stützstrukturen',t('Aktivieren')],['Typ',t('Baum (automatisch)')],['Schwellenwinkel',sp.orca+'°',t('zur Waagerechten – Überhänge ab {a}° von der Senkrechten',{a:sp.angle})],mark(['critical'],['Nur kritische Bereiche',t(supCritical?'Ein':'Aus')]),
       ['Nur auf Druckplatte',t('Ein, zuerst testen')],['Kleine Überhänge entfernen',t(sp.small)],['Raft',t('0 Schichten')],
       ['Oberer Z-Abstand',de(supZ.top,2)+' mm'],['Unterer Z-Abstand',de(supZ.bottom,2)+' mm'],['Stützen/Objekt XY-Abstand',sp.xy],
       ['Obere Schnittstellenschichten',sp.iface],['Untere Schnittstellenschichten','1'],['Schnittstellenabstand',sp.gap],

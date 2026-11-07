@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.55.1] – 2026-11-07
+
+### Behoben
+- **Überhangwinkel änderte die Stützen nicht:** Der Schieber unter dem Viewer wirkte nur auf die rote Markierung, an Orca ging immer der Winkel der Stützreduzierung. Außerdem misst Orca zur Waagerechten, das Tool zur Senkrechten: „Weniger Stützen“ (55°) stützte in Orca mehr statt weniger. Jetzt geht der Schieber an Orca, umgerechnet auf 90° minus Wert (55° → Schwellenwinkel 35°). Mit der Orca-CLI geprüft: Modell mit zwei Armen (50° und 65° von der Senkrechten), bei 45° beide gestützt (52 273 Stützbahnen), bei 55° nur noch der steilere (23 773). Test in `tests/overrides.js`.
+
 ## [10.55.0] – 2026-11-07
 
 ### Neu

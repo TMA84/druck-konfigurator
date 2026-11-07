@@ -604,7 +604,7 @@ Ist eine Platte größer als dein Bett, erscheint ein Hinweis.
 
 - Maus: **links ziehen** drehen, **rechts ziehen** verschieben, **Rad** zoomen.
 - **Farben | Grenzwinkel** (unten, bleibt gemerkt): „Farben“ zeigt das Teil in Slot-, Körper- und Malfarben, so wie es gedruckt wird; „Grenzwinkel“ zeigt die Überhänge – blau unkritisch, gelb nahe am Grenzwinkel, rot darüber, grau liegt auf dem Bett. Beim Malen schaltet das Tool kurz auf „Farben“.
-- **Überhangwinkel** (unten): Flächen steiler als dieser Winkel gelten als Überhang (rot in „Grenzwinkel“) und zählen für die Stützen-Entscheidung.
+- **Überhangwinkel** (unten): Flächen steiler als dieser Winkel gelten als Überhang (rot in „Grenzwinkel“), zählen für die Stützen-Entscheidung und bestimmen, ab wo Orca stützt. **Größer = weniger Stützen.** Die Stützreduzierung stellt ihn vor (45° / 50° / 55°), der Schieber gewinnt. Orca misst zur Waagerechten, deshalb steht im Datenblatt und in der 3MF als *Schwellenwinkel* 90° minus dieser Wert (Überhangwinkel 55° → Schwellenwinkel 35°).
 - **Wireframe**, **Achsen**, **Schnitt** (Schnittebene je Achse verschieben; **Hier teilen** schneidet das Teil dort in zwei, siehe [Teil schneiden](#teil-schneiden)), **Messen** (zwei Punkte anklicken).
 - **Fläche aufs Bett**, **↻ X**, **↻ Y** – wie in der Spalte daneben unter „Lage auf dem Bett“.
 - Die Drahtbox zeigt den **Bauraum** des Druckers. Ist sie rot, passt das Teil nicht hinein (der Hinweis oben nennt Breite, Tiefe oder Höhe) – Teil drehen, skalieren oder mit **Hier teilen** schneiden.

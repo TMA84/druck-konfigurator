@@ -30,6 +30,11 @@ check('Stützen aus trotz Freiform', val(off, 'enable_support') === '0' && off.s
 check('Nur kritische Bereiche: Vorschlag aus (sonst keine Stützen an schrägen Überhängen)', val(r, 'support_critical_regions_only') === '0' && r.supCritical === false, val(r, 'support_critical_regions_only'));
 const crit = K.compute({ ...I, overrides: { support: 'on', critical: 'on' } }, null, c);
 check('Nur kritische Bereiche je Auftrag an', val(crit, 'support_critical_regions_only') === '1' && crit.changed.includes('critical'), crit.changed);
+// Überhangwinkel (Schieber, von der Senkrechten) → Orca-Schwellenwinkel zur Waagerechten (90° − Wert); größer = weniger Stützen
+const thr = th => val(K.compute({ ...I, thresh: String(th), overrides: { support: 'on' } }, null, c), 'support_threshold_angle');
+check('Überhangwinkel 45/55/30 → Schwellenwinkel 45/35/60', thr(45) === '45' && thr(55) === '35' && thr(30) === '60', [thr(45), thr(55), thr(30)]);
+const thRow = (K.compute({ ...I, thresh: '55', overrides: { support: 'on' } }, null, c).ordered.flatMap(g => g[1]).find(x => x[0] === 'Schwellenwinkel') || []);
+check('Datenblatt: Schwellenwinkel 35° zur Waagerechten', thRow[1] === '35°' && /55°/.test(thRow[2]), thRow);
 check('Füllmuster-Zuordnung', K.orcaInfillPattern('Waben') === 'honeycomb' && K.orcaInfillPattern('Gyroid oder Kubisch') === 'gyroid' && K.orcaInfillPattern('Blitz') === 'lightning');
 console.log(pass + '/' + (pass + fail) + ' bestanden');
 process.exit(fail ? 1 : 0);

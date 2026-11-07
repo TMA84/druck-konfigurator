@@ -95,7 +95,7 @@ function supportChanges(r) {
   const sp = r.sp, tpu = r.tpu;
   const out = [
     [t('Stützentyp'), 'support_type', 'tree(auto)'],
-    [t('Schwellenwinkel'), 'support_threshold_angle', sp.angle],
+    [t('Schwellenwinkel'), 'support_threshold_angle', sp.orca != null ? sp.orca : 90 - sp.angle],
     [t('Nur kritische Bereiche'), 'support_critical_regions_only', r.supCritical ? 1 : 0],
     [t('Nur auf Druckplatte'), 'support_on_build_plate_only', 1],
     [t('Kleine Überhänge entfernen'), 'support_remove_small_overhang', sp.small === 'Ein' ? 1 : 0],
