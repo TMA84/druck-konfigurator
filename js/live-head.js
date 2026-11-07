@@ -100,7 +100,7 @@ function lvFilamentAt(seg) {
   if (k === lv.filTool) return;
   lv.filTool = k;
   const c = lvToolColour(k);
-  if (c) lv.filM.color.set(c);
+  if (c) { lv.filM.color.set(c); if (lv.filGlowM) lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3); }
 }
 // Kopf und Mechanik an die Stelle p (Düsenspitze)
 function lvPlaceHead(p) {

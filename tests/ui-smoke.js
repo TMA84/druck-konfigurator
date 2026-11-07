@@ -727,6 +727,20 @@ async function runSmoke(opts={}){
       liveUpdate(st);await wait(100);ok(calls===1,'nicht sofort erneut gefragt');
       lv.missingAt=Date.now()-30000;liveUpdate(st);await wait(200);ok(calls===2,'nach 20 s erneut gefragt');
       window.fetch=of;lv.name=null;lv.missing=false; }
+    // Farbwechsel im Druck: Schlauch zum Kopf zeigt beim Zurückziehen die alte Farbe, danach wieder die des geladenen Slots (10.57.1)
+    if(typeof THREE!=='undefined'){ const keep={sp:lv.aceSpools,g:lv.aceG,m:lv.filM,gm:lv.filGlowM,mv:lv.aceMove,last:lv.aceLast,sw:lv.swap,ft:lv.filTool,u:lv.aceUnits,fx:lv.aceUnitsFx};
+      const mat=()=>new THREE.MeshStandardMaterial(),obj=()=>new THREE.Mesh(new THREE.BufferGeometry(),mat());
+      const spool=(unit,slot)=>{const cv=document.createElement('canvas');cv.width=128;cv.height=48;const lbl=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv)}));const fil=obj();
+        return {unit,slot,fil:fil.material,filMesh:fil,line:mat(),group:new THREE.Group(),tubes:[obj(),obj()],lbl,cv,txt:null,strand:obj(),spoolC:new THREE.Vector3(),inlet:new THREE.Vector3(),k:null,funnel:mat(),flow:lvFlowMat(100),flowS:lvFlowMat(150),glow:obj(),glowS:obj(),loaded:false,active:false}};
+      lv.aceSpools=[spool(0,0),spool(0,1)];lv.aceG=null;lv.aceUnitsFx=[];lv.aceUnits=1;lv.filM=mat();lv.filGlowM=mat();lv.aceMove=null;lv.aceLast=null;lv.swap={drops:[]};
+      const box=(loaded,status)=>[{id:0,loaded_slot:loaded,status,slots:[{index:0,colour:'#FF0000',present:true,loaded:loaded===0},{index:1,colour:'#0000FF',present:true,loaded:loaded===1}]}];
+      const job={name:'x',layer:3,layers:10};
+      lvAceColours({job,ace:box(0,1),ace_activity:null});lv.filTool=0;
+      lvAceColours({job,ace:box(0,2),ace_activity:{phase:'unload',from:0,to:-1}});
+      ok(lv.filM.color.getHexString()==='ff0000','Farbwechsel: Schlauch beim Zurückziehen in der alten Farbe');
+      lvAceColours({job,ace:box(1,1),ace_activity:{phase:'done',from:0,to:1}});
+      ok(lv.filM.color.getHexString()==='0000ff'&&lv.filTool===null,'Farbwechsel vorbei: Schlauch in der Farbe des neuen Slots (nicht die alte bis zum Neuladen)');
+      Object.assign(lv,{aceSpools:keep.sp,aceG:keep.g,filM:keep.m,filGlowM:keep.gm,aceMove:keep.mv,aceLast:keep.last,swap:keep.sw,filTool:keep.ft,aceUnits:keep.u,aceUnitsFx:keep.fx}); }
     // Nivellierung: Bettnetz über Moonraker (Fläche, Kennzahlen, Tabelle), Abfrage nur bei Anlass, Werksfirmware → Hinweis statt Fehler
     { const of=window.fetch,hosts=store.settings.printerHosts;let calls=0,answer=null;
       window.fetch=(u,o)=>{u=String(u);if(u.startsWith('api/anycubic/mesh?')){calls++;return Promise.resolve(new Response(JSON.stringify(answer.body),{status:answer.status,headers:{'Content-Type':'application/json'}}))}return of(u,o)};

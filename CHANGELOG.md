@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.57.1] – 2026-11-07
+
+### Behoben
+- **3D-Ansicht: Filament zum Kopf blieb nach einem Farbwechsel in der alten Farbe.** Beim Zurückziehen färbt die Ansicht den Schlauch in der Farbe des Slots, der zurückgeht. Danach setzte sie die Farbe nicht zurück, weil sie das Werkzeug schon kannte, und das blieb so bis zum Neuladen der Seite. Jetzt bekommt der Schlauch nach dem Wechsel die Farbe des geladenen Slots. Test im Bedientest.
+
 ## [10.57.0] – 2026-11-07
 
 ### Neu

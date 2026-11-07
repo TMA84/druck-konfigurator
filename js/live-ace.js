@@ -198,6 +198,12 @@ function lvAceColours(st) {
   // Kopfschlauch in der Farbe des Filaments, das gerade darin läuft
   if (lv.aceMove && lv.filM) { lv.filM.color.copy(lv.aceMove.sp.fil.color); if (lv.filGlowM) lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3); }
   const now = lv.aceSpools.find(sp => sp.loaded) || null;
+  /* Wechsel vorbei: Schlauch wieder in der Farbe des geladenen Slots. Vorher blieb die Farbe aus der Bewegung stehen (beim
+     Zurückziehen die alte), weil lvFilamentAt das Werkzeug schon kannte und nichts neu setzte – bis zum Neuladen (2026-11-07) */
+  if (prevMove && !lv.aceMove && lv.filM) {
+    lv.filTool = null;
+    if (now) { lv.filM.color.copy(now.fil.color); if (lv.filGlowM) lv.filGlowM.color.copy(lv.filM.color).lerp(new THREE.Color(0xffffff), 0.3); }
+  }
   if (st && 'ace_activity' in st) {
     // Wechsel fertig (neuer Slot am Kopf): Tropfen der Spülmenge alte → neue Farbe unter der Düse
     if (printing && prevMove && !lv.aceMove && now && lv.aceLast && now !== lv.aceLast && !lv.swap)
