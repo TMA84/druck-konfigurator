@@ -6,7 +6,9 @@
    /local/druckwerkstatt/ ab. Karte:
      type: custom:druckwerkstatt-card
      aspect_ratio: 80%            # optional, Höhe zur Breite (Standard 56%)
-     slug: d761c650_druck_konfigurator   # optional */
+     slug: d761c650_druck_konfigurator   # optional
+     ansicht: kopf                # optional: „3d“ (Standard) oder „kopf“ – Druckkopf-Grafik mit Düse, Bett, Lüfter, Speed …
+     leistung: sensor.…_power     # optional, nur für „kopf“: Leistungs-Entität (Watt, z. B. Shelly-Steckdose) → „Energie“ */
 const DW_SLUG = 'd761c650_druck_konfigurator';
 const DW_KEEPALIVE_MS = 60000;
 const DW_RETRY_MS = 30000;
@@ -21,6 +23,7 @@ class DruckwerkstattCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._frame) this._build();
+    this._power();
     if (this._canStart()) this._start();
   }
   connectedCallback() {
@@ -33,6 +36,17 @@ class DruckwerkstattCard extends HTMLElement {
     this._run = (this._run || 0) + 1;   // laufendes _start verwerfen
     this._started = false;
   }
+  // Leistung an die eingebettete Seite (gleicher Ursprung über Ingress, js/head-ui.js) – nur bei Änderung
+  _power(force) {
+    const id = this._config.leistung, st = id && this._hass && this._hass.states[id];
+    if (!st || !this._frame || !this._frame.contentWindow) return;
+    let w = parseFloat(st.state);
+    if (!Number.isFinite(w)) return;
+    if ((st.attributes || {}).unit_of_measurement === 'kW') w *= 1000;
+    if (!force && w === this._sentW) return;
+    this._sentW = w;
+    try { this._frame.contentWindow.postMessage({ druckwerkstatt: 'leistung', w }, location.origin); } catch (e) { /* noch nicht geladen */ }
+  }
   _canStart() { return !this._started && this.isConnected && Date.now() >= (this._retryAt || 0); }
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 6, rows: 6, min_rows: 3 }; }
@@ -43,7 +57,7 @@ class DruckwerkstattCard extends HTMLElement {
     root.innerHTML = '<style>:host{display:block;height:100%}ha-card{overflow:hidden;height:100%}.box{position:relative;box-sizing:border-box;width:100%;height:100%;min-height:100%}'
       + 'iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#14161a}'
       + '.msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;color:var(--secondary-text-color)}</style>'
-      + '<ha-card><div class="box"><iframe title="Druckwerkstatt 3D" allow="fullscreen"></iframe><div class="msg">Druckwerkstatt wird geladen …</div></div></ha-card>';
+      + '<ha-card><div class="box"><iframe title="Druckwerkstatt" allow="fullscreen"></iframe><div class="msg">Druckwerkstatt wird geladen …</div></div></ha-card>';
     this._box = root.querySelector('.box'); this._frame = root.querySelector('iframe'); this._msg = root.querySelector('.msg');
     this._layout();
     // iOS übernimmt eine spätere Größenänderung der Kachel nicht in die eingebettete Seite – feste Pixelgröße setzen
@@ -97,8 +111,9 @@ class DruckwerkstattCard extends HTMLElement {
       await this._session();
       if (gone()) return;
       this._retryAt = 0;
-      const src = info.ingress_url + '?ansicht=3d';
-      if (this._frame.getAttribute('src') !== src) { this._frame.onload = () => this._fit(); this._frame.setAttribute('src', src); }
+      const view = this._config.ansicht === 'kopf' ? 'kopf' : '3d', src = info.ingress_url + '?ansicht=' + view;
+      // Leistung nach dem Laden noch einmal schicken (und wenige Sekunden später, wenn die Seite fertig aufgebaut ist)
+      if (this._frame.getAttribute('src') !== src) { this._frame.onload = () => { this._fit(); this._power(true); setTimeout(() => this._power(true), 3000); }; this._frame.setAttribute('src', src); }
       this._msg.style.display = 'none';
       this._timer = setInterval(() => this._keep(), DW_KEEPALIVE_MS);
     } catch (e) {
@@ -112,6 +127,7 @@ class DruckwerkstattCard extends HTMLElement {
   }
   async _keep() {
     if (!this.isConnected) return;
+    this._power(true);   // die Seite blendet „Energie“ nach 5 min ohne Wert aus
     try { await this._ws('/ingress/validate_session', 'post', { session: this._sid }); }
     catch (e) { if (!this.isConnected) return; try { await this._session(); } catch (e2) { /* nächste Minute */ } }
   }
@@ -119,4 +135,4 @@ class DruckwerkstattCard extends HTMLElement {
 if (!customElements.get('druckwerkstatt-card')) customElements.define('druckwerkstatt-card', DruckwerkstattCard);
 window.customCards = window.customCards || [];
 if (!window.customCards.some(c => c.type === 'druckwerkstatt-card'))
-  window.customCards.push({ type: 'druckwerkstatt-card', name: 'Druckwerkstatt 3D', description: '3D-Fortschritt des Druckers – auch für Benutzer ohne Admin-Rechte' });
+  window.customCards.push({ type: 'druckwerkstatt-card', name: 'Druckwerkstatt 3D', description: '3D-Fortschritt oder Druckkopf-Grafik (ansicht: kopf) des Druckers – auch für Benutzer ohne Admin-Rechte' });

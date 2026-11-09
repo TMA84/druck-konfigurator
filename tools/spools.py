@@ -283,13 +283,15 @@ def _maint(state):
 
 
 def maintenance_view(state, now=None):
-    """Für Seite und Home Assistant: {items: [{key, name, interval_h, hours, left_h, due, done_at, done_hours}], due: [Name …]}."""
+    """Für Seite und Home Assistant: {items: [{key, name, interval_h, hours, left_h, due, done_at, done_hours}], due: [Name …], total_h}."""
     items = []
     for k, it in _maint(state).items():
         h = print_hours_since(state, it["done_at"], now)
         items.append(dict(it, key=k, name=MAINT_ITEMS[k][0], default_h=MAINT_ITEMS[k][1], hours=round(h, 1),
                           left_h=round(it["interval_h"] - h, 1), due=h >= it["interval_h"]))
-    return {"items": items, "due": [i["name"] for i in items if i["due"]]}
+    # total_h: alle Druckstunden der Historie samt laufendem Druck (Druckkopf-Grafik in ④ „Gesamtlaufzeit“, js/head-ui.js)
+    return {"items": items, "due": [i["name"] for i in items if i["due"]],
+            "total_h": round(print_hours_since(state, None, now), 2)}
 
 
 def maintenance_update(state, req, now=None):

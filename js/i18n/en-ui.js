@@ -1127,4 +1127,18 @@ I18N.add({
  "Bild / Logo": "Image / logo",
  "unten": "bottom",
  "oben": "top",
+ // Druckkopf-Grafik (js/head-ui.js)
+ "Druckkopf: Düse {n}, Bett {b}": "Print head: nozzle {n}, bed {b}",
+ "Energie": "Power",
+ "Bauteillüfter": "Part fan",
+ "Zusatz {p} %": "Aux {p} %",
+ "Gehäuse {p} %": "Chamber {p} %",
+ "Fluss": "Flow",
+ "geschätzt aus dem G-Code": "estimated from the G-code",
+ "Ø dieser Schicht": "avg. of this layer",
+ "laut G-Code an dieser Stelle": "per G-code at this spot",
+ "Gesamtlaufzeit": "Total runtime",
+ "gedruckt mit der Druckwerkstatt": "printed with Print Workshop",
+ "bisher / in diesem Druck": "so far / in this print",
+ "kein Druck": "no print",
 });

@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.58.0] – 2026-11-09
+
+### Neu
+- **Werkbank: Druckkopf-Grafik.** Die Karte heißt jetzt **Druckkopf & Temperaturen**. Oben steht eine Zeichnung aus Spule in Filamentfarbe, Kühlkörper mit Slot-Nummer und drehendem Lüfter, Düse, Schichten und Bett. Daran beschriftet sind Bauteillüfter (dazu Zusatz und Gehäuse), Fluss, Speed, Düsentemperatur, Schicht, Farbwechsel (bisher / gesamt), Gesamtlaufzeit und Betttemperatur. Speed und Fluss schätzt das Tool aus dem G-Code an der Kopfposition, weil der Kobra S1 sie nicht meldet. Die Vorschau speichert dafür je Schicht den Querschnitt der Bahnen und die Farbwechsel. Die Gesamtlaufzeit kommt aus dem Druckverlauf (`maintenance.total_h`).
+- **Home Assistant: Druckkopf-Grafik als Dashboard-Karte.** `custom:druckwerkstatt-card` mit `ansicht: kopf` zeigt die Grafik (Adresse `?ansicht=kopf`). Mit `leistung: <Entität>` erscheint zusätzlich die Leistung in Watt, zum Beispiel von einer Shelly-Steckdose, als „Energie“.
+- Tests: Vorschau (Farbwechsel und Querschnitt je Schicht), Gesamtlaufzeit, Bedientest für die Grafik samt Leistung von der Karte.
+
 ## [10.57.1] – 2026-11-07
 
 ### Behoben

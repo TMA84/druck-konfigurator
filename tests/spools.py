@@ -476,6 +476,7 @@ mv = spools.maintenance_view(st, now=50000)
 nz = next(i for i in mv["items"] if i["key"] == "nozzle")
 check("Wartung: Standard 200 h Düse, 12 h gedruckt", nz["interval_h"] == 200 and nz["hours"] == 12.0 and not nz["due"] and nz["left_h"] == 188, nz)
 check("Wartung: drei Punkte, nichts fällig", len(mv["items"]) == 3 and mv["due"] == [], mv)
+check("Wartung: Gesamtlaufzeit 12 h", mv["total_h"] == 12.0, mv.get("total_h"))
 st["track"] = {"job": "c", "start": 46800 + 3600, "mm": 0, "used": {}}
 check("Wartung: laufender Druck zählt mit", spools.maintenance_view(st, now=50400 + 3600)["items"][0]["hours"] == 13.0)
 st["track"] = {}

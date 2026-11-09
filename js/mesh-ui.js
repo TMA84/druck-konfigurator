@@ -58,7 +58,7 @@ function meshFactor(span, width) {
 }
 
 function meshOnStatus(st) {
-  if (document.documentElement.classList.contains('embed-3d')) return;   // eingebettet nur 3D-Fortschritt
+  if (/embed-(3d|kopf)/.test(document.documentElement.className)) return;   // eingebettet nur 3D-Fortschritt
   const host = wbHost();
   if (!host || !st || st.connected === false) return;
   const printing = !!st.printing, ended = mh.printing === true && !printing;

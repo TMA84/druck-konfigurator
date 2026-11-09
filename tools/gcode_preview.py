@@ -9,7 +9,9 @@ Format (little endian):  b"GCPV3" · uint32 Länge des JSON-Kopfs · JSON · Auf
                          · uint8[n] Vorschub je Bahn in speed_unit mm/s (aus F im G-Code – Einstellungen samt Abbremsen
                            für die Mindest-Schichtzeit; 0 = unbekannt)
 JSON: {"count": n, "types": [...], "layers": [[z, erste Bahn], ...], "bbox": [x0, y0, z0, x1, y1, z1], "tools": [...],
-       "speed_unit": 2, "travel": Fahrgeschwindigkeit mm/s (schnellste Fahrt ohne Extrusion)}
+       "speed_unit": 2, "travel": Fahrgeschwindigkeit mm/s (schnellste Fahrt ohne Extrusion),
+       "changes": Farbwechsel je Schicht, "layer_xs": Querschnitt der Bahnen je Schicht in mm² (Filamentvolumen / Bahnlänge;
+       × Vorschub = Fluss in mm³/s – Druckkopf-Grafik in ④, js/head-ui.js; 0 = Schicht ohne Bahnen)}
 Bis 10.4 hieß das Format GCPV2 (ohne Vorschub) – js/preview-ui.js parsePreview liest beide.
 """
 import json
@@ -40,14 +42,17 @@ def build_preview(path):
     changes, n_change, cur_tool = [], 0, None      # Farbwechsel je Schicht; Dauer aus dem Profil (machine_*_time, Fußzeile)
     change_keys = {"machine_load_filament_time": 0.0, "machine_unload_filament_time": 0.0, "machine_tool_change_time": 0.0}
     bb = [math.inf, math.inf, math.inf, -math.inf, -math.inf, -math.inf]
+    lay_len, lay_e, xs_raw = 0.0, 0.0, []           # Bahnlänge und Filament (mm) je Schicht → Querschnitt
+    fil_d = 1.75
     last = None  # (ende_x, ende_y, dx, dy, art, werkzeug, vorschub) der letzten Bahn – zum Zusammenfassen
 
     def add(x0, y0, x1, y1):
-        nonlocal last
+        nonlocal last, lay_len
         dx, dy = x1 - x0, y1 - y0
         ln = math.hypot(dx, dy)
         if ln < 1e-6:
             return
+        lay_len += ln
         spd = max(0, min(255, int(round(feed / 60 / SPEED_UNIT))))
         if last and last[4] == kind and last[5] == tool and last[6] == spd and abs(last[0] - x0) < 1e-4 and abs(last[1] - y0) < 1e-4:
             lx, ly = last[2], last[3]
@@ -78,7 +83,8 @@ def build_preview(path):
                         if layers:
                             layer_s.append(round(t_layer, 1))
                             changes.append(n_change)
-                        t_layer, n_change = 0.0, 0
+                            xs_raw.append((lay_e, lay_len))
+                        t_layer, n_change, lay_len, lay_e = 0.0, 0, 0.0, 0.0
                         layer_z = nz
                         layers.append([round(nz, 4), len(attrs) // 2])
                         last = None
@@ -89,6 +95,11 @@ def build_preview(path):
                             change_keys[k] = float(v.split(",")[0])
                         except ValueError:
                             pass
+                elif raw.startswith("; filament_diameter") and "=" in raw:
+                    try:
+                        fil_d = float(raw.split("=", 1)[1].split(",")[0]) or 1.75
+                    except ValueError:
+                        pass
                 elif raw.startswith("; estimated printing time (normal mode)"):
                     orca_s = sum(int(a) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[u] for a, u in re.findall(r"(\d+)\s*([dhms])", raw.split("=", 1)[-1]))
                 continue
@@ -126,6 +137,7 @@ def build_preview(path):
                         e_abs = w["E"]
                 z = nz
                 if de > 0 and (nx != x or ny != y):
+                    lay_e += de
                     if cmd in ("G2", "G3") and ("I" in w or "J" in w):
                         cx, cy = x + w.get("I", 0.0), y + w.get("J", 0.0)
                         r = math.hypot(x - cx, y - cy)
@@ -153,6 +165,9 @@ def build_preview(path):
     if layers:
         layer_s.append(round(t_layer, 1))
         changes.append(n_change)
+        xs_raw.append((lay_e, lay_len))
+    area = math.pi * fil_d * fil_d / 4
+    layer_xs = [round(e * area / ln, 4) if ln > 0 else 0 for e, ln in xs_raw]
     change_s = sum(change_keys.values())
     if change_s > 0:
         layer_s = [round(t + c * change_s, 1) for t, c in zip(layer_s, changes)]
@@ -163,7 +178,8 @@ def build_preview(path):
     q = array("H", (int(round((v - (bb[0] if i % 2 == 0 else bb[1])) / (sx if i % 2 == 0 else sy) * 65535)) for i, v in enumerate(segs)))
     head = json.dumps({"count": n, "types": TYPES, "layers": layers, "bbox": [round(v, 3) for v in bb],
                        "tools": sorted(tools), "speed_unit": SPEED_UNIT, "travel": round(travel, 1),
-                       "layer_s": layer_s, "orca_s": orca_s}).encode()
+                       "layer_s": layer_s, "orca_s": orca_s,
+                       "changes": changes, "layer_xs": layer_xs}).encode()
     pad = (-(5 + 4 + len(head))) % 4
     return b"GCPV3" + struct.pack("<I", len(head)) + head + b" " * pad + q.tobytes() + attrs.tobytes() + speeds.tobytes()
 

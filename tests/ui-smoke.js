@@ -355,6 +355,20 @@ async function runSmoke(opts={}){
         ok($('wbAceAct').classList.contains('hidden'),'Werkstatt: ohne ACE-Tätigkeit keine Zeile');
       }catch(e){ok(false,'Werkstatt mit zwei ACE: '+e.message)}
       finally{wb.st=saved;wb.box=0;if(saved)wbRender()} }
+    /* Druckkopf-Grafik (js/head-ui.js): Werte aus Drucker-Stand und Vorschau, Leistung von der HA-Karte */
+    { const saved=wb.st,keep={data:lv.data,name:lv.name,at:lv.at,hs:lv.hs,pos:lv.pos},val=k=>document.querySelector('[data-hd-k="'+k+'"] .hd-val').textContent;
+      try{ wb.st={connected:true,state:'busy',printing:true,temps:{curr_nozzle_temp:204.6,target_nozzle_temp:205,curr_hotbed_temp:60,target_hotbed_temp:60},fans:{fan_speed_pct:100,aux_fan_speed_pct:40,box_fan_level:0},lights:[],
+          ace:[{id:0,slots:[{index:0,type:'PLA',colour:'#ff0000',present:true,loaded:false},{index:1,type:'PETG',colour:'#00ff00',present:true,loaded:true}]}],has_ace:1,job:{name:'hd.gcode',layer:5,layers:10,progress:50}};
+        lv.name='hd.gcode';lv.hs=null;lv.at={li:1,frac:0.5};lv.pos=new Float32Array([0,0,0,10,0,0.2,0,0,0,10,0,0.4]);
+        lv.data={count:2,layers:[[0.2,0],[0.4,1]],v:new Uint8Array([25,50]),speed_unit:2,changes:[0,3],layer_xs:[0.08,0.1]};
+        hdRender(wb.st);
+        ok(val('speed')==='100 mm/s'&&/^10[,.]0 mm³\/s$/.test(val('flow'))&&val('changes')==='1 / 3'&&val('layer')==='5 / 10'&&val('nozzle')==='205°','Druckkopf: Speed, Fluss, Farbwechsel, Schicht, Düse ('+['speed','flow','changes','layer','nozzle'].map(val).join(' | ')+')');
+        ok(document.querySelector('[data-hd="slot"]').textContent==='2'&&document.querySelector('[data-hd="mat"]').textContent==='PETG'&&document.querySelectorAll('.hd-row.done').length===4,'Druckkopf: geladener Slot 2 (PETG), Schichten halb');
+        ok(document.querySelector('[data-hd-k="power"]').classList.contains('hidden'),'Druckkopf: ohne Home Assistant keine Energie');
+        window.postMessage({druckwerkstatt:'leistung',w:112},location.origin);await wait(50);
+        ok(val('power')==='112 W','Druckkopf: Leistung von der HA-Karte');
+      }catch(e){ok(false,'Druckkopf-Grafik: '+e.message)}
+      finally{Object.assign(lv,keep);hd.powerW=null;wb.st=saved;if(saved)wbRender()} }
     $('exportDlg').close();
     if(prevPrinter!=='kobra_s1'){document.querySelector('.printer-switch [data-printer="'+prevPrinter+'"]').click();await wait(120);}}
 

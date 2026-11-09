@@ -136,6 +136,7 @@ I18N.add({
   "Fortsetzen": "Resume",
   "Kamera": "Camera",
   "Temperaturen & Lüfter": "Temperatures &amp; fans",
+  "Druckkopf & Temperaturen": "Print head &amp; temperatures",
   "Düse Zieltemperatur": "Nozzle target temperature",
   "Setzen": "Set",
   "Bett Zieltemperatur": "Bed target temperature",

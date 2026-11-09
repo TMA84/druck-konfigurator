@@ -90,5 +90,9 @@ ls = head.get("layer_s") or []
 check("Zeit je Schicht: zwei Schichten, Schicht 1 ≈ 0,8 s", len(ls) == 2 and 0.6 < ls[0] < 1.0, ls)
 check("Farbwechsel T0→T1 zählt mit der Wechselzeit (20 s)", 20 < ls[1] < 21.5, ls)
 check("Orcas Gesamtzeit aus dem G-Code (1m 30s = 90 s)", head.get("orca_s") == 90, head.get("orca_s"))
+# Druckkopf-Grafik in ④: Farbwechsel je Schicht und Querschnitt (Filament × 1,75er-Fläche / Bahnlänge) für den Fluss
+check("Farbwechsel je Schicht", head.get("changes") == [0, 1], head.get("changes"))
+xs = head.get("layer_xs") or []
+check("Querschnitt Schicht 1: 4 mm Filament auf 40 mm Bahn ≈ 0,2405 mm²", len(xs) == 2 and abs(xs[0] - 0.2405) < 0.001, xs)
 print("%d/%d bestanden" % (passed, passed + failed))
 sys.exit(1 if failed else 0)

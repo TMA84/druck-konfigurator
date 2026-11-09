@@ -177,7 +177,8 @@ function wbRender() {
   $('wbPause').disabled = !job || job.paused || busy; $('wbResume').disabled = !job || !job.paused || busy; $('wbStop').disabled = !job || busy;
   $('wbPause').classList.toggle('hidden', !job || job.paused); $('wbResume').classList.toggle('hidden', !(job && job.paused)); $('wbStop').classList.toggle('hidden', !job);
   $('wbGcode').classList.toggle('hidden', !!job);   // fertigen G-Code senden (js/gcode-ui.js), nur ohne laufenden Druck
-  if (typeof skRender === 'function') skRender(st);   // Objekte überspringen (js/skip-ui.js)
+  if (typeof skRender === 'function') skRender(st);
+  if (typeof hdRender === 'function') hdRender(st);   // Druckkopf-Grafik (js/head-ui.js)   // Objekte überspringen (js/skip-ui.js)
   const badge = $('printerBadge');
   badge.textContent = job ? safeInt(job.progress) + ' %' : ''; badge.classList.toggle('hidden', !job);
 
