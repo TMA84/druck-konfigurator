@@ -699,43 +699,47 @@ table.changes tr.body-row td { color: var(--ink-2); font-size: 12.5px; }
 .wb-toggle input { accent-color: var(--accent); }
 .wb-heat > p { margin: 0; }
 
-/* Druckkopf-Grafik (js/head-ui.js): eigene dunkle Tafel in beiden Darstellungen, Filamentfarbe über --hd-fil */
-.wb-headfig { background: #142033; border-radius: var(--r-m); padding: 6px; }
-.hd-svg { display: block; width: 100%; height: auto; max-height: 640px; --hd-fil: #7c8796; --hd-spin: 0s; font-family: var(--f-display); }
-.hd-metal { fill: #b4b9c1; }
+/* Druckkopf-Grafik (js/head-ui.js): Farben der Werkbank (hell/dunkel über die Tokens), Filamentfarbe über --hd-fil,
+   Heizen rot wie die Heizbalken (.wb-heatbar) */
+.wb-headfig { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-m); padding: 6px; }
+.hd-svg { display: block; width: 100%; height: auto; max-height: 640px; --hd-fil: #7c8796; --hd-spin: 0s; --hd-heat: #e5514f; font-family: var(--f-display); }
+.hd-metal { fill: var(--rule-strong); }
 .hd-spool rect { fill: var(--hd-fil); opacity: .9; }
-.hd-pill { fill: #142a4a; stroke: #2c4a75; stroke-width: 2; }
-.hd-pilltxt { fill: #fff; font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+.hd-pill { fill: var(--sheet); stroke: var(--accent); stroke-width: 2; }
+.hd-pilltxt { fill: var(--accent); font-size: 18px; font-weight: 700; letter-spacing: .02em; }
 .hd-fil { stroke: var(--hd-fil); stroke-width: 6; stroke-linecap: round; fill: none; }
 .hd-drop { stroke-width: 4; }
 .hd-svg:not(.hd-printing) .hd-drop { opacity: 0; }
-.hd-badge { fill: #eef1f5; stroke: #142033; stroke-width: 4; }
-.hd-badgetxt { fill: #142033; font-size: 40px; font-weight: 700; }
-.hd-fanframe { fill: none; stroke: #b4b9c1; stroke-width: 6; }
-.hd-blades { fill: #b4b9c1; transform-box: view-box; transform-origin: 198px 283px; }
-.hd-fan-on .hd-blades { animation: hd-spin var(--hd-spin) linear infinite; }
+.hd-badge { fill: var(--sheet); stroke: var(--accent); stroke-width: 4; }
+.hd-badgetxt { fill: var(--accent); font-size: 40px; font-weight: 700; }
+.hd-fanframe { fill: none; stroke: var(--rule-strong); stroke-width: 6; }
+.hd-blades { fill: var(--ink-3); transform-box: view-box; transform-origin: 198px 283px; }
+.hd-fan-on .hd-blades { fill: var(--accent); animation: hd-spin var(--hd-spin) linear infinite; }
 @keyframes hd-spin { to { transform: rotate(360deg); } }
-.hd-nozzle { fill: #8a929e; transition: fill .4s; }
-.hd-noz-hot .hd-nozzle { fill: #f2c230; }
+.hd-nozzle { fill: var(--ink-3); transition: fill .4s; }
+.hd-noz-hot .hd-nozzle { fill: var(--hd-heat); }
 .hd-row { stroke: var(--hd-fil); stroke-width: 7; fill: none; opacity: .22; stroke-linecap: round; }
 .hd-row.done { opacity: 1; }
-.hd-bedtop { fill: #c2c6cc; }
-.hd-bedfront { fill: #6d737c; }
-.hd-waves path { fill: none; stroke: #5d636c; stroke-width: 3; stroke-linecap: round; }
-.hd-bed-hot .hd-waves path { stroke: #e5514f; }
-.hd-bedtxt { fill: #fff; font-size: 24px; font-weight: 700; }
-.hd-cap { fill: #9fb0c8; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
-.hd-val { fill: #fff; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.hd-sub { fill: #9fb0c8; font-size: 12px; }
-.hd-lead { fill: none; stroke: #8b97a8; stroke-width: 1.6; }
+.hd-bedtop { fill: var(--rule); }
+.hd-bedfront { fill: var(--ink-2); }
+.hd-waves path { fill: none; stroke: var(--rule-strong); stroke-width: 3; stroke-linecap: round; }
+.hd-bed-hot .hd-waves path { stroke: var(--hd-heat); }
+.hd-bedtxt { fill: var(--sheet); font-size: 24px; font-weight: 700; }
+.hd-cap { fill: var(--ink-3); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+.hd-val { fill: var(--ink); font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hd-sub { fill: var(--ink-3); font-size: 12px; }
+.hd-lead { fill: none; stroke: var(--rule-strong); stroke-width: 1.6; }
 .hd-label.hidden { display: none; }
+/* dunkel: Metallteile heller, sonst verschwinden sie im Hintergrund */
+[data-theme="dark"] .hd-metal { fill: var(--ink-3); }
+[data-theme="dark"] .hd-fanframe { stroke: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) { .hd-fan-on .hd-blades { animation: none; } }
 /* Nur die Grafik (index.html?ansicht=kopf) – zum Einbetten in Home Assistant */
 html.embed-kopf .topbar, html.embed-kopf .tabs, html.embed-kopf footer,
 html.embed-kopf #wbGrid > :not(.wb-heat), html.embed-kopf .wb-heat > :not(.wb-headfig) { display: none !important; }
-html.embed-kopf, html.embed-kopf body { overflow: hidden; background: #142033; height: 100%; }
-html.embed-kopf .wb-heat { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; margin: 0; padding: 0; background: #142033; box-shadow: none; }
-html.embed-kopf .wb-headfig { height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 0; }
+html.embed-kopf, html.embed-kopf body { overflow: hidden; background: var(--sheet); height: 100%; }
+html.embed-kopf .wb-heat { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; margin: 0; padding: 0; background: var(--sheet); box-shadow: none; }
+html.embed-kopf .wb-headfig { height: 100%; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 0; background: var(--sheet); }
 html.embed-kopf .hd-svg { width: 100%; height: 100%; max-height: none; }
 
 /* ACE: vier Slot-Kacheln in Filamentfarbe */

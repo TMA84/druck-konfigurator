@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.58.1] – 2026-11-09
+
+### Geändert
+- **Druckkopf-Grafik in den Farben der Werkbank.** Statt der eigenen dunkelblauen Tafel nutzt sie jetzt Papier, Linien und Petrol der Werkbank und passt sich hell und dunkel an. Heizen ist rot wie die Heizbalken, Spule und Schichten bleiben in Filamentfarbe. Die eingebettete Ansicht (`?ansicht=kopf`) übernimmt dieselben Farben.
+
 ## [10.58.0] – 2026-11-09
 
 ### Neu
