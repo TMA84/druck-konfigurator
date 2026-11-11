@@ -178,6 +178,8 @@ class FakeBroker(threading.Thread):
                 self.reply(conn, kind, {"msgid": ""})  # reine Quittung – muss ignoriert werden
                 if (kind, action) in self.ignore:
                     pass
+                elif (kind, action) in self.noop:   # quittiert mit „done“, ändert aber nichts
+                    self.reply(conn, kind, {"type": kind, "action": action, "state": "done", "code": 200, "msgid": msg["msgid"], "data": dict(self.light)})
                 elif (kind, action) == ("info", "query"):
                     self.reply(conn, "info", {"type": "info", "action": "report", "state": "done", "code": 200, "msgid": "x", "data": INFO})
                 elif (kind, action) == ("multiColorBox", "getInfo"):
@@ -196,8 +198,6 @@ class FakeBroker(threading.Thread):
                     self.reply(conn, kind, {"type": kind, "action": "setSpeed", "state": "done", "code": 200, "msgid": msg["msgid"], "data": None})
                 elif (kind, action) == ("light", "query"):
                     self.reply(conn, kind, {"type": kind, "action": "query", "state": "done", "code": 200, "msgid": msg["msgid"], "data": {"lights": [dict(self.light)]}})
-                elif (kind, action) in self.noop:   # quittiert mit „done“, ändert aber nichts
-                    self.reply(conn, kind, {"type": kind, "action": action, "state": "done", "code": 200, "msgid": msg["msgid"], "data": dict(self.light)})
                 elif (kind, action) == ("light", "control") and (kind, action) in self.silent:
                     self.light.update(msg["data"])   # führt aus, bestätigt aber nicht (andere Firmware)
                 elif (kind, action) == ("light", "control"):
