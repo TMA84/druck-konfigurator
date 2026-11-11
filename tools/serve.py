@@ -1003,7 +1003,11 @@ def scheduled_heat(on, bed):
     host = printer_host()
     if not host:
         raise anycubic_lan.LanError("Kein Drucker eingestellt", "unreachable")
-    anycubic_lan.command(host, "tempature", "set", {"type": 1, "target_hotbed_temp": int(bed) if on else 0, "target_nozzle_temp": 0})
+    res = anycubic_lan.command(host, "tempature", "set", {"type": 1, "target_hotbed_temp": int(bed) if on else 0, "target_nozzle_temp": 0})
+    if not res.get("ok"):
+        # früher stillschweigend als „gesendet“ gezählt – dann heizte nichts und es kam kein zweiter Versuch
+        print("Geplanter Druck: Bett %s abgelehnt: %s" % ("auf %d °C" % bed if on else "aus", res), flush=True)
+        raise anycubic_lan.LanError(res.get("msg") or "Drucker hat abgelehnt (%s)" % (res.get("state") or res.get("code")), "rejected")
     print("Geplanter Druck: Bett %s" % ("auf %d °C" % bed if on else "aus"), flush=True)
 
 

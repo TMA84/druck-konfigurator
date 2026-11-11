@@ -149,6 +149,22 @@ sc.api_post({"action": "cancel"}, None, path, NOW + 60, on_cancel=lambda plan: s
 check("Absage nach Vorwärmen: on_cancel (Heizung aus)", heats == [(True, 105)] and stopped == [True], (heats, stopped))
 
 sc.api_post({"action": "dismiss"}, None, path, NOW + 120)
+# Drucker lehnt das Vorwärmen ab (Ziel nicht übernommen): nicht als gesendet zählen, nächste Runde erneut
+v = sc.api_post(dict(base, start_at=NOW + 10 * 60 + 20, preheat={"bed": 105, "minutes": 10}), gfor, path, NOW)
+tries = []
+def flaky(on, bed):
+    tries.append((on, bed))
+    if len(tries) == 1:
+        raise RuntimeError("Drucker hat die Temperatur nicht übernommen")
+r = sc.Runner(lambda: FREE, start, dry, path=path, heat_fn=flaky)
+r.step(NOW + 21)
+pl = sc.api_get(path)["plan"]
+check("Vorwärmen abgelehnt: Grund sichtbar, nicht als gesendet", not pl["preheat"]["sent"] and "nicht übernommen" in (pl["note"] or "") and pl["state"] == "wait", pl)
+r.step(NOW + 40)
+pl = sc.api_get(path)["plan"]
+check("nächste Runde erneut versucht: heizt", tries == [(True, 105), (True, 105)] and pl["preheat"]["sent"] and pl["state"] == "heating", (tries, pl))
+sc.api_post({"action": "cancel"}, None, path, NOW + 60)
+sc.api_post({"action": "dismiss"}, None, path, NOW + 61)
 
 # Zwei ACE: Werkzeug-Nummern durchgehend (ACE 2, Slot 1 = Werkzeug 4), st["ace"] zählt je Einheit ab 0
 TWO = dict(FREE, ace=[{"id": 0, "slots": [{"index": 0, "type": "PLA", "present": True}, {"index": 1, "type": "PLA", "present": True}]},

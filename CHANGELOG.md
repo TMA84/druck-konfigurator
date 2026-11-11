@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.58.2] – 2026-11-11
+
+### Behoben
+- **Geplanter Druck: Vorwärmen startete nicht.** Der Plan zeigte „heizt vor“, das Bett blieb aber kalt. Die Antwort des Druckers wurde nicht ausgewertet: Lehnte er ab oder übernahm er das Ziel nicht, galt das Vorwärmen trotzdem als gesendet und wurde nie wiederholt. Jetzt prüft das Tool, ob der Drucker das neue Bett-Ziel meldet. Wenn nicht, steht der Grund am Plan und der nächste Durchlauf (alle 15 s) versucht es erneut. Auch die Temperatur-Knöpfe der Werkbank melden jetzt „nicht übernommen“ statt eines stummen OK.
+
 ## [10.58.1] – 2026-11-09
 
 ### Geändert

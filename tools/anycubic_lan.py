@@ -854,6 +854,15 @@ def command(host, kind, action, data):
     if ok and (kind, action) == ("light", "control") and not _took_effect(link, kind, action, payload):
         # „done“ quittiert, aber anderer Zustand gemeldet (nach dem Nachfragen oben) – sonst sprang der Schalter stumm zurück
         return {"ok": False, "state": "not_applied", "code": rep.get("code"), "msg": "Drucker hat das Licht nicht umgeschaltet", "reply": rep.get("data")}
+    if ok and (kind, action) == ("tempature", "set") and not _took_effect(link, kind, action, payload):
+        # quittiert, aber altes Ziel gemeldet – einmal kurz nachfragen (Bericht kann hinterherhinken), dann ehrlich melden
+        time.sleep(1.5)
+        try:
+            link.request("tempature", "query", None, timeout=4)
+        except LanError:
+            pass
+        if not _took_effect(link, kind, action, payload):
+            return {"ok": False, "state": "not_applied", "code": rep.get("code"), "msg": "Drucker hat die Temperatur nicht übernommen", "reply": rep.get("data")}
     if kind == "skip":
         # Merken, was gesendet wurde – die Firmware quittiert je nach Version nicht; die Anzeige zeigt es als „gesendet“
         job = link.project() or {}
@@ -895,6 +904,12 @@ def _took_effect(link, kind, action, payload):
     if (kind, action) == ("fan", "setSpeed"):
         fan = link.data("fan")
         return all(fan.get(k) == v for k, v in payload.items())
+    if (kind, action) == ("tempature", "set"):
+        # gemeldetes Ziel (tempature-Bericht, sonst info.temp) gleich dem gesendeten – je nach type Düse, Bett oder beide
+        tp, ti = link.data("tempature"), link.data("info").get("temp") or {}
+        keys = {0: ("target_nozzle_temp",), 1: ("target_hotbed_temp",)}.get(payload["type"], ("target_nozzle_temp", "target_hotbed_temp"))
+        got = lambda k: tp.get(k, ti.get(k))
+        return all(isinstance(got(k), (int, float)) and round(got(k)) == payload[k] for k in keys)
     return False
 
 

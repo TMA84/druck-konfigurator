@@ -368,6 +368,12 @@ broker.noop.add(("light", "control"))
 res = lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})   # ist aus – bleibt aus
 check("Licht mit „done“ quittiert, aber nicht umgeschaltet: gemeldet statt stumm ok", not res["ok"] and res["state"] == "not_applied", res)
 broker.noop.clear()
+broker.noop.add(("tempature", "set"))
+res = lan.command("127.0.0.1", "tempature", "set", {"type": 1, "target_nozzle_temp": 0, "target_hotbed_temp": 105})   # Ziel bleibt 60
+check("Bett mit „done“ quittiert, aber Ziel nicht übernommen: gemeldet statt stumm ok", not res["ok"] and res["state"] == "not_applied", res)
+broker.noop.clear()
+res = lan.command("127.0.0.1", "tempature", "set", {"type": 1, "target_nozzle_temp": 0, "target_hotbed_temp": 60})
+check("Bett-Ziel übernommen: ok", res["ok"], res)
 lan.command("127.0.0.1", "light", "control", {"type": 2, "status": 1, "brightness": 80})
 st = lan.status("127.0.0.1")
 check("Lüfter 40 % und Licht an", st["fans"]["fan_speed_pct"] == 40 and st["lights"] and st["lights"][0]["status"] == 1, (st["fans"], st["lights"]))
