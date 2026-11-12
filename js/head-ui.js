@@ -9,7 +9,7 @@
      js/live-head.js lvTrack – Weg durch Druckzeit, also samt Abbremsen in Ecken). Ohne Kopfposition: Mittel der Schicht.
    - Fluss: Speed × Querschnitt der Bahnen dieser Schicht (Vorschau layer_xs: Filamentvolumen / Bahnlänge, tools/gcode_preview.py)
    - Farbwechsel: je Schicht aus der Vorschau (changes) – bisher / gesamt
-   - Gesamtlaufzeit: alle Druckstunden der Historie (api/spools maintenance.total_h)
+   - Druckzeit Düse: Stunden seit „Düse prüfen/wechseln“ (maintenance.items nozzle), darunter gesamt (maintenance.total_h)
    - Energie: nur eingebettet in Home Assistant – die Karte schickt den Wert ihrer Leistungs-Entität (postMessage). */
 
 const HD_WINDOW_S = 2, HD_POWER_FRESH_MS = 5 * 60000, HD_ROWS = 7;
@@ -154,8 +154,12 @@ function hdRender(st) {
   const mo = hdMotion(st);
   hdLabel('flow', t('Fluss'), mo && mo.flow != null ? de(mo.flow, 1) + ' mm³/s' : '–', mo && mo.flow != null ? (mo.now ? t('geschätzt aus dem G-Code') : t('Ø dieser Schicht')) : '');
   hdLabel('speed', t('Speed'), mo ? Math.round(mo.speed) + ' mm/s' : '–', mo ? (mo.now ? t('laut G-Code an dieser Stelle') : t('Ø dieser Schicht')) : '');
-  const tot = typeof spoolData !== 'undefined' && spoolData && spoolData.maintenance && spoolData.maintenance.total_h;
-  hdLabel('hours', t('Gesamtlaufzeit'), typeof tot === 'number' ? hdHours(tot) : '–', t('gedruckt mit der Druckwerkstatt'));
+  // groß die Druckstunden der Düse (seit „Düse prüfen/wechseln“ erledigt, Wartung in ③), darunter alle Stunden
+  const mt = typeof spoolData !== 'undefined' && spoolData && spoolData.maintenance || {};
+  const tot = mt.total_h, noz = (mt.items || []).find(i => i.key === 'nozzle');
+  const totTxt = typeof tot === 'number' ? t('gesamt {h}', { h: hdHours(tot) }) : '';
+  if (noz && typeof noz.hours === 'number') hdLabel('hours', t('Druckzeit Düse'), hdHours(noz.hours), totTxt);
+  else hdLabel('hours', t('Gesamtlaufzeit'), typeof tot === 'number' ? hdHours(tot) : '–', t('gedruckt mit der Druckwerkstatt'));
   const ch = hdChanges(st);
   hdLabel('changes', t('Farbwechsel'), ch ? ch.done + ' / ' + ch.total : '–', ch ? t('bisher / in diesem Druck') : '');
   hdLabel('nozzle', t('Düsentemperatur'), hdDeg(tp.curr_nozzle_temp), +tp.target_nozzle_temp > 0 ? t('Ziel {temp}', { temp: hdDeg(tp.target_nozzle_temp) }) : t('aus'));

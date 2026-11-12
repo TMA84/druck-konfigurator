@@ -1138,6 +1138,8 @@ I18N.add({
  "Ø dieser Schicht": "avg. of this layer",
  "laut G-Code an dieser Stelle": "per G-code at this spot",
  "Gesamtlaufzeit": "Total runtime",
+ "Druckzeit Düse": "Nozzle print time",
+ "gesamt {h}": "total {h}",
  "gedruckt mit der Druckwerkstatt": "printed with Print Workshop",
  "bisher / in diesem Druck": "so far / in this print",
  "kein Druck": "no print",

@@ -367,6 +367,11 @@ async function runSmoke(opts={}){
         ok(document.querySelector('[data-hd-k="power"]').classList.contains('hidden'),'Druckkopf: ohne Home Assistant keine Energie');
         window.postMessage({druckwerkstatt:'leistung',w:112},location.origin);await wait(50);
         ok(val('power')==='112 W','Druckkopf: Leistung von der HA-Karte');
+        { const sd=typeof spoolData!=='undefined'?spoolData:undefined;
+          try{ spoolData={spools:[],maintenance:{total_h:194.13,items:[{key:'nozzle',hours:12.5},{key:'axes',hours:100}]}};hdRender(wb.st);
+            const sub=document.querySelectorAll('[data-hd-k="hours"] text')[2].textContent;
+            ok(val('hours')==='12 h 30 min'&&/194 h 8 min/.test(sub),'Druckkopf: Druckzeit Düse, darunter gesamt ('+val('hours')+' | '+sub+')'); }
+          finally{spoolData=sd} }
       }catch(e){ok(false,'Druckkopf-Grafik: '+e.message)}
       finally{Object.assign(lv,keep);hd.powerW=null;wb.st=saved;if(saved)wbRender()} }
     $('exportDlg').close();

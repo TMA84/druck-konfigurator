@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.59.0] – 2026-11-12
+
+### Geändert
+- **Druckkopf-Grafik: Druckzeit der Düse.** Oben rechts steht jetzt groß die Druckzeit der Düse, also die Druckstunden seit dem letzten „Düse prüfen/wechseln“ in der Wartung. Darunter steht die Gesamtzeit aller Drucke. Nach einem Düsenwechsel einfach den Wartungspunkt als erledigt markieren, dann zählt die Düse wieder ab null.
+
 ## [10.58.2] – 2026-11-11
 
 ### Behoben
