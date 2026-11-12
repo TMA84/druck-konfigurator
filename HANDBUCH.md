@@ -596,6 +596,8 @@ Der Knopf **„3MF für OrcaSlicer speichern“** im Schritt **③ Slicen & Kost
 
 In der Datei stehen: Druckerprofil aus der Vorlage, die berechneten Filament- und Prozesswerte (auch Lüfter in der ersten Schicht und Z-Hop je Filament sowie die Beschleunigung, wenn das Datenblatt eine vorgibt). Der **Rückzug** bleibt beim Orca-Standard: Er hängt von Filament, Temperatur und Extruder ab, und das Orca-Filamentprofil des Slots bringt passende Werte mit, die Stützen, je Teil der Slot und abweichende Werte als **Objekt-Einstellung**. Mehrere Teile werden nebeneinander aufs Bett gelegt; passt nicht alles, kommt eine weitere Platte dazu.
 
+**Werte aus dem Orca-Filamentprofil:** Jeder Slot bekommt das Orca-Systemprofil seines Filaments (z. B. „Anycubic ABS @Anycubic Kobra S1 0.4 nozzle“) samt dessen Werten. Was das Tool nicht selbst berechnet, kommt von dort: Rückzug, Lüfter-Rampe, Überhang- und Brückenlüfter, Abbremsen kurzer Schichten. Die Lüfter-Schwellen stehen im Datenblatt unter **Material / Filament**: **Lüfter-Anlauf** (ab welcher Schicht der Lüfter läuft und bis zu welcher Schicht er auf den eingestellten Wert hochfährt), **Überhänge / Brücken** (Drehzahl und ab welchem Überhang) und **Kurze Schichten** (unter welcher Schichtzeit Orca langsamer druckt).
+
 > Die **Schichthöhe** gilt in Orca für die ganze Platte. Empfiehlt das Tool für einzelne Teile eine andere, steht das als Hinweis im Dialog.
 
 ---

@@ -331,9 +331,20 @@ function compute(I,geom,ctx){
     }
   }
   const dryNeed=tpu||m.kind==='petg'||m.abrasive;
+  /* Lüfter-Schwellen aus dem Orca-Filamentprofil (setzt das Tool nicht selbst; js/export3mf-settings.js orcaCooling).
+     Erste Schicht: das Tool schreibt close_fan_the_first_x_layers (Lüfter erste Schicht), die Rampe danach kommt aus Orca. */
+  const cool=typeof orcaCooling==='function'?orcaCooling(printer.id,dSel,m.kind):null,coolRows=[];
+  if(cool){
+    const from=+m.fanFirst>0?1:2,src=t('Orca-Profil');
+    if(cool.fullLayer!=null)coolRows.push(['Lüfter-Anlauf',cool.fullLayer>from?t('steigt ab Schicht {a} bis Schicht {b} auf {p} %',{a:from,b:cool.fullLayer,p:m.fan}):t('ab Schicht {a} gleich {p} %',{a:from,p:m.fan}),
+      [cool.alwaysOn?t('läuft auch bei langen Schichten'):cool.coolTime!=null?t('nur bei Schichten unter {s} s',{s:cool.coolTime}):'',src].filter(Boolean).join(' · ')]);
+    coolRows.push(['Überhänge / Brücken',cool.overhangOn&&cool.overhangSpeed!=null?t('{p} % ab {thr} Überhang',{p:cool.overhangSpeed,thr:cool.overhangThr||'0%'}):t('aus'),src]);
+    coolRows.push(['Kurze Schichten',cool.slowOn&&cool.slowTime!=null?t('langsamer unter {s} s je Schicht',{s:cool.slowTime}):t('aus'),
+      [cool.slowOn&&cool.slowMin!=null?t('mindestens {v} mm/s',{v:cool.slowMin}):'',src].filter(Boolean).join(' · ')]);
+  }
   ordered.push(['Material / Filament',[
     ['Profilname',m.name],['Düse',nozzle+' °C',t('erste und weitere Schichten')],['Herstellerbereich',m.range||t('Angabe auf der Rolle')],
-    ['Heizbett',m.bed+' °C',bedNote],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],
+    ['Heizbett',m.bed+' °C',bedNote],mark(['fan_first'],['Lüfter erste Schicht',m.fanFirst+' %']),['Lüfter Folgeschichten',m.fan+' %',fanNote],...coolRows,
     mark(['max_vol'],['Maximale Volumengeschwindigkeit',de(maxVol,1)+' mm³/s']),mark(['flow'],['Durchflussverhältnis',de(m.flow,2)])]
     .concat(m.pa!=null&&m.pa!==''?[mark(['pa'],['Pressure Advance',de(m.pa,3)])]:[]).concat([retrRow,['Filament trocken',dryNeed?t('Ja, unbedingt'):t('Ja'),t(m.dry)]])]);
   {const xo=typeof extraOverrides==='function'?extraOverrides(ov):{};const xk=Object.keys(xo);

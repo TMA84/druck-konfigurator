@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen am Druck-Konfigurator. Versionen folgen [SemVer](https://semver.org/lang/de/): Hauptversion bei grundlegenden Änderungen, Nebenversion bei neuen Funktionen, Patch bei Fehlerbehebungen.
 
+## [10.60.0] – 2026-11-12
+
+### Behoben
+- **Kobra S1: ABS, ASA, PETG und TPU rechneten mit den PLA-Werten der Vorlage.** Der Slot bekam zwar den Namen des passenden Orca-Profils, aber die Orca-CLI übernahm dessen Werte nicht, sondern rechnete mit denen des PLA-Presets aus der Vorlage. Bei ABS lief so der Hilfslüfter mit 60 % statt 0 %, der Überhanglüfter mit 100 % statt 80 %, und es fehlte die Lüfter-Rampe bis Schicht 100. Auch Rückzug und Pressure Advance waren betroffen, wenn du sie nicht selbst gesetzt hattest. Die Vorlage enthält jetzt die Werte aller Anycubic-Filamentprofile für den Kobra S1 (beim Snapmaker U1 genauso), und der Export schreibt sie in den Slot. Was das Tool selbst berechnet (Temperaturen, Lüfter, Fluss, Hilfs- und Gehäuselüfter …), hat weiter Vorrang.
+
+### Neu
+- **Datenblatt: Lüfter-Schwellen aus dem Orca-Profil.** Unter **Material / Filament** stehen jetzt **Lüfter-Anlauf** (ab welcher Schicht und bis wann der Lüfter hochfährt, ob er auch bei langen Schichten läuft), **Überhänge / Brücken** und **Kurze Schichten**.
+- Tests: Bedientest prüft die ABS-Werte im 3MF-Slot und die neuen Zeilen; die 3MF-Prüfung gegen die echte OrcaSlicer-CLI lief lokal durch.
+
 ## [10.59.0] – 2026-11-12
 
 ### Geändert

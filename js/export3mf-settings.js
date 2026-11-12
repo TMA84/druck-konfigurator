@@ -38,6 +38,22 @@ function exportTemplate(printerId, nozD) {
   return tpl && n > tpl.slots.length ? widenTemplate(tpl, n) : tpl;
 }
 
+/* Kühlung laut Orca-Filamentprofil des Materials (Werte, die beim Export im Slot stehen und die das Tool nicht selbst
+   setzt): Anlauf-Rampe, Lüfter dauerhaft an oder nur bei kurzen Schichten, Überhang-/Brückenlüfter, Abbremsen kurzer
+   Schichten. Für die Anzeige im Datenblatt (js/engine.js); null, wenn keine Vorlage bekannt ist. */
+function orcaCooling(printerId, nozD, kind) {
+  const tpl = typeof ORCA_TEMPLATES !== 'undefined' ? exportTemplate(printerId, nozD) : null;
+  if (!tpl || !tpl.settings) return null;
+  const vals = (tpl.filamentValues || {})[ORCA_KIND[kind] || 'PLA'] || {};
+  const get = k => { const v = k in vals ? vals[k] : Array.isArray(tpl.settings[k]) ? tpl.settings[k][0] : tpl.settings[k]; return v == null ? null : String(v); };
+  const num = k => { const v = parseFloat(get(k)); return Number.isFinite(v) ? v : null; };
+  return {
+    fullLayer: num('full_fan_speed_layer'), coolTime: num('fan_cooling_layer_time'), alwaysOn: get('reduce_fan_stop_start_freq') === '1',
+    overhangOn: get('enable_overhang_bridge_fan') !== '0', overhangSpeed: num('overhang_fan_speed'), overhangThr: get('overhang_fan_threshold'),
+    slowOn: get('slow_down_for_layer_cooling') !== '0', slowTime: num('slow_down_layer_time'), slowMin: num('slow_down_min_speed')
+  };
+}
+
 /* Vorlage mit n statt 4 Filament-Slots (zweite ACE-Einheit: Slot 5–8). Die Vorlage ist mit einer ACE gespeichert;
    alle Werte je Filament (Listen mit einem Eintrag je Slot) bekommen für die neuen Slots die Werte von Slot 1,
    filament_self_index zählt weiter, die Spülmatrix wächst auf n × n (neue Paare mit der größten Spülmenge der
@@ -160,7 +176,7 @@ function plannedChanges(r, slot, liveSlots) {
   if (Number(r.m.fanFirst) > 0) fil(t('Lüfter erste Schicht'), 'first_x_layer_fan_speed', numStr(r.m.fanFirst));
   const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   if (isNum(r.m.zhop)) fil(t('Z-Hop'), 'filament_z_hop', numStr(r.m.zhop));
-  // Hilfs- und Gehäuselüfter (Kobra S1) nur, wenn du sie für diesen Auftrag gesetzt hast – sonst das Profil (60 %)
+  // Hilfs- und Gehäuselüfter (Kobra S1) nur, wenn gesetzt (js/engine.js S1P / dein Wert) – sonst das Orca-Filamentprofil des Slots
   if (r.fans2 && r.fans2.aux != null) fil(t('Hilfslüfter'), 'additional_cooling_fan_speed', numStr(r.fans2.aux));
   if (r.fans2 && r.fans2.box != null) fil(t('Gehäuselüfter (Abluft)'), 'during_print_exhaust_fan_speed', numStr(r.fans2.box));
   // Rückzug nur, wenn du ihn für diesen Auftrag gesetzt hast (r.retr) – sonst das Orca-Profil des Slots

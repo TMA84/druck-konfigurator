@@ -30,6 +30,37 @@ function filamentPresets(printer, nozzle) {
   return presets;
 }
 
+/* Werte der System-Filamentpresets (Vererbung aufgelöst), nur Schlüssel, die die Vorlage je Slot führt und die
+   vom Vorlagen-Slot abweichen. js/export3mf-settings.js schreibt sie beim Presetwechsel in den Slot – sonst rechnet
+   die Orca-CLI mit den Werten des PLA-Presets der Vorlage weiter (Lüfterschwellen, Rückzug, PA …; gefunden
+   2026-11-12: ABS-Slots liefen mit Hilfslüfter 60 % und Lüfter ab Schicht 2 statt 0 % und ab Schicht 6). */
+const VALUE_SKIP = new Set(['filament_settings_id', 'filament_colour', 'filament_multi_colour', 'filament_colour_type', 'filament_self_index',
+  'filament_map', 'filament_extruder_variant', 'default_filament_colour', 'inherits', 'name', 'from', 'instantiation', 'setting_id',
+  'compatible_printers', 'compatible_printers_condition', 'compatible_prints', 'compatible_prints_condition', 'version', 'type']);
+function filamentValues(printer, nozzle, presets, tplSettings) {
+  const src = (PRESET_SOURCES[printer] || {})[nozzle];
+  if (!src || !Object.keys(presets).length) return undefined;
+  const dir = path.join(ORCA_PROFILES, src.vendor, 'filament');
+  const load = name => {
+    const f = path.join(dir, name + '.json');
+    if (!fs.existsSync(f)) return {};
+    const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return Object.assign(j.inherits ? load(j.inherits) : {}, j);
+  };
+  const one = v => String(Array.isArray(v) ? v[0] : v);
+  const out = {};
+  for (const [type, name] of Object.entries(presets)) {
+    const r = load(name), vals = {};
+    for (const [k, v] of Object.entries(r)) {
+      const t = tplSettings[k];
+      if (VALUE_SKIP.has(k) || !Array.isArray(t) || t.length !== tplSettings.filament_settings_id.length) continue;
+      if (one(v) !== String(t[0])) vals[k] = one(v);
+    }
+    out[type] = vals;
+  }
+  return out;
+}
+
 // printable_area: ["0x0","250x0","250x250","0x250"] → Mittelpunkt des Druckbetts
 function bedCenter(area) {
   const pts = area.map(p => p.split('x').map(Number));
@@ -54,6 +85,8 @@ for (const f of fs.readdirSync(TEMPLATE_DIR).filter(f => /^[a-z0-9_]+_\d+(\.\d+)
   const [, printer, nozzle] = f.match(/^(.+)_(\d+(?:\.\d+)?)\.3mf$/);
   const tpl = readTemplate(path.join(TEMPLATE_DIR, f));
   tpl.filamentPresets = filamentPresets(printer, nozzle);
+  const values = filamentValues(printer, nozzle, tpl.filamentPresets, tpl.settings);
+  if (values) tpl.filamentValues = values;
   (templates[printer] = templates[printer] || {})[nozzle] = tpl;
   console.log(`${f}: ${tpl.printerPreset}, ${tpl.slots.length} Slots, Bettmitte ${tpl.bedCenter.join('/')}, Orca ${tpl.orcaVersion}, ${Object.keys(tpl.filamentPresets).length} Filamentpresets`);
 }

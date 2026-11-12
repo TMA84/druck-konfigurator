@@ -355,6 +355,16 @@ async function runSmoke(opts={}){
         ok($('wbAceAct').classList.contains('hidden'),'Werkstatt: ohne ACE-Tätigkeit keine Zeile');
       }catch(e){ok(false,'Werkstatt mit zwei ACE: '+e.message)}
       finally{wb.st=saved;wb.box=0;if(saved)wbRender()} }
+    /* Lüfter-Schwellen aus dem Orca-Profil: ABS-Slot bekommt die ABS-Werte (nicht die der PLA-Vorlage), Datenblatt zeigt sie */
+    { try{ const c=orcaCooling('kobra_s1','0.4','abs');
+        ok(c&&c.fullLayer===100&&c.coolTime===30&&c.overhangSpeed===80&&c.overhangThr==='25%'&&c.slowTime===3,'Orca-Kühlung ABS (Kobra S1): '+JSON.stringify(c));
+        const tpl=exportTemplate('kobra_s1','0.4'),r=lastResult;
+        if(r){ const fake=Object.assign({},r,{fans2:null,m:Object.assign({},r.m,{kind:'abs',pa:null})});
+          const set=buildProjectSettings(tpl,fake,0,null).settings;
+          ok(set.additional_cooling_fan_speed[0]==='0'&&set.full_fan_speed_layer[0]==='100'&&set.overhang_fan_speed[0]==='80'&&set.pressure_advance[0]==='0.04','3MF: ABS-Slot mit Werten des ABS-Profils (Hilfslüfter '+set.additional_cooling_fan_speed[0]+', Rampe '+set.full_fan_speed_layer[0]+', Überhang '+set.overhang_fan_speed[0]+', PA '+set.pressure_advance[0]+')'); }
+        const rows=(lastResult&&lastResult.ordered||[]).flatMap(sec=>sec[1]).map(x=>x[0]);
+        ok(rows.includes('Lüfter-Anlauf')&&rows.includes('Überhänge / Brücken')&&rows.includes('Kurze Schichten'),'Datenblatt: Lüfter-Schwellen aus dem Orca-Profil');
+      }catch(e){ok(false,'Orca-Kühlung: '+e.message)} }
     /* Druckkopf-Grafik (js/head-ui.js): Werte aus Drucker-Stand und Vorschau, Leistung von der HA-Karte */
     { const saved=wb.st,keep={data:lv.data,name:lv.name,at:lv.at,hs:lv.hs,pos:lv.pos},val=k=>document.querySelector('[data-hd-k="'+k+'"] .hd-val').textContent;
       try{ wb.st={connected:true,state:'busy',printing:true,temps:{curr_nozzle_temp:204.6,target_nozzle_temp:205,curr_hotbed_temp:60,target_hotbed_temp:60},fans:{fan_speed_pct:100,aux_fan_speed_pct:40,box_fan_level:0},lights:[],
